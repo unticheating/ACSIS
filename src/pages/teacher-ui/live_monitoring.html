@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Live Monitoring</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="sidebar.css" />
+  <link rel="stylesheet" href="navbar.css" />
+  <link rel="stylesheet" href="live_monitoring.css" />
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+</head>
+<body>
+  <div class="page-wrapper">
+  <aside class="sidebar" id="main-sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-brand-avatar">T</div>
+      <div class="sidebar-brand-info">
+        <span class="sidebar-brand-name">Teacher</span>
+        <span class="sidebar-brand-role">Portal</span>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="teacher_dashboard.html" class="sidebar-link" data-page="dashboard">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+          <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+          <rect x="3" y="14" width="7" height="7" rx="1"></rect>
+          <rect x="14" y="14" width="7" height="7" rx="1"></rect>
+        </svg>
+        Dashboard
+      </a>
+      <a href="create_exam.html" class="sidebar-link" data-page="create-exam">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+          <line x1="12" y1="18" x2="12" y2="12"></line>
+          <line x1="9" y1="15" x2="15" y2="15"></line>
+        </svg>
+        Create Exam
+      </a>
+      <a href="my_exams.html" class="sidebar-link" data-page="my-exams">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"></path>
+          <rect x="9" y="3" width="6" height="4" rx="1"></rect>
+          <path d="M9 12h6M9 16h4"></path>
+        </svg>
+        My Exams
+      </a>
+      <a href="live_monitoring.html" class="sidebar-link" data-page="live-monitoring">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+        </svg>
+        Live Monitoring
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="sidebar-logout" onclick="handleLogout()">Logout</button>
+    </div>
+  </aside>
+
+  <nav class="navbar" id="main-navbar">
+    <div class="navbar-left">
+      <span class="navbar-title">Prof. Juan Dela Cruz</span>
+      <span class="navbar-subtitle">Welcome back, Teacher</span>
+    </div>
+    <div class="navbar-right">
+      <button class="navbar-bell" title="Notifications" aria-label="Notifications">
+        <span class="material-icons">notifications</span>
+      </button>
+      <div class="navbar-avatar" title="Teacher Profile">T</div>
+    </div>
+  </nav>
+
+  <main class="main-content">
+  <div class="container">
+    <div class="monitoring-card">
+      <h1 class="title">Live Monitoring</h1>
+      <p class="description">
+        Real-time monitoring dashboard will appear here when exams are active.
+      </p>
+    </div>
+  </div>
+  </main>
+  </div>
+
+  <script>
+    (function() {
+      const links = document.querySelectorAll('.sidebar-link[data-page]');
+      const currentPage = window.location.pathname.split('/').pop().replace('.html', '').replace('_', '-');
+      links.forEach((link) => {
+        const href = (link.getAttribute('href') || '').replace('.html', '').replace('_', '-');
+        if (href === currentPage || link.dataset.page === currentPage) {
+          link.classList.add('active');
+        }
+      });
+    })();
+
+    function handleLogout() {
+      if (confirm('Are you sure you want to logout?')) {
+        window.location.href = 'index.html';
+      }
+    }
+  </script>
+</body>
+</html>
