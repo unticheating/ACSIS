@@ -22,21 +22,29 @@
             <i class="fas fa-book-open"></i>
             <span>Subjects</span>
         </a>
-        <a href="#" class="nav-item <?= $current == 'examinations.php' ? 'active' : '' ?>">
+        <a href="examinations.php" class="nav-item <?= $current == 'examinations.php' ? 'active' : '' ?>">
             <i class="fas fa-file-alt"></i>
             <span>Examinations</span>
         </a>
-        <a href="#" class="nav-item <?= $current == 'monitoring.php' ? 'active' : '' ?>">
+        <a href="monitoring.php" class="nav-item <?= $current == 'monitoring.php' ? 'active' : '' ?>">
             <i class="fas fa-wave-square"></i>
             <span>Monitoring</span>
         </a>
-        <a href="#" class="nav-item <?= $current == 'settings.php' ? 'active' : '' ?>">
+        <a href="violation_records.php" class="nav-item <?= $current == 'violation_records.php' ? 'active' : '' ?>">
+            <i class="fas fa-shield-alt"></i>
+            <span>Violation Records</span>
+        </a>
+        <a href="user_management.php" class="nav-item <?= $current == 'user_management.php' ? 'active' : '' ?>">
+            <i class="fas fa-users-cog"></i>
+            <span>User Management</span>
+        </a>
+        <a href="settings.php" class="nav-item <?= $current == 'settings.php' ? 'active' : '' ?>">
             <i class="fas fa-cog"></i>
             <span>Settings</span>
         </a>
     </nav>
 
-    <a href="#" class="logout-btn">
+    <a href="logout.php" class="logout-btn">
         <i class="fas fa-sign-out-alt"></i>
         <span>Logout</span>
     </a>
