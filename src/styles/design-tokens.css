@@ -1,0 +1,118 @@
+/**
+ * ACSIS design tokens — spacing, elevation, semantic surfaces.
+ * Aligns with product appendix (8pt grid, semantic roles, z-tiers, motion).
+ * Institution themes (PostgreSQL `themes`) can override --color-* via inline style or data-theme.
+ */
+
+:root {
+  /* —— Spacing (4pt grid; base unit 8pt) —— */
+  --size-0: 2px;
+  --size-1: 4px;
+  --size-2: 8px;
+  --size-3: 12px;
+  --size-4: 16px;
+  --size-5: 24px;
+  --size-6: 32px;
+  --size-7: 48px;
+  --size-8: 64px;
+  --size-9: 128px;
+
+  /* —— Semantic surfaces (named by role, not hue) —— */
+  --bg-canvas: var(--acsis-canvas, #ddeeec);
+  --bg-surface: #ffffff;
+  --bg-surface-muted: hsl(138 30% 97%);
+  --fg-default: hsl(142 20% 12%);
+  --fg-muted: hsl(142 10% 40%);
+  --border-default: hsl(140 15% 90%);
+  --border-muted: rgba(22, 101, 52, 0.12);
+  --accent-primary: hsl(142 71% 36%);
+  --accent-primary-hover: #15803d;
+  --accent-danger: hsl(0 72% 42%);
+  --focus-ring: hsl(142 71% 36%);
+
+  /* —— Elevation (z-index tiers) —— */
+  --z-sticky: 120;
+  --z-dropdown: 650;
+  --z-modal: 850;
+  --z-overlay: 999;
+
+  /* —— Motion —— */
+  --motion-fast: 160ms;
+  --motion-medium: 240ms;
+  --ease-out: cubic-bezier(0.33, 1, 0.68, 1);
+  --ease-in: cubic-bezier(0.32, 0, 0.67, 0);
+}
+
+/* Dark mode — matches `html.dark` from ThemeContext + shell-dark.css */
+html.dark {
+  --bg-canvas: #0b1710;
+  --bg-surface: #12261b;
+  --bg-surface-muted: hsl(142 22% 14%);
+  --fg-default: hsl(138 25% 92%);
+  --fg-muted: hsl(140 15% 68%);
+  --border-default: hsl(142 18% 22%);
+  --border-muted: rgba(74, 222, 128, 0.18);
+}
+
+/* Optional: map institution theme from API — set on <html data-theme="ocean"> + CSS below */
+html[data-theme='ocean'] {
+  --accent-primary: hsl(221 83% 40%);
+  --focus-ring: hsl(221 83% 40%);
+}
+
+/* —— Reduced motion (appendix §4.4) —— */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 0.01ms;
+    --motion-medium: 0.01ms;
+  }
+
+  .stat-card,
+  .acsis-class-card,
+  .acsis-stream-item,
+  .nav-item,
+  .acsis-btn-primary,
+  .acsis-btn-ghost,
+  .acsis-link-create,
+  .activate-btn {
+    transition-duration: 0.01ms !important;
+  }
+
+  .stat-card:hover,
+  .acsis-class-card:hover {
+    transform: none !important;
+  }
+}
+
+/* —— Skip to main (appendix §5) —— */
+.acsis-skip-link {
+  position: fixed;
+  left: var(--size-4);
+  top: var(--size-4);
+  z-index: var(--z-overlay);
+  padding: var(--size-3) var(--size-5);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--bg-surface);
+  background: var(--accent-primary);
+  border-radius: 10px;
+  text-decoration: none;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  clip-path: inset(50%);
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  white-space: nowrap;
+  border: 0;
+}
+
+.acsis-skip-link:focus {
+  clip-path: none;
+  width: auto;
+  height: auto;
+  margin: 0;
+  overflow: visible;
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}

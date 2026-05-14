@@ -1,0 +1,437 @@
+/* Google Classroom–inspired: class grid + stream list */
+
+.acsis-mc-view {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+.acsis-mc-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: var(--size-4, 16px);
+  margin-bottom: var(--size-5, 24px);
+}
+
+.acsis-mc-title {
+  color: #111827;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0 0 6px;
+}
+
+.acsis-mc-sub {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.acsis-mc-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.acsis-mc-tab {
+  border: none;
+  background: transparent;
+  color: #4b5563;
+  font-size: 0.875rem;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.acsis-mc-tab:hover {
+  background: rgba(22, 163, 74, 0.08);
+  color: #166534;
+}
+
+.acsis-mc-tab--active {
+  background: #16a34a;
+  color: #fff;
+}
+
+.acsis-mc-tab--active:hover {
+  background: #15803d;
+  color: #fff;
+}
+
+.acsis-mc-grid {
+  display: grid;
+  /* auto-fit (not auto-fill): empty columns collapse so one card stretches to full row width */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: 18px;
+}
+
+.acsis-class-card {
+  position: relative;
+  display: block;
+  text-align: left;
+  width: 100%;
+  background: var(--bg-surface, #fff);
+  border-radius: 14px;
+  border: 1px solid var(--border-default, #e5e7eb);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  padding: 18px 18px 14px;
+  cursor: pointer;
+  transition:
+    box-shadow var(--motion-fast, 160ms) var(--ease-out, ease),
+    transform var(--motion-fast, 160ms) var(--ease-out, ease);
+  text-decoration: none;
+  color: inherit;
+}
+
+.acsis-class-card:hover {
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+
+.acsis-class-card__top {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+  margin-bottom: 10px;
+}
+
+.acsis-class-card__name {
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: #111827;
+  line-height: 1.35;
+  margin: 0;
+  padding-right: 4px;
+}
+
+.acsis-class-card__meta {
+  margin: 0 0 16px;
+  font-size: 0.8125rem;
+  color: #6b7280;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.acsis-class-card__footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid #f3f4f6;
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+.acsis-class-card__status {
+  font-weight: 600;
+  font-size: 0.75rem;
+}
+
+.acsis-class-card__status--open {
+  color: #16a34a;
+}
+
+.acsis-class-card__menu-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 9999px;
+  background: transparent;
+  color: #6b7280;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.acsis-class-card__menu-btn:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+/* Class stream (exam list) */
+.acsis-stream-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 14px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #166534;
+  text-decoration: none;
+}
+
+.acsis-stream-back:hover {
+  text-decoration: underline;
+}
+
+.acsis-stream-banner {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 20px 22px;
+  margin-bottom: 22px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+}
+
+.acsis-stream-banner h1 {
+  margin: 0 0 6px;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.acsis-stream-banner p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.acsis-stream-section-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #6b7280;
+  margin: 0 0 10px 4px;
+}
+
+.acsis-stream-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.acsis-stream-item {
+  display: flex;
+  align-items: stretch;
+  background: #fff;
+  border: 1px solid #e8eaed;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(60, 64, 67, 0.12);
+  transition: box-shadow 0.2s;
+}
+
+.acsis-stream-item:hover {
+  box-shadow: 0 2px 8px rgba(60, 64, 67, 0.18);
+}
+
+.acsis-stream-item__accent {
+  width: 5px;
+  flex-shrink: 0;
+  background: linear-gradient(180deg, #34a853 0%, #16a34a 100%);
+}
+
+.acsis-stream-item__main {
+  flex: 1;
+  min-width: 0;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.acsis-stream-item__link {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+}
+
+.acsis-stream-item__title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #202124;
+  margin: 0 0 4px;
+  line-height: 1.35;
+}
+
+.acsis-stream-item__meta {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: #5f6368;
+  font-weight: 500;
+}
+
+.acsis-stream-item__right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.acsis-pill {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 5px 10px;
+  border-radius: 9999px;
+}
+
+.acsis-pill--draft {
+  background: #f3f4f6;
+  color: #6b7280;
+}
+
+.acsis-pill--live {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.acsis-stream-item__menu {
+  flex-shrink: 0;
+}
+
+/* Exam detail (assignment-style) */
+.acsis-exam-detail {
+  width: 100%;
+  max-width: 100%;
+}
+
+.acsis-exam-detail__card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 24px 26px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+.acsis-exam-detail__card h1 {
+  margin: 0 0 12px;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1.25;
+}
+
+.acsis-exam-detail__meta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px 20px;
+  margin: 20px 0 22px;
+  padding: 16px;
+  background: #f9fafb;
+  border-radius: 10px;
+  font-size: 0.875rem;
+}
+
+.acsis-exam-detail__meta-grid dt {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #9ca3af;
+}
+
+.acsis-exam-detail__meta-grid dd {
+  margin: 4px 0 0;
+  font-weight: 600;
+  color: #374151;
+}
+
+.acsis-exam-detail__code {
+  font-family: ui-monospace, monospace;
+  font-size: 0.9rem;
+  letter-spacing: 0.04em;
+}
+
+.acsis-exam-detail__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.acsis-btn-primary {
+  background: #16a34a;
+  color: #fff;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 9999px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.15s;
+}
+
+.acsis-btn-primary:hover {
+  background: #15803d;
+}
+
+.acsis-btn-primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.acsis-btn-ghost {
+  background: #fff;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+  padding: 10px 18px;
+  border-radius: 9999px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.acsis-btn-ghost:hover {
+  background: #f0fdf4;
+}
+
+.acsis-empty-panel {
+  background: #fff;
+  border: 1px dashed #d1d5db;
+  border-radius: 14px;
+  padding: 36px 24px;
+  text-align: center;
+}
+
+.acsis-empty-panel h2 {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+  color: #166534;
+}
+
+.acsis-empty-panel p {
+  margin: 0 0 18px;
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.acsis-link-create {
+  display: inline-block;
+  background: #16a34a;
+  color: #fff !important;
+  text-decoration: none;
+  padding: 10px 20px;
+  border-radius: 9999px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.acsis-link-create:hover {
+  background: #15803d;
+}

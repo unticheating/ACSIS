@@ -2,8 +2,6 @@
    NAVBAR STYLES
    =========================== */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
 :root {
   --green-primary: #22c55e;
   --green-dark: #16a34a;
@@ -22,7 +20,7 @@
   --shadow-md: 0 4px 12px rgba(0,0,0,0.10);
   --radius-md: 10px;
   --radius-lg: 14px;
-  --font-main: 'Inter', sans-serif;
+  --font-main: 'Google Sans', 'Google Sans Text', system-ui, sans-serif;
 }
 
 * {

@@ -18,7 +18,7 @@
   --sidebar-width: 170px;
   --navbar-height: 64px;
   --shadow-md: 0 4px 12px rgba(0,0,0,0.10);
-  --font-main: 'Inter', sans-serif;
+  --font-main: 'Google Sans', 'Google Sans Text', system-ui, sans-serif;
 }
 
 * {

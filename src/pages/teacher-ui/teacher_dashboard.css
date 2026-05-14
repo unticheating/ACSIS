@@ -1,12 +1,14 @@
 /* ===========================
-   TEACHER DASHBOARD STYLES
+   TEACHER DASHBOARD (scoped — avoids clashing with admin .stat-card)
    =========================== */
 
-:root {
+.td-dashboard {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   --green-primary: #22c55e;
   --green-dark: #16a34a;
   --green-light: #bbf7d0;
-  --green-bg: #f0fdf4;
   --white: #ffffff;
   --gray-100: #f3f4f6;
   --gray-200: #e5e7eb;
@@ -14,58 +16,25 @@
   --gray-500: #6b7280;
   --gray-600: #4b5563;
   --gray-800: #1f2937;
-  --red-500: #ef4444;
-  --sidebar-width: 260px;
-  --navbar-height: 64px;
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
-  --shadow-md: 0 4px 12px rgba(0,0,0,0.10);
-  --radius-md: 10px;
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
   --radius-lg: 14px;
-  --font-main: 'Nunito', 'Segoe UI', sans-serif;
 }
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-html, body {
-  font-family: var(--font-main);
-  background: var(--green-bg);
-  min-height: 100vh;
-}
-
-/* ---- Layout Shell ---- */
-.page-wrapper {
-  display: flex;
-  min-height: 100vh;
-}
-
-/* Main Content Area (right of sidebar, below navbar) */
-.main-content {
-  margin-left: var(--sidebar-width);
-  margin-top: var(--navbar-height);
-  flex: 1;
-  min-height: calc(100vh - var(--navbar-height));
-  padding: 36px 36px 48px;
-  background: linear-gradient(135deg, #f0fdf4 60%, #dcfce7 100%);
-}
-
-/* ---- Stat Cards Grid ---- */
-.stats-grid {
+.td-dashboard .stats-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 24px;
-  max-width: 1100px;
+  width: 100%;
+  max-width: 100%;
 }
 
-.stat-card {
+.td-dashboard .stat-card {
   background: var(--white);
   border-radius: var(--radius-lg);
   padding: 28px 28px 24px;
   box-shadow: var(--shadow-sm);
-  border: 1px solid rgba(34,197,94,0.10);
+  border: 1px solid rgba(34, 197, 94, 0.1);
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -74,7 +43,7 @@ html, body {
   overflow: hidden;
 }
 
-.stat-card::after {
+.td-dashboard .stat-card::after {
   content: '';
   position: absolute;
   bottom: 0;
@@ -86,59 +55,54 @@ html, body {
   transition: opacity 0.2s;
 }
 
-.stat-card:hover {
+.td-dashboard .stat-card:hover {
   box-shadow: var(--shadow-md);
   transform: translateY(-2px);
 }
 
-.stat-card:hover::after {
+.td-dashboard .stat-card:hover::after {
   opacity: 1;
 }
 
-.stat-card-body {
+.td-dashboard .stat-card-body {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.stat-card-label {
+.td-dashboard .stat-card-label {
   font-size: 0.85rem;
   color: var(--gray-500);
   font-weight: 600;
   letter-spacing: 0.2px;
 }
 
-.stat-card-value {
+.td-dashboard .stat-card-value {
   font-size: 2.4rem;
   font-weight: 800;
   color: var(--green-dark);
   line-height: 1;
 }
 
-.stat-card-icon {
+.td-dashboard .stat-card-icon {
   color: var(--green-light);
   flex-shrink: 0;
   margin-top: 4px;
 }
 
-.stat-card-icon svg {
+.td-dashboard .stat-card-icon svg {
   width: 44px;
   height: 44px;
 }
 
-/* ---- Responsive ---- */
 @media (max-width: 900px) {
-  .stats-grid {
+  .td-dashboard .stats-grid {
     grid-template-columns: 1fr 1fr;
   }
 }
 
 @media (max-width: 600px) {
-  .main-content {
-    padding: 20px 14px 36px;
-    margin-left: 0;
-  }
-  .stats-grid {
+  .td-dashboard .stats-grid {
     grid-template-columns: 1fr;
   }
 }

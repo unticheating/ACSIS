@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap');
-
 /* RESET */
 * {
     margin: 0;
@@ -7,26 +5,40 @@
     box-sizing: border-box;
 }
 
+html {
+    overflow-x: hidden;
+}
+
+/* LAYOUT — shared AppShell (tokens must appear before body uses var(--acsis-canvas)) */
+:root {
+    --sidebar-width: 240px;
+    --acsis-canvas: #DDEEE4;
+    --acsis-main-pad-x: clamp(14px, 2.5vw, 28px);
+    --acsis-main-pad-y: clamp(12px, 2vw, 22px);
+}
+
 body {
-    font-family: 'DM Sans', 'Segoe UI', sans-serif;
-    background: #f0faf4;
+    font-family: 'Google Sans', 'Google Sans Text', system-ui, sans-serif;
+    background: var(--acsis-canvas, #DDEEE4);
     color: #1a2e22;
 }
 
-/* LAYOUT */
-.container {
+/* App root: sidebar + main. */
+.acsis-app {
     display: flex;
     min-height: 100vh;
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
+    box-sizing: border-box;
+    background: var(--acsis-canvas, #DDEEE4);
 }
 
-/* ========================
-   SIDEBAR
-======================== */
 .sidebar {
-    width: 240px;
+    width: var(--sidebar-width, 240px);
     height: 100vh;
     background: #ffffff;
-    border-right: 1px solid #e4ede8;
+    border-right: 1px solid rgba(22, 101, 52, 0.1);
     padding: 0;
     position: fixed;
     display: flex;
@@ -34,9 +46,10 @@ body {
     top: 0;
     left: 0;
     z-index: 100;
+    transition: width 0.22s ease;
+    box-shadow: 4px 0 32px rgba(15, 60, 35, 0.06);
 }
 
-/* Admin Avatar + Info */
 .sidebar-top {
     display: flex;
     align-items: center;
@@ -77,7 +90,6 @@ body {
     color: #7a9585;
 }
 
-/* Nav */
 .sidebar-nav {
     display: flex;
     flex-direction: column;
@@ -91,13 +103,13 @@ body {
     display: flex;
     align-items: center;
     gap: 11px;
-    padding: 10px 13px;
+    padding: 10px 14px;
     text-decoration: none;
     color: #3d5a47;
-    border-radius: 7px;
+    border-radius: 10px;
     font-weight: 400;
     font-size: 13.5px;
-    transition: background 0.15s, color 0.15s;
+    transition: background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
     letter-spacing: -0.01em;
 }
 
@@ -123,14 +135,34 @@ body {
     background: #16a34a;
     color: #ffffff;
     font-weight: 500;
-    box-shadow: 0 2px 8px rgba(22, 163, 74, 0.28);
+    box-shadow: 0 4px 14px rgba(22, 163, 74, 0.35);
 }
 
 .nav-item.active i {
     color: #ffffff;
 }
 
-/* Logout */
+.nav-item .admin-nav-icon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    color: #7a9585;
+    transition: color 0.15s;
+}
+
+.nav-item:hover .admin-nav-icon {
+    color: #16a34a;
+}
+
+.nav-item.active .admin-nav-icon {
+    color: #ffffff;
+}
+
+.nav-item:focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+}
+
 .logout-btn {
     display: flex;
     align-items: center;
@@ -153,28 +185,95 @@ body {
     text-align: center;
 }
 
+.logout-btn .admin-nav-icon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    color: #c0392b;
+}
+
 .logout-btn:hover {
     background: #fef2f2;
 }
 
-/* ========================
-   CONTENT AREA
-======================== */
-.content {
-    margin-left: 240px;
-    width: calc(100% - 240px);
+.acsis-main {
+    margin-left: var(--sidebar-width, 240px);
+    width: calc(100% - var(--sidebar-width, 240px));
     min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    box-sizing: border-box;
+    background: var(--acsis-canvas, #DDEEE4);
+    padding: var(--acsis-main-pad-y) var(--acsis-main-pad-x);
+    transition: margin-left 0.22s ease, width 0.22s ease;
+    min-width: 0;
+}
+
+/* Centered page column inside main (all roles) */
+.acsis-page {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    align-self: stretch;
+    box-sizing: border-box;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    background: var(--acsis-canvas, #DDEEE4);
+}
+
+.acsis-page > .acsis-stack {
+    flex: 1;
+    min-height: 0;
     display: flex;
     flex-direction: column;
 }
 
-/* Breadcrumb header */
+.acsis-page > .content-header {
+    flex-shrink: 0;
+}
+
+/* Standard vertical stack for admin views (header + body) */
+.acsis-stack {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+}
+
+/* Route view root: fills acsis-page width */
+.acsis-view {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+/* Breadcrumb header — sticky within main column (appendix elevation tier) */
 .content-header {
-    background: #f0faf4;
-    padding: 18px 28px 14px;
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    padding: 14px 18px 12px;
     display: flex;
     align-items: center;
     justify-content: space-between;
+    border-radius: 14px;
+    border: 1px solid rgba(22, 101, 52, 0.1);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    margin-bottom: 14px;
+    width: 100%;
+    box-sizing: border-box;
+    position: sticky;
+    top: 0;
+    z-index: var(--z-sticky, 120);
 }
 
 .breadcrumb {
@@ -226,11 +325,18 @@ body {
     font-size: 12px;
 }
 
-/* Body */
+/* Body — fills main column; views should not introduce their own max-width columns */
 .content-body {
     flex: 1;
-    padding: 20px 28px 28px;
-    background: #f0faf4;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+    align-items: stretch;
+    padding: 4px 0 8px;
+    background: var(--acsis-canvas, #DDEEE4);
 }
 
 /* ========================
@@ -1250,4 +1356,122 @@ body {
     border-radius: 99px;
     font-size: 11.5px;
     font-weight: 500;
+}
+
+/* Teacher/student route roots use .acsis-view (no name clash with shell) */
+.content-body > .acsis-view {
+    display: block;
+    flex: 1;
+    min-height: 0;
+}
+
+/* Radix portals: popper wrapper must stack above fixed sidebar (z-index: 100) */
+[data-radix-popper-content-wrapper] {
+    z-index: 200 !important;
+}
+
+/* Shared placeholder + settings + super admin home */
+.admin-placeholder-lead {
+    margin: 0;
+    padding: 24px 28px;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #3d5a47;
+    max-width: 72ch;
+}
+
+.super-admin-intro {
+    margin: 0 0 20px;
+    padding: 0 4px 0 0;
+    max-width: 72ch;
+}
+
+.super-admin-stat-cards {
+    margin-bottom: 22px;
+}
+
+.super-admin-links {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.super-admin-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid #e4ede8;
+    background: #fafcfa;
+    text-decoration: none;
+    color: #1a2e22;
+    font-weight: 600;
+    font-size: 14px;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.super-admin-link:hover {
+    border-color: rgba(22, 163, 74, 0.45);
+    background: #f0fdf4;
+}
+
+.super-admin-link__icon {
+    color: #16a34a;
+    flex-shrink: 0;
+}
+
+.admin-settings-lead {
+    margin: 0 0 16px;
+    font-size: 14px;
+    line-height: 1.55;
+    color: #3d5a47;
+    max-width: 64ch;
+}
+
+.admin-settings-appearance {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.admin-settings-mode {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    border-radius: 12px;
+    border: 2px solid #e4ede8;
+    background: #ffffff;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 14px;
+    color: #1a2e22;
+    font-family: inherit;
+    transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.admin-settings-mode:hover {
+    border-color: #86efac;
+}
+
+.admin-settings-mode.is-active {
+    border-color: #16a34a;
+    background: #f0fdf4;
+    color: #166534;
+}
+
+.admin-settings-back {
+    margin: 12px 0 0;
+    font-size: 14px;
+}
+
+.admin-settings-back a {
+    color: #16a34a;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.admin-settings-back a:hover {
+    text-decoration: underline;
 }

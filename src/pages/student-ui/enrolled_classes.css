@@ -1,0 +1,226 @@
+/* Student: enrolled class list + Gmail-style in-class banner + exam stream */
+
+.stu-enroll-hero {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-4, 16px);
+  margin-bottom: var(--size-5, 24px);
+}
+
+.stu-enroll-join-box {
+  background: var(--bg-surface, #fff);
+  border: 1px solid var(--border-default, #e5e7eb);
+  border-radius: 14px;
+  padding: var(--size-4, 16px) var(--size-5, 24px);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.stu-enroll-join-box h2 {
+  margin: 0 0 var(--size-2, 8px);
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #166534;
+}
+
+.stu-enroll-join-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--size-3, 12px);
+  align-items: flex-end;
+}
+
+.stu-enroll-join-row label {
+  flex: 1;
+  min-width: 200px;
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: 600;
+  color: #374151;
+}
+
+.stu-enroll-join-row input {
+  margin-top: var(--size-1, 4px);
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--size-3, 12px) var(--size-3, 12px);
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  font-size: var(--text-sm, 0.875rem);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.stu-enroll-msg {
+  margin: var(--size-3, 12px) 0 0;
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: 500;
+}
+
+.stu-enroll-msg--ok {
+  color: #166534;
+}
+
+.stu-enroll-msg--err {
+  color: #b91c1c;
+}
+
+.stu-class-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: var(--size-4, 16px);
+}
+
+.stu-class-card {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  background: var(--bg-surface, #fff);
+  border: 1px solid var(--border-default, #e5e7eb);
+  border-radius: 14px;
+  padding: var(--size-4, 16px);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+  transition:
+    box-shadow var(--motion-fast, 160ms) var(--ease-out, ease),
+    transform var(--motion-fast, 160ms) var(--ease-out, ease);
+}
+
+.stu-class-card:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+
+.stu-class-card h3 {
+  margin: 0 0 var(--size-2, 8px);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.stu-class-card p {
+  margin: 0;
+  font-size: var(--text-sm, 0.875rem);
+  color: #6b7280;
+}
+
+/* Gmail-style promotional / info banner */
+.stu-gmail-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--size-4, 16px);
+  padding: var(--size-4, 16px) var(--size-5, 20px);
+  margin-bottom: var(--size-5, 24px);
+  background: linear-gradient(90deg, #fef9c3 0%, #fef3c7 40%, #fffbeb 100%);
+  border: 1px solid #fde047;
+  border-left-width: 4px;
+  border-left-color: #eab308;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.stu-gmail-banner__icon {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 9999px;
+  background: #fef08a;
+  color: #854d0e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.stu-gmail-banner__body strong {
+  display: block;
+  font-size: var(--text-sm, 0.875rem);
+  color: #713f12;
+  margin-bottom: 4px;
+}
+
+.stu-gmail-banner__body p {
+  margin: 0;
+  font-size: var(--text-sm, 0.875rem);
+  line-height: 1.5;
+  color: #854d0e;
+}
+
+.stu-stream-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #6b7280;
+  margin: 0 0 var(--size-3, 12px) 4px;
+}
+
+.stu-stream-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-3, 12px);
+}
+
+.stu-stream-item {
+  display: flex;
+  align-items: stretch;
+  background: #fff;
+  border: 1px solid #e8eaed;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(60, 64, 67, 0.12);
+}
+
+.stu-stream-item__accent {
+  width: 5px;
+  flex-shrink: 0;
+  background: linear-gradient(180deg, #22c55e 0%, #16a34a 100%);
+}
+
+.stu-stream-item__main {
+  flex: 1;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.stu-stream-item__title {
+  margin: 0 0 4px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #202124;
+}
+
+.stu-stream-item__meta {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: #5f6368;
+}
+
+.stu-stream-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 14px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #166534;
+  text-decoration: none;
+}
+
+.stu-stream-back:hover {
+  text-decoration: underline;
+}
+
+.stu-empty {
+  text-align: center;
+  padding: var(--size-7, 48px) var(--size-4, 16px);
+  background: var(--bg-surface, #fff);
+  border: 1px dashed #d1d5db;
+  border-radius: 14px;
+  color: #6b7280;
+  font-size: var(--text-sm, 0.875rem);
+}

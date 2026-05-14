@@ -1,0 +1,401 @@
+/* Dark mode for AppShell + admin layout (loaded after style.css / sidebar-extras). */
+
+html.dark {
+  color-scheme: dark;
+  --acsis-canvas: #0b1710;
+}
+
+html.dark body,
+html.dark #root {
+  background-color: var(--acsis-canvas) !important;
+  color: #e8f4ec;
+}
+
+html.dark .acsis-app {
+  background: var(--acsis-canvas);
+}
+
+html.dark .sidebar {
+  background: #0f1f16;
+  border-right-color: rgba(74, 222, 128, 0.12);
+  box-shadow: 4px 0 32px rgba(0, 0, 0, 0.35);
+}
+
+html.dark .sidebar-top {
+  border-bottom-color: rgba(74, 222, 128, 0.1);
+}
+
+html.dark .admin-name {
+  color: #ecfdf5;
+}
+
+html.dark .admin-role {
+  color: #9cbcaa;
+}
+
+html.dark .nav-item {
+  color: #b8d4c4;
+}
+
+html.dark .nav-item i,
+html.dark .nav-item .admin-nav-icon {
+  color: #7a9d8a;
+}
+
+html.dark .nav-item:hover {
+  background: rgba(34, 197, 94, 0.12);
+  color: #ecfdf5;
+}
+
+html.dark .nav-item.active {
+  background: linear-gradient(135deg, rgba(22, 163, 74, 0.35) 0%, rgba(21, 128, 61, 0.25) 100%);
+  color: #ecfdf5;
+  box-shadow: 0 1px 0 rgba(74, 222, 128, 0.15);
+}
+
+html.dark .logout-btn {
+  background: rgba(239, 68, 68, 0.12);
+  color: #fca5a5;
+  border-color: rgba(239, 68, 68, 0.25);
+}
+
+html.dark .logout-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+html.dark .acsis-main {
+  background: var(--acsis-canvas);
+}
+
+html.dark .acsis-page {
+  background: var(--acsis-canvas);
+}
+
+html.dark .content-header {
+  background: rgba(15, 31, 22, 0.92);
+  border-color: rgba(74, 222, 128, 0.12);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+}
+
+html.dark .breadcrumb,
+html.dark .breadcrumb .page-name {
+  color: #c5e4d4;
+}
+
+html.dark .breadcrumb .sep {
+  color: #6b8f7a;
+}
+
+html.dark .content-body {
+  color: #dceee4;
+}
+
+html.dark .acsis-sidebar-header {
+  border-bottom-color: rgba(74, 222, 128, 0.12);
+}
+
+html.dark .acsis-collapse-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(74, 222, 128, 0.15);
+  color: #b8d4c4;
+}
+
+html.dark .acsis-collapse-btn:hover {
+  background: rgba(34, 197, 94, 0.15);
+  color: #86efac;
+  border-color: rgba(34, 197, 94, 0.35);
+}
+
+html.dark .acsis-profile-card--trigger,
+html.dark .acsis-profile-card {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(74, 222, 128, 0.12);
+}
+
+html.dark .acsis-profile-card--trigger:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+html.dark .acsis-profile-avatar {
+  background: rgba(34, 197, 94, 0.2);
+  color: #bbf7d0;
+}
+
+html.dark .acsis-profile-name {
+  color: #ecfdf5;
+}
+
+html.dark .acsis-profile-role {
+  color: #9cbcaa;
+}
+
+/* Student enrolled / stream (enrolled_classes.css) */
+html.dark .stu-stream-item {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(74, 222, 128, 0.12);
+  box-shadow: none;
+}
+
+html.dark .stu-stream-item__title {
+  color: #ecfdf5;
+}
+
+html.dark .stu-stream-item__meta {
+  color: #9cbcaa;
+}
+
+html.dark .stu-gmail-banner {
+  background: rgba(22, 101, 52, 0.2);
+  border-color: rgba(74, 222, 128, 0.2);
+}
+
+html.dark .stu-gmail-banner__body strong {
+  color: #ecfdf5;
+}
+
+html.dark .stu-gmail-banner__body p {
+  color: #c5e4d4;
+}
+
+html.dark .stu-stream-back {
+  color: #86efac;
+}
+
+html.dark .stu-empty {
+  color: #9cbcaa;
+}
+
+html.dark .stu-enroll-join-box {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(74, 222, 128, 0.15);
+}
+
+html.dark .stu-class-card {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(74, 222, 128, 0.12);
+}
+
+html.dark .stu-class-card h3 {
+  color: #ecfdf5;
+}
+
+html.dark .stu-class-card p {
+  color: #9cbcaa;
+}
+
+/* ---- Admin UI (style.css): panels, lists, tables ---- */
+html.dark .content-body {
+  background: transparent;
+}
+
+html.dark .panel {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(74, 222, 128, 0.12);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+}
+
+html.dark .panel-title,
+html.dark .exam-name,
+html.dark .detected-name {
+  color: #ecfdf5 !important;
+}
+
+html.dark .panel-view-all {
+  color: #9cbcaa;
+}
+
+html.dark .panel-view-all:hover {
+  color: #86efac;
+}
+
+html.dark .exam-item {
+  border-top-color: rgba(255, 255, 255, 0.08);
+}
+
+html.dark .exam-by,
+html.dark .exam-timer-sub,
+html.dark .exam-progress {
+  color: #9cbcaa;
+}
+
+html.dark .exam-timer {
+  color: #86efac;
+}
+
+html.dark .detected-item {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(74, 222, 128, 0.1);
+}
+
+html.dark .detected-item:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+html.dark .detected-name span,
+html.dark .detected-sub {
+  color: #9cbcaa !important;
+}
+
+html.dark .view-info-link {
+  color: #b8d4c4;
+}
+
+html.dark .view-info-link:hover {
+  color: #86efac;
+}
+
+html.dark .table-wrapper {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(74, 222, 128, 0.12);
+}
+
+html.dark .table thead tr {
+  background: rgba(22, 101, 52, 0.35);
+  border-bottom-color: rgba(74, 222, 128, 0.15);
+}
+
+html.dark .table th {
+  color: #bbf7d0;
+}
+
+html.dark .table td {
+  color: #dceee4;
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+html.dark .table tbody tr:hover td {
+  background: rgba(34, 197, 94, 0.08);
+}
+
+html.dark .card {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(74, 222, 128, 0.12);
+}
+
+html.dark .card-label {
+  color: #9cbcaa;
+}
+
+html.dark .card-value {
+  color: #86efac;
+}
+
+html.dark .um-email {
+  color: #9cbcaa !important;
+}
+
+html.dark .admin-placeholder-lead,
+html.dark .admin-settings-lead,
+html.dark .super-admin-intro {
+  color: #b8d4c4;
+}
+
+html.dark .super-admin-intro strong {
+  color: #ecfdf5;
+}
+
+html.dark .super-admin-link {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(74, 222, 128, 0.12);
+  color: #ecfdf5;
+}
+
+html.dark .super-admin-link:hover {
+  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(74, 222, 128, 0.25);
+}
+
+html.dark .super-admin-link__icon {
+  color: #86efac;
+}
+
+html.dark .admin-settings-mode {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(74, 222, 128, 0.2);
+  color: #ecfdf5;
+}
+
+html.dark .admin-settings-mode.is-active {
+  background: rgba(34, 197, 94, 0.15);
+  border-color: #4ade80;
+  color: #ecfdf5;
+}
+
+html.dark .admin-settings-back a {
+  color: #86efac;
+}
+
+/* Teacher dashboard */
+html.dark .td-dashboard {
+  --white: rgba(255, 255, 255, 0.06);
+  --gray-100: rgba(255, 255, 255, 0.08);
+  --gray-200: rgba(74, 222, 128, 0.12);
+  --gray-500: #9cbcaa;
+  --gray-600: #c5e4d4;
+  --gray-800: #ecfdf5;
+}
+
+html.dark .td-dashboard .stat-card {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(74, 222, 128, 0.15);
+  box-shadow: none;
+}
+
+html.dark .td-dashboard .stat-card-label {
+  color: #9cbcaa;
+}
+
+html.dark .td-dashboard .stat-card-value {
+  color: #86efac;
+}
+
+/* Teacher my-classes */
+html.dark .acsis-mc-title {
+  color: #ecfdf5;
+}
+
+html.dark .acsis-mc-sub {
+  color: #9cbcaa;
+}
+
+html.dark .acsis-mc-tab {
+  color: #b8d4c4;
+}
+
+html.dark .acsis-mc-tab--active {
+  background: #15803d;
+  color: #fff;
+}
+
+/* Teacher create exam (scoped wrapper) */
+html.dark .acsis-create-exam .card {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(74, 222, 128, 0.15);
+  color: #dceee4;
+}
+
+html.dark .acsis-create-exam .page-title,
+html.dark .acsis-create-exam .section-title {
+  color: #86efac;
+}
+
+html.dark .acsis-create-exam .form-group label {
+  color: #c5e4d4;
+}
+
+html.dark .acsis-create-exam .form-group input,
+html.dark .acsis-create-exam .form-group select,
+html.dark .acsis-create-exam .form-group textarea {
+  background: rgba(0, 0, 0, 0.25);
+  border-color: rgba(74, 222, 128, 0.2);
+  color: #ecfdf5;
+}
+
+html.dark .content-header .breadcrumb .brand-plp,
+html.dark .content-header .breadcrumb .brand-acsis {
+  color: #4ade80;
+}
+
+html.dark .content-header .breadcrumb .sep {
+  color: #6b8f7a;
+}

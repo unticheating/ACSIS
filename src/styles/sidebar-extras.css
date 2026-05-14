@@ -1,0 +1,199 @@
+/* Wireframe add-ons on top of admin sidebar. Load after admin style.css */
+
+:root {
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-500: #6b7280;
+  --gray-600: #4b5563;
+  --gray-700: #374151;
+  --gray-800: #1f2937;
+  --green-bg: #f0fdf4;
+  --green-dark: #16a34a;
+  --red-500: #ef4444;
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.acsis-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 12px 10px;
+  border-bottom: 1px solid var(--gray-200);
+  gap: 8px;
+}
+
+.acsis-collapse-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid var(--gray-200);
+  background: var(--gray-100);
+  color: var(--gray-600);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  flex-shrink: 0;
+}
+
+.acsis-collapse-btn:hover {
+  background: var(--green-bg);
+  color: var(--green-dark);
+  border-color: rgba(22, 163, 74, 0.35);
+}
+
+.acsis-collapse-btn:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
+.acsis-logo-mark {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #16a34a, #22c55e);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  letter-spacing: -0.02em;
+  flex-shrink: 0;
+}
+
+.acsis-profile-card--trigger {
+  width: 100%;
+  cursor: pointer;
+  border: none;
+  font: inherit;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px;
+  border-radius: 12px;
+  background: var(--gray-100);
+  border: 1px solid var(--gray-200);
+}
+
+.acsis-profile-card--trigger:hover {
+  background: #fff;
+  border-color: var(--gray-200);
+}
+
+.acsis-profile-card--trigger:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
+.acsis-account-dropdown {
+  max-width: min(100vw - 24px, 260px);
+}
+
+.acsis-sidebar-bottom {
+  margin-top: auto;
+  padding: 0 10px 16px;
+  flex-shrink: 0;
+  position: relative;
+}
+
+/* Hide legacy teacher-only rule */
+.sidebar-brand.acsis-sidebar-brand--hidden {
+  display: none;
+}
+
+.acsis-profile-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px;
+  border-radius: 12px;
+  background: var(--gray-100);
+  border: 1px solid var(--gray-200);
+}
+
+.acsis-profile-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  background: #e5e7eb;
+  color: var(--gray-600);
+  font-weight: 800;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.acsis-profile-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.acsis-profile-name {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--gray-800);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.acsis-profile-role {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--gray-500);
+}
+
+.acsis-profile-switch {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--gray-500);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
+.acsis-nav-label {
+  flex: 1;
+  min-width: 0;
+}
+
+html.acsis-sidebar-collapsed {
+  --sidebar-width: 72px;
+}
+
+html.acsis-sidebar-collapsed .acsis-nav-label {
+  display: none;
+}
+
+html.acsis-sidebar-collapsed .acsis-profile-text {
+  display: none;
+}
+
+html.acsis-sidebar-collapsed .acsis-sidebar-header {
+  flex-direction: column;
+  padding-top: 10px;
+}
+
+html.acsis-sidebar-collapsed .acsis-profile-card,
+html.acsis-sidebar-collapsed .acsis-profile-card--trigger {
+  justify-content: center;
+}
+
+html.acsis-sidebar-collapsed .acsis-profile-switch {
+  display: none;
+}

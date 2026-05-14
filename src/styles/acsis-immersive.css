@@ -1,0 +1,331 @@
+/**
+ * Full-viewport immersive chrome (login, exam lobby, in-exam, countdown).
+ * Reuse: add class `acsis-immersive` on a root that fills the viewport.
+ */
+
+.acsis-immersive {
+  --acsis-immersive-fg: #f0fdf4;
+  --acsis-immersive-fg-muted: rgba(220, 252, 231, 0.82);
+  --acsis-immersive-fg-dim: rgba(187, 247, 208, 0.65);
+  --acsis-immersive-accent: #4ade80;
+  --acsis-immersive-accent-strong: #22c55e;
+  --acsis-immersive-danger: #f87171;
+  --acsis-immersive-input-border: rgba(74, 222, 128, 0.45);
+  --acsis-immersive-panel: rgba(0, 24, 8, 0.35);
+
+  min-height: 100vh;
+  min-height: 100dvh;
+  width: 100%;
+  margin: 0;
+  box-sizing: border-box;
+  font-family: var(--font-app, 'Google Sans', system-ui, sans-serif);
+  color: var(--acsis-immersive-fg);
+  background-color: #020806;
+  background-image:
+    radial-gradient(ellipse 120% 85% at 50% 100%, rgba(22, 101, 52, 0.55) 0%, transparent 55%),
+    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(15, 60, 35, 0.35) 0%, transparent 45%),
+    linear-gradient(180deg, #030f08 0%, #051a0d 35%, #020806 100%);
+  background-attachment: fixed;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow-x: hidden;
+}
+
+.acsis-immersive__institution {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 20px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--acsis-immersive-fg-dim);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.acsis-immersive__logo-mark {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #166534, #052e16);
+  border: 1px solid rgba(74, 222, 128, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.55rem;
+  font-weight: 800;
+  color: #bbf7d0;
+  flex-shrink: 0;
+}
+
+.acsis-immersive__main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 72px 20px 48px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.acsis-immersive__panel {
+  width: 100%;
+  max-width: 420px;
+  text-align: center;
+}
+
+/* Email + Login + demo footer — same column width as Google button (320px) */
+.acsis-immersive__auth-stack {
+  width: 100%;
+  max-width: 320px;
+  margin-inline: auto;
+  box-sizing: border-box;
+}
+
+.acsis-immersive__title {
+  margin: 0 0 8px;
+  font-size: clamp(2.25rem, 6vw, 3.25rem);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #ecfdf5;
+  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.35);
+}
+
+/* Login hero — italic wordmark (700 italic matches bundled Latin face) */
+.acsis-immersive__title--brand {
+  font-style: italic;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.acsis-immersive__subtitle {
+  margin: 0 0 32px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--acsis-immersive-fg-muted);
+  line-height: 1.5;
+}
+
+.acsis-immersive__hint {
+  margin: 0 0 10px;
+  font-size: 0.8125rem;
+  color: var(--acsis-immersive-fg-muted);
+}
+
+.acsis-immersive__btn-google {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 320px;
+  padding: 12px 20px;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(0, 0, 0, 0.2);
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s, border-color 0.18s, transform 0.15s;
+}
+
+.acsis-immersive__btn-google:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.acsis-immersive__btn-google:active {
+  transform: scale(0.99);
+}
+
+.acsis-immersive__or {
+  margin: 22px 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: var(--acsis-immersive-fg-dim);
+}
+
+.acsis-immersive__field {
+  text-align: left;
+  margin-bottom: 14px;
+}
+
+.acsis-immersive__field label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.8125rem;
+  color: var(--acsis-immersive-fg-muted);
+}
+
+.acsis-immersive__input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--acsis-immersive-input-border);
+  background: var(--acsis-immersive-panel);
+  color: #fff;
+  font-size: 0.9375rem;
+}
+
+.acsis-immersive__input::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.acsis-immersive__input:focus {
+  outline: none;
+  border-color: var(--acsis-immersive-accent);
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.25);
+}
+
+.acsis-immersive__btn-primary {
+  width: 100%;
+  margin-top: 8px;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #22c55e 0%, #15803d 100%);
+  color: #fff;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  transition: filter 0.15s, transform 0.12s;
+}
+
+.acsis-immersive__btn-primary:hover {
+  filter: brightness(1.06);
+}
+
+.acsis-immersive__btn-primary:active {
+  transform: scale(0.99);
+}
+
+.acsis-immersive__footer {
+  margin-top: 28px;
+  font-size: 0.75rem;
+  color: var(--acsis-immersive-fg-dim);
+}
+
+.acsis-immersive__footer a {
+  color: var(--acsis-immersive-accent);
+  text-decoration: none;
+}
+
+.acsis-immersive__footer a:hover {
+  text-decoration: underline;
+}
+
+/* —— In-exam / lobby layers (reuse same root) —— */
+.acsis-immersive__topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 20px;
+  background: rgba(0, 0, 0, 0.35);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 0.8125rem;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.acsis-immersive__exam-title {
+  flex: 1;
+  text-align: center;
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: 0.02em;
+  color: #fff;
+}
+
+.acsis-immersive__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px 48px;
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.acsis-immersive__warning-title {
+  margin: 0 0 16px;
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  font-weight: 800;
+  color: var(--acsis-immersive-danger);
+  letter-spacing: 0.06em;
+}
+
+.acsis-immersive__prose {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.65;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.acsis-immersive__prose strong {
+  color: #fff;
+}
+
+.acsis-immersive__countdown {
+  margin-top: 40px;
+  font-size: 1.1rem;
+  color: var(--acsis-immersive-fg-muted);
+}
+
+.acsis-immersive__countdown-num {
+  display: block;
+  margin-top: 8px;
+  font-size: clamp(4rem, 15vw, 6rem);
+  font-weight: 800;
+  line-height: 1;
+  color: #fff;
+  text-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+}
+
+.acsis-immersive__status {
+  margin-top: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  font-size: 0.9rem;
+  color: var(--acsis-immersive-fg-muted);
+}
+
+.acsis-immersive__spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid rgba(255, 255, 255, 0.2);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: acsis-spin 0.85s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .acsis-immersive__spinner {
+    animation: none;
+    border-top-color: rgba(255, 255, 255, 0.5);
+  }
+}
+
+@keyframes acsis-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

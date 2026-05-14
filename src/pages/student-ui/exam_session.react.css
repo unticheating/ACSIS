@@ -1,0 +1,519 @@
+/* Scoped student exam session (ported from exam_session.css; ACSIS greens, Google Sans via parent). */
+
+.acsis-student-exam {
+  --exam-bg-deep: #051a0d;
+  --exam-text: #ffffff;
+  --exam-warning-red: #f87171;
+  --exam-accent: #22c55e;
+  --exam-accent-dim: rgba(34, 197, 94, 0.35);
+  --exam-question-box: #e8f5ec;
+  --exam-question-text: #0f1f14;
+  --exam-option-border: rgba(34, 197, 94, 0.35);
+  --exam-option-border-active: #4ade80;
+  --exam-next-bg: #166534;
+  --exam-next-bg-hover: #15803d;
+  --detection-red: #dc2626;
+  --header-pad-x: clamp(16px, 4vw, 40px);
+  --header-pad-y: clamp(14px, 2.5vh, 22px);
+
+  position: relative;
+  isolation: isolate;
+  box-sizing: border-box;
+  min-height: 100vh;
+  min-height: 100dvh;
+  width: 100%;
+  margin: 0;
+  font-family: var(--font-app, 'Google Sans', 'Google Sans Text', system-ui, sans-serif);
+  color: var(--exam-text);
+  background: linear-gradient(180deg, #030f08 0%, #051a0d 38%, #020806 100%);
+  -webkit-font-smoothing: antialiased;
+}
+
+.acsis-student-exam *,
+.acsis-student-exam *::before,
+.acsis-student-exam *::after {
+  box-sizing: border-box;
+}
+
+.acsis-student-exam::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 120% 85% at 50% 100%, rgba(22, 101, 52, 0.45) 0%, transparent 55%),
+    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(15, 60, 35, 0.3) 0%, transparent 45%);
+}
+
+.acsis-student-exam > * {
+  position: relative;
+  z-index: 1;
+}
+
+.acsis-student-exam .visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.acsis-student-exam .exam-chrome {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--header-pad-y) var(--header-pad-x);
+  flex-shrink: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.acsis-student-exam .exam-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #166534, #052e16);
+  border: 2px solid rgba(74, 222, 128, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 0.55rem;
+  font-weight: 800;
+  color: #bbf7d0;
+}
+
+.acsis-student-exam .exam-title-bar {
+  flex: 1;
+  text-align: center;
+  font-size: clamp(13px, 2vw, 16px);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0 12px;
+}
+
+.acsis-student-exam .exam-timer {
+  font-size: clamp(18px, 2.8vw, 24px);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+  min-width: 5ch;
+  text-align: right;
+}
+
+.acsis-student-exam .scene {
+  display: none;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: transparent;
+}
+
+.acsis-student-exam .scene.is-active {
+  display: flex;
+}
+
+.acsis-student-exam .lobby-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px var(--header-pad-x) 32px;
+  text-align: center;
+  max-width: 720px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.acsis-student-exam .lobby-warning-title {
+  color: var(--exam-warning-red);
+  font-size: clamp(28px, 5vw, 40px);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 28px;
+}
+
+.acsis-student-exam .lobby-copy {
+  font-size: clamp(14px, 2.1vw, 17px);
+  font-weight: 400;
+  line-height: 1.65;
+  color: var(--exam-text);
+}
+
+.acsis-student-exam .lobby-copy p {
+  margin-bottom: 18px;
+}
+
+.acsis-student-exam .lobby-footer {
+  padding: 28px var(--header-pad-x) 36px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+
+.acsis-student-exam .lobby-spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid rgba(255, 255, 255, 0.25);
+  border-top-color: var(--exam-text);
+  border-radius: 50%;
+  animation: acsis-student-exam-spin 0.85s linear infinite;
+}
+
+@keyframes acsis-student-exam-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.acsis-student-exam .lobby-waiting {
+  font-size: clamp(14px, 2vw, 16px);
+  font-weight: 500;
+  text-align: center;
+  max-width: 560px;
+  line-height: 1.5;
+}
+
+.acsis-student-exam .countdown-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.acsis-student-exam .countdown-label {
+  font-size: clamp(18px, 3vw, 22px);
+  font-weight: 500;
+  margin-bottom: 12px;
+}
+
+.acsis-student-exam .countdown-number {
+  font-size: clamp(72px, 18vw, 120px);
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.acsis-student-exam .exam-stage {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px var(--header-pad-x) 24px;
+  width: 100%;
+  max-width: 920px;
+  margin: 0 auto;
+}
+
+.acsis-student-exam .exam-type-label {
+  font-size: clamp(13px, 2vw, 15px);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.acsis-student-exam .exam-type-hint {
+  font-size: clamp(12px, 1.6vw, 14px);
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.85);
+  text-align: center;
+  margin-bottom: 22px;
+}
+
+.acsis-student-exam .question-box {
+  width: 100%;
+  background: var(--exam-question-box);
+  color: var(--exam-question-text);
+  border-radius: 18px;
+  padding: clamp(18px, 3vw, 26px) clamp(20px, 3vw, 28px);
+  font-size: clamp(14px, 2vw, 17px);
+  line-height: 1.55;
+  font-weight: 500;
+  margin-bottom: 20px;
+  border: 1px solid rgba(22, 101, 52, 0.15);
+}
+
+.acsis-student-exam .options-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.acsis-student-exam .option-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 16px 18px;
+  border-radius: 16px;
+  border: 2px solid var(--exam-option-border);
+  background: rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  text-align: left;
+  color: var(--exam-text);
+  font-family: inherit;
+  font-size: clamp(14px, 1.9vw, 16px);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.acsis-student-exam .option-row:hover {
+  border-color: var(--exam-accent-dim);
+}
+
+.acsis-student-exam .option-row.is-selected {
+  border-color: var(--exam-option-border-active);
+  background: rgba(34, 197, 94, 0.12);
+}
+
+.acsis-student-exam .option-radio {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--exam-option-border);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.acsis-student-exam .option-row.is-selected .option-radio {
+  border-color: var(--exam-accent);
+}
+
+.acsis-student-exam .option-row.is-selected .option-radio::after {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--exam-accent);
+}
+
+.acsis-student-exam .id-input {
+  width: 100%;
+  padding: 16px 18px;
+  border-radius: 16px;
+  border: 2px solid var(--exam-accent);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--exam-text);
+  font-family: inherit;
+  font-size: clamp(14px, 2vw, 16px);
+  margin-bottom: 28px;
+}
+
+.acsis-student-exam .id-input::placeholder {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.acsis-student-exam .question-box code {
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 0.92em;
+  font-weight: 600;
+  background: rgba(0, 0, 0, 0.08);
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.acsis-student-exam .code-editor-wrap {
+  width: 100%;
+  margin-bottom: 28px;
+}
+
+.acsis-student-exam .code-editor {
+  width: 100%;
+  min-height: 200px;
+  max-height: min(42vh, 360px);
+  padding: 16px 18px;
+  border-radius: 16px;
+  border: 2px solid var(--exam-accent);
+  background: rgba(0, 0, 0, 0.35);
+  color: #e8ffe8;
+  font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.55;
+  tab-size: 4;
+  resize: vertical;
+  outline: none;
+}
+
+.acsis-student-exam .code-editor:focus {
+  border-color: var(--exam-option-border-active);
+  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.25);
+}
+
+.acsis-student-exam .tf-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  width: 100%;
+  margin-bottom: 28px;
+}
+
+.acsis-student-exam .tf-grid .option-row {
+  justify-content: center;
+  min-height: 72px;
+}
+
+.acsis-student-exam .exam-footer-bar {
+  width: 100%;
+  max-width: 920px;
+  margin-top: auto;
+  padding: 16px var(--header-pad-x) 28px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.acsis-student-exam .exam-section-label {
+  font-size: 13px;
+  font-weight: 500;
+  opacity: 0.95;
+}
+
+.acsis-student-exam .exam-footer-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.acsis-student-exam .btn-next {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 22px;
+  border-radius: 14px;
+  border: none;
+  background: var(--exam-next-bg);
+  color: var(--exam-text);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.acsis-student-exam .btn-next:hover {
+  background: var(--exam-next-bg-hover);
+}
+
+.acsis-student-exam .progress-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 200px;
+}
+
+.acsis-student-exam .progress-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.9;
+}
+
+.acsis-student-exam .progress-track {
+  flex: 1;
+  height: 8px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.35);
+  overflow: hidden;
+  min-width: 120px;
+}
+
+.acsis-student-exam .progress-fill {
+  height: 100%;
+  border-radius: 99px;
+  background: var(--exam-accent);
+  width: 25%;
+  transition: width 0.25s ease;
+}
+
+.acsis-student-exam .detection-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: var(--detection-red);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 32px;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.32s ease, visibility 0.32s ease;
+}
+
+.acsis-student-exam .detection-overlay.is-active {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.acsis-student-exam .detection-title {
+  font-size: clamp(26px, 5vw, 38px);
+  font-weight: 800;
+  margin-bottom: 16px;
+  max-width: 520px;
+  line-height: 1.2;
+}
+
+.acsis-student-exam .detection-sub {
+  font-size: clamp(16px, 2.5vw, 20px);
+  font-weight: 400;
+  margin-bottom: 24px;
+}
+
+.acsis-student-exam .detection-strikes {
+  font-size: clamp(20px, 3.5vw, 26px);
+  font-weight: 700;
+}
+
+.acsis-student-exam .detection-countdown {
+  position: absolute;
+  bottom: clamp(32px, 6vh, 56px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: clamp(14px, 2vw, 17px);
+  font-weight: 500;
+  width: 100%;
+  text-align: center;
+  padding: 0 16px;
+}
+
+.acsis-student-exam .exam-session-exit {
+  margin-top: auto;
+  padding: 16px;
+  text-align: center;
+  font-size: 0.85rem;
+}
+
+.acsis-student-exam .exam-session-exit a {
+  color: #86efac;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .acsis-student-exam .lobby-spinner {
+    animation: none;
+    border-top-color: rgba(255, 255, 255, 0.5);
+  }
+}

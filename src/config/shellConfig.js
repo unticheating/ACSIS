@@ -1,0 +1,103 @@
+import {
+  AlertCircle,
+  BarChart3,
+  ClipboardList,
+  FileText,
+  LayoutDashboard,
+  LayoutGrid,
+  Mail,
+  ScrollText,
+  Settings,
+  Shield,
+  TrendingUp,
+  UsersRound,
+} from 'lucide-react'
+import { getClassById, getExamInClass } from '../lib/classesExams.js'
+
+/** Navigation only — chrome (names, avatars) comes from SessionContext. */
+export const shellConfig = {
+  teacher: {
+    nav: [
+      { to: '/teacher', label: 'Dashboard', end: true, icon: LayoutGrid },
+      { to: '/teacher/my-classes', label: 'My Classes', icon: ClipboardList },
+      { to: '/teacher/detections', label: 'Detections', icon: AlertCircle },
+      { to: '/teacher/reports', label: 'Reports', icon: BarChart3 },
+    ],
+  },
+  student: {
+    nav: [
+      { to: '/student/my-classes', label: 'Enrolled classes', icon: ClipboardList },
+      { to: '/student/performance', label: 'Performance', icon: TrendingUp },
+      { to: '/student/reports', label: 'Reports', icon: ScrollText },
+      { to: '/student/messages', label: 'Results & Email', icon: Mail },
+    ],
+  },
+  admin: {
+    nav: [
+      { to: '/admin', label: 'Dashboard', end: true, icon: LayoutDashboard },
+      { to: '/admin/classes', label: 'Classes', icon: FileText },
+      { to: '/admin/violations', label: 'Violation Records', icon: Shield },
+      { to: '/admin/users', label: 'User Management', icon: UsersRound },
+      { to: '/admin/settings', label: 'System Settings', icon: Settings },
+    ],
+  },
+  /** Platform scope (multi-tenant) — same shell pattern as institution admin for the demo. */
+  super_admin: {
+    nav: [
+      { to: '/super-admin', label: 'Platform', end: true, icon: LayoutDashboard },
+      { to: '/super-admin/classes', label: 'Classes', icon: FileText },
+      { to: '/super-admin/violations', label: 'Violation Records', icon: Shield },
+      { to: '/super-admin/users', label: 'User Management', icon: UsersRound },
+      { to: '/super-admin/settings', label: 'System Settings', icon: Settings },
+    ],
+  },
+}
+
+/**
+ * Breadcrumb segment for teacher/student chrome (matches admin reference).
+ * @param {'teacher' | 'student'} role
+ * @param {string} pathname
+ */
+export function resolveShellPageTitle(role, pathname) {
+  if (role === 'teacher') {
+    const examDetail = pathname.match(/^\/teacher\/my-classes\/([^/]+)\/exams\/([^/]+)$/)
+    if (examDetail) {
+      const hit = getExamInClass(examDetail[1], examDetail[2])
+      if (hit?.exam?.title) return hit.exam.title
+    }
+    const classStream = pathname.match(/^\/teacher\/my-classes\/([^/]+)$/)
+    if (classStream) {
+      const cls = getClassById(classStream[1])
+      if (cls?.name) return cls.name
+    }
+  }
+
+  if (role === 'student') {
+    const clsPath = pathname.match(/^\/student\/my-classes\/([^/]+)$/)
+    if (clsPath) {
+      const cls = getClassById(clsPath[1])
+      if (cls?.name) return cls.name
+    }
+  }
+
+  const extras =
+    role === 'teacher'
+      ? { '/teacher/create-exam': 'Create examination' }
+      : role === 'student'
+        ? { '/student/performance': 'Performance' }
+        : {}
+
+  const extra = extras[pathname]
+  if (extra) return extra
+
+  const nav = shellConfig[role].nav
+  for (const item of nav) {
+    if (item.end && pathname === item.to) return item.label
+  }
+  const ordered = nav.filter((i) => !i.end).sort((a, b) => b.to.length - a.to.length)
+  for (const item of ordered) {
+    if (pathname === item.to || pathname.startsWith(`${item.to}/`)) return item.label
+  }
+  if (role === 'super_admin') return 'Super admin'
+  return role === 'student' ? 'Enrolled classes' : 'Dashboard'
+}
