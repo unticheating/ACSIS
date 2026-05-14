@@ -1,0 +1,227 @@
+/* Past examinations — minimalist list, aligned with student dashboard */
+
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+
+.content-body.pe-body {
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  padding-top: 8px;
+  padding-bottom: 40px;
+}
+
+.pe-intro {
+  margin-bottom: 8px;
+  max-width: 52ch;
+}
+
+.pe-title {
+  font-size: clamp(1.35rem, 2.4vw, 1.6rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: #0f172a;
+  line-height: 1.2;
+  margin: 0 0 6px;
+}
+
+.pe-lead {
+  font-size: 14px;
+  line-height: 1.5;
+  color: #7a9585;
+  margin: 0;
+}
+
+.pe-count {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  margin: 0 0 14px;
+}
+
+.pe-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pe-card {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 12px 16px;
+  padding: 18px 18px 18px 20px;
+  background: #ffffff;
+  border: 1px solid #e4ede8;
+  border-radius: 12px;
+  text-decoration: none;
+  color: inherit;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.pe-card:hover {
+  border-color: #c5e0d0;
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.08);
+  transform: translateY(-1px);
+}
+
+.pe-card:focus {
+  outline: 2px solid #16a34a;
+  outline-offset: 2px;
+}
+
+.pe-card:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.pe-card:focus-visible {
+  outline: 2px solid #16a34a;
+  outline-offset: 2px;
+}
+
+.pe-card-main {
+  min-width: 0;
+}
+
+.pe-exam-name {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #0f172a;
+  line-height: 1.35;
+  margin: 0 0 8px;
+}
+
+.pe-subject {
+  font-size: 13px;
+  line-height: 1.45;
+  color: #64748b;
+  margin: 0;
+}
+
+.pe-code {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #3d5a47;
+  background: #f0faf4;
+  border-radius: 6px;
+  vertical-align: baseline;
+}
+
+.pe-card-meta {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.pe-date {
+  font-size: 12px;
+  font-weight: 500;
+  color: #94a3b8;
+  font-variant-numeric: tabular-nums;
+}
+
+.pe-score {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 11px;
+  border-radius: 999px;
+  letter-spacing: 0.02em;
+}
+
+.pe-score--high {
+  color: #166534;
+  background: #ecfdf3;
+  border: 1px solid rgba(22, 163, 74, 0.22);
+}
+
+.pe-score--mid {
+  color: #3d5a47;
+  background: #f0faf4;
+  border: 1px solid #d0e5d8;
+}
+
+.pe-score--low {
+  color: #9a3412;
+  background: #fff7ed;
+  border: 1px solid rgba(234, 88, 12, 0.2);
+}
+
+.pe-score--neutral {
+  color: #475569;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.pe-card-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  transition: color 0.15s ease, transform 0.18s ease;
+}
+
+.pe-card:hover .pe-card-arrow {
+  color: #16a34a;
+  transform: translateX(3px);
+}
+
+.pe-empty {
+  margin-top: 12px;
+  padding: 36px 24px;
+  text-align: center;
+  background: #fafcfb;
+  border: 1px dashed #d0e5d8;
+  border-radius: 12px;
+}
+
+.pe-empty-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1a2e22;
+  margin: 0 0 6px;
+}
+
+.pe-empty-text {
+  font-size: 13px;
+  color: #7a9585;
+  margin: 0;
+  line-height: 1.5;
+}
+
+@media (max-width: 720px) {
+  .pe-card {
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto;
+  }
+
+  .pe-card-main {
+    grid-column: 1 / -1;
+  }
+
+  .pe-card-meta {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    text-align: left;
+    grid-column: 1 / 2;
+  }
+
+  .pe-card-arrow {
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: end;
+  }
+}
