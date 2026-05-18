@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Reports - Teacher Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="sidebar.css" />
+  <link rel="stylesheet" href="navbar.css" />
+  <link rel="stylesheet" href="reports.css" />
+</head>
+<body>
+  <div class="page-wrapper">
+    <aside class="sidebar" id="main-sidebar">
+      <div class="sidebar-brand">
+        <div class="sidebar-brand-avatar">T</div>
+        <div class="sidebar-brand-info">
+          <span class="sidebar-brand-name">Teacher</span>
+          <span class="sidebar-brand-role">Portal</span>
+        </div>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="teacher_dashboard.html" class="sidebar-link" data-page="dashboard">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect>
+          </svg> Dashboard
+        </a>
+        <a href="create_exam.html" class="sidebar-link" data-page="create-exam">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line>
+          </svg> Create Exam
+        </a>
+        <a href="my_exams.html" class="sidebar-link" data-page="my-exams">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"></path><rect x="9" y="3" width="6" height="4" rx="1"></rect><path d="M9 12h6M9 16h4"></path>
+          </svg> My Exams
+        </a>
+        <a href="detections.html" class="sidebar-link" data-page="detections">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+          </svg> Detections
+        </a>
+        <a href="reports.html" class="sidebar-link active" data-page="reports">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line>
+          </svg> Reports
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <button class="sidebar-logout" onclick="handleLogout()">Logout</button>
+      </div>
+    </aside>
+
+    <nav class="navbar" id="main-navbar">
+      <div class="navbar-left">
+        <span class="navbar-title">Prof. Juan Dela Cruz</span>
+        <span class="navbar-subtitle">Welcome back, Teacher</span>
+      </div>
+    </nav>
+
+    <main class="main-content">
+      <div class="container">
+        
+        <div class="panel">
+          <div class="exam-title-row">
+            <div>
+              <h2>Data Structures Final EXAM</h2>
+              <p>2 student(s) • 2 questions</p>
+            </div>
+            <button class="btn-ghost-text" onclick="changeExam()">Change Exam</button>
+          </div>
+          
+          <div class="tabs-and-actions-row">
+            <div class="tabs-group">
+              <button class="tab-btn" onclick="switchTab('summary', this)">Summary</button>
+              <button class="tab-btn" onclick="switchTab('violations', this)">Violations</button>
+              <button class="tab-btn active" onclick="switchTab('detailed', this)">Detailed</button>
+            </div>
+            
+            <div class="action-group">
+              <button class="btn-action btn-blue" onclick="exportData('CSV')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                Download CSV
+              </button>
+              <button class="btn-action btn-green" onclick="exportData('PDF')">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                Print PDF
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div id="tab-summary" class="tab-panel panel">
+          <div class="report-header">
+            <h3>Summary Report</h3>
+            <p>Data Structures Final EXAM</p>
+          </div>
+          <p class="text-gray">Overview metrics will appear here.</p>
+        </div>
+
+        <div id="tab-violations" class="tab-panel panel">
+          <div class="report-header">
+            <h3>Violations Report</h3>
+            <p>Data Structures Final EXAM</p>
+          </div>
+          
+          <div class="violation-alert-box">
+            <div class="alert-title">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+              Total Violations Detected
+            </div>
+            <div class="alert-count">0</div>
+            <div class="alert-sub">0 student(s) with violations</div>
+          </div>
+
+          <h4 class="violation-details-title">Violation Details</h4>
+          </div>
+
+        <div id="tab-detailed" class="tab-panel active panel">
+          <div class="report-header">
+            <h3>Detailed Performance Report</h3>
+            <p>Data Structures Final EXAM</p>
+          </div>
+
+          <div class="student-detail-card">
+            <div class="sdc-header">
+              <div class="sdc-info">
+                <h4>Juan Dela Cruz</h4>
+                <span>Student ID: 2024-12345 • Section: A</span>
+              </div>
+              <div class="sdc-score">
+                <div class="score-val text-green">N/A%</div>
+                <div class="score-lbl">Final Score</div>
+              </div>
+            </div>
+            <div class="sdc-stats">
+              <div class="sdc-stat">
+                <div class="stat-val">0/2</div>
+                <div class="stat-lbl">Questions Answered</div>
+              </div>
+              <div class="sdc-stat">
+                <div class="stat-val">0</div>
+                <div class="stat-lbl">Violations</div>
+              </div>
+              <div class="sdc-stat">
+                <div class="stat-val text-red">Auto</div>
+                <div class="stat-lbl">Submission</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="student-detail-card">
+            <div class="sdc-header">
+              <div class="sdc-info">
+                <h4>Juan Dela Cruz</h4>
+                <span>Student ID: 2024-12345 • Section: A</span>
+              </div>
+              <div class="sdc-score">
+                <div class="score-val text-green">50.0%</div>
+                <div class="score-lbl">Final Score</div>
+              </div>
+            </div>
+            <div class="sdc-stats">
+              <div class="sdc-stat">
+                <div class="stat-val">2/2</div>
+                <div class="stat-lbl">Questions Answered</div>
+              </div>
+              <div class="sdc-stat">
+                <div class="stat-val">0</div>
+                <div class="stat-lbl">Violations</div>
+              </div>
+              <div class="sdc-stat">
+                <div class="stat-val text-green">Normal</div>
+                <div class="stat-lbl">Submission</div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </main>
+  </div>
+  <script src="reports.js"></script>
+</body>
+</html>
