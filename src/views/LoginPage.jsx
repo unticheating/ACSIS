@@ -1,6 +1,7 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { demoAccounts, useSession } from '@/context/SessionContext.jsx'
+import { AUTH_ERROR_MESSAGES, startGoogleSignIn } from '@/lib/authApi.js'
 import '../styles/acsis-immersive.css'
 
 function pickAccountFromEmail(email) {
@@ -22,11 +23,37 @@ function pickAccountFromEmail(email) {
 
 export default function LoginPage() {
   const navigate = useNavigate()
-  const { switchAccount } = useSession()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const { switchAccount, refreshAuth, authUser, authLoading, isAuthenticated, activeAccount } =
+    useSession()
   const [email, setEmail] = useState('acsisadmin@gmail.com')
+  const [banner, setBanner] = useState(null)
+
+  useEffect(() => {
+    const errorCode = searchParams.get('error')
+    if (errorCode) {
+      setBanner(AUTH_ERROR_MESSAGES[errorCode] || 'Sign-in could not be completed.')
+      searchParams.delete('error')
+      searchParams.delete('auth')
+      setSearchParams(searchParams, { replace: true })
+    }
+  }, [searchParams, setSearchParams])
+
+  useEffect(() => {
+    if (authLoading) return
+    if (searchParams.get('auth') === 'success' && isAuthenticated && activeAccount.entryPath) {
+      navigate(activeAccount.entryPath, { replace: true })
+    }
+  }, [authLoading, isAuthenticated, activeAccount.entryPath, navigate, searchParams])
+
+  useEffect(() => {
+    if (searchParams.get('auth') === 'success') {
+      refreshAuth().catch(() => {})
+    }
+  }, [refreshAuth, searchParams])
 
   function onGoogle() {
-    window.alert('Google sign-in will be connected to your institution (plp.edu.ph) when OAuth is configured.')
+    startGoogleSignIn()
   }
 
   function onLogin(e) {
@@ -51,7 +78,18 @@ export default function LoginPage() {
           <p className="acsis-immersive__subtitle">Anti-Cheating Student Integrity System</p>
 
           <div className="acsis-immersive__auth-stack">
-            <p className="acsis-immersive__hint">Sign in with your plp.edu.ph email</p>
+            {banner ? (
+              <p className="acsis-immersive__error" role="alert">
+                {banner}
+              </p>
+            ) : null}
+            {authUser && !authUser.portal ? (
+              <p className="acsis-immersive__error" role="alert">
+                {AUTH_ERROR_MESSAGES.no_membership}
+              </p>
+            ) : null}
+
+            <p className="acsis-immersive__hint">Sign in with your @plpasig.edu.ph Google account</p>
             <button type="button" className="acsis-immersive__btn-google" onClick={onGoogle}>
               <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden>
                 <path
@@ -78,7 +116,7 @@ export default function LoginPage() {
 
             <form onSubmit={onLogin}>
               <div className="acsis-immersive__field">
-                <label htmlFor="acsis-email">Sign in with your ACSIS registered email</label>
+                <label htmlFor="acsis-email">Demo sign-in (development only)</label>
                 <input
                   id="acsis-email"
                   className="acsis-immersive__input"
@@ -86,17 +124,18 @@ export default function LoginPage() {
                   autoComplete="username"
                   value={email}
                   onChange={(ev) => setEmail(ev.target.value)}
-                  placeholder="you@plp.edu.ph"
+                  placeholder="you@plpasig.edu.ph"
                 />
               </div>
               <button type="submit" className="acsis-immersive__btn-primary">
-                Login
+                Demo login
               </button>
             </form>
 
             <p className="acsis-immersive__footer">
-              Demo: <code>superadmin@acsis.dev</code> → Super admin · <code>acsisadmin@gmail.com</code> → Institution
-              admin · faculty-style email → Faculty · other → Student.{' '}
+              Production: use Google with <code>@plpasig.edu.ph</code>. Demo:{' '}
+              <code>superadmin@acsis.dev</code> → Super admin · <code>acsisadmin@gmail.com</code> →
+              Institution admin · faculty-style email → Faculty · other → Student.{' '}
               <Link to="/dev/portals">Portal picker</Link>
             </p>
           </div>

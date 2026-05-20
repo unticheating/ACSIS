@@ -37,9 +37,10 @@ function readInitialCollapsed() {
 }
 
 export default function AppSidebar({ items, settingsPath = null }) {
-  const { accounts, activeAccount, switchAccount } = useSession()
+  const { accounts, activeAccount, switchAccount, logout, sessionMode } = useSession()
   const { theme, toggleTheme } = useTheme()
-  const otherAccounts = accounts.filter((a) => a.id !== activeAccount.id)
+  const otherAccounts =
+    sessionMode === 'demo' ? accounts.filter((a) => a.id !== activeAccount.id) : []
   const [collapsed, setCollapsed] = useState(readInitialCollapsed)
 
   useLayoutEffect(() => {
@@ -153,7 +154,7 @@ export default function AppSidebar({ items, settingsPath = null }) {
                 if (!window.confirm('Are you sure you want to logout?')) {
                   e.preventDefault()
                 } else {
-                  window.location.assign('/')
+                  logout()
                 }
               }}
             >

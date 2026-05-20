@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
+import ProtectedRoute from './components/auth/ProtectedRoute.jsx'
 import AdminLayout from './layouts/AdminLayout.jsx'
 import StudentLayout from './layouts/StudentLayout.jsx'
 import SuperAdminLayout from './layouts/SuperAdminLayout.jsx'
@@ -30,7 +31,14 @@ export default function App() {
     <Routes>
       <Route path="/" element={<LoginPage />} />
       <Route path="/dev/portals" element={<DevPortalsPage />} />
-      <Route path="/teacher" element={<TeacherLayout />}>
+      <Route
+        path="/teacher"
+        element={
+          <ProtectedRoute portal="teacher">
+            <TeacherLayout />
+          </ProtectedRoute>
+        }
+      >
         <Route index element={<TeacherDashboardPage />} />
         <Route path="create-exam" element={<TeacherCreateExamPage />} />
         <Route path="my-classes" element={<TeacherMyClassesPage />} />
@@ -44,7 +52,14 @@ export default function App() {
       <Route path="/student/exam/lobby" element={<Navigate to="/student/exam/session" replace />} />
       <Route path="/student/exam/session" element={<StudentExamSessionPage />} />
       <Route path="/student/exam/result" element={<StudentExamResultPage />} />
-      <Route path="/student" element={<StudentLayout />}>
+      <Route
+        path="/student"
+        element={
+          <ProtectedRoute portal="student">
+            <StudentLayout />
+          </ProtectedRoute>
+        }
+      >
         <Route index element={<Navigate to="/student/my-classes" replace />} />
         <Route path="join" element={<Navigate to="/student/my-classes" replace />} />
         <Route path="my-classes" element={<StudentExamsPage />} />
@@ -54,7 +69,14 @@ export default function App() {
         <Route path="reports" element={<StudentReportsPage />} />
         <Route path="messages" element={<StudentMessagesPage />} />
       </Route>
-      <Route path="/admin" element={<AdminLayout />}>
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute portal="admin">
+            <AdminLayout />
+          </ProtectedRoute>
+        }
+      >
         <Route index element={<AdminDashboardPage />} />
         <Route path="students" element={<AdminPlaceholderPage title="Students" />} />
         <Route path="subjects" element={<AdminPlaceholderPage title="Subjects" />} />
@@ -66,7 +88,14 @@ export default function App() {
         <Route path="reports" element={<AdminPlaceholderPage title="Reports" />} />
         <Route path="settings" element={<AdminSettingsPage basePath="/admin" />} />
       </Route>
-      <Route path="/super-admin" element={<SuperAdminLayout />}>
+      <Route
+        path="/super-admin"
+        element={
+          <ProtectedRoute portal="super_admin">
+            <SuperAdminLayout />
+          </ProtectedRoute>
+        }
+      >
         <Route index element={<SuperAdminDashboardPage />} />
         <Route path="students" element={<AdminPlaceholderPage title="Students" />} />
         <Route path="subjects" element={<AdminPlaceholderPage title="Subjects" />} />

@@ -57,7 +57,9 @@ CREATE TABLE users (
     last_name      VARCHAR(50)  NOT NULL,
     suffix         VARCHAR(10)  DEFAULT NULL,
     email          VARCHAR(100) NOT NULL UNIQUE,
-    password       VARCHAR(255) NOT NULL, -- bcrypt hash, never plaintext
+    password       VARCHAR(255) DEFAULT NULL, -- bcrypt hash; NULL for Google-only accounts
+    google_sub     VARCHAR(255) UNIQUE, -- Google account subject (stable id)
+    avatar_url     TEXT         DEFAULT NULL,
     is_super_admin BOOLEAN      NOT NULL DEFAULT FALSE,
     created_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
