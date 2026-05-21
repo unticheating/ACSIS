@@ -1,0 +1,114 @@
+import { ChevronsUpDown, Moon, Settings, Sun } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu.jsx'
+import { useSession } from '@/context/SessionContext.jsx'
+import { useTheme } from '@/context/ThemeContext.jsx'
+
+/**
+ * @param {{
+ *   settingsPath?: string | null,
+ *   showText?: boolean,
+ *   triggerClassName?: string,
+ *   onTriggerClick?: (e: import('react').MouseEvent) => void,
+ *   menuSide?: 'top' | 'bottom',
+ * }} props
+ */
+export default function AccountMenu({
+  settingsPath = null,
+  showText = true,
+  triggerClassName = 'acsis-profile-card acsis-profile-card--trigger',
+  onTriggerClick,
+  menuSide = 'top',
+}) {
+  const { accounts, activeAccount, switchAccount, logout, sessionMode } = useSession()
+  const { theme, toggleTheme } = useTheme()
+  const otherAccounts =
+    sessionMode === 'demo' ? accounts.filter((a) => a.id !== activeAccount.id) : []
+
+  return (
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className={triggerClassName}
+          aria-label="Account menu"
+          onClick={onTriggerClick}
+        >
+          <div className="acsis-profile-avatar">{activeAccount.avatarLetter}</div>
+          {showText ? (
+            <>
+              <div className="acsis-profile-text">
+                <span className="acsis-profile-name">{activeAccount.displayName}</span>
+                <span className="acsis-profile-role">{activeAccount.roleLabel}</span>
+              </div>
+              <span className="acsis-profile-switch" aria-hidden>
+                <ChevronsUpDown size={18} strokeWidth={2} />
+              </span>
+            </>
+          ) : null}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        side={menuSide}
+        align="end"
+        sideOffset={8}
+        collisionPadding={12}
+        className="acsis-account-dropdown z-[200] min-w-[220px] max-w-[min(320px,calc(100vw-24px))]"
+      >
+        {otherAccounts.length > 0
+          ? otherAccounts.map((a) => (
+              <DropdownMenuItem
+                key={a.id}
+                className="flex cursor-pointer flex-col items-start gap-0.5 py-2 font-semibold"
+                onSelect={() => switchAccount(a)}
+              >
+                {a.displayName}
+                <span className="text-xs font-medium text-muted-foreground">{a.roleLabel}</span>
+              </DropdownMenuItem>
+            ))
+          : null}
+        {otherAccounts.length > 0 ? <DropdownMenuSeparator /> : null}
+        {settingsPath ? (
+          <DropdownMenuItem asChild className="cursor-pointer p-0 focus:bg-transparent">
+            <Link
+              to={settingsPath}
+              className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-accent focus:text-accent-foreground"
+            >
+              <Settings size={16} strokeWidth={2} aria-hidden />
+              Settings
+            </Link>
+          </DropdownMenuItem>
+        ) : null}
+        <DropdownMenuItem
+          className="cursor-pointer gap-2"
+          onSelect={(e) => {
+            e.preventDefault()
+            toggleTheme()
+          }}
+        >
+          {theme === 'dark' ? <Sun size={16} strokeWidth={2} aria-hidden /> : <Moon size={16} strokeWidth={2} aria-hidden />}
+          {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          className="cursor-pointer text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40 dark:focus:text-red-300"
+          onSelect={(e) => {
+            if (!window.confirm('Are you sure you want to logout?')) {
+              e.preventDefault()
+            } else {
+              logout()
+            }
+          }}
+        >
+          Log out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}

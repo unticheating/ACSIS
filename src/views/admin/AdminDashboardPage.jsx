@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { SummaryStatCard, SummaryStatGrid } from '@/components/dashboard/SummaryStatCard.jsx'
 import '../../pages/admin-ui/style.css'
 
 const demoExams = [
@@ -54,20 +55,11 @@ export default function AdminDashboardPage({ basePath = '/admin' }) {
       </div>
 
       <div className="content-body">
-        <div className="stat-cards">
-          <div className="stat-card green">
-            <div className="stat-card-label">On-Going Examinations</div>
-            <div className="stat-card-value">0</div>
-          </div>
-          <div className="stat-card green">
-            <div className="stat-card-label">Total Examinations</div>
-            <div className="stat-card-value">0</div>
-          </div>
-          <div className="stat-card red">
-            <div className="stat-card-label">Detected Students</div>
-            <div className="stat-card-value">0</div>
-          </div>
-        </div>
+        <SummaryStatGrid>
+          <SummaryStatCard label="On-Going Examinations" value={0} tone="success" />
+          <SummaryStatCard label="Total Examinations" value={0} tone="success" />
+          <SummaryStatCard label="Detected Students" value={0} tone="danger" />
+        </SummaryStatGrid>
 
         <div className="panel">
           <div className="panel-header">
@@ -81,15 +73,13 @@ export default function AdminDashboardPage({ basePath = '/admin' }) {
               <div key={exam.name} className="exam-item">
                 <div className="exam-info">
                   <div className="exam-name">{exam.name}</div>
-                  <div className="exam-by">by {exam.by}</div>
+                  <div className="exam-by">{exam.by}</div>
                 </div>
-                <div className="exam-meta">
-                  <div className="exam-timer">
-                    {exam.timer}
-                    <span className="exam-timer-sub">({exam.sub})</span>
-                  </div>
-                  <div className="exam-progress">{exam.done}</div>
+                <div className="exam-timer-wrap">
+                  <div className="exam-timer">{exam.timer}</div>
+                  <div className="exam-timer-sub">{exam.sub}</div>
                 </div>
+                <div className="exam-progress">{exam.done}</div>
               </div>
             ))}
           </div>
@@ -105,30 +95,17 @@ export default function AdminDashboardPage({ basePath = '/admin' }) {
           <div className="detected-list">
             {demoDetected.map((student) => (
               <div key={student.id} className="detected-item">
-                <div className="detected-left">
-                  <div className="strikes-badge">
-                    <span className="strikes-count">{student.strikes}</span>
-                    <span className="strikes-label">strikes</span>
+                <div className="detected-info">
+                  <div className="detected-name">
+                    {student.strikes} — {student.name}
                   </div>
-                  <div className="detected-info">
-                    <div className="detected-name">
-                      {student.name}
-                      <span>
-                        {' '}
-                        in {student.exam}
-                      </span>
-                    </div>
-                    <div className="detected-sub">{student.sub}</div>
+                  <div className="detected-sub">
+                    {student.exam} · {student.sub}
                   </div>
                 </div>
-                <div className="detected-right">
-                  <Link to={`${basePath}/violations?id=${student.id}`} className="view-info-link">
-                    View more info
-                  </Link>
-                  <button type="button" className="ticket-btn" onClick={() => ticketViolation(student.id)}>
-                    Ticket Violation
-                  </button>
-                </div>
+                <button type="button" className="view-info-link" onClick={() => ticketViolation(student.id)}>
+                  Issue ticket
+                </button>
               </div>
             ))}
           </div>

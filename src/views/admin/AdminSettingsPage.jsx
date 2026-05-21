@@ -10,6 +10,21 @@ export default function AdminSettingsPage({ basePath = '/admin' }) {
   const { theme, setTheme } = useTheme()
   const isPlatform = basePath === '/super-admin'
 
+  if (isPlatform) {
+    return (
+      <div className="acsis-stack">
+        <div className="content-header">
+          <div className="breadcrumb">
+            <span className="brand-plp">PLP</span>
+            <span className="brand-acsis"> ACSIS</span>
+            <span className="sep">/</span>
+            <span className="page-name">System settings</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="acsis-stack">
       <div className="content-header">
@@ -50,12 +65,10 @@ export default function AdminSettingsPage({ basePath = '/admin' }) {
 
         <div className="panel">
           <div className="panel-header">
-            <span className="panel-title">{isPlatform ? 'Platform' : 'Institution'}</span>
+            <span className="panel-title">Institution</span>
           </div>
           <p className="admin-placeholder-lead">
-            {isPlatform
-              ? 'Super admin tools (tenant provisioning, billing, audit) will connect here. Use the sidebar for classes and users in this demo.'
-              : 'Branding, LDAP, email, and exam policies will connect here when wired to your backend.'}
+            Branding, LDAP, email, and exam policies will connect here when wired to your backend.
           </p>
           <p className="admin-settings-back">
             <Link to={basePath}>← Back to dashboard</Link>

@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { Clock, Eye } from 'lucide-react'
+import { SummaryStatCard, SummaryStatGrid } from '@/components/dashboard/SummaryStatCard.jsx'
 import { getAllExamsWithClassMeta } from '@/lib/classesExams.js'
 import '../../pages/teacher-ui/detections.css'
 
@@ -33,7 +35,7 @@ export default function TeacherDetectionsPage() {
 
   if (!activeExam) {
     return (
-      <div className="acsis-view">
+      <div className="acsis-view detections-page">
         <div className="acsis-empty-panel" style={{ marginTop: '40px' }}>
           <h2>No Active Exams</h2>
           <p>Activate an exam from the 'My Exams' or 'My Classes' page to begin live monitoring.</p>
@@ -47,34 +49,25 @@ export default function TeacherDetectionsPage() {
   const completed = activeSessions.filter(s => s.status === 'submitted').length
 
   return (
-    <div className="acsis-view">
+    <div className="acsis-view detections-page">
       <div className="container" style={{ padding: 0 }}>
         
         {/* Stats Row */}
-        <div className="stats-grid-4">
-          <div className="stat-card">
-            <span className="stat-title">Still Answering</span>
-            <span className="stat-value">{stillAnswering}</span>
-          </div>
-          <div className="stat-card">
-            <span className="stat-title">Completed</span>
-            <span className="stat-value">{completed}</span>
-          </div>
-          <div className="stat-card">
-            <span className="stat-title">Highest Score</span>
-            <span className="stat-value text-gray-400 text-lg mt-2">Pending...</span>
-            <div className="stat-icon">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                <circle cx="12" cy="12" r="3"></circle>
-              </svg>
-            </div>
-          </div>
-          <div className="stat-card">
-            <span className="stat-title">Timer</span>
-            <span className="stat-value">{formatTime(seconds)}</span>
-          </div>
-        </div>
+        <SummaryStatGrid columns={4}>
+          <SummaryStatCard label="Still Answering" value={stillAnswering} tone="success" />
+          <SummaryStatCard label="Completed" value={completed} tone="success" />
+          <SummaryStatCard
+            label="Highest Score"
+            value="—"
+            hint="Pending…"
+            icon={<Eye width={28} height={28} strokeWidth={1.5} aria-hidden />}
+          />
+          <SummaryStatCard
+            label="Timer"
+            value={formatTime(seconds)}
+            icon={<Clock width={28} height={28} strokeWidth={1.5} aria-hidden />}
+          />
+        </SummaryStatGrid>
 
         {/* Alerts Section */}
         <div className="panel">

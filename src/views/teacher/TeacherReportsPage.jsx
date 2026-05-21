@@ -42,7 +42,7 @@ export default function TeacherReportsPage() {
   }, [allExams, selectedExamId])
 
   return (
-    <div className="acsis-view">
+    <div className="acsis-view reports-page">
       <div className="container" style={{ padding: 0 }}>
         
         {/* VIEW 1: EXAM SELECTION PANEL */}

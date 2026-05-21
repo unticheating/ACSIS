@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import PlpLogo from '@/components/brand/PlpLogo.jsx'
 import { getExamInClass } from '@/lib/classesExams.js'
 import { useSession } from '@/context/SessionContext.jsx'
 import '../../pages/student-ui/exam_session.react.css'
@@ -37,7 +38,7 @@ function Chrome({ title, secondsLeft }) {
   return (
     <header className="exam-chrome">
       <div className="exam-logo" aria-hidden>
-        PLP
+        <PlpLogo className="exam-logo-img" width={40} height={40} alt="" />
       </div>
       <div className="exam-title-bar">{title}</div>
       <div className="exam-timer">{formatClock(secondsLeft)}</div>

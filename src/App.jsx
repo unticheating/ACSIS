@@ -11,11 +11,11 @@ import AdminUserManagementPage from './views/admin/AdminUserManagementPage.jsx'
 import AdminSettingsPage from './views/admin/AdminSettingsPage.jsx'
 import DevPortalsPage from './views/DevPortalsPage.jsx'
 import LoginPage from './views/LoginPage.jsx'
+import VerifyEmailPage from './views/VerifyEmailPage.jsx'
 import StudentClassStreamPage from './views/student/StudentClassStreamPage.jsx'
 import StudentExamResultPage from './views/student/StudentExamResultPage.jsx'
 import StudentExamSessionPage from './views/student/StudentExamSessionPage.jsx'
 import StudentExamsPage from './views/student/StudentExamsPage.jsx'
-import StudentMessagesPage from './views/student/StudentMessagesPage.jsx'
 import StudentPerformancePage from './views/student/StudentPerformancePage.jsx'
 import StudentReportsPage from './views/student/StudentReportsPage.jsx'
 import TeacherCreateExamPage from './views/teacher/TeacherCreateExamPage.jsx'
@@ -31,6 +31,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<LoginPage />} />
+      <Route path="/verify" element={<VerifyEmailPage />} />
       <Route path="/dev/portals" element={<DevPortalsPage />} />
       <Route
         path="/teacher"
@@ -68,7 +69,7 @@ export default function App() {
         <Route path="exams" element={<Navigate to="/student/my-classes" replace />} />
         <Route path="performance" element={<StudentPerformancePage />} />
         <Route path="reports" element={<StudentReportsPage />} />
-        <Route path="messages" element={<StudentMessagesPage />} />
+        <Route path="messages" element={<Navigate to="/student/my-classes" replace />} />
       </Route>
       <Route
         path="/admin"
@@ -100,10 +101,12 @@ export default function App() {
         <Route index element={<SuperAdminDashboardPage />} />
         <Route path="students" element={<AdminPlaceholderPage title="Students" />} />
         <Route path="subjects" element={<AdminPlaceholderPage title="Subjects" />} />
-        <Route path="classes" element={<AdminExaminationsPage />} />
-        <Route path="examinations" element={<Navigate to="/super-admin/classes" replace />} />
+        <Route path="institutions" element={<AdminExaminationsPage pageTitle="Institutions" />} />
+        <Route path="classes" element={<Navigate to="/super-admin/institutions" replace />} />
+        <Route path="examinations" element={<Navigate to="/super-admin/institutions" replace />} />
         <Route path="monitoring" element={<AdminPlaceholderPage title="Monitoring" />} />
-        <Route path="violations" element={<AdminPlaceholderPage title="Violation records" />} />
+        <Route path="analytics" element={<AdminPlaceholderPage title="System Analytics" />} />
+        <Route path="violations" element={<Navigate to="/super-admin/analytics" replace />} />
         <Route path="users" element={<AdminUserManagementPage basePath="/super-admin" />} />
         <Route path="reports" element={<AdminPlaceholderPage title="Reports" />} />
         <Route path="settings" element={<AdminSettingsPage basePath="/super-admin" />} />

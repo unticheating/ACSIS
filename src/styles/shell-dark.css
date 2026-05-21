@@ -3,6 +3,17 @@
 html.dark {
   color-scheme: dark;
   --acsis-canvas: #0b1710;
+  --acsis-nav-fg: #b8d4c4;
+  --acsis-nav-icon: #7a9d8a;
+  --acsis-nav-hover-bg: rgba(34, 197, 94, 0.12);
+  --acsis-nav-hover-fg: #ecfdf5;
+  --acsis-nav-active-bg: linear-gradient(
+    135deg,
+    rgba(22, 163, 74, 0.35) 0%,
+    rgba(21, 128, 61, 0.25) 100%
+  );
+  --acsis-nav-active-fg: #ecfdf5;
+  --acsis-nav-active-shadow: 0 1px 0 rgba(74, 222, 128, 0.15);
 }
 
 html.dark body,
@@ -34,23 +45,33 @@ html.dark .admin-role {
 }
 
 html.dark .nav-item {
-  color: #b8d4c4;
+  color: var(--acsis-nav-fg);
 }
 
 html.dark .nav-item i,
 html.dark .nav-item .admin-nav-icon {
-  color: #7a9d8a;
+  color: var(--acsis-nav-icon);
 }
 
 html.dark .nav-item:hover {
-  background: rgba(34, 197, 94, 0.12);
-  color: #ecfdf5;
+  background: var(--acsis-nav-hover-bg);
+  color: var(--acsis-nav-hover-fg);
+}
+
+html.dark .nav-item:hover i,
+html.dark .nav-item:hover .admin-nav-icon {
+  color: var(--acsis-nav-hover-fg);
 }
 
 html.dark .nav-item.active {
-  background: linear-gradient(135deg, rgba(22, 163, 74, 0.35) 0%, rgba(21, 128, 61, 0.25) 100%);
-  color: #ecfdf5;
-  box-shadow: 0 1px 0 rgba(74, 222, 128, 0.15);
+  background: var(--acsis-nav-active-bg);
+  color: var(--acsis-nav-active-fg);
+  box-shadow: var(--acsis-nav-active-shadow);
+}
+
+html.dark .nav-item.active i,
+html.dark .nav-item.active .admin-nav-icon {
+  color: var(--acsis-nav-active-fg);
 }
 
 html.dark .logout-btn {
@@ -77,9 +98,21 @@ html.dark .content-header {
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
 }
 
-html.dark .breadcrumb,
+@media (min-width: 768px) {
+  html.dark .content-header {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+  }
+}
+
+html.dark .breadcrumb .brand-plp,
+html.dark .breadcrumb .brand-acsis {
+  color: var(--brand-mark, #4ade80);
+}
+
 html.dark .breadcrumb .page-name {
-  color: #c5e4d4;
+  color: var(--brand-page, #c5e4d4);
 }
 
 html.dark .breadcrumb .sep {
@@ -391,11 +424,255 @@ html.dark .acsis-create-exam .form-group textarea {
   color: #ecfdf5;
 }
 
-html.dark .content-header .breadcrumb .brand-plp,
-html.dark .content-header .breadcrumb .brand-acsis {
+
+@media (max-width: 767px) {
+  html.dark .acsis-mobile-top-bar {
+    background: #0f1f16;
+    border-bottom-color: rgba(74, 222, 128, 0.12);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+  }
+
+  html.dark .acsis-mobile-top-bar__breadcrumb .brand-plp,
+  html.dark .acsis-mobile-top-bar__breadcrumb .brand-acsis {
+    color: var(--brand-mark, #4ade80);
+  }
+
+  html.dark .acsis-mobile-top-bar__breadcrumb .page-name {
+    color: var(--brand-page, #c5e4d4);
+  }
+
+  html.dark .acsis-mobile-top-bar__breadcrumb .sep {
+    color: #6b8f7a;
+  }
+
+  html.dark .acsis-mobile-account-trigger {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(74, 222, 128, 0.15);
+  }
+
+  html.dark .acsis-mobile-bottom-nav {
+    background: #0f1f16;
+    border-top-color: rgba(74, 222, 128, 0.12);
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.35);
+  }
+
+  html.dark .acsis-bottom-nav__item {
+    color: var(--acsis-nav-fg);
+  }
+
+  html.dark .acsis-bottom-nav__item:not(.is-active) .acsis-bottom-nav__icon {
+    color: var(--acsis-nav-icon);
+  }
+
+  html.dark .acsis-bottom-nav__item:hover:not(.is-active) {
+    color: var(--acsis-nav-hover-fg);
+    background: var(--acsis-nav-hover-bg);
+  }
+
+  html.dark .acsis-bottom-nav__item:hover:not(.is-active) .acsis-bottom-nav__icon {
+    color: var(--acsis-nav-hover-fg);
+  }
+
+  html.dark .acsis-bottom-nav__item.is-active {
+    color: var(--acsis-nav-active-fg);
+    background: var(--acsis-nav-active-bg);
+    box-shadow: var(--acsis-nav-active-shadow);
+  }
+
+  html.dark .acsis-bottom-nav__item.is-active .acsis-bottom-nav__icon,
+  html.dark .acsis-bottom-nav__item.is-active .acsis-bottom-nav__label {
+    color: var(--acsis-nav-active-fg);
+  }
+
+  html.dark.acsis-sidebar-collapsed .nav-item:hover {
+    background: var(--acsis-nav-hover-bg);
+    color: var(--acsis-nav-hover-fg);
+  }
+
+  html.dark.acsis-sidebar-collapsed .nav-item.active {
+    background: var(--acsis-nav-active-bg);
+    color: var(--acsis-nav-active-fg);
+    box-shadow: var(--acsis-nav-active-shadow);
+  }
+}
+
+/* Shared summary stat cards */
+html.dark .acsis-summary-stat {
+  background: var(--bg-surface);
+  border-color: var(--border-muted);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+}
+
+html.dark .acsis-summary-stat:hover {
+  border-color: rgba(74, 222, 128, 0.28);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+
+html.dark .acsis-summary-stat__label {
+  color: var(--fg-muted);
+}
+
+html.dark .acsis-summary-stat__value {
+  color: #86efac;
+}
+
+html.dark .acsis-summary-stat--success .acsis-summary-stat__value {
   color: #4ade80;
 }
 
-html.dark .content-header .breadcrumb .sep {
-  color: #6b8f7a;
+html.dark .acsis-summary-stat--danger .acsis-summary-stat__value {
+  color: #f87171;
+}
+
+html.dark .acsis-summary-stat__hint {
+  color: #9cbcaa;
+}
+
+html.dark .acsis-summary-stat__icon {
+  color: rgba(74, 222, 128, 0.35);
+}
+
+html.dark .acsis-summary-stat--danger .acsis-summary-stat__icon {
+  color: rgba(248, 113, 113, 0.35);
+}
+
+/* Legacy PHP admin solid stat cards */
+html.dark .stat-card.green {
+  background: linear-gradient(135deg, #15803d 0%, #166534 100%);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+html.dark .stat-card.red {
+  background: linear-gradient(135deg, #b91c1c 0%, #991b1b 100%);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+/* Monitoring stat rows */
+html.dark .monitor-stat-card {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(74, 222, 128, 0.12);
+}
+
+html.dark .monitor-stat-label {
+  color: #9cbcaa;
+}
+
+html.dark .monitor-stat-value {
+  color: #ecfdf5;
+}
+
+/* Teacher — my classes */
+html.dark .acsis-mc-title {
+  color: #ecfdf5;
+}
+
+html.dark .acsis-mc-sub {
+  color: #9cbcaa;
+}
+
+html.dark .acsis-mc-tab {
+  color: #b8d4c4;
+}
+
+html.dark .acsis-mc-tab:hover {
+  background: rgba(34, 197, 94, 0.12);
+  color: #ecfdf5;
+}
+
+html.dark .acsis-class-card {
+  background: var(--bg-surface);
+  border-color: var(--border-default);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+}
+
+html.dark .acsis-class-card:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+
+html.dark .acsis-class-card__name {
+  color: #ecfdf5;
+}
+
+html.dark .acsis-class-card__meta,
+html.dark .acsis-class-card__footer {
+  color: #9cbcaa;
+}
+
+html.dark .acsis-view .panel,
+html.dark .acsis-empty-panel {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(74, 222, 128, 0.12);
+  color: #dceee4;
+}
+
+
+html.dark .acsis-mc-empty {
+  color: #9cbcaa;
+}
+
+/* Teacher — reports */
+html.dark .reports-page h1,
+html.dark .reports-page h2,
+html.dark .reports-page h3,
+html.dark .violation-details-title,
+html.dark .sdc-info h4 {
+  color: #ecfdf5;
+}
+
+html.dark .reports-page p,
+html.dark .sdc-info span,
+html.dark .alert-sub {
+  color: #9cbcaa;
+}
+
+html.dark .student-detail-card,
+html.dark .tab-panel.panel {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(74, 222, 128, 0.12);
+}
+
+html.dark .tab-btn {
+  color: #b8d4c4;
+}
+
+html.dark .tab-btn.active {
+  background: rgba(34, 197, 94, 0.2);
+  color: #86efac;
+}
+
+html.dark .tab-btn:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.06);
+  color: #ecfdf5;
+}
+
+/* Teacher — detections */
+html.dark .detections-page .panel,
+html.dark .detections-empty {
+  color: #b8d4c4;
+}
+
+html.dark .detections-page h2 {
+  color: #ecfdf5;
+}
+
+/* Dev portals picker */
+html.dark .acsis-dev-portals {
+  background: linear-gradient(135deg, #0b1710 0%, #0f1f16 100%) !important;
+}
+
+html.dark .acsis-dev-portals h1 {
+  color: var(--brand-mark, #4ade80) !important;
+}
+
+html.dark .acsis-dev-portals > div > p {
+  color: #b8d4c4 !important;
+}
+
+html.dark .acsis-dev-portals a {
+  color: #86efac !important;
+}
+
+/* Radix / shadcn surfaces */
+html.dark [data-radix-popper-content-wrapper] {
+  color-scheme: dark;
 }

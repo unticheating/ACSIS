@@ -1,4 +1,5 @@
 import { Navigate } from 'react-router-dom'
+import AuthLoadingSkeleton from '@/components/layout/AuthLoadingSkeleton.jsx'
 import { useSession } from '@/context/SessionContext.jsx'
 
 /**
@@ -8,11 +9,7 @@ export default function ProtectedRoute({ children, portal }) {
   const { authLoading, isAuthenticated, activeAccount } = useSession()
 
   if (authLoading) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center p-8 text-muted-foreground" role="status">
-        Loading…
-      </div>
-    )
+    return <AuthLoadingSkeleton />
   }
 
   if (!isAuthenticated) {

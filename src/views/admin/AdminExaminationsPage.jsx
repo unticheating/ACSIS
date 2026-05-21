@@ -27,7 +27,10 @@ import {
 } from '@/lib/classesExams.js'
 import '../../pages/admin-ui/style.css'
 
-export default function AdminExaminationsPage() {
+/**
+ * @param {{ pageTitle?: string }} props
+ */
+export default function AdminExaminationsPage({ pageTitle = 'Classes' }) {
   const [classes, setClasses] = useState(() => {
     ensureClassesMigrated()
     return getClasses()
@@ -112,7 +115,7 @@ export default function AdminExaminationsPage() {
           <span className="brand-plp">PLP</span>
           <span className="brand-acsis"> ACSIS</span>
           <span className="sep">/</span>
-          <span className="page-name">Classes</span>
+          <span className="page-name">{pageTitle}</span>
         </div>
       </div>
 

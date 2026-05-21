@@ -54,15 +54,11 @@
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: linear-gradient(145deg, #166534, #052e16);
-  border: 1px solid rgba(74, 222, 128, 0.35);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.55rem;
-  font-weight: 800;
-  color: #bbf7d0;
   flex-shrink: 0;
+  overflow: hidden;
 }
 
 .acsis-immersive__main {
@@ -70,8 +66,9 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 72px 20px 48px;
+  justify-content: flex-start;
+  min-height: 0;
+  padding: clamp(88px, 14vh, 120px) 20px 48px;
   width: 100%;
   box-sizing: border-box;
 }
@@ -79,7 +76,39 @@
 .acsis-immersive__panel {
   width: 100%;
   max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   text-align: center;
+}
+
+/* Auth login / verify — brand fixed at top, form centered in remaining viewport */
+.acsis-immersive__panel:has(.acsis-immersive__brand) {
+  flex: 1;
+  min-height: 0;
+}
+
+.acsis-immersive__brand {
+  width: 100%;
+  flex-shrink: 0;
+  margin: 0;
+  text-align: center;
+}
+
+.acsis-immersive__content {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.acsis-immersive__panel:has(.acsis-immersive__brand) .acsis-immersive__content {
+  flex: 1;
+  min-height: 0;
+  justify-content: center;
+  /* Extra bottom space shifts the block above true vertical center (eye level) */
+  padding-top: 0;
+  padding-bottom: clamp(96px, 18vh, 180px);
 }
 
 /* Email + Login + demo footer — same column width as Google button (320px) */
@@ -91,26 +120,27 @@
 }
 
 .acsis-immersive__title {
-  margin: 0 0 8px;
-  font-size: clamp(2.25rem, 6vw, 3.25rem);
+  margin: 0 0 10px;
+  font-size: clamp(3rem, 10vw, 4.5rem);
   font-weight: 800;
-  letter-spacing: 0.04em;
+  letter-spacing: -0.02em;
   color: #ecfdf5;
   text-shadow: 0 2px 24px rgba(0, 0, 0, 0.35);
+  line-height: 1;
 }
 
 /* Login hero — italic wordmark (700 italic matches bundled Latin face) */
 .acsis-immersive__title--brand {
   font-style: italic;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: -0.03em;
 }
 
 .acsis-immersive__subtitle {
-  margin: 0 0 32px;
+  margin: 0;
   font-size: 0.7rem;
   font-weight: 500;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--acsis-immersive-fg-muted);
   line-height: 1.5;
@@ -249,6 +279,83 @@
 
 .acsis-immersive__footer a:hover {
   text-decoration: underline;
+}
+
+/* Email verification step (after landing email submit) */
+.acsis-immersive__verify-lead {
+  margin: 0 0 28px;
+  width: 100%;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  color: var(--acsis-immersive-accent);
+  text-align: center;
+}
+
+.acsis-immersive__verify-email {
+  display: block;
+  margin-top: 6px;
+  font-weight: 600;
+  color: var(--acsis-immersive-fg);
+  word-break: break-all;
+}
+
+.acsis-immersive__verify-form {
+  width: 100%;
+}
+
+.acsis-immersive__code-row {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 22px;
+}
+
+.acsis-immersive__code-box {
+  width: 48px;
+  height: 52px;
+  box-sizing: border-box;
+  padding: 0;
+  border-radius: 10px;
+  border: 1px solid var(--acsis-immersive-input-border);
+  background: var(--acsis-immersive-panel);
+  color: #fff;
+  font-size: 1.375rem;
+  font-weight: 700;
+  text-align: center;
+  caret-color: var(--acsis-immersive-accent);
+}
+
+.acsis-immersive__code-box:focus {
+  outline: none;
+  border-color: var(--acsis-immersive-accent);
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.25);
+}
+
+.acsis-immersive__verify-back {
+  margin-top: 22px;
+  font-size: 0.8125rem;
+  text-align: center;
+}
+
+.acsis-immersive__verify-back a {
+  color: var(--acsis-immersive-accent);
+  text-decoration: none;
+}
+
+.acsis-immersive__verify-back a:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 380px) {
+  .acsis-immersive__code-row {
+    gap: 6px;
+  }
+
+  .acsis-immersive__code-box {
+    width: 42px;
+    height: 48px;
+    font-size: 1.25rem;
+  }
 }
 
 /* —— In-exam / lobby layers (reuse same root) —— */

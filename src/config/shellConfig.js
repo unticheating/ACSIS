@@ -5,12 +5,12 @@ import {
   FileText,
   LayoutDashboard,
   LayoutGrid,
-  Mail,
   ScrollText,
   Settings,
   Shield,
   TrendingUp,
   UsersRound,
+  Building2,
 } from 'lucide-react'
 import { getClassById, getExamInClass } from '../lib/classesExams.js'
 
@@ -19,46 +19,49 @@ export const shellConfig = {
   teacher: {
     nav: [
       { to: '/teacher', label: 'Dashboard', end: true, icon: LayoutGrid },
-      { to: '/teacher/my-classes', label: 'My Classes', icon: ClipboardList },
+      { to: '/teacher/my-classes', label: 'My Classes', mobileLabel: 'Classes', icon: ClipboardList },
       { to: '/teacher/detections', label: 'Detections', icon: AlertCircle },
       { to: '/teacher/reports', label: 'Reports', icon: BarChart3 },
     ],
   },
   student: {
     nav: [
-      { to: '/student/my-classes', label: 'Enrolled classes', icon: ClipboardList },
-      { to: '/student/performance', label: 'Performance', icon: TrendingUp },
-      { to: '/student/reports', label: 'Reports', icon: ScrollText },
-      { to: '/student/messages', label: 'Results & Email', icon: Mail },
+      { to: '/student/my-classes', label: 'Enrolled classes', mobileLabel: 'Classes', icon: ClipboardList },
+      { to: '/student/performance', label: 'Performance', mobileLabel: 'Performance', icon: TrendingUp },
+      { to: '/student/reports', label: 'Reports', mobileLabel: 'Reports', icon: ScrollText },
     ],
   },
   admin: {
     nav: [
       { to: '/admin', label: 'Dashboard', end: true, icon: LayoutDashboard },
       { to: '/admin/classes', label: 'Classes', icon: FileText },
-      { to: '/admin/violations', label: 'Violation Records', icon: Shield },
-      { to: '/admin/users', label: 'User Management', icon: UsersRound },
-      { to: '/admin/settings', label: 'System Settings', icon: Settings },
+      { to: '/admin/violations', label: 'Violation Records', mobileLabel: 'Violations', icon: Shield },
+      { to: '/admin/users', label: 'User Management', mobileLabel: 'Users', icon: UsersRound },
+      { to: '/admin/settings', label: 'System Settings', mobileLabel: 'Settings', icon: Settings },
     ],
   },
   /** Platform scope (multi-tenant) — same shell pattern as institution admin for the demo. */
   super_admin: {
     nav: [
       { to: '/super-admin', label: 'Platform', end: true, icon: LayoutDashboard },
-      { to: '/super-admin/classes', label: 'Classes', icon: FileText },
-      { to: '/super-admin/violations', label: 'Violation Records', icon: Shield },
-      { to: '/super-admin/users', label: 'User Management', icon: UsersRound },
-      { to: '/super-admin/settings', label: 'System Settings', icon: Settings },
+      { to: '/super-admin/institutions', label: 'Institutions', mobileLabel: 'Schools', icon: Building2 },
+      { to: '/super-admin/analytics', label: 'System Analytics', mobileLabel: 'Analytics', icon: BarChart3 },
+      { to: '/super-admin/users', label: 'User Management', mobileLabel: 'Users', icon: UsersRound },
+      { to: '/super-admin/settings', label: 'System Settings', mobileLabel: 'Settings', icon: Settings },
     ],
   },
 }
 
 /**
- * Breadcrumb segment for teacher/student chrome (matches admin reference).
- * @param {'teacher' | 'student'} role
+ * Breadcrumb page segment (matches in-page admin/teacher/student headers).
+ * @param {'teacher' | 'student' | 'admin' | 'super_admin'} role
  * @param {string} pathname
  */
 export function resolveShellPageTitle(role, pathname) {
+  if (role === 'super_admin' && pathname === '/super-admin') {
+    return 'Super admin'
+  }
+
   if (role === 'teacher') {
     const examDetail = pathname.match(/^\/teacher\/my-classes\/([^/]+)\/exams\/([^/]+)$/)
     if (examDetail) {

@@ -1,19 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { ClipboardList, FileText, Users } from 'lucide-react'
+import { SummaryStatCard, SummaryStatGrid } from '@/components/dashboard/SummaryStatCard.jsx'
 import { CLASSES_CHANGED_EVENT, CLASSES_STORAGE_KEY, getAllExamsWithClassMeta } from '../../lib/classesExams.js'
-import '../../pages/teacher-ui/teacher_dashboard.css'
-
-function StatCard({ label, value, children }) {
-  return (
-    <div className="stat-card">
-      <div className="stat-card-body">
-        <span className="stat-card-label">{label}</span>
-        <span className="stat-card-value">{value}</span>
-      </div>
-      <div className="stat-card-icon">{children}</div>
-    </div>
-  )
-}
 
 export default function TeacherDashboardPage() {
   const [exams, setExams] = useState(() => getAllExamsWithClassMeta())
@@ -39,18 +27,27 @@ export default function TeacherDashboardPage() {
   const totalStudents = 1
 
   return (
-    <div className="acsis-view td-dashboard">
-      <div className="stats-grid">
-        <StatCard label="My Classes" value={total}>
-          <FileText width={28} height={28} strokeWidth={1.5} aria-hidden />
-        </StatCard>
-        <StatCard label="Active Exams" value={active}>
-          <ClipboardList width={28} height={28} strokeWidth={1.5} aria-hidden />
-        </StatCard>
-        <StatCard label="Total Students" value={totalStudents}>
-          <Users width={28} height={28} strokeWidth={1.5} aria-hidden />
-        </StatCard>
-      </div>
+    <div className="acsis-view">
+      <SummaryStatGrid>
+        <SummaryStatCard
+          label="My Classes"
+          value={total}
+          tone="success"
+          icon={<FileText width={28} height={28} strokeWidth={1.5} aria-hidden />}
+        />
+        <SummaryStatCard
+          label="Active Exams"
+          value={active}
+          tone="success"
+          icon={<ClipboardList width={28} height={28} strokeWidth={1.5} aria-hidden />}
+        />
+        <SummaryStatCard
+          label="Total Students"
+          value={totalStudents}
+          tone="success"
+          icon={<Users width={28} height={28} strokeWidth={1.5} aria-hidden />}
+        />
+      </SummaryStatGrid>
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
-import { Building2, FileText, Settings, ShieldCheck } from 'lucide-react'
+import { BarChart3, Building2, Settings } from 'lucide-react'
+import { SummaryStatCard, SummaryStatGrid } from '@/components/dashboard/SummaryStatCard.jsx'
 import '../../pages/admin-ui/style.css'
 
 /** Platform home — separate from institution admin dashboard. */
@@ -23,29 +24,20 @@ export default function SuperAdminDashboardPage() {
           operators only.
         </p>
 
-        <div className="stat-cards super-admin-stat-cards">
-          <div className="stat-card green">
-            <div className="stat-card-label">Institutions (demo)</div>
-            <div className="stat-card-value">1</div>
-          </div>
-          <div className="stat-card green">
-            <div className="stat-card-label">Active sessions</div>
-            <div className="stat-card-value">—</div>
-          </div>
-          <div className="stat-card red">
-            <div className="stat-card-label">Open incidents</div>
-            <div className="stat-card-value">0</div>
-          </div>
-        </div>
+        <SummaryStatGrid>
+          <SummaryStatCard label="Institutions (demo)" value={1} tone="success" />
+          <SummaryStatCard label="Active sessions" value="—" tone="success" />
+          <SummaryStatCard label="Open incidents" value={0} tone="danger" />
+        </SummaryStatGrid>
 
         <div className="panel">
           <div className="panel-header">
             <span className="panel-title">Quick links</span>
           </div>
           <div className="super-admin-links">
-            <Link to={`${base}/classes`} className="super-admin-link">
-              <FileText size={20} strokeWidth={2} aria-hidden className="super-admin-link__icon" />
-              <span>Classes across tenants</span>
+            <Link to={`${base}/institutions`} className="super-admin-link">
+              <Building2 size={20} strokeWidth={2} aria-hidden className="super-admin-link__icon" />
+              <span>Institutions</span>
             </Link>
             <Link to={`${base}/users`} className="super-admin-link">
               <Building2 size={20} strokeWidth={2} aria-hidden className="super-admin-link__icon" />
@@ -53,11 +45,11 @@ export default function SuperAdminDashboardPage() {
             </Link>
             <Link to={`${base}/settings`} className="super-admin-link">
               <Settings size={20} strokeWidth={2} aria-hidden className="super-admin-link__icon" />
-              <span>System settings & appearance</span>
+              <span>System settings</span>
             </Link>
-            <Link to={`${base}/violations`} className="super-admin-link">
-              <ShieldCheck size={20} strokeWidth={2} aria-hidden className="super-admin-link__icon" />
-              <span>Violation records</span>
+            <Link to={`${base}/analytics`} className="super-admin-link">
+              <BarChart3 size={20} strokeWidth={2} aria-hidden className="super-admin-link__icon" />
+              <span>System analytics</span>
             </Link>
           </div>
         </div>

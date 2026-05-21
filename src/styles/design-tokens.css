@@ -27,6 +27,11 @@
   --border-muted: rgba(22, 101, 52, 0.12);
   --accent-primary: hsl(142 71% 36%);
   --accent-primary-hover: #15803d;
+  /* Breadcrumb brand (light mode — single dark forest green) */
+  --brand-mark: #14532d;
+  --brand-plp: var(--brand-mark);
+  --brand-acsis: var(--brand-mark);
+  --brand-page: #1a2e22;
   --accent-danger: hsl(0 72% 42%);
   --focus-ring: hsl(142 71% 36%);
 
@@ -52,6 +57,10 @@ html.dark {
   --fg-muted: hsl(140 15% 68%);
   --border-default: hsl(142 18% 22%);
   --border-muted: rgba(74, 222, 128, 0.18);
+  --brand-mark: #4ade80;
+  --brand-plp: var(--brand-mark);
+  --brand-acsis: var(--brand-mark);
+  --brand-page: #c5e4d4;
 }
 
 /* Optional: map institution theme from API — set on <html data-theme="ocean"> + CSS below */
@@ -67,7 +76,7 @@ html[data-theme='ocean'] {
     --motion-medium: 0.01ms;
   }
 
-  .stat-card,
+  .acsis-summary-stat,
   .acsis-class-card,
   .acsis-stream-item,
   .nav-item,
@@ -78,7 +87,7 @@ html[data-theme='ocean'] {
     transition-duration: 0.01ms !important;
   }
 
-  .stat-card:hover,
+  .acsis-summary-stat:hover,
   .acsis-class-card:hover {
     transform: none !important;
   }

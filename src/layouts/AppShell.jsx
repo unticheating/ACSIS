@@ -1,9 +1,13 @@
 import { Outlet } from 'react-router-dom'
 import AppSidebar from '../components/layout/AppSidebar.jsx'
+import MobileBottomNav from '../components/layout/MobileBottomNav.jsx'
+import MobileTopBar from '../components/layout/MobileTopBar.jsx'
 import ShellBreadcrumb from '../components/layout/ShellBreadcrumb.jsx'
 import { shellConfig } from '../config/shellConfig.js'
 import '../pages/admin-ui/style.css'
 import '../styles/sidebar-extras.css'
+import '../styles/mobile-shell.css'
+import '../styles/summary-stat-cards.css'
 import '../styles/shell-dark.css'
 
 /**
@@ -21,6 +25,7 @@ export default function AppShell({ role }) {
         Skip to main content
       </a>
       <AppSidebar items={nav} settingsPath={settingsPath} />
+      <MobileTopBar settingsPath={settingsPath} role={role} />
       <main className="acsis-main" id="acsis-main-content" tabIndex={-1}>
         {role === 'admin' || role === 'super_admin' ? (
           <div className="acsis-page">
@@ -35,6 +40,7 @@ export default function AppShell({ role }) {
           </div>
         )}
       </main>
+      <MobileBottomNav items={nav} />
     </div>
   )
 }

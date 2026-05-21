@@ -1,4 +1,5 @@
 import { Link, useSearchParams } from 'react-router-dom'
+import PlpLogo from '@/components/brand/PlpLogo.jsx'
 import { getExamInClass } from '@/lib/classesExams.js'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx'
 import '../../styles/acsis-immersive.css'
@@ -14,7 +15,7 @@ export default function StudentExamResultPage() {
     <div className="acsis-immersive">
       <header className="acsis-immersive__institution">
         <div className="acsis-immersive__logo-mark" aria-hidden>
-          PLP
+          <PlpLogo className="acsis-logo-img" width={28} height={28} alt="" />
         </div>
         <span>Pamantasan ng Lungsod ng Pasig</span>
       </header>

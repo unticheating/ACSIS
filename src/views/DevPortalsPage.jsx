@@ -1,17 +1,21 @@
 import { Link } from 'react-router-dom'
-import '../pages/teacher-ui/teacher_dashboard.css'
+import '../styles/summary-stat-cards.css'
+import { SummaryStatGrid } from '@/components/dashboard/SummaryStatCard.jsx'
+import { cn } from '@/lib/utils'
 
 function PortalCard({ to, title, description, letter }) {
   return (
-    <Link to={to} className="stat-card" style={{ textDecoration: 'none', color: 'inherit' }}>
-      <div className="stat-card-body">
-        <span className="stat-card-label">{title}</span>
-        <span className="stat-card-value" style={{ fontSize: '1.5rem', fontWeight: 700 }}>
+    <Link
+      to={to}
+      className={cn('acsis-summary-stat', 'acsis-summary-stat--success')}
+      style={{ textDecoration: 'none', color: 'inherit' }}
+    >
+      <div className="acsis-summary-stat__body">
+        <span className="acsis-summary-stat__label">{title}</span>
+        <span className="acsis-summary-stat__value" style={{ fontSize: '1.5rem' }}>
           {letter}
         </span>
-        <span className="stat-card-label" style={{ marginTop: 8, fontWeight: 500 }}>
-          {description}
-        </span>
+        <span className="acsis-summary-stat__hint">{description}</span>
       </div>
     </Link>
   )
@@ -21,6 +25,7 @@ function PortalCard({ to, title, description, letter }) {
 export default function DevPortalsPage() {
   return (
     <div
+      className="acsis-dev-portals"
       style={{
         minHeight: '100vh',
         padding: '48px 24px',
@@ -30,23 +35,22 @@ export default function DevPortalsPage() {
     >
       <div style={{ width: '100%', maxWidth: '100%', margin: 0 }}>
         <p style={{ marginBottom: 16 }}>
-          <Link to="/" style={{ color: '#166534', fontWeight: 600 }}>
+          <Link to="/" style={{ color: 'var(--brand-plp, #14532d)', fontWeight: 600 }}>
             ← Back to login
           </Link>
         </p>
-        <h1 style={{ fontSize: '1.75rem', color: '#166534', marginBottom: 8 }}>PLP ACSIS — demo portals</h1>
+        <h1 style={{ fontSize: '1.75rem', color: 'var(--brand-mark, #14532d)', marginBottom: 8 }}>
+          PLP ACSIS — demo portals
+        </h1>
         <p style={{ color: '#4b5563', marginBottom: 32, lineHeight: 1.5 }}>
           Jump directly into a role layout without going through the login screen.
         </p>
-        <div
-          className="td-dashboard stats-grid"
-          style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}
-        >
+        <SummaryStatGrid className="!grid-cols-[repeat(auto-fit,minmax(200px,1fr))]">
           <PortalCard to="/super-admin" letter="X" title="Super admin" description="Platform / multi-tenant (demo)" />
           <PortalCard to="/teacher" letter="T" title="Teacher" description="Dashboard, exams, live monitoring" />
           <PortalCard to="/student/my-classes" letter="S" title="Student" description="Enrolled classes, exam stream" />
           <PortalCard to="/admin" letter="A" title="Admin" description="Subjects, students, violations" />
-        </div>
+        </SummaryStatGrid>
       </div>
     </div>
   )

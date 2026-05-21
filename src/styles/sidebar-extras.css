@@ -11,6 +11,8 @@
   --green-dark: #16a34a;
   --red-500: #ef4444;
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
+  --acsis-sidebar-duration: 0.3s;
+  --acsis-sidebar-ease: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .acsis-sidebar-header {
@@ -20,6 +22,7 @@
   padding: 12px 12px 10px;
   border-bottom: 1px solid var(--gray-200);
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .acsis-collapse-btn {
@@ -33,8 +36,8 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
   flex-shrink: 0;
+  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
 }
 
 .acsis-collapse-btn:hover {
@@ -52,15 +55,18 @@
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: linear-gradient(145deg, #16a34a, #22c55e);
-  color: #fff;
-  font-size: 0.65rem;
-  font-weight: 800;
   display: flex;
   align-items: center;
   justify-content: center;
-  letter-spacing: -0.02em;
   flex-shrink: 0;
+  overflow: hidden;
+}
+
+.acsis-logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
 }
 
 .acsis-profile-card--trigger {
@@ -72,10 +78,11 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 10px;
+  padding: 10px;
   border-radius: 12px;
   background: var(--gray-100);
   border: 1px solid var(--gray-200);
+  transition: background 0.18s ease, border-color 0.18s ease;
 }
 
 .acsis-profile-card--trigger:hover {
@@ -99,7 +106,6 @@
   position: relative;
 }
 
-/* Hide legacy teacher-only rule */
 .sidebar-brand.acsis-sidebar-brand--hidden {
   display: none;
 }
@@ -108,7 +114,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 10px;
+  padding: 10px;
   border-radius: 12px;
   background: var(--gray-100);
   border: 1px solid var(--gray-200);
@@ -159,7 +165,6 @@
   border-radius: 8px;
   background: transparent;
   color: var(--gray-500);
-  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -170,17 +175,19 @@
 .acsis-nav-label {
   flex: 1;
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
+/* ── Collapsed (icon rail) ── */
 html.acsis-sidebar-collapsed {
   --sidebar-width: 72px;
 }
 
-html.acsis-sidebar-collapsed .acsis-nav-label {
-  display: none;
-}
-
-html.acsis-sidebar-collapsed .acsis-profile-text {
+html.acsis-sidebar-collapsed .acsis-nav-label,
+html.acsis-sidebar-collapsed .acsis-profile-text,
+html.acsis-sidebar-collapsed .acsis-profile-switch {
   display: none;
 }
 
@@ -189,11 +196,75 @@ html.acsis-sidebar-collapsed .acsis-sidebar-header {
   padding-top: 10px;
 }
 
+html.acsis-sidebar-collapsed .sidebar-nav {
+  align-items: center;
+  padding-left: 10px;
+  padding-right: 10px;
+  gap: 4px;
+}
+
+html.acsis-sidebar-collapsed .nav-item {
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  justify-content: center;
+  align-items: center;
+  gap: 0;
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+html.acsis-sidebar-collapsed .nav-item .admin-nav-icon {
+  width: 20px;
+  height: 20px;
+}
+
+html.acsis-sidebar-collapsed .nav-item:hover {
+  background: #f0faf4;
+  color: #16a34a;
+}
+
+html.acsis-sidebar-collapsed .nav-item:hover .admin-nav-icon {
+  color: #16a34a;
+}
+
+html.acsis-sidebar-collapsed .nav-item.active {
+  background: #16a34a;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(22, 163, 74, 0.35);
+}
+
+html.acsis-sidebar-collapsed .nav-item.active .admin-nav-icon {
+  color: #ffffff;
+}
+
 html.acsis-sidebar-collapsed .acsis-profile-card,
 html.acsis-sidebar-collapsed .acsis-profile-card--trigger {
   justify-content: center;
+  padding-left: 8px;
+  padding-right: 8px;
 }
 
-html.acsis-sidebar-collapsed .acsis-profile-switch {
-  display: none;
+html.acsis-sidebar-collapsed .sidebar.acsis-sidebar--collapsed-expandable {
+  cursor: ew-resize;
+}
+
+html.acsis-sidebar-collapsed .sidebar.acsis-sidebar--collapsed-expandable .nav-item,
+html.acsis-sidebar-collapsed .sidebar.acsis-sidebar--collapsed-expandable .acsis-profile-card--trigger,
+html.acsis-sidebar-collapsed .sidebar.acsis-sidebar--collapsed-expandable a,
+html.acsis-sidebar-collapsed .sidebar.acsis-sidebar--collapsed-expandable button {
+  cursor: pointer;
+}
+
+html.acsis-sidebar-collapsed .sidebar.acsis-sidebar--collapsed-expandable:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: -2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar,
+  .acsis-main {
+    transition: none !important;
+  }
 }

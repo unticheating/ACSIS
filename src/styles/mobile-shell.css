@@ -1,0 +1,247 @@
+/* Mobile shell: bottom nav + top bar (desktop keeps left sidebar). */
+
+:root {
+  --acsis-bottom-nav-tile: clamp(64px, 18vw, 72px);
+  --acsis-bottom-nav-height: calc(var(--acsis-bottom-nav-tile) + 20px);
+  --acsis-mobile-top-height: 64px;
+  --acsis-mobile-top-offset: calc(
+    var(--acsis-mobile-top-height) + env(safe-area-inset-top, 0px)
+  );
+}
+
+.acsis-mobile-top-bar,
+.acsis-mobile-bottom-nav {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .acsis-sidebar-desktop {
+    display: none !important;
+  }
+
+  .acsis-mobile-top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    position: fixed;
+    top: env(safe-area-inset-top, 0px);
+    left: 0;
+    right: 0;
+    z-index: 110;
+    height: var(--acsis-mobile-top-height);
+    min-height: var(--acsis-mobile-top-height);
+    padding: 0 12px;
+    box-sizing: border-box;
+    background: #fff;
+    border-bottom: 1px solid rgba(22, 101, 52, 0.1);
+    box-shadow: 0 2px 12px rgba(15, 60, 35, 0.06);
+  }
+
+  .acsis-mobile-top-bar__brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .acsis-mobile-top-bar__logo {
+    width: clamp(32px, 9vw, 40px);
+    height: clamp(32px, 9vw, 40px);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .acsis-mobile-top-bar__logo .acsis-logo-img {
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    display: block;
+  }
+
+  .acsis-mobile-top-bar__breadcrumb {
+    min-width: 0;
+    flex: 1;
+    display: flex;
+    align-items: baseline;
+    flex-wrap: nowrap;
+    gap: 0;
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    font-size: 1.0625rem;
+    line-height: 1.25;
+    letter-spacing: -0.02em;
+  }
+
+  .acsis-mobile-top-bar__breadcrumb .brand-plp,
+  .acsis-mobile-top-bar__breadcrumb .brand-acsis {
+    flex-shrink: 0;
+    font-size: 1.0625rem;
+    font-weight: 700;
+    line-height: 1.25;
+    color: var(--brand-mark, #14532d);
+  }
+
+  .acsis-mobile-top-bar__breadcrumb .sep {
+    margin: 0 5px;
+    font-size: 1.0625rem;
+    font-weight: 500;
+    line-height: 1.25;
+    color: #7a9585;
+  }
+
+  .acsis-mobile-top-bar__breadcrumb .page-name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+    font-size: 1.0625rem;
+    font-weight: 600;
+    line-height: 1.25;
+    color: var(--brand-page, #1a2e22);
+  }
+
+  /* Breadcrumb lives in the mobile top bar; hide duplicate in-page headers */
+  .acsis-page > .content-header,
+  .acsis-page > .acsis-stack > .content-header {
+    display: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    min-height: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  .acsis-page > .content-body {
+    padding-top: 0;
+  }
+
+  .acsis-mobile-account-trigger {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    border: 1px solid var(--gray-200, #e5e7eb);
+    background: var(--gray-100, #f3f4f6);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    flex-shrink: 0;
+  }
+
+  .acsis-mobile-account-trigger .acsis-profile-avatar {
+    width: 32px;
+    height: 32px;
+    font-size: 0.75rem;
+  }
+
+  .acsis-mobile-bottom-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-evenly;
+    gap: 4px;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 110;
+    min-height: var(--acsis-bottom-nav-height);
+    padding: 10px 8px;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0));
+    background: #fff;
+    border-top: 1px solid rgba(22, 101, 52, 0.12);
+    box-shadow: 0 -4px 20px rgba(15, 60, 35, 0.08);
+  }
+
+  /* 1:1 square — icon + label inside the highlight box */
+  .acsis-bottom-nav__item {
+    flex: 0 0 auto;
+    box-sizing: border-box;
+    width: var(--acsis-bottom-nav-tile);
+    height: var(--acsis-bottom-nav-tile);
+    min-width: var(--acsis-bottom-nav-tile);
+    max-width: var(--acsis-bottom-nav-tile);
+    aspect-ratio: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 6px 4px;
+    text-decoration: none;
+    color: #374151;
+    border-radius: 14px;
+    background: transparent;
+    text-align: center;
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+      background 0.15s ease,
+      color 0.15s ease,
+      box-shadow 0.15s ease;
+  }
+
+  .acsis-bottom-nav__item:hover:not(.is-active) {
+    color: #166534;
+    background: #f0fdf4;
+  }
+
+  .acsis-bottom-nav__item.is-active {
+    color: #ffffff;
+    background: #16a34a;
+    box-shadow: 0 4px 12px rgba(22, 163, 74, 0.35);
+  }
+
+  .acsis-bottom-nav__icon-wrap {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: inherit;
+    line-height: 0;
+  }
+
+  .acsis-bottom-nav__icon {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+    color: inherit;
+  }
+
+  .acsis-bottom-nav__label {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    padding: 0 2px;
+    color: inherit;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: 0.01em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .acsis-main {
+    margin-left: 0 !important;
+    width: 100% !important;
+    padding-top: calc(var(--acsis-mobile-top-offset) + var(--acsis-main-pad-y, 12px));
+    padding-right: var(--acsis-main-pad-x, 14px);
+    padding-bottom: calc(
+      var(--acsis-bottom-nav-height) + env(safe-area-inset-bottom, 0px) + var(--acsis-main-pad-y, 12px)
+    );
+    padding-left: var(--acsis-main-pad-x, 14px);
+    scroll-padding-top: var(--acsis-mobile-top-offset);
+  }
+}

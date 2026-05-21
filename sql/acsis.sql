@@ -2,33 +2,64 @@
 --  ANTI-CHEATING EXAM SYSTEM (ACSIS) — PostgreSQL Schema
 --  Multi-tenant, institution-scoped, Google Classroom-style
 --  Requires PostgreSQL 12+ (GENERATED columns on exam_results).
+--
+--  Safe to re-run (idempotent):
+--    - ENUMs via pg_type check (works on all supported PG versions)
+--    - CREATE TABLE / INDEX IF NOT EXISTS
+--    - CREATE OR REPLACE FUNCTION
+--    - DROP TRIGGER IF EXISTS + CREATE TRIGGER
+--    - INSERT … ON CONFLICT DO NOTHING
+--
+--  Usage:  psql -U postgres -d your_db -f sql/acsis.sql
 -- ============================================================
 
 -- ============================================================
---  ENUM TYPES
+--  ENUM TYPES (skip if already created)
 -- ============================================================
 
-CREATE TYPE institution_user_role AS ENUM ('admin', 'faculty', 'student');
---  super_admin is a flag on the users table, not an institution role
+DO $acsis$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'institution_user_role') THEN
+        CREATE TYPE institution_user_role AS ENUM ('admin', 'faculty', 'student');
+    END IF;
+    -- super_admin is a flag on the users table, not an institution role
 
-CREATE TYPE semester_type AS ENUM ('1st', '2nd', 'Summer');
-CREATE TYPE exam_status AS ENUM ('draft', 'waiting', 'open', 'closed');
---  draft   = faculty is still building the exam
---  waiting = password released, students can enter lobby
---  open    = faculty signals start, students can now answer
---  closed  = exam ended, no more submissions
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'semester_type') THEN
+        CREATE TYPE semester_type AS ENUM ('1st', '2nd', 'Summer');
+    END IF;
 
-CREATE TYPE question_type AS ENUM ('mcq', 'identification', 'true_false');
-CREATE TYPE session_status AS ENUM ('in_progress', 'submitted', 'expired');
-CREATE TYPE cheat_event AS ENUM (
-    'alt_tab',
-    'copy_attempt',
-    'paste_attempt',
-    'window_blur',
-    'devtools_open',
-    'other'
-);
-CREATE TYPE report_type AS ENUM ('class_results', 'individual', 'item_analysis');
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'exam_status') THEN
+        CREATE TYPE exam_status AS ENUM ('draft', 'waiting', 'open', 'closed');
+    END IF;
+    -- draft   = faculty is still building the exam
+    -- waiting = password released, students can enter lobby
+    -- open    = faculty signals start, students can now answer
+    -- closed  = exam ended, no more submissions
+
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'question_type') THEN
+        CREATE TYPE question_type AS ENUM ('mcq', 'identification', 'true_false');
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'session_status') THEN
+        CREATE TYPE session_status AS ENUM ('in_progress', 'submitted', 'expired');
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'cheat_event') THEN
+        CREATE TYPE cheat_event AS ENUM (
+            'alt_tab',
+            'copy_attempt',
+            'paste_attempt',
+            'window_blur',
+            'devtools_open',
+            'other'
+        );
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'report_type') THEN
+        CREATE TYPE report_type AS ENUM ('class_results', 'individual', 'item_analysis');
+    END IF;
+END
+$acsis$;
 
 -- ============================================================
 --  REUSABLE TRIGGER: auto-update updated_at columns
@@ -50,7 +81,7 @@ $$;
 --  is_super_admin = TRUE for developer/platform-level accounts only.
 -- ============================================================
 
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     uid            SERIAL PRIMARY KEY,
     first_name     VARCHAR(50)  NOT NULL,
     middle_name    VARCHAR(50)  DEFAULT NULL,
@@ -73,7 +104,7 @@ CREATE TABLE users (
 --  base_color      = page background (almost always white)
 -- ============================================================
 
-CREATE TABLE themes (
+CREATE TABLE IF NOT EXISTS themes (
     theme_id        SERIAL PRIMARY KEY,
     theme_name      VARCHAR(50) NOT NULL UNIQUE,
     primary_color   VARCHAR(7)  NOT NULL, -- e.g. "#16A34A"
@@ -89,7 +120,8 @@ VALUES
     ('Crimson', '#B91C1C', '#FEE2E2', '#FFFFFF'), -- red
     ('Violet', '#7C3AED', '#EDE9FE', '#FFFFFF'), -- purple
     ('Amber', '#D97706', '#FEF3C7', '#FFFFFF'), -- yellow-orange
-    ('Slate', '#334155', '#F1F5F9', '#FFFFFF'); -- neutral dark
+    ('Slate', '#334155', '#F1F5F9', '#FFFFFF') -- neutral dark
+ON CONFLICT (theme_name) DO NOTHING;
 
 -- ============================================================
 --  SECTION 3: INSTITUTIONS
@@ -98,7 +130,7 @@ VALUES
 --  Instance name shown in the app = acronym || ' ACSIS' (never stored).
 -- ============================================================
 
-CREATE TABLE institutions (
+CREATE TABLE IF NOT EXISTS institutions (
     institution_id   SERIAL PRIMARY KEY,
     institution_name VARCHAR(100) NOT NULL, -- e.g. "Pamantasan ng Lungsod ng Pasig"
     acronym          VARCHAR(20)  NOT NULL UNIQUE, -- e.g. "PLP" → shown as "PLP ACSIS"
@@ -111,10 +143,11 @@ CREATE TABLE institutions (
     updated_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
+DROP TRIGGER IF EXISTS trg_institutions_updated_at ON institutions;
 CREATE TRIGGER trg_institutions_updated_at
     BEFORE UPDATE ON institutions
     FOR EACH ROW
-    EXECUTE PROCEDURE fn_set_updated_at();
+    EXECUTE FUNCTION fn_set_updated_at();
 
 -- ============================================================
 --  SECTION 4: INSTITUTION MEMBERS
@@ -123,7 +156,7 @@ CREATE TRIGGER trg_institutions_updated_at
 --  school_id = institution-issued ID (student number, employee number, etc.)
 -- ============================================================
 
-CREATE TABLE institution_members (
+CREATE TABLE IF NOT EXISTS institution_members (
     member_id      SERIAL PRIMARY KEY,
     institution_id INT NOT NULL REFERENCES institutions (institution_id) ON DELETE CASCADE,
     uid            INT NOT NULL REFERENCES users (uid) ON DELETE CASCADE,
@@ -143,7 +176,7 @@ CREATE TABLE institution_members (
 --  Academic year and semester live here.
 -- ============================================================
 
-CREATE TABLE classes (
+CREATE TABLE IF NOT EXISTS classes (
     class_id       SERIAL PRIMARY KEY,
     institution_id INT NOT NULL REFERENCES institutions (institution_id) ON DELETE CASCADE,
     member_id      INT NOT NULL REFERENCES institution_members (member_id),
@@ -157,17 +190,18 @@ CREATE TABLE classes (
     updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+DROP TRIGGER IF EXISTS trg_classes_updated_at ON classes;
 CREATE TRIGGER trg_classes_updated_at
     BEFORE UPDATE ON classes
     FOR EACH ROW
-    EXECUTE PROCEDURE fn_set_updated_at();
+    EXECUTE FUNCTION fn_set_updated_at();
 
 -- ============================================================
 --  SECTION 6: CLASS ENROLLMENTS
 --  Tracks which students have joined a class via access_code.
 -- ============================================================
 
-CREATE TABLE class_enrollments (
+CREATE TABLE IF NOT EXISTS class_enrollments (
     enrollment_id SERIAL PRIMARY KEY,
     class_id      INT NOT NULL REFERENCES classes (class_id) ON DELETE CASCADE,
     member_id     INT NOT NULL REFERENCES institution_members (member_id) ON DELETE CASCADE,
@@ -180,7 +214,7 @@ CREATE TABLE class_enrollments (
 --  Belong to a class. Students enter via password to join the lobby.
 -- ============================================================
 
-CREATE TABLE exams (
+CREATE TABLE IF NOT EXISTS exams (
     exam_id           SERIAL PRIMARY KEY,
     class_id          INT NOT NULL REFERENCES classes (class_id) ON DELETE CASCADE,
     title             VARCHAR(200) NOT NULL,
@@ -196,16 +230,17 @@ CREATE TABLE exams (
     updated_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+DROP TRIGGER IF EXISTS trg_exams_updated_at ON exams;
 CREATE TRIGGER trg_exams_updated_at
     BEFORE UPDATE ON exams
     FOR EACH ROW
-    EXECUTE PROCEDURE fn_set_updated_at();
+    EXECUTE FUNCTION fn_set_updated_at();
 
 -- ============================================================
 --  SECTION 8: QUESTIONS & CHOICES
 -- ============================================================
 
-CREATE TABLE questions (
+CREATE TABLE IF NOT EXISTS questions (
     question_id   SERIAL PRIMARY KEY,
     exam_id       INT NOT NULL REFERENCES exams (exam_id) ON DELETE CASCADE,
     question_text TEXT NOT NULL,
@@ -216,7 +251,7 @@ CREATE TABLE questions (
     -- if shuffle_questions = TRUE, app serves a randomized order.
 );
 
-CREATE TABLE choices (
+CREATE TABLE IF NOT EXISTS choices (
     choice_id   SERIAL PRIMARY KEY,
     question_id INT NOT NULL REFERENCES questions (question_id) ON DELETE CASCADE,
     choice_text VARCHAR(500) NOT NULL,
@@ -232,7 +267,7 @@ CREATE TABLE choices (
 --  Created when student submits the correct exam password.
 -- ============================================================
 
-CREATE TABLE exam_sessions (
+CREATE TABLE IF NOT EXISTS exam_sessions (
     session_id     SERIAL PRIMARY KEY,
     exam_id        INT NOT NULL REFERENCES exams (exam_id) ON DELETE CASCADE,
     member_id      INT NOT NULL REFERENCES institution_members (member_id),
@@ -249,7 +284,7 @@ CREATE TABLE exam_sessions (
 --  Locked after submission — cannot be edited post-submission.
 -- ============================================================
 
-CREATE TABLE student_answers (
+CREATE TABLE IF NOT EXISTS student_answers (
     answer_id        SERIAL PRIMARY KEY,
     session_id       INT NOT NULL REFERENCES exam_sessions (session_id) ON DELETE CASCADE,
     question_id      INT NOT NULL REFERENCES questions (question_id),
@@ -267,7 +302,7 @@ CREATE TABLE student_answers (
 --  SECTION 11: CHEATING LOGS
 -- ============================================================
 
-CREATE TABLE cheating_logs (
+CREATE TABLE IF NOT EXISTS cheating_logs (
     log_id      SERIAL PRIMARY KEY,
     session_id  INT NOT NULL REFERENCES exam_sessions (session_id) ON DELETE CASCADE,
     event_type  cheat_event NOT NULL,
@@ -279,7 +314,7 @@ CREATE TABLE cheating_logs (
 --  SECTION 12: EXAM RESULTS
 -- ============================================================
 
-CREATE TABLE exam_results (
+CREATE TABLE IF NOT EXISTS exam_results (
     result_id      SERIAL PRIMARY KEY,
     session_id     INT NOT NULL UNIQUE REFERENCES exam_sessions (session_id) ON DELETE CASCADE,
     raw_score      NUMERIC(7, 2) NOT NULL DEFAULT 0.00,
@@ -301,7 +336,7 @@ CREATE TABLE exam_results (
 --  SECTION 13: REPORT LOGS
 -- ============================================================
 
-CREATE TABLE report_logs (
+CREATE TABLE IF NOT EXISTS report_logs (
     report_log_id SERIAL PRIMARY KEY,
     exam_id       INT NOT NULL REFERENCES exams (exam_id),
     generated_by  INT NOT NULL REFERENCES institution_members (member_id),
@@ -310,23 +345,90 @@ CREATE TABLE report_logs (
 );
 
 -- ============================================================
---  PERFORMANCE INDEXES
+--  PERFORMANCE INDEXES (skip missing tables/columns — safe on legacy DBs)
 -- ============================================================
 
-CREATE INDEX idx_members_institution ON institution_members (institution_id);
-CREATE INDEX idx_members_user ON institution_members (uid);
-CREATE INDEX idx_classes_institution ON classes (institution_id);
-CREATE INDEX idx_classes_member ON classes (member_id);
-CREATE INDEX idx_enrollments_class ON class_enrollments (class_id);
-CREATE INDEX idx_enrollments_member ON class_enrollments (member_id);
-CREATE INDEX idx_exams_class ON exams (class_id);
-CREATE INDEX idx_exams_status ON exams (status, is_archived);
-CREATE INDEX idx_sessions_exam ON exam_sessions (exam_id);
-CREATE INDEX idx_sessions_member ON exam_sessions (member_id);
-CREATE INDEX idx_answers_session ON student_answers (session_id);
-CREATE INDEX idx_answers_question ON student_answers (question_id);
-CREATE INDEX idx_questions_exam ON questions (exam_id);
-CREATE INDEX idx_cheat_session ON cheating_logs (session_id);
-CREATE INDEX idx_cheat_occurred ON cheating_logs (session_id, occurred_at);
-CREATE INDEX idx_results_session ON exam_results (session_id);
-CREATE INDEX idx_report_exam ON report_logs (exam_id);
+CREATE OR REPLACE FUNCTION acsis_safe_index(
+    p_index_name text,
+    p_table_name text,
+    p_columns text[]
+)
+RETURNS void
+LANGUAGE plpgsql
+AS $$
+DECLARE
+    col text;
+    col_list text;
+    missing int;
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name = p_table_name
+    ) THEN
+        RAISE NOTICE 'Skipping index % — table % does not exist', p_index_name, p_table_name;
+        RETURN;
+    END IF;
+
+    SELECT COUNT(*) INTO missing
+    FROM unnest(p_columns) AS req(col)
+    WHERE NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = p_table_name
+          AND column_name = req.col
+    );
+
+    IF missing > 0 THEN
+        RAISE NOTICE 'Skipping index % — not all columns exist on %', p_index_name, p_table_name;
+        RETURN;
+    END IF;
+
+    SELECT string_agg(quote_ident(c), ', ' ORDER BY ord)
+    INTO col_list
+    FROM unnest(p_columns) WITH ORDINALITY AS t(c, ord);
+
+    EXECUTE format(
+        'CREATE INDEX IF NOT EXISTS %I ON %I (%s)',
+        p_index_name,
+        p_table_name,
+        col_list
+    );
+END;
+$$;
+
+SELECT acsis_safe_index('idx_members_institution', 'institution_members', ARRAY['institution_id']);
+SELECT acsis_safe_index('idx_members_user', 'institution_members', ARRAY['uid']);
+SELECT acsis_safe_index('idx_classes_institution', 'classes', ARRAY['institution_id']);
+SELECT acsis_safe_index('idx_classes_member', 'classes', ARRAY['member_id']);
+SELECT acsis_safe_index('idx_enrollments_class', 'class_enrollments', ARRAY['class_id']);
+SELECT acsis_safe_index('idx_enrollments_member', 'class_enrollments', ARRAY['member_id']);
+SELECT acsis_safe_index('idx_exams_class', 'exams', ARRAY['class_id']);
+SELECT acsis_safe_index('idx_exams_assignment', 'exams', ARRAY['assignment_id']);
+SELECT acsis_safe_index('idx_exams_status', 'exams', ARRAY['status', 'is_archived']);
+SELECT acsis_safe_index('idx_sessions_exam', 'exam_sessions', ARRAY['exam_id']);
+SELECT acsis_safe_index('idx_sessions_member', 'exam_sessions', ARRAY['member_id']);
+SELECT acsis_safe_index('idx_sessions_student', 'exam_sessions', ARRAY['student_id']);
+SELECT acsis_safe_index('idx_answers_session', 'student_answers', ARRAY['session_id']);
+SELECT acsis_safe_index('idx_answers_question', 'student_answers', ARRAY['question_id']);
+SELECT acsis_safe_index('idx_questions_exam', 'questions', ARRAY['exam_id']);
+SELECT acsis_safe_index('idx_cheat_session', 'cheating_logs', ARRAY['session_id']);
+SELECT acsis_safe_index('idx_cheat_occurred', 'cheating_logs', ARRAY['session_id', 'occurred_at']);
+SELECT acsis_safe_index('idx_results_session', 'exam_results', ARRAY['session_id']);
+SELECT acsis_safe_index('idx_report_exam', 'report_logs', ARRAY['exam_id']);
+
+-- Quick sanity check (visible in pgAdmin Messages tab)
+DO $acsis$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'institutions'
+    ) THEN
+        RAISE NOTICE 'OK: public.institutions exists (% rows)', (SELECT COUNT(*) FROM institutions);
+    ELSE
+        RAISE WARNING 'MISSING: public.institutions — you may be on legacy schema or acsis.sql did not run. Use a fresh DB or run this file on database "acsis".';
+    END IF;
+END
+$acsis$;

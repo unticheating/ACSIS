@@ -1,3 +1,4 @@
+import { SummaryStatCard, SummaryStatGrid } from '@/components/dashboard/SummaryStatCard.jsx'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx'
 
 /** Placeholder analytics until grades API exists — matches ACSIS shell + green accent. */
@@ -11,35 +12,11 @@ export default function StudentPerformancePage() {
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Average (demo)</CardDescription>
-            <CardTitle className="text-3xl font-bold tabular-nums">—</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-xs text-muted-foreground">No graded attempts in this preview yet.</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Exams completed</CardDescription>
-            <CardTitle className="text-3xl font-bold tabular-nums">0</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-xs text-muted-foreground">Counts finished sessions only.</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Integrity strikes (demo)</CardDescription>
-            <CardTitle className="text-3xl font-bold tabular-nums">0</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-xs text-muted-foreground">Tab-leave and hotkey flags from exam sessions.</p>
-          </CardContent>
-        </Card>
-      </div>
+      <SummaryStatGrid>
+        <SummaryStatCard label="Average (demo)" value="—" hint="No graded attempts yet." tone="success" />
+        <SummaryStatCard label="Exams completed" value={0} tone="success" />
+        <SummaryStatCard label="Integrity strikes (demo)" value={0} tone="danger" />
+      </SummaryStatGrid>
 
       <Card>
         <CardHeader>
