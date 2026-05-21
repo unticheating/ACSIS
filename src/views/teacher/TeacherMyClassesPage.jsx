@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { apiFetch } from '@/lib/apiFetch.js'
 import { MoreVertical } from 'lucide-react'
 import {
   DropdownMenu,
@@ -7,13 +8,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu.jsx'
-import {
-  CLASSES_CHANGED_EVENT,
-  CLASSES_STORAGE_KEY,
-  ensureClassesMigrated,
-  ensureClassAccessCodes,
-  getClasses,
-} from '@/lib/classesExams.js'
 import '../../pages/teacher-ui/my_classes.css'
 
 function ClassCard({ c }) {
@@ -78,31 +72,27 @@ function ClassCard({ c }) {
 }
 
 export default function TeacherMyClassesPage() {
-  const [classes, setClasses] = useState(() => {
-    ensureClassesMigrated()
-    ensureClassAccessCodes()
-    return getClasses()
-  })
+  const [classes, setClasses] = useState([])
+  const [loading, setLoading] = useState(true)
 
-  const refresh = useCallback(() => {
-    ensureClassesMigrated()
-    ensureClassAccessCodes()
-    setClasses(getClasses())
+  const fetchClasses = useCallback(async () => {
+    try {
+      const res = await apiFetch('/api/teacher/classes')
+      if (res.ok) {
+        const data = await res.json()
+        setClasses(data)
+      }
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
   useEffect(() => {
-    const onStorage = (event) => {
-      if (event.key === CLASSES_STORAGE_KEY) refresh()
-    }
-    window.addEventListener('storage', onStorage)
-    window.addEventListener(CLASSES_CHANGED_EVENT, refresh)
-    return () => {
-      window.removeEventListener('storage', onStorage)
-      window.removeEventListener(CLASSES_CHANGED_EVENT, refresh)
-    }
-  }, [refresh])
+    fetchClasses()
+  }, [fetchClasses])
 
-  ensureClassesMigrated()
   const firstId = classes[0]?.id
   const defaultCreateHref = firstId
     ? `/teacher/create-exam?classId=${encodeURIComponent(firstId)}`
@@ -126,7 +116,11 @@ export default function TeacherMyClassesPage() {
         </button>
       </div>
 
-      {classes.length === 0 ? (
+      {loading ? (
+        <div className="acsis-empty-panel">
+          <p>Loading your classes...</p>
+        </div>
+      ) : classes.length === 0 ? (
         <div className="acsis-empty-panel">
           <h2>No classes yet</h2>
           <p>Classes are managed from the admin workspace. Once a class exists, it appears here as a card.</p>

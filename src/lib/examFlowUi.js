@@ -10,8 +10,36 @@ export const PG_EXAM_STATUS = {
 }
 
 /** @param {string | null | undefined} status */
+export function normalizeExamStatus(status) {
+  return (status || '').toLowerCase()
+}
+
+/** Draft only — not yet published to students. */
+export function isExamDraft(status) {
+  return normalizeExamStatus(status) === PG_EXAM_STATUS.DRAFT
+}
+
+/** Published (waiting lobby, live, or closed). */
+export function isExamPublished(status) {
+  const s = normalizeExamStatus(status)
+  return s === PG_EXAM_STATUS.WAITING || s === PG_EXAM_STATUS.OPEN || s === PG_EXAM_STATUS.CLOSED
+}
+
+/** Faculty "on-going" tab: lobby or live. */
+export function isExamOngoing(status) {
+  const s = normalizeExamStatus(status)
+  return s === PG_EXAM_STATUS.WAITING || s === PG_EXAM_STATUS.OPEN
+}
+
+/** Student can open lobby / session UI. */
+export function isExamEnterableByStudent(status) {
+  const s = normalizeExamStatus(status)
+  return s === PG_EXAM_STATUS.WAITING || s === PG_EXAM_STATUS.OPEN
+}
+
+/** @param {string | null | undefined} status */
 export function labelForPgExamStatus(status) {
-  const s = (status || '').toLowerCase()
+  const s = normalizeExamStatus(status)
   const map = {
     draft: 'Draft',
     waiting: 'Lobby',

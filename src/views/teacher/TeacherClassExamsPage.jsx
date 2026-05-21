@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { apiFetch } from '@/lib/apiFetch.js'
+import {
+  isExamDraft,
+  isExamOngoing,
+  labelForPgExamStatus,
+  PG_EXAM_STATUS,
+} from '@/lib/examFlowUi.js'
 import { MoreVertical } from 'lucide-react'
 import {
   DropdownMenu,
@@ -8,14 +15,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu.jsx'
-import {
-  CLASSES_CHANGED_EVENT,
-  CLASSES_STORAGE_KEY,
-  deleteExamFromClass,
-  ensureClassesMigrated,
-  getClassById,
-  updateExamInClass,
-} from '@/lib/classesExams.js'
+
 import '../../pages/teacher-ui/my_classes.css'
 
 async function copyExamCode(code) {
@@ -27,10 +27,6 @@ async function copyExamCode(code) {
   }
 }
 
-function isExamActive(status) {
-  return (status || '').toLowerCase() === 'active'
-}
-
 export default function TeacherClassExamsPage() {
   const { classId } = useParams()
   const navigate = useNavigate()
@@ -39,30 +35,46 @@ export default function TeacherClassExamsPage() {
 
   const refresh = useCallback(() => setTick((t) => t + 1), [])
 
-  useEffect(() => {
-    const onStorage = (event) => {
-      if (event.key === CLASSES_STORAGE_KEY) refresh()
-    }
-    window.addEventListener('storage', onStorage)
-    window.addEventListener(CLASSES_CHANGED_EVENT, refresh)
-    return () => {
-      window.removeEventListener('storage', onStorage)
-      window.removeEventListener(CLASSES_CHANGED_EVENT, refresh)
-    }
-  }, [refresh])
+  const [cls, setCls] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
-  ensureClassesMigrated()
-  const cls = useMemo(() => getClassById(classId), [classId, tick])
+  useEffect(() => {
+    async function loadData() {
+      setLoading(true)
+      try {
+        const res = await apiFetch(`/api/teacher/classes/${classId}/exams`)
+        if (!res.ok) {
+          throw new Error('Failed to fetch class.')
+        }
+        const data = await res.json()
+        setCls(data)
+      } catch (err) {
+        setError(err.message)
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadData()
+  }, [classId, tick])
 
   const exams = cls?.exams || []
   const filtered = useMemo(() => {
-    if (filter === 'ongoing') return exams.filter((e) => isExamActive(e.status))
-    if (filter === 'drafts') return exams.filter((e) => !isExamActive(e.status))
-    if (filter === 'completed') return exams.filter((e) => (e.status || '').toLowerCase() === 'completed')
+    if (filter === 'ongoing') return exams.filter((e) => isExamOngoing(e.status))
+    if (filter === 'drafts') return exams.filter((e) => isExamDraft(e.status))
+    if (filter === 'completed') return exams.filter((e) => (e.status || '').toLowerCase() === PG_EXAM_STATUS.CLOSED)
     return exams
   }, [exams, filter])
 
-  if (!cls) {
+  if (loading) {
+    return (
+      <div className="acsis-mc-view">
+        <p className="acsis-mc-sub">Loading...</p>
+      </div>
+    )
+  }
+
+  if (error || !cls) {
     return (
       <div className="acsis-mc-view">
         <p className="acsis-mc-sub">This class could not be found.</p>
@@ -75,15 +87,25 @@ export default function TeacherClassExamsPage() {
 
   const createHref = `/teacher/create-exam?classId=${encodeURIComponent(cls.id)}`
 
-  function publish(classId, examId) {
-    updateExamInClass(classId, examId, { status: 'Active' })
-    refresh()
+  async function publish(classId, examId) {
+    try {
+      const res = await apiFetch(`/api/teacher/classes/${classId}/exams/${examId}`, { method: 'PUT' })
+      if (!res.ok) throw new Error('Failed to publish')
+      refresh()
+    } catch (err) {
+      alert(err.message)
+    }
   }
 
-  function removeExam(classId, examId, title) {
+  async function removeExam(classId, examId, title) {
     if (!window.confirm(`Delete “${title || 'this exam'}”? This cannot be undone.`)) return
-    deleteExamFromClass(classId, examId)
-    refresh()
+    try {
+      const res = await apiFetch(`/api/teacher/classes/${classId}/exams/${examId}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Failed to delete')
+      refresh()
+    } catch (err) {
+      alert(err.message)
+    }
   }
 
   return (
@@ -141,7 +163,8 @@ export default function TeacherClassExamsPage() {
           <p className="acsis-stream-section-title">Posted</p>
           <div className="acsis-stream-list">
             {filtered.map((exam) => {
-              const active = isExamActive(exam.status)
+              const active = isExamOngoing(exam.status)
+              const draft = isExamDraft(exam.status)
               const detailPath = `/teacher/my-classes/${encodeURIComponent(cls.id)}/exams/${encodeURIComponent(exam.id)}`
               return (
                 <div key={exam.id} className="acsis-stream-item">
@@ -160,7 +183,7 @@ export default function TeacherClassExamsPage() {
                     </button>
                     <div className="acsis-stream-item__right">
                       <span className={`acsis-pill ${active ? 'acsis-pill--live' : 'acsis-pill--draft'}`}>
-                        {active ? 'On-going' : 'Draft'}
+                        {labelForPgExamStatus(exam.status)}
                       </span>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -173,7 +196,7 @@ export default function TeacherClassExamsPage() {
                           </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="min-w-[11rem]">
-                          {!active ? (
+                          {draft ? (
                             <DropdownMenuItem
                               onSelect={() => {
                                 publish(cls.id, exam.id)

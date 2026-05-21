@@ -1,13 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import {
-  CLASSES_CHANGED_EVENT,
-  CLASSES_STORAGE_KEY,
-  deleteExamFromClass,
-  ensureClassesMigrated,
-  getExamInClass,
-  updateExamInClass,
-} from '@/lib/classesExams.js'
+import { apiFetch } from '@/lib/apiFetch.js'
+import { isExamDraft, isExamOngoing, labelForPgExamStatus } from '@/lib/examFlowUi.js'
 import '../../pages/teacher-ui/my_classes.css'
 
 async function copyExamCode(code) {
@@ -19,77 +13,116 @@ async function copyExamCode(code) {
   }
 }
 
-function isExamActive(status) {
-  return (status || '').toLowerCase() === 'active'
-}
-
 export default function TeacherExamDetailPage() {
   const { classId, examId } = useParams()
   const navigate = useNavigate()
-  const [tick, setTick] = useState(0)
-
-  const refresh = useCallback(() => setTick((t) => t + 1), [])
+  
+  const [hit, setHit] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [refreshTick, setRefreshTick] = useState(0)
 
   useEffect(() => {
-    const onStorage = (event) => {
-      if (event.key === CLASSES_STORAGE_KEY) refresh()
+    async function fetchExam() {
+      if (!classId || !examId) return
+      setLoading(true)
+      try {
+        const res = await apiFetch(`/api/teacher/classes/${classId}/exams/${examId}`)
+        if (!res.ok) {
+          throw new Error('Exam not found or you do not have permission.')
+        }
+        const data = await res.json()
+        // data will have { id, class_group_id, title, status, ... }
+        setHit(data)
+      } catch (err) {
+        setError(err.message)
+      } finally {
+        setLoading(false)
+      }
     }
-    window.addEventListener('storage', onStorage)
-    window.addEventListener(CLASSES_CHANGED_EVENT, refresh)
-    return () => {
-      window.removeEventListener('storage', onStorage)
-      window.removeEventListener(CLASSES_CHANGED_EVENT, refresh)
-    }
-  }, [refresh])
+    fetchExam()
+  }, [classId, examId, refreshTick])
 
-  ensureClassesMigrated()
-  const hit = useMemo(() => getExamInClass(classId, examId), [classId, examId, tick])
-
-  if (!hit) {
+  if (loading) {
     return (
       <div className="acsis-mc-view acsis-exam-detail">
-        <Link to="/teacher/my-classes" className="acsis-stream-back">
-          ← My Classes
-        </Link>
-        <p className="acsis-mc-sub">This exam is not available.</p>
+        <p className="acsis-mc-sub">Loading exam details...</p>
       </div>
     )
   }
 
-  const { classGroup, exam } = hit
-  const active = isExamActive(exam.status)
-  const streamHref = `/teacher/my-classes/${encodeURIComponent(classGroup.id)}`
-
-  function publish() {
-    updateExamInClass(classGroup.id, exam.id, { status: 'Active' })
-    refresh()
+  if (error || !hit) {
+    return (
+      <div className="acsis-mc-view acsis-exam-detail">
+        <Link to={`/teacher/my-classes/${classId}`} className="acsis-stream-back">
+          ← Back to class
+        </Link>
+        <p className="acsis-mc-sub" style={{ color: '#ef4444' }}>{error || 'This exam is not available.'}</p>
+      </div>
+    )
   }
 
-  function remove() {
+  const exam = hit
+  const active = isExamOngoing(exam.status)
+  const draft = isExamDraft(exam.status)
+  // exam.class_name, exam.academic_year, exam.semester should come from the backend if we did a join,
+  // but since our getExamDetailsService might only return exam properties, we'll gracefully fallback if they are missing.
+  
+  const streamHref = `/teacher/my-classes/${encodeURIComponent(classId)}`
+
+  async function publish() {
+    try {
+      const res = await apiFetch(`/api/teacher/classes/${classId}/exams/${examId}`, {
+        method: 'PUT'
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Failed to publish exam.')
+      }
+      setRefreshTick(t => t + 1)
+    } catch (err) {
+      alert(err.message)
+    }
+  }
+
+  async function remove() {
     if (!window.confirm(`Delete “${exam.title || 'this exam'}”? This cannot be undone.`)) return
-    deleteExamFromClass(classGroup.id, exam.id)
-    navigate(streamHref)
+    try {
+      const res = await apiFetch(`/api/teacher/classes/${classId}/exams/${examId}`, {
+        method: 'DELETE'
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Failed to delete exam.')
+      }
+      navigate(streamHref)
+    } catch (err) {
+      alert(err.message)
+    }
   }
 
-  const qs = new URLSearchParams({ classId: String(classGroup.id) })
+  const qs = new URLSearchParams({ classId })
   const createHref = `/teacher/create-exam?${qs.toString()}`
 
   return (
     <div className="acsis-mc-view acsis-exam-detail">
       <Link to={streamHref} className="acsis-stream-back">
-        ← {classGroup.name}
+        ← Back to class stream
       </Link>
 
       <div className="acsis-exam-detail__card">
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginBottom: 8 }}>
           <span className={`acsis-pill ${active ? 'acsis-pill--live' : 'acsis-pill--draft'}`}>
-            {active ? 'On-going' : 'Draft'}
+            {labelForPgExamStatus(exam.status)}
           </span>
         </div>
         <h1>{exam.title || 'Untitled exam'}</h1>
-        <p className="acsis-mc-sub" style={{ marginBottom: 0 }}>
-          In {classGroup.name} · {classGroup.academicYear} · {classGroup.semester}
-        </p>
+        
+        {exam.class_name && (
+          <p className="acsis-mc-sub" style={{ marginBottom: 0 }}>
+            In {exam.class_name} · {exam.academic_year} · {exam.semester}
+          </p>
+        )}
 
         <dl className="acsis-exam-detail__meta-grid">
           <div>
@@ -98,7 +131,8 @@ export default function TeacherExamDetailPage() {
           </div>
           <div>
             <dt>Questions</dt>
-            <dd>{Number(exam.questionCount || 0)}</dd>
+            {/* questions array length or questionCount based on how it's structured in the db */}
+            <dd>{exam.questions ? exam.questions.length : (exam.questionCount || 0)}</dd>
           </div>
           <div>
             <dt>Time limit</dt>
@@ -120,7 +154,7 @@ export default function TeacherExamDetailPage() {
           <button type="button" className="acsis-btn-primary" onClick={() => copyExamCode(exam.code)}>
             Copy exam code
           </button>
-          {!active ? (
+          {draft ? (
             <button type="button" className="acsis-btn-primary" onClick={publish}>
               Publish exam
             </button>

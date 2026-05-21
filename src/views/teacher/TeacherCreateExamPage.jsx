@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import { Clock, Pencil, Plus, Shuffle, Trash2 } from 'lucide-react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx'
+import { Link, useSearchParams, useNavigate } from 'react-router-dom'
+import { Clock, Plus, Shuffle, Trash2, ArrowLeft, GripVertical, CheckCircle2 } from 'lucide-react'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card.jsx'
 import { Label } from '@/components/ui/label.jsx'
-import { addExamToClass, CLASSES_CHANGED_EVENT, ensureClassesMigrated, getClasses } from '@/lib/classesExams.js'
-import '../../pages/teacher-ui/create_exam.css'
 
 const HOURS = [0, 1, 2, 3, 4]
 const MINUTES = Array.from({ length: 12 }, (_, i) => i * 5)
@@ -14,86 +12,59 @@ function emptyMc() {
 }
 
 export default function TeacherCreateExamPage() {
-  const [searchParams, setSearchParams] = useSearchParams()
-  const [classesTick, setClassesTick] = useState(0)
+  const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
+  
+  const [classes, setClasses] = useState([])
+  const [loadingClasses, setLoadingClasses] = useState(true)
+  const [selectedClass, setSelectedClass] = useState(searchParams.get('classId') || '')
 
   useEffect(() => {
-    ensureClassesMigrated()
+    fetch('/api/teacher/classes')
+      .then(res => res.json())
+      .then(data => {
+        setClasses(data)
+        setLoadingClasses(false)
+        if (!selectedClass && data.length > 0) {
+          setSelectedClass(String(data[0].id))
+        }
+      })
+      .catch(err => {
+        console.error(err)
+        setLoadingClasses(false)
+      })
   }, [])
-
-  useEffect(() => {
-    const fn = () => setClassesTick((t) => t + 1)
-    window.addEventListener(CLASSES_CHANGED_EVENT, fn)
-    return () => window.removeEventListener(CLASSES_CHANGED_EVENT, fn)
-  }, [])
-
-  const classes = useMemo(() => {
-    ensureClassesMigrated()
-    return getClasses()
-  }, [classesTick])
-
-  const firstId = classes[0]?.id ?? ''
-  const qp = searchParams.get('classId')
-  const classId = classes.some((c) => String(c.id) === String(qp)) ? String(qp) : String(firstId)
-
-  useEffect(() => {
-    if (classId && String(searchParams.get('classId')) !== classId) {
-      setSearchParams({ classId }, { replace: true })
-    }
-  }, [classId, searchParams, setSearchParams])
 
   const [examTitle, setExamTitle] = useState('')
   const [duration, setDuration] = useState('')
-  const [subject, setSubject] = useState('')
-  const [yearLevel, setYearLevel] = useState('')
-  const [section, setSection] = useState('')
 
-  const [questionType, setQuestionType] = useState('')
+  const [questionType, setQuestionType] = useState('multiple')
   const [questionText, setQuestionText] = useState('')
   const [mc, setMc] = useState(emptyMc)
   const [identAnswer, setIdentAnswer] = useState('')
   const [tfAnswer, setTfAnswer] = useState('')
 
   const [questions, setQuestions] = useState([])
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const [timeModalOpen, setTimeModalOpen] = useState(false)
   const [selectedHours, setSelectedHours] = useState(1)
   const [selectedMinutes, setSelectedMinutes] = useState(0)
 
-  const resetMc = useCallback(() => {
-    setMc(emptyMc())
-  }, [])
-
-  const clearExamDetails = useCallback(() => {
-    setExamTitle('')
-    setDuration('')
-    setSubject('')
-    setYearLevel('')
-    setSection('')
-  }, [])
+  const resetMc = useCallback(() => setMc(emptyMc()), [])
 
   const resetQuestionForm = useCallback(() => {
     setQuestionText('')
-    setQuestionType('')
+    setQuestionType('multiple')
     resetMc()
     setIdentAnswer('')
     setTfAnswer('')
   }, [resetMc])
 
-  const resetAll = useCallback(() => {
-    setQuestions([])
-    clearExamDetails()
-    resetQuestionForm()
-  }, [clearExamDetails, resetQuestionForm])
-
   function addQuestion() {
     const text = questionText.trim()
     if (!text) {
       window.alert('Please enter a question.')
-      return
-    }
-    if (!questionType) {
-      window.alert('Please select a question type.')
       return
     }
 
@@ -157,47 +128,38 @@ export default function TeacherCreateExamPage() {
     setTimeModalOpen(false)
   }
 
-  function createExam() {
+  async function createExam() {
     const title = examTitle.trim()
     const dur = Number(duration)
-    if (!classId) {
-      window.alert('No class is available. Ask an administrator to add a class under Admin → Classes.')
-      return
-    }
-    if (!title) {
-      window.alert('Please enter an exam title.')
-      return
-    }
-    if (!dur || dur < 1) {
-      window.alert('Please set a valid time limit.')
-      return
-    }
-    if (!subject || !yearLevel || !section) {
-      window.alert('Please select subject, year level, and section.')
-      return
-    }
-    if (questions.length === 0) {
-      window.alert('Please add at least one question.')
-      return
+    if (!selectedClass) return window.alert('No class is available.')
+    if (!title) return window.alert('Please enter an exam title.')
+    if (!dur || dur < 1) return window.alert('Please set a valid time limit.')
+    if (questions.length === 0) return window.alert('Please add at least one question.')
+
+    const payload = {
+      title,
+      duration: dur,
+      questions,
     }
 
-    const ok = addExamToClass(classId, {
-      id: Date.now(),
-      title,
-      questionCount: questions.length,
-      duration: dur,
-      status: 'Draft',
-      subject,
-      yearLevel,
-      section,
-      questions,
-    })
-    if (!ok) {
-      window.alert('Could not save to the selected class. Try picking another class or refresh the page.')
-      return
+    setIsSubmitting(true)
+    try {
+      const res = await fetch(`/api/teacher/classes/${selectedClass}/exams`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) {
+        const errData = await res.json()
+        throw new Error(errData.error || 'Failed to create exam.')
+      }
+      window.alert(`Exam "${title}" created successfully with ${questions.length} questions.`)
+      navigate(`/teacher/classes/${selectedClass}`)
+    } catch (err) {
+      window.alert(err.message)
+    } finally {
+      setIsSubmitting(false)
     }
-    window.alert(`Exam "${title}" created successfully with ${questions.length} questions.`)
-    resetAll()
   }
 
   const hourLabel = (h) => (h === 0 ? '00' : String(h))
@@ -205,28 +167,26 @@ export default function TeacherCreateExamPage() {
   const optionsBlock = useMemo(() => {
     if (questionType === 'multiple') {
       return (
-        <>
-          <div className="form-group">
-            <label htmlFor="opt1">Options</label>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Options</Label>
             {['opt1', 'opt2', 'opt3', 'opt4'].map((key, idx) => (
               <input
                 key={key}
-                id={`mc-${key}`}
                 type="text"
                 placeholder={`Option ${idx + 1}`}
                 value={mc[key]}
                 onChange={(e) => setMc((m) => ({ ...m, [key]: e.target.value }))}
-                style={{ marginTop: idx === 0 ? 0 : 12 }}
-                aria-label={`Option ${idx + 1}`}
+                className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-50"
               />
             ))}
           </div>
-          <div className="form-group">
-            <label htmlFor="correct-answer">Correct Answer</label>
+          <div className="space-y-2">
+            <Label>Correct Answer</Label>
             <select
-              id="correct-answer"
               value={mc.correct}
               onChange={(e) => setMc((m) => ({ ...m, correct: e.target.value }))}
+              className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-0"
             >
               <option value="">Select correct answer</option>
               <option value="1">Option 1</option>
@@ -235,29 +195,33 @@ export default function TeacherCreateExamPage() {
               <option value="4">Option 4</option>
             </select>
           </div>
-        </>
+        </div>
       )
     }
     if (questionType === 'identification') {
       return (
-        <div className="form-group">
-          <label htmlFor="ident-answer">Correct Answer</label>
+        <div className="space-y-2">
+          <Label>Correct Answer</Label>
           <input
-            id="ident-answer"
             type="text"
-            placeholder="Enter correct answer"
+            placeholder="Enter exact correct answer"
             value={identAnswer}
             onChange={(e) => setIdentAnswer(e.target.value)}
+            className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-0"
           />
         </div>
       )
     }
     if (questionType === 'truefalse') {
       return (
-        <div className="form-group">
-          <label htmlFor="tf-answer">Correct Answer</label>
-          <select id="tf-answer" value={tfAnswer} onChange={(e) => setTfAnswer(e.target.value)}>
-            <option value="">Select answer</option>
+        <div className="space-y-2">
+          <Label>Correct Answer</Label>
+          <select 
+            value={tfAnswer} 
+            onChange={(e) => setTfAnswer(e.target.value)}
+            className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-0"
+          >
+            <option value="">Select True or False</option>
             <option value="true">True</option>
             <option value="false">False</option>
           </select>
@@ -267,237 +231,261 @@ export default function TeacherCreateExamPage() {
     return null
   }, [identAnswer, mc, questionType, tfAnswer])
 
-  const selectedClass = classes.find((c) => String(c.id) === String(classId))
+  const selectedClassObj = classes.find((c) => String(c.id) === String(selectedClass))
 
   return (
-    <div className="acsis-view acsis-create-exam">
-      <h1 className="page-title">Create New Examination</h1>
+    <div className="flex flex-col md:flex-row min-h-screen bg-gray-50">
+      {/* LEFT SIDEBAR - EXAM DETAILS */}
+      <aside className="w-full md:w-[320px] lg:w-[380px] bg-white border-r border-gray-200 md:h-screen md:sticky top-0 flex flex-col shrink-0">
+        <div className="p-6 border-b border-gray-100 flex items-center gap-3">
+          <Link to={selectedClass ? `/teacher/classes/${selectedClass}` : '/teacher/my-classes'} className="p-2 -ml-2 rounded-full hover:bg-gray-100 transition-colors text-gray-500">
+            <ArrowLeft size={20} />
+          </Link>
+          <h1 className="text-xl font-bold tracking-tight text-gray-900">Create Exam</h1>
+        </div>
+        
+        <div className="p-6 flex-1 overflow-y-auto space-y-8">
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold text-gray-700">Target Class</Label>
+              <select
+                className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+                value={selectedClass}
+                onChange={(e) => setSelectedClass(e.target.value)}
+              >
+                {loadingClasses ? (
+                  <option value="">Loading classes...</option>
+                ) : classes.length === 0 ? (
+                  <option value="">No classes available</option>
+                ) : (
+                  <>
+                    <option value="" disabled>Select a class</option>
+                    {classes.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} ({c.academicYear} - {c.semester})
+                      </option>
+                    ))}
+                  </>
+                )}
+              </select>
+            </div>
 
-      <Card className="mb-6 w-full border-border shadow-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base text-foreground">Class</CardTitle>
-          <CardDescription>
-            Exams are saved under a class (academic year and semester are set on the class in Admin → Classes).
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <Label htmlFor="exam-class">Select class</Label>
-          <select
-            id="exam-class"
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            value={classId}
-            disabled={classes.length === 0}
-            onChange={(e) => setSearchParams({ classId: e.target.value }, { replace: true })}
-          >
-            {classes.length === 0 ? <option value="">No classes</option> : null}
-            {classes.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name} — {c.academicYear} · {c.semester}
-              </option>
-            ))}
-          </select>
-          {selectedClass ? (
-            <p className="text-sm text-muted-foreground">
-              Saving to: <strong className="text-foreground">{selectedClass.name}</strong> ({selectedClass.academicYear},{' '}
-              {selectedClass.semester})
-            </p>
-          ) : null}
-        </CardContent>
-      </Card>
-
-      <div className="card">
-        <h2 className="section-title">Exam Details</h2>
-        <div className="form-grid">
-          <div className="form-group full">
-            <label htmlFor="exam-title">Exam Title</label>
-            <input id="exam-title" type="text" value={examTitle} onChange={(e) => setExamTitle(e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label htmlFor="subject">Subject</label>
-            <select id="subject" value={subject} onChange={(e) => setSubject(e.target.value)}>
-              <option value="">Select subject</option>
-              <option>Data Structures (CS101)</option>
-              <option>Networking II (CS604)</option>
-              <option>Introduction to Java (CS432)</option>
-            </select>
-          </div>
-          <div className="form-group">
-            <label htmlFor="time-limit">Time Limit (minutes)</label>
-            <div className="time-input-group">
-              <input
-                id="time-limit"
-                type="number"
-                min={1}
-                readOnly
-                value={duration}
-                onClick={() => setTimeModalOpen(true)}
-                onFocus={() => setTimeModalOpen(true)}
-                aria-haspopup="dialog"
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold text-gray-700">Exam Title</Label>
+              <input 
+                type="text" 
+                placeholder="e.g. Midterm Examination"
+                value={examTitle} 
+                onChange={(e) => setExamTitle(e.target.value)} 
+                className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
               />
-              <span className="time-icon" aria-hidden>
-                <Clock size={22} strokeWidth={2} />
-              </span>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold text-gray-700">Time Limit (minutes)</Label>
+              <div className="relative">
+                <input
+                  type="number"
+                  placeholder="Set time limit"
+                  readOnly
+                  value={duration}
+                  onClick={() => setTimeModalOpen(true)}
+                  className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+                />
+                <Clock className="absolute right-3 top-2.5 text-gray-400" size={18} />
+              </div>
             </div>
           </div>
-          <div className="form-group">
-            <label htmlFor="year-level">Year Level</label>
-            <select id="year-level" value={yearLevel} onChange={(e) => setYearLevel(e.target.value)}>
-              <option value="">Select year level</option>
-              <option>1st Year</option>
-              <option>2nd Year</option>
-              <option>3rd Year</option>
-              <option>4th Year</option>
-            </select>
-          </div>
-          <div className="form-group">
-            <label htmlFor="section">Section</label>
-            <select id="section" value={section} onChange={(e) => setSection(e.target.value)}>
-              <option value="">Select section</option>
-              <option>A</option>
-              <option>B</option>
-              <option>C</option>
-              <option>D</option>
-              <option>E</option>
-            </select>
-          </div>
         </div>
-      </div>
 
-      <div className="card">
-        <h2 className="section-title">Add Question</h2>
-        <div className="form-group">
-          <label htmlFor="question-type">Question Type</label>
-          <select
-            id="question-type"
-            value={questionType}
-            onChange={(e) => {
-              setQuestionType(e.target.value)
-              resetMc()
-              setIdentAnswer('')
-              setTfAnswer('')
-            }}
+        <div className="p-6 border-t border-gray-100 bg-gray-50">
+          <button 
+            type="button" 
+            onClick={createExam}
+            disabled={isSubmitting}
+            className="w-full flex items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-3 text-sm font-medium text-white shadow transition-colors hover:bg-blue-700 disabled:opacity-50"
           >
-            <option value="">Select question type</option>
-            <option value="multiple">Multiple Choice</option>
-            <option value="identification">Identification</option>
-            <option value="truefalse">True / False</option>
-          </select>
+            {isSubmitting ? 'Saving Exam...' : 'Finish & Save Exam'}
+          </button>
         </div>
-        <div className="form-group">
-          <label htmlFor="question-text">Question</label>
-          <textarea
-            id="question-text"
-            rows={3}
-            className="question-textarea"
-            value={questionText}
-            onChange={(e) => setQuestionText(e.target.value)}
-          />
-        </div>
-        {optionsBlock}
-        <button type="button" className="add-btn" onClick={addQuestion}>
-          <Plus size={20} strokeWidth={2} aria-hidden />
-          Add Question
-        </button>
-      </div>
+      </aside>
 
-      {questions.length > 0 ? (
-        <div className="card" id="questions-list-card">
-          <div className="questions-header">
-            <h2>
-              Questions (<span id="question-count">{questions.length}</span>)
-            </h2>
-            <button type="button" className="shuffle-btn" onClick={shuffleQuestions}>
-              <Shuffle size={20} strokeWidth={2} aria-hidden />
-              Shuffle
-            </button>
+      {/* MAIN CONTENT - QUESTIONS BUILDER */}
+      <main className="flex-1 p-6 md:p-8 lg:p-12 overflow-y-auto">
+        <div className="max-w-3xl mx-auto space-y-8">
+          
+          <div className="flex items-center justify-between pb-4 border-b border-gray-200">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Questions</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                {questions.length} {questions.length === 1 ? 'question' : 'questions'} added to this exam
+              </p>
+            </div>
+            {questions.length > 1 && (
+              <button 
+                type="button" 
+                onClick={shuffleQuestions}
+                className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-md hover:bg-gray-50 hover:text-gray-900 transition-colors shadow-sm"
+              >
+                <Shuffle size={16} />
+                Shuffle Order
+              </button>
+            )}
           </div>
-          <div id="questions-list">
-            {questions.map((q) => (
-              <div key={q.id} className="question-item">
-                <div className="question-text">{q.question}</div>
-                <div className="meta">
-                  Type: {q.type}
-                  <br />
-                  Answer: <span className="correct-answer">{q.correctAnswer}</span>
+
+          <div className="space-y-6">
+            {questions.map((q, index) => (
+              <Card key={q.id} className="border border-gray-200 shadow-sm overflow-hidden group bg-white">
+                <div className="flex items-stretch">
+                  <div className="w-12 bg-gray-50 flex flex-col items-center justify-center text-gray-400 border-r border-gray-100 shrink-0">
+                    <span className="text-xs font-bold mb-1 text-gray-500">{index + 1}</span>
+                    <GripVertical size={16} className="opacity-50 group-hover:opacity-100 cursor-move" />
+                  </div>
+                  <div className="flex-1 p-5">
+                    <div className="flex justify-between items-start gap-4">
+                      <h3 className="font-medium text-gray-900 leading-relaxed whitespace-pre-wrap">{q.question}</h3>
+                      <button 
+                        type="button" 
+                        onClick={() => deleteQuestion(q.id)}
+                        className="text-gray-400 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100 p-1 rounded-md hover:bg-red-50 shrink-0"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                    
+                    <div className="mt-3 flex items-center gap-2">
+                      <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700">
+                        {q.type === 'multiple-choice' ? 'Multiple Choice' : q.type === 'truefalse' ? 'True/False' : 'Identification'}
+                      </span>
+                    </div>
+
+                    <div className="mt-4 pt-4 border-t border-gray-100">
+                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <CheckCircle2 size={16} className="text-green-600 shrink-0" />
+                        <span className="font-medium">Answer:</span>
+                        <span className="text-gray-900 font-semibold">{q.correctAnswer}</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="actions">
-                  <button type="button" className="edit-btn" onClick={() => window.alert('Edit functionality coming soon...')} aria-label="Edit question">
-                    <Pencil size={20} strokeWidth={2} aria-hidden />
-                  </button>
-                  <button type="button" className="delete-btn" onClick={() => deleteQuestion(q.id)} aria-label="Delete question">
-                    <Trash2 size={20} strokeWidth={2} aria-hidden />
-                  </button>
-                </div>
-              </div>
+              </Card>
             ))}
           </div>
-        </div>
-      ) : null}
 
-      <button type="button" className="create-exam-btn" onClick={createExam}>
-        Create Exam
-      </button>
-
-      <div
-        id="time-picker-modal"
-        className="modal"
-        style={{ display: timeModalOpen ? 'flex' : 'none' }}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="time-picker-title"
-      >
-        <div className="modal-content">
-          <h3 id="time-picker-title">Select Time Limit (minutes)</h3>
-          <div className="time-picker-grid">
-            <div className="column">
-              <div className="picker-label">Hours</div>
-              <div id="hours-list" className="number-list">
-                {HOURS.map((h) => (
-                  <div
-                    key={h}
-                    role="button"
-                    tabIndex={0}
-                    className={selectedHours === h ? 'selected' : ''}
-                    onClick={() => setSelectedHours(h)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') setSelectedHours(h)
+          <Card className="border-2 border-dashed border-gray-300 shadow-none bg-white">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg text-gray-900">Add New Question</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid md:grid-cols-3 gap-6">
+                <div className="space-y-2 md:col-span-1">
+                  <Label>Question Type</Label>
+                  <select
+                    className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-0"
+                    value={questionType}
+                    onChange={(e) => {
+                      setQuestionType(e.target.value)
+                      resetQuestionForm()
+                      setQuestionType(e.target.value)
                     }}
                   >
-                    {hourLabel(h)}
-                  </div>
-                ))}
+                    <option value="multiple">Multiple Choice</option>
+                    <option value="identification">Identification</option>
+                    <option value="truefalse">True / False</option>
+                  </select>
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label>Question Text</Label>
+                  <textarea
+                    rows={2}
+                    className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-0 min-h-[80px]"
+                    placeholder="Enter your question here..."
+                    value={questionText}
+                    onChange={(e) => setQuestionText(e.target.value)}
+                  />
+                </div>
               </div>
-            </div>
-            <div className="column">
-              <div className="picker-label">Minutes</div>
-              <div id="minutes-list" className="number-list">
-                {MINUTES.map((m) => (
-                  <div
-                    key={m}
-                    role="button"
-                    tabIndex={0}
-                    className={selectedMinutes === m ? 'selected' : ''}
-                    onClick={() => setSelectedMinutes(m)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') setSelectedMinutes(m)
-                    }}
-                  >
-                    {m < 10 ? `0${m}` : String(m)}
-                  </div>
-                ))}
+              
+              <div className="pt-4 border-t border-gray-100">
+                {optionsBlock}
               </div>
-            </div>
-          </div>
-          <div className="modal-buttons">
-            <button type="button" className="cancel-btn" onClick={() => setTimeModalOpen(false)}>
-              CANCEL
-            </button>
-            <button type="button" className="save-btn" onClick={saveTimeLimit}>
-              OK
-            </button>
-          </div>
+            </CardContent>
+            <CardFooter className="bg-gray-50 border-t border-gray-100 p-4">
+              <button 
+                type="button" 
+                onClick={addQuestion}
+                className="flex items-center justify-center gap-2 rounded-md bg-white border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-100 w-full md:w-auto"
+              >
+                <Plus size={16} />
+                Save Question to List
+              </button>
+            </CardFooter>
+          </Card>
+
         </div>
-      </div>
+      </main>
+
+      {/* TIME PICKER MODAL */}
+      {timeModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <Card className="w-full max-w-sm shadow-xl border-0 animate-in zoom-in-95 duration-200">
+            <CardHeader>
+              <CardTitle className="text-xl">Set Time Limit</CardTitle>
+              <CardDescription>How long should students have to complete this exam?</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex gap-4 h-[200px]">
+                <div className="flex-1 flex flex-col border rounded-md overflow-hidden">
+                  <div className="bg-gray-50 text-xs font-bold text-center py-2 border-b text-gray-500 uppercase tracking-wider">Hours</div>
+                  <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                    {HOURS.map((h) => (
+                      <button
+                        key={h}
+                        type="button"
+                        onClick={() => setSelectedHours(h)}
+                        className={`w-full py-2 px-3 text-center text-sm rounded-md transition-colors ${selectedHours === h ? 'bg-blue-600 text-white font-bold shadow-sm' : 'hover:bg-gray-100 text-gray-700'}`}
+                      >
+                        {hourLabel(h)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex-1 flex flex-col border rounded-md overflow-hidden">
+                  <div className="bg-gray-50 text-xs font-bold text-center py-2 border-b text-gray-500 uppercase tracking-wider">Minutes</div>
+                  <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                    {MINUTES.map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setSelectedMinutes(m)}
+                        className={`w-full py-2 px-3 text-center text-sm rounded-md transition-colors ${selectedMinutes === m ? 'bg-blue-600 text-white font-bold shadow-sm' : 'hover:bg-gray-100 text-gray-700'}`}
+                      >
+                        {m < 10 ? `0${m}` : String(m)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+            <CardFooter className="flex justify-end gap-3 bg-gray-50 py-4 border-t">
+              <button 
+                type="button" 
+                onClick={() => setTimeModalOpen(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                type="button" 
+                onClick={saveTimeLimit}
+                className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-md hover:bg-gray-800 transition-colors shadow-sm"
+              >
+                Set Time Limit
+              </button>
+            </CardFooter>
+          </Card>
+        </div>
+      )}
     </div>
   )
 }

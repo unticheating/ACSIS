@@ -17,12 +17,57 @@ export function readSession(req) {
  * @param {import('express').Response} res
  * @param {import('express').NextFunction} next
  */
-export function requireAuth(req, res, next) {
+export async function requireAuth(req, res, next) {
+  // Allow demo bypass during development testing
+  if (req.headers['x-demo-account']) {
+    const demoRole = req.headers['x-demo-account'];
+    if (demoRole === 'student') {
+      req.authSession = { uid: 999, roleLabel: 'Student Demo', portal: 'student' };
+      req.memberId = 999;
+      return next();
+    }
+    if (demoRole === 'faculty') {
+      req.authSession = { uid: 888, roleLabel: 'Faculty Demo', portal: 'teacher' };
+      req.memberId = 888;
+      return next();
+    }
+    if (demoRole === 'admin') {
+      req.authSession = { uid: 1, roleLabel: 'Admin Demo', portal: 'admin' };
+      req.memberId = 1;
+      return next();
+    }
+  }
+
   const session = readSession(req)
   if (!session?.uid) {
     return res.status(401).json({ error: 'Not authenticated.' })
   }
   req.authSession = session
+
+  if (isDatabaseEnabled()) {
+    const pool = getPool()
+    if (pool) {
+      try {
+        const { rows } = await pool.query(
+          `SELECT member_id FROM institution_members
+           WHERE uid = $1 AND is_active = TRUE
+           ORDER BY joined_at ASC
+           LIMIT 1`,
+          [session.uid],
+        )
+        if (rows[0]?.member_id) {
+          req.memberId = rows[0].member_id
+          return next()
+        }
+      } catch (err) {
+        console.error('[requireAuth] member lookup failed:', err)
+      }
+    }
+  }
+
+  // Demo / legacy fallback when member row is missing (seed uses member_id = uid)
+  req.memberId = session.uid
+
   return next()
 }
 

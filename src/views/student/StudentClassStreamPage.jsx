@@ -1,46 +1,35 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import {
-  CLASSES_CHANGED_EVENT,
-  CLASSES_STORAGE_KEY,
-  ensureClassAccessCodes,
-  ensureClassesMigrated,
-  getClassById,
-} from '@/lib/classesExams.js'
-import { isEnrolled, STUDENT_ENROLLMENTS_EVENT } from '@/lib/studentEnrollments.js'
+import { apiFetch } from '@/lib/apiFetch.js'
+import { isExamEnterableByStudent, labelForPgExamStatus } from '@/lib/examFlowUi.js'
 import '../../pages/student-ui/enrolled_classes.css'
-
-function isActive(status) {
-  return (status || '').toLowerCase() === 'active'
-}
 
 export default function StudentClassStreamPage() {
   const { classId } = useParams()
-  const [tick, setTick] = useState(0)
 
-  const refresh = useCallback(() => setTick((t) => t + 1), [])
-
-  useEffect(() => {
-    ensureClassesMigrated()
-    ensureClassAccessCodes()
-  }, [])
+  const [cls, setCls] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
-    const onStorage = (e) => {
-      if (e.key === CLASSES_STORAGE_KEY) refresh()
+    async function loadData() {
+      setLoading(true)
+      try {
+        const res = await apiFetch(`/api/student/classes/${classId}/exams`)
+        if (!res.ok) {
+          const errData = await res.json()
+          throw new Error(errData.error || 'Failed to fetch class.')
+        }
+        const data = await res.json()
+        setCls(data)
+      } catch (err) {
+        setError(err.message)
+      } finally {
+        setLoading(false)
+      }
     }
-    window.addEventListener('storage', onStorage)
-    window.addEventListener(CLASSES_CHANGED_EVENT, refresh)
-    window.addEventListener(STUDENT_ENROLLMENTS_EVENT, refresh)
-    return () => {
-      window.removeEventListener('storage', onStorage)
-      window.removeEventListener(CLASSES_CHANGED_EVENT, refresh)
-      window.removeEventListener(STUDENT_ENROLLMENTS_EVENT, refresh)
-    }
-  }, [refresh])
-
-  const cls = useMemo(() => getClassById(classId), [classId, tick])
-  const allowed = cls && isEnrolled(classId)
+    loadData()
+  }, [classId])
 
   const examsSorted = useMemo(() => {
     const list = [...(cls?.exams || [])]
@@ -48,18 +37,18 @@ export default function StudentClassStreamPage() {
     return list
   }, [cls])
 
-  if (!cls) {
+  if (loading) {
     return (
       <div className="acsis-view">
         <Link to="/student/my-classes" className="stu-stream-back">
           ← Enrolled classes
         </Link>
-        <p className="text-sm text-muted-foreground">This class was not found.</p>
+        <p className="text-sm text-muted-foreground">Loading...</p>
       </div>
     )
   }
 
-  if (!allowed) {
+  if (error === 'NOT_ENROLLED') {
     return (
       <div className="acsis-view">
         <Link to="/student/my-classes" className="stu-stream-back">
@@ -77,6 +66,21 @@ export default function StudentClassStreamPage() {
             </p>
           </div>
         </div>
+      </div>
+    )
+  }
+
+  if (error || !cls) {
+    const message =
+      error === 'Class not found.'
+        ? 'This class was not found.'
+        : error || 'This class could not be loaded.'
+    return (
+      <div className="acsis-view">
+        <Link to="/student/my-classes" className="stu-stream-back">
+          ← Enrolled classes
+        </Link>
+        <p className="text-sm text-muted-foreground">{message}</p>
       </div>
     )
   }
@@ -120,12 +124,14 @@ export default function StudentClassStreamPage() {
                   <div className="flex flex-wrap items-center justify-end gap-2">
                     <span
                       className={`rounded-full px-2.5 py-1 text-xs font-bold uppercase tracking-wide ${
-                        isActive(exam.status) ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
+                        isExamEnterableByStudent(exam.status)
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-gray-100 text-gray-600'
                       }`}
                     >
-                      {isActive(exam.status) ? 'Open' : 'Draft'}
+                      {labelForPgExamStatus(exam.status)}
                     </span>
-                    {isActive(exam.status) ? (
+                    {isExamEnterableByStudent(exam.status) ? (
                       <Link
                         to={`/student/exam/session?classId=${encodeURIComponent(classId)}&examId=${encodeURIComponent(
                           exam.id,

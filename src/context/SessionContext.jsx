@@ -65,14 +65,27 @@ function loadAcademic() {
 }
 
 function loadAccountId() {
-  const id = localStorage.getItem(STORAGE_ACCOUNT)
+  // Only use sessionStorage for demo accounts. localStorage should only be for real auth.
+  const id = sessionStorage.getItem(STORAGE_ACCOUNT)
   if (id && demoAccounts.some((a) => a.id === id)) return id
-  return 'admin'
+  return 'super' // default fallback if no demo account active
 }
 
 function loadSessionMode() {
-  const mode = localStorage.getItem(STORAGE_SESSION_MODE)
-  if (mode === 'demo' || mode === 'auth' || mode === 'google') return mode === 'google' ? 'auth' : mode
+  // Check sessionStorage first for demo
+  const sMode = sessionStorage.getItem(STORAGE_SESSION_MODE)
+  if (sMode === 'demo') return 'demo'
+
+  // Only check localStorage for real auth
+  const lMode = localStorage.getItem(STORAGE_SESSION_MODE)
+  if (lMode === 'auth' || lMode === 'google') return 'auth'
+  
+  // Clean up legacy demo from localStorage if it exists
+  if (lMode === 'demo') {
+    localStorage.removeItem(STORAGE_SESSION_MODE)
+    localStorage.removeItem(STORAGE_ACCOUNT)
+  }
+  
   return null
 }
 
@@ -116,7 +129,9 @@ export function SessionProvider({ children }) {
           const stored = localStorage.getItem(STORAGE_SESSION_MODE)
           if (stored === 'auth' || stored === 'google') {
             localStorage.removeItem(STORAGE_SESSION_MODE)
-            setSessionMode(null)
+            if (sessionMode !== 'demo') {
+              setSessionMode(null)
+            }
           }
         }
       } catch {
@@ -128,7 +143,7 @@ export function SessionProvider({ children }) {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const demoAccount = useMemo(
     () => demoAccounts.find((a) => a.id === activeAccountId) ?? demoAccounts[0],
@@ -163,7 +178,7 @@ export function SessionProvider({ children }) {
     if (!match) return
     setActiveAccountId((current) => {
       if (match.id !== current) {
-        localStorage.setItem(STORAGE_ACCOUNT, match.id)
+        sessionStorage.setItem(STORAGE_ACCOUNT, match.id)
         return match.id
       }
       return current
@@ -172,17 +187,22 @@ export function SessionProvider({ children }) {
 
   const setActiveAccount = useCallback((id) => {
     setActiveAccountId(id)
-    localStorage.setItem(STORAGE_ACCOUNT, id)
-  }, [])
+    if (sessionMode === 'demo') {
+      sessionStorage.setItem(STORAGE_ACCOUNT, id)
+    } else {
+      localStorage.setItem(STORAGE_ACCOUNT, id)
+    }
+  }, [sessionMode])
 
   const switchAccount = useCallback(
     (account) => {
       setSessionMode('demo')
-      localStorage.setItem(STORAGE_SESSION_MODE, 'demo')
-      setActiveAccount(account.id)
+      sessionStorage.setItem(STORAGE_SESSION_MODE, 'demo')
+      setActiveAccountId(account.id)
+      sessionStorage.setItem(STORAGE_ACCOUNT, account.id)
       navigate(account.entryPath)
     },
-    [navigate, setActiveAccount],
+    [navigate],
   )
 
   const logout = useCallback(async () => {
@@ -195,6 +215,8 @@ export function SessionProvider({ children }) {
     setSessionMode(null)
     localStorage.removeItem(STORAGE_SESSION_MODE)
     localStorage.removeItem(STORAGE_ACCOUNT)
+    sessionStorage.removeItem(STORAGE_SESSION_MODE)
+    sessionStorage.removeItem(STORAGE_ACCOUNT)
     navigate('/', { replace: true })
   }, [navigate])
 

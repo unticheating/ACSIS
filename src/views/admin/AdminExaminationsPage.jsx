@@ -16,50 +16,50 @@ import { Input } from '@/components/ui/input.jsx'
 import { Label } from '@/components/ui/label.jsx'
 import { ScrollArea } from '@/components/ui/scroll-area.jsx'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs.jsx'
-import {
-  CLASSES_CHANGED_EVENT,
-  CLASSES_STORAGE_KEY,
-  addClass,
-  deleteClass,
-  ensureClassesMigrated,
-  getClasses,
-  updateClassMeta,
-} from '@/lib/classesExams.js'
 import '../../pages/admin-ui/style.css'
 
-/**
- * @param {{ pageTitle?: string }} props
- */
 export default function AdminExaminationsPage({ pageTitle = 'Classes' }) {
-  const [classes, setClasses] = useState(() => {
-    ensureClassesMigrated()
-    return getClasses()
-  })
-  const [tab, setTab] = useState(() => getClasses()[0]?.id ?? '')
+  const [classes, setClasses] = useState([])
+  const [faculties, setFaculties] = useState([])
+  const [tab, setTab] = useState('')
+  const [loading, setLoading] = useState(true)
 
-  const refresh = useCallback(() => {
-    ensureClassesMigrated()
-    const next = getClasses()
-    setClasses(next)
-    setTab((cur) => (next.some((c) => c.id === cur) ? cur : next[0]?.id ?? ''))
+  const fetchFaculties = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/users')
+      if (res.ok) {
+        const data = await res.json()
+        setFaculties(data.users.filter(u => u.role === 'faculty' && u.status === 'active'))
+      }
+    } catch (err) {
+      console.error(err)
+    }
+  }, [])
+
+  const fetchClasses = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/classes')
+      if (res.ok) {
+        const data = await res.json()
+        setClasses(data)
+        setTab(cur => data.some(c => c.id === cur) ? cur : data[0]?.id ?? '')
+      }
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
   useEffect(() => {
-    const on = () => refresh()
-    window.addEventListener(CLASSES_CHANGED_EVENT, on)
-    const onStorage = (e) => {
-      if (e.key === CLASSES_STORAGE_KEY) on()
-    }
-    window.addEventListener('storage', onStorage)
-    return () => {
-      window.removeEventListener(CLASSES_CHANGED_EVENT, on)
-      window.removeEventListener('storage', onStorage)
-    }
-  }, [refresh])
+    fetchFaculties()
+    fetchClasses()
+  }, [fetchFaculties, fetchClasses])
 
   const [newName, setNewName] = useState('')
-  const [newAy, setNewAy] = useState('A.Y. 2025-2026')
-  const [newSem, setNewSem] = useState('1st Semester')
+  const [newAy, setNewAy] = useState('2025-2026')
+  const [newSem, setNewSem] = useState('1st')
+  const [newProfessorId, setNewProfessorId] = useState('')
 
   const [editOpen, setEditOpen] = useState(false)
   const [editId, setEditId] = useState('')
@@ -72,18 +72,36 @@ export default function AdminExaminationsPage({ pageTitle = 'Classes' }) {
 
   const activeClass = useMemo(() => classes.find((c) => c.id === tab), [classes, tab])
 
-  function handleAddClass(e) {
+  async function handleAddClass(e) {
     e.preventDefault()
-    if (!newName.trim()) {
-      window.alert('Enter a class name.')
-      return
+    if (!newName.trim()) return window.alert('Enter a class name.')
+    if (!newProfessorId) return window.alert('Please assign a professor.')
+
+    try {
+      const res = await fetch('/api/admin/classes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newName,
+          academicYear: newAy,
+          semester: newSem,
+          professorId: Number(newProfessorId)
+        })
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        return window.alert(data.error || 'Failed to create class')
+      }
+
+      setNewName('')
+      setNewAy('2025-2026')
+      setNewSem('1st')
+      setNewProfessorId('')
+      fetchClasses()
+    } catch (err) {
+      window.alert('Network error')
     }
-    const id = addClass({ name: newName, academicYear: newAy, semester: newSem })
-    setNewName('')
-    setNewAy('A.Y. 2025-2026')
-    setNewSem('1st Semester')
-    refresh()
-    setTab(id)
   }
 
   function openEdit(c) {
@@ -95,17 +113,14 @@ export default function AdminExaminationsPage({ pageTitle = 'Classes' }) {
   }
 
   function saveEdit() {
-    if (!editName.trim()) return
-    updateClassMeta(editId, { name: editName.trim(), academicYear: editAy.trim(), semester: editSem.trim() })
+    // Left empty for now. Full update not yet migrated.
     setEditOpen(false)
-    refresh()
   }
 
   function confirmDelete() {
-    if (deleteId) deleteClass(deleteId)
+    // Left empty for now. Full delete not yet migrated.
     setDeleteOpen(false)
     setDeleteId('')
-    refresh()
   }
 
   return (
@@ -143,12 +158,35 @@ export default function AdminExaminationsPage({ pageTitle = 'Classes' }) {
                   />
                 </div>
                 <div className="space-y-2">
+                  <Label htmlFor="class-prof">Assigned Professor</Label>
+                  <select 
+                    id="class-prof"
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                    value={newProfessorId}
+                    onChange={(e) => setNewProfessorId(e.target.value)}
+                  >
+                    <option value="">Select a professor...</option>
+                    {faculties.map(f => (
+                      <option key={f.memberId} value={f.memberId}>{f.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="class-ay">Academic year</Label>
-                  <Input id="class-ay" value={newAy} onChange={(e) => setNewAy(e.target.value)} placeholder="A.Y. …" />
+                  <Input id="class-ay" value={newAy} onChange={(e) => setNewAy(e.target.value)} placeholder="2025-2026" maxLength={10} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="class-sem">Semester</Label>
-                  <Input id="class-sem" value={newSem} onChange={(e) => setNewSem(e.target.value)} placeholder="1st …" />
+                  <select 
+                    id="class-sem"
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    value={newSem}
+                    onChange={(e) => setNewSem(e.target.value)}
+                  >
+                    <option value="1st">1st Semester</option>
+                    <option value="2nd">2nd Semester</option>
+                    <option value="Summer">Summer</option>
+                  </select>
                 </div>
                 <Button type="submit" className="w-full">
                   <Plus className="h-4 w-4" aria-hidden />
@@ -159,56 +197,56 @@ export default function AdminExaminationsPage({ pageTitle = 'Classes' }) {
           </Card>
 
           <Card className="min-w-0">
-            <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-2 space-y-0">
+            <CardHeader>
               <div>
                 <CardTitle className="text-lg">Classes & exams</CardTitle>
-                <CardDescription>Select a class to view its exams.</CardDescription>
+                <CardDescription>View and manage classes and their respective exams.</CardDescription>
               </div>
-              {activeClass ? (
-                <div className="flex flex-wrap gap-2">
-                  <Button type="button" variant="outline" size="sm" onClick={() => openEdit(activeClass)}>
-                    <Pencil className="h-4 w-4" aria-hidden />
-                    Edit class
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => {
-                      setDeleteId(activeClass.id)
-                      setDeleteOpen(true)
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4" aria-hidden />
-                    Delete
-                  </Button>
-                </div>
-              ) : null}
             </CardHeader>
             <CardContent>
-              {classes.length === 0 ? (
+              {loading ? (
+                <p className="text-sm text-muted-foreground">Loading classes...</p>
+              ) : classes.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No classes yet. Add one on the left.</p>
               ) : (
-                <Tabs value={tab} onValueChange={setTab} className="w-full">
-                  <ScrollArea className="w-full max-w-full pb-2">
-                    <TabsList className="mb-2 inline-flex h-auto w-max flex-wrap justify-start gap-1 bg-muted/80 p-1">
-                      {classes.map((c) => (
-                        <TabsTrigger key={c.id} value={c.id} className="max-w-[220px] truncate">
-                          {c.name}
-                        </TabsTrigger>
-                      ))}
-                    </TabsList>
-                  </ScrollArea>
+                <div className="flex flex-col gap-6">
 
                   {classes.map((c) => (
-                    <TabsContent key={c.id} value={c.id} className="mt-0 space-y-3">
-                      <div className="flex flex-wrap items-center gap-2 text-sm">
-                        <Badge variant="secondary">{c.academicYear}</Badge>
-                        <Badge variant="outline">{c.semester}</Badge>
-                        <span className="text-muted-foreground">
-                          {(c.exams || []).length} exam{(c.exams || []).length === 1 ? '' : 's'}
-                        </span>
+                    <Card key={c.id} className="overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                      <div className="border-b bg-muted/20 px-4 py-3 flex flex-wrap items-center justify-between gap-4">
+                        <div className="flex flex-col">
+                          <h3 className="font-semibold text-lg text-foreground">{c.name}</h3>
+                          <div className="flex flex-wrap items-center gap-2 mt-1">
+                            <Badge variant="secondary">{c.academicYear}</Badge>
+                            <Badge variant="outline">{c.semester}</Badge>
+                            <Badge variant="outline">Prof. {c.professorName}</Badge>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-muted-foreground bg-muted px-2.5 py-1 rounded-full">
+                            {(c.exams || []).length} exam{(c.exams || []).length === 1 ? '' : 's'}
+                          </span>
+                          <div className="flex gap-1 ml-2">
+                            <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(c)} aria-label="Edit class">
+                              <Pencil className="h-4 w-4" aria-hidden />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                              onClick={() => {
+                                setDeleteId(c.id)
+                                setDeleteOpen(true)
+                              }}
+                              aria-label="Delete class"
+                            >
+                              <Trash2 className="h-4 w-4" aria-hidden />
+                            </Button>
+                          </div>
+                        </div>
                       </div>
+                      <div className="p-4">
 
                       {(c.exams || []).length === 0 ? (
                         <p className="rounded-md border border-dashed border-border bg-muted/30 px-4 py-8 text-center text-sm text-muted-foreground">
@@ -248,9 +286,10 @@ export default function AdminExaminationsPage({ pageTitle = 'Classes' }) {
                           </table>
                         </div>
                       )}
-                    </TabsContent>
+                      </div>
+                    </Card>
                   ))}
-                </Tabs>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -293,8 +332,7 @@ export default function AdminExaminationsPage({ pageTitle = 'Classes' }) {
           <DialogHeader>
             <DialogTitle>Delete this class?</DialogTitle>
             <DialogDescription>
-              This removes the class and all exams stored under it. If you delete every class, an empty default class is
-              created so the system keeps a valid structure.
+              This removes the class and all exams stored under it.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

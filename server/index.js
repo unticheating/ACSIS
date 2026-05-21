@@ -4,6 +4,9 @@ import express from 'express'
 import { assertAuthConfig, config } from './config.js'
 import authRouter from './routes/auth.js'
 import adminUsersRouter from './routes/adminUsers.js'
+import adminClassesRouter from './routes/adminClasses.js'
+import teacherClassesRouter from './routes/teacherClasses.js'
+import studentRouter from './routes/student.js'
 
 try {
   if (config.google.clientId && config.google.clientSecret) {
@@ -30,6 +33,9 @@ app.get('/api/health', (_req, res) => {
 
 app.use('/api/auth', authRouter)
 app.use('/api/admin/users', adminUsersRouter)
+app.use('/api/admin/classes', adminClassesRouter)
+app.use('/api/teacher/classes', teacherClassesRouter)
+app.use('/api/student', studentRouter)
 
 app.listen(config.port, () => {
   console.log(`ACSIS auth API listening on http://localhost:${config.port}`)

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import AuthImmersiveShell from '@/components/auth/AuthImmersiveShell.jsx'
 import { useSession } from '@/context/SessionContext.jsx'
-import { AUTH_ERROR_MESSAGES, startGoogleSignIn } from '@/lib/authApi.js'
+import { AUTH_ERROR_MESSAGES, startGoogleSignIn, loginWithPassword } from '@/lib/authApi.js'
 import { acsisToastError } from '@/lib/acsisToast.js'
 import '../styles/acsis-immersive.css'
 
@@ -33,7 +33,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (searchParams.get('auth') === 'success') {
-      refreshAuth().catch(() => {})
+      refreshAuth().catch(() => { })
     }
   }, [refreshAuth, searchParams])
 
@@ -47,7 +47,7 @@ export default function LoginPage() {
     startGoogleSignIn()
   }
 
-  function onEmailContinue(e) {
+  async function onEmailContinue(e) {
     e.preventDefault()
     const trimmed = email.trim()
     if (!trimmed) {
@@ -62,6 +62,28 @@ export default function LoginPage() {
       acsisToastError('Enter your password.')
       return
     }
+
+    const demoAccounts = [
+      'admin@plpasig.edu.ph',
+      'teacher@plpasig.edu.ph',
+      'student@plpasig.edu.ph'
+    ];
+
+    if (demoAccounts.includes(trimmed.toLowerCase())) {
+      try {
+        await loginWithPassword(trimmed, password)
+        const user = await refreshAuth()
+        if (user?.entryPath) {
+          navigate(user.entryPath, { replace: true })
+        } else {
+          acsisToastError(AUTH_ERROR_MESSAGES.no_membership)
+        }
+      } catch (err) {
+        acsisToastError(err instanceof Error ? err.message : 'Sign-in failed.')
+      }
+      return
+    }
+
     navigate('/verify', { state: { email: trimmed, password } })
   }
 

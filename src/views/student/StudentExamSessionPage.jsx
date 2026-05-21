@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Clock, LayoutGrid, CheckCircle2, Circle, AlertTriangle } from 'lucide-react'
 import PlpLogo from '@/components/brand/PlpLogo.jsx'
-import { getExamInClass } from '@/lib/classesExams.js'
+import { apiFetch } from '@/lib/apiFetch.js'
+
 import { useSession } from '@/context/SessionContext.jsx'
-import '../../pages/student-ui/exam_session.react.css'
+// Removed legacy CSS import
 
 const LOBBY_MS = 4000
 const COUNTDOWN_SEC = 3
@@ -12,19 +14,8 @@ const OVERLAY_FADE_MS = 340
 const TAB_LEAVE_DEBOUNCE_MS = 450
 const POST_DETECTION_COOLDOWN_MS = 1400
 
-const MC_OPTIONS = [
-  { value: 'a', label: 'IDS' },
-  { value: 'b', label: 'IPS' },
-  { value: 'c', label: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.' },
-  { value: 'd', label: 'Firewall' },
-]
-
-const DEFAULT_CODE = `def is_strong_password(p):
-    # your code here
-    pass`
-
 function isExamScene(name) {
-  return name === 'mc' || name === 'id' || name === 'code' || name === 'tf'
+  return name === 'question'
 }
 
 function formatClock(totalSec) {
@@ -34,18 +25,6 @@ function formatClock(totalSec) {
   return `${String(m).padStart(2, '0')}:${String(r).padStart(2, '0')}`
 }
 
-function Chrome({ title, secondsLeft }) {
-  return (
-    <header className="exam-chrome">
-      <div className="exam-logo" aria-hidden>
-        <PlpLogo className="exam-logo-img" width={40} height={40} alt="" />
-      </div>
-      <div className="exam-title-bar">{title}</div>
-      <div className="exam-timer">{formatClock(secondsLeft)}</div>
-    </header>
-  )
-}
-
 export default function StudentExamSessionPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -53,9 +32,31 @@ export default function StudentExamSessionPage() {
   const examId = searchParams.get('examId') || ''
   const { activeAccount } = useSession()
 
-  const hit = useMemo(() => {
-    if (!classId || !examId) return null
-    return getExamInClass(classId, examId)
+  const [hit, setHit] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    async function loadExam() {
+      if (!classId || !examId) {
+        setLoading(false)
+        return
+      }
+      try {
+        const res = await apiFetch(`/api/student/classes/${classId}/exams/${examId}`)
+        if (!res.ok) {
+          const errData = await res.json()
+          throw new Error(errData.error || 'Failed to fetch exam.')
+        }
+        const data = await res.json()
+        setHit({ exam: data })
+      } catch (err) {
+        setError(err.message)
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadExam()
   }, [classId, examId])
 
   const examTitle = hit?.exam?.title || 'Examination'
@@ -65,6 +66,8 @@ export default function StudentExamSessionPage() {
     return 'your instructor'
   }, [activeAccount])
 
+  const questions = hit?.exam?.questions || []
+
   const [scene, setScene] = useState('lobby')
   const sceneRef = useRef(scene)
   useEffect(() => {
@@ -73,17 +76,17 @@ export default function StudentExamSessionPage() {
 
   const [countdownNum, setCountdownNum] = useState(COUNTDOWN_SEC)
   const [secondsLeft, setSecondsLeft] = useState(durationMin * 60)
-  const [mcSel, setMcSel] = useState('a')
-  const [idAnswer, setIdAnswer] = useState('')
-  const [codeAnswer, setCodeAnswer] = useState(DEFAULT_CODE)
-  const [tfSel, setTfSel] = useState('true')
+  
+  // Dynamic Exam State
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
+  const [answers, setAnswers] = useState({})
 
   const [detectionOpen, setDetectionOpen] = useState(false)
   const [detectionReturn, setDetectionReturn] = useState(DETECTION_RETURN_SEC)
   const detectionRunningRef = useRef(false)
   const postCooldownUntilRef = useRef(0)
   const visibilityTimerRef = useRef(null)
-  const returnSceneRef = useRef('mc')
+  const returnSceneRef = useRef('question')
 
   useEffect(() => {
     setSecondsLeft(durationMin * 60)
@@ -92,7 +95,13 @@ export default function StudentExamSessionPage() {
   useEffect(() => {
     if (!isExamScene(scene)) return undefined
     const id = window.setInterval(() => {
-      setSecondsLeft((t) => Math.max(0, t - 1))
+      setSecondsLeft((t) => {
+        if (t <= 1) {
+          setScene('submitted')
+          return 0
+        }
+        return t - 1
+      })
     }, 1000)
     return () => window.clearInterval(id)
   }, [scene])
@@ -186,7 +195,7 @@ export default function StudentExamSessionPage() {
     const step = () => {
       setCountdownNum(n)
       if (n <= 1) {
-        window.setTimeout(() => setScene('mc'), 1000)
+        window.setTimeout(() => setScene('question'), 1000)
         return
       }
       n -= 1
@@ -196,14 +205,23 @@ export default function StudentExamSessionPage() {
     return () => window.clearTimeout(id)
   }, [scene])
 
-  if (!classId || !examId || !hit) {
+  if (loading) {
     return (
-      <div className="acsis-student-exam">
-        <div className="lobby-main" style={{ minHeight: '60vh' }}>
-          <p className="lobby-copy" style={{ marginBottom: 24 }}>
-            Open an exam from a class you are enrolled in, or check the class code and exam link.
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <p className="text-gray-500 animate-pulse">Loading exam details...</p>
+      </div>
+    )
+  }
+
+  if (error || !classId || !examId || !hit) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 max-w-md text-center">
+          <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <p className="text-gray-800 font-medium mb-6">
+            {error || 'Open an exam from a class you are enrolled in, or check the class code and exam link.'}
           </p>
-          <Link to="/student/my-classes" className="exam-session-exit" style={{ color: '#86efac' }}>
+          <Link to="/student/my-classes" className="inline-flex items-center text-blue-600 hover:text-blue-800 font-medium">
             ← Enrolled classes
           </Link>
         </div>
@@ -211,217 +229,351 @@ export default function StudentExamSessionPage() {
     )
   }
 
+  const currentQ = questions[currentQuestionIndex]
+
+  // Lobby Scene
+  if (scene === 'lobby') {
+    return (
+      <div 
+        className="min-h-screen flex flex-col font-sans relative overflow-hidden"
+        style={{ background: 'linear-gradient(180deg, #030f08 0%, #051a0d 38%, #020806 100%)' }}
+      >
+        {/* Background glow effects from original CSS */}
+        <div 
+          className="absolute inset-0 pointer-events-none z-0" 
+          style={{ 
+            background: `radial-gradient(ellipse 120% 85% at 50% 100%, rgba(22, 101, 52, 0.45) 0%, transparent 55%), 
+                         radial-gradient(ellipse 80% 50% at 50% 0%, rgba(15, 60, 35, 0.3) 0%, transparent 45%)`
+          }} 
+        />
+        <div className="relative z-10 flex flex-col min-h-screen">
+          <header className="h-16 border-b border-white/10 flex items-center px-6">
+            <PlpLogo className="w-8 h-8 mr-3 opacity-90" />
+            <h1 className="font-semibold text-gray-200 truncate">{examTitle}</h1>
+          </header>
+          <main className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+            <h1 className="text-4xl md:text-5xl font-bold mb-8 uppercase tracking-wider" style={{ color: '#f87171' }}>
+              WARNING:
+            </h1>
+            <div className="max-w-2xl text-left text-gray-200 space-y-5 text-lg leading-relaxed">
+              <p>This examination system monitors your activity to ensure academic fairness.</p>
+              <p>
+                Actions like <strong className="text-white">tab switching</strong>, <strong className="text-white">leaving the exam page</strong>,{' '}
+                <strong className="text-white">screenshots</strong>, or <strong className="text-white">right-clicking</strong> are detected. Avoid pressing the Windows Key.
+              </p>
+              <p>
+                You are allowed up to <strong className="text-white">3 strikes</strong> only. If this limit is exceeded, your exam will be
+                automatically submitted.
+              </p>
+              <p>Please remain on this page and complete the exam honestly.</p>
+            </div>
+            
+            <div className="mt-16 flex flex-col items-center gap-4">
+              <div className="w-6 h-6 border-2 border-white/25 border-t-white rounded-full animate-spin" />
+              <p className="text-white/90 font-medium tracking-wide">
+                Waiting for {instructorWait} to start the exam…
+              </p>
+            </div>
+            
+            <Link to={`/student/my-classes/${classId}`} className="mt-12 text-sm text-green-300 hover:text-green-100 transition-colors tracking-widest font-semibold">
+              ← Back to class
+            </Link>
+          </main>
+        </div>
+      </div>
+    )
+  }
+
+  // Countdown Scene
+  if (scene === 'countdown') {
+    return (
+      <div className="min-h-screen bg-blue-600 flex items-center justify-center">
+        <div className="text-center text-white">
+          <p className="text-2xl font-medium mb-4 opacity-80">Starting in</p>
+          <p className="text-9xl font-bold animate-pulse">{countdownNum}</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Submitted Scene
+  if (scene === 'submitted') {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+        <div className="bg-white p-10 rounded-2xl shadow-sm border border-gray-200 max-w-lg w-full text-center">
+          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <CheckCircle2 className="w-10 h-10 text-green-600" />
+          </div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">Exam Submitted Successfully!</h1>
+          <p className="text-gray-600 text-lg mb-8">
+            Thank you for completing the exam. Your responses have been recorded and securely submitted to your instructor.
+          </p>
+          <Link to={`/student/my-classes/${classId}`} className="inline-flex items-center justify-center w-full px-6 py-3 text-base font-medium text-white bg-blue-600 border border-transparent rounded-lg shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+            Return to Class Dashboard
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  // Main Question Layout
   return (
-    <div className="acsis-student-exam">
-      <section className={`scene${scene === 'lobby' ? ' is-active' : ''}`} aria-label="Exam lobby">
-        <Chrome title={examTitle} secondsLeft={secondsLeft} />
-        <main className="lobby-main">
-          <h1 className="lobby-warning-title">WARNING:</h1>
-          <div className="lobby-copy">
-            <p>This examination system monitors your activity to ensure academic fairness.</p>
-            <p>
-              Actions like <strong>tab switching</strong>, <strong>leaving the exam page</strong>,{' '}
-              <strong>screenshots</strong>, or <strong>right-clicking</strong> are detected. Avoid pressing Windows Key.
-            </p>
-            <p>
-              You are allowed up to <strong>3 strikes</strong> only. If this limit is exceeded, your exam will be
-              automatically submitted.
-            </p>
-            <p>Please remain on this page and complete the exam honestly.</p>
-          </div>
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      {/* Header */}
+      <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 shrink-0 z-10 sticky top-0">
+        <div className="flex items-center gap-3">
+          <PlpLogo className="w-8 h-8" />
+          <h1 className="font-semibold text-gray-800 hidden sm:block truncate max-w-md">{examTitle}</h1>
+        </div>
+        {/* Mobile Timer (Hidden on Desktop) */}
+        <div className="flex lg:hidden items-center gap-2 px-4 py-1.5 bg-gray-100 rounded-full font-mono text-gray-700 font-semibold">
+          <Clock className="w-4 h-4" />
+          {formatClock(secondsLeft)}
+        </div>
+      </header>
+
+      {/* Main Split Layout */}
+      <div className="flex-1 flex flex-col lg:flex-row w-full max-w-7xl mx-auto items-stretch">
+        
+        {/* Left Pane: Question Area */}
+        <main className="flex-1 flex flex-col p-6 lg:p-10 lg:pr-6 min-w-0">
+          {currentQ ? (
+            <div className="flex-1 flex flex-col max-w-3xl w-full mx-auto">
+              {/* Question Header */}
+              <div className="mb-8">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-sm font-medium mb-4">
+                  {currentQ.type === 'multiple-choice' ? 'Multiple Choice' : 
+                   currentQ.type === 'truefalse' ? 'True / False' : 'Identification'}
+                </div>
+                <h2 className="text-2xl lg:text-3xl font-medium text-gray-900 leading-relaxed whitespace-pre-wrap">
+                  {currentQ.question}
+                </h2>
+              </div>
+
+              {/* Question Inputs */}
+              <div className="flex-1">
+                {currentQ.type === 'multiple-choice' && (
+                  <div className="space-y-3">
+                    {(currentQ.options || []).map((opt, i) => {
+                      const isSelected = answers[currentQ.id] === opt;
+                      return (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => setAnswers(prev => ({ ...prev, [currentQ.id]: opt }))}
+                          className={`w-full text-left p-4 rounded-xl border-2 transition-all duration-200 flex items-start gap-4 ${
+                            isSelected 
+                              ? 'border-blue-600 bg-blue-50 shadow-sm' 
+                              : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          <div className={`mt-0.5 shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                            isSelected ? 'border-blue-600' : 'border-gray-300'
+                          }`}>
+                            {isSelected && <div className="w-2.5 h-2.5 bg-blue-600 rounded-full" />}
+                          </div>
+                          <span className={`text-base leading-relaxed ${isSelected ? 'text-blue-900 font-medium' : 'text-gray-700'}`}>
+                            {opt}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {currentQ.type === 'truefalse' && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {['True', 'False'].map((v) => {
+                      const isSelected = answers[currentQ.id] === v;
+                      return (
+                        <button
+                          key={v}
+                          type="button"
+                          onClick={() => setAnswers(prev => ({ ...prev, [currentQ.id]: v }))}
+                          className={`p-6 rounded-xl border-2 transition-all duration-200 flex flex-col items-center justify-center gap-3 ${
+                            isSelected 
+                              ? 'border-blue-600 bg-blue-50 shadow-sm' 
+                              : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                            isSelected ? 'border-blue-600' : 'border-gray-300'
+                          }`}>
+                            {isSelected && <div className="w-2.5 h-2.5 bg-blue-600 rounded-full" />}
+                          </div>
+                          <span className={`text-lg ${isSelected ? 'text-blue-900 font-bold' : 'text-gray-700 font-medium'}`}>
+                            {v}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {currentQ.type === 'identification' && (
+                  <div className="max-w-xl">
+                    <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="id-answer">
+                      Type your answer below
+                    </label>
+                    <input
+                      id="id-answer"
+                      type="text"
+                      className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 transition-all text-lg"
+                      value={answers[currentQ.id] || ''}
+                      onChange={(e) => setAnswers(prev => ({ ...prev, [currentQ.id]: e.target.value }))}
+                      placeholder="Your answer..."
+                      autoComplete="off"
+                      spellCheck="false"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Navigation Footer */}
+              <div className="mt-12 pt-6 border-t border-gray-200 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <button 
+                    type="button" 
+                    onClick={() => setCurrentQuestionIndex(i => Math.max(0, i - 1))}
+                    disabled={currentQuestionIndex === 0}
+                    className={`px-5 py-2.5 rounded-lg border font-medium transition-colors ${
+                      currentQuestionIndex === 0 
+                        ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed' 
+                        : 'border-gray-300 text-gray-700 bg-white hover:bg-gray-50 active:bg-gray-100'
+                    }`}
+                  >
+                    ← Previous
+                  </button>
+                </div>
+                <div className="flex items-center gap-3">
+                  {currentQuestionIndex < questions.length - 1 ? (
+                    <button 
+                      type="button" 
+                      onClick={() => setCurrentQuestionIndex(i => i + 1)}
+                      className="px-6 py-2.5 rounded-lg font-medium bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800 transition-colors shadow-sm"
+                    >
+                      Next →
+                    </button>
+                  ) : (
+                    <button 
+                      type="button" 
+                      onClick={() => setScene('submitted')}
+                      className="px-6 py-2.5 rounded-lg font-medium bg-green-600 text-white hover:bg-green-700 active:bg-green-800 transition-colors shadow-sm"
+                    >
+                      Submit Exam
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1 flex items-center justify-center text-gray-500">
+              No questions found.
+            </div>
+          )}
         </main>
-        <footer className="lobby-footer">
-          <div className="lobby-spinner" aria-hidden />
-          <p className="lobby-waiting">Waiting for {instructorWait} to start the exam…</p>
-        </footer>
-        <div className="exam-session-exit">
-          <Link to={`/student/my-classes/${classId}`}>← Back to class</Link>
-        </div>
-      </section>
 
-      <section className={`scene${scene === 'countdown' ? ' is-active' : ''}`} aria-label="Starting soon">
-        <Chrome title={examTitle} secondsLeft={secondsLeft} />
-        <main className="countdown-main">
-          <p className="countdown-label">Starting in</p>
-          <p className="countdown-number">{countdownNum}</p>
-        </main>
-      </section>
-
-      <section className={`scene${scene === 'mc' ? ' is-active' : ''}`} aria-label="Multiple choice question">
-        <Chrome title={examTitle} secondsLeft={secondsLeft} />
-        <div className="exam-stage">
-          <p className="exam-type-label">Multiple choice</p>
-          <p className="exam-type-hint">Read carefully and choose the best answer for the question.</p>
-          <div className="question-box">
-            A tool that monitors network or system activities for suspicious behavior or attacks and alerts administrators.
-          </div>
-          <div className="options-list">
-            {MC_OPTIONS.map((o) => (
-              <button
-                key={o.value}
-                type="button"
-                className={`option-row${mcSel === o.value ? ' is-selected' : ''}`}
-                onClick={() => setMcSel(o.value)}
-              >
-                <span className="option-radio" aria-hidden />
-                <span>{o.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-        <footer className="exam-footer-bar">
-          <span className="exam-section-label">Section 1 of 2</span>
-          <div className="exam-footer-right">
-            <button type="button" className="btn-next" onClick={() => setScene('id')}>
-              Next <span aria-hidden>→</span>
-            </button>
-            <div className="progress-row">
-              <span className="progress-label">Progress</span>
-              <div className="progress-track">
-                <div className="progress-fill" style={{ width: '18%' }} />
-              </div>
+        {/* Right Pane: Question Navigator Sidebar */}
+        <aside className="w-full lg:w-80 lg:border-l border-gray-200 bg-white shrink-0 p-6 lg:p-8 flex flex-col lg:sticky lg:top-16 lg:h-[calc(100vh-4rem)]">
+          {/* Desktop Timer Area */}
+          <div className="hidden lg:block mb-8">
+            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Time Remaining</h3>
+            <div className="flex items-center gap-3 px-5 py-4 bg-gray-50 rounded-xl border border-gray-200">
+              <Clock className="w-6 h-6 text-gray-400" />
+              <span className="font-mono text-3xl text-gray-800 tracking-tight font-semibold">
+                {formatClock(secondsLeft)}
+              </span>
             </div>
           </div>
-        </footer>
-      </section>
 
-      <section className={`scene${scene === 'id' ? ' is-active' : ''}`} aria-label="Identification question">
-        <Chrome title={examTitle} secondsLeft={secondsLeft} />
-        <div className="exam-stage">
-          <p className="exam-type-label">Identification</p>
-          <p className="exam-type-hint">Type the correct answer for each question.</p>
-          <div className="question-box">
-            A tool that monitors network or system activities for suspicious behavior or attacks and alerts administrators.
-          </div>
-          <label className="visually-hidden" htmlFor="id-answer">
-            Your answer
-          </label>
-          <input
-            id="id-answer"
-            className="id-input"
-            value={idAnswer}
-            onChange={(e) => setIdAnswer(e.target.value)}
-            placeholder="Type your answer.."
-            autoComplete="off"
-          />
-        </div>
-        <footer className="exam-footer-bar">
-          <span className="exam-section-label">Section 1 of 2</span>
-          <div className="exam-footer-right">
-            <button type="button" className="btn-next" onClick={() => setScene('code')}>
-              Next <span aria-hidden>→</span>
-            </button>
-            <div className="progress-row">
-              <span className="progress-label">Progress</span>
-              <div className="progress-track">
-                <div className="progress-fill" style={{ width: '32%' }} />
-              </div>
+          <div className="flex-1 overflow-y-auto">
+            <div className="flex items-center gap-2 mb-4">
+              <LayoutGrid className="w-5 h-5 text-gray-400" />
+              <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Question Navigator</h3>
+            </div>
+            
+            {/* Legend */}
+            <div className="flex items-center gap-4 mb-6 text-xs text-gray-500">
+              <div className="flex items-center gap-1.5"><Circle className="w-3 h-3 text-gray-300" /> Unanswered</div>
+              <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-green-500 rounded-full" /> Answered</div>
+            </div>
+
+            {/* Grid */}
+            <div className="grid grid-cols-5 gap-2.5">
+              {questions.map((q, idx) => {
+                const isActive = idx === currentQuestionIndex;
+                const isAnswered = !!answers[q.id] && answers[q.id].trim() !== '';
+                
+                let btnClass = "relative flex items-center justify-center w-full aspect-square rounded-lg text-sm font-medium transition-all duration-200 border-2 ";
+                
+                if (isActive) {
+                  // Active question takes priority in styling (Blue)
+                  btnClass += "border-blue-600 bg-blue-50 text-blue-700 ring-2 ring-blue-600/20";
+                } else if (isAnswered) {
+                  // Answered (Green)
+                  btnClass += "border-transparent bg-green-100 text-green-800 hover:bg-green-200";
+                } else {
+                  // Unanswered (White/Gray outline)
+                  btnClass += "border-gray-200 bg-white text-gray-500 hover:border-gray-300 hover:bg-gray-50";
+                }
+
+                return (
+                  <button
+                    key={q.id || idx}
+                    type="button"
+                    onClick={() => setCurrentQuestionIndex(idx)}
+                    className={btnClass}
+                    aria-label={`Go to question ${idx + 1}`}
+                  >
+                    {idx + 1}
+                    {isAnswered && !isActive && (
+                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 border-2 border-white rounded-full" />
+                    )}
+                  </button>
+                )
+              })}
             </div>
           </div>
-        </footer>
-      </section>
 
-      <section className={`scene${scene === 'code' ? ' is-active' : ''}`} aria-label="Coding question">
-        <Chrome title={examTitle} secondsLeft={secondsLeft} />
-        <div className="exam-stage">
-          <p className="exam-type-label">Manual coding</p>
-          <p className="exam-type-hint">Write your solution in the editor. Syntax is not auto-checked in this preview.</p>
-          <div className="question-box">
-            Implement <strong>is_strong_password(p)</strong>: return <code>True</code> if string <code>p</code> is at least
-            12 characters and contains at least one uppercase letter, one lowercase letter, and one digit; otherwise return{' '}
-            <code>False</code>. Use only the starter code below.
-          </div>
-          <label className="visually-hidden" htmlFor="code-answer">
-            Your code
-          </label>
-          <div className="code-editor-wrap">
-            <textarea
-              id="code-answer"
-              className="code-editor"
-              rows={14}
-              spellCheck={false}
-              autoCapitalize="off"
-              autoComplete="off"
-              value={codeAnswer}
-              onChange={(e) => setCodeAnswer(e.target.value)}
-            />
-          </div>
-        </div>
-        <footer className="exam-footer-bar">
-          <span className="exam-section-label">Section 1 of 2</span>
-          <div className="exam-footer-right">
-            <button type="button" className="btn-next" onClick={() => setScene('tf')}>
-              Next <span aria-hidden>→</span>
-            </button>
-            <div className="progress-row">
-              <span className="progress-label">Progress</span>
-              <div className="progress-track">
-                <div className="progress-fill" style={{ width: '55%' }} />
-              </div>
+          {/* Submit Action Block at bottom of Navigator */}
+          <div className="mt-8 pt-6 border-t border-gray-100">
+            <div className="mb-4 flex items-center justify-between text-sm">
+              <span className="text-gray-500 font-medium">Completion</span>
+              <span className="font-semibold text-gray-900">
+                {Object.keys(answers).filter(k => answers[k] && answers[k].trim() !== '').length} / {questions.length}
+              </span>
             </div>
-          </div>
-        </footer>
-      </section>
-
-      <section className={`scene${scene === 'tf' ? ' is-active' : ''}`} aria-label="True or false question">
-        <Chrome title={examTitle} secondsLeft={secondsLeft} />
-        <div className="exam-stage">
-          <p className="exam-type-label">True or false</p>
-          <p className="exam-type-hint">Select whether the statement is true or false.</p>
-          <div className="question-box">
-            An intrusion detection system (IDS) only blocks malicious traffic and never logs events for review.
-          </div>
-          <div className="options-list tf-grid">
-            {['true', 'false'].map((v) => (
-              <button
-                key={v}
-                type="button"
-                className={`option-row${tfSel === v ? ' is-selected' : ''}`}
-                onClick={() => setTfSel(v)}
-              >
-                <span className="option-radio" aria-hidden />
-                <span>{v === 'true' ? 'True' : 'False'}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-        <footer className="exam-footer-bar">
-          <span className="exam-section-label">Section 1 of 2</span>
-          <div className="exam-footer-right">
-            <button
-              type="button"
-              className="btn-next"
-              onClick={() =>
-                navigate(`/student/exam/result?classId=${encodeURIComponent(classId)}&examId=${encodeURIComponent(examId)}`)
-              }
+            <button 
+              type="button" 
+              onClick={() => setScene('submitted')}
+              className="w-full px-6 py-3.5 rounded-xl font-semibold bg-gray-900 text-white hover:bg-gray-800 active:bg-black transition-colors shadow-sm"
             >
-              Finish <span aria-hidden>→</span>
+              Finish & Submit
             </button>
-            <div className="progress-row">
-              <span className="progress-label">Progress</span>
-              <div className="progress-track">
-                <div className="progress-fill" style={{ width: '82%' }} />
-              </div>
-            </div>
           </div>
-        </footer>
-      </section>
+        </aside>
 
+      </div>
+
+      {/* Cheat Detection Overlay */}
       <div
-        className={`detection-overlay${detectionOpen ? ' is-active' : ''}`}
+        className={`fixed inset-0 z-50 bg-red-600/95 backdrop-blur-sm flex flex-col items-center justify-center text-white transition-opacity duration-300 ${
+          detectionOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        }`}
         role="alertdialog"
         aria-modal="true"
-        aria-labelledby="detection-title"
-        aria-describedby="detection-desc"
       >
-        <h2 id="detection-title" className="detection-title">
-          Suspicious Activity Detected!
-        </h2>
-        <p id="detection-desc" className="detection-sub">
-          This is a warning.
+        <AlertTriangle className="w-20 h-20 mb-6 text-white" />
+        <h2 className="text-4xl font-bold mb-4">Suspicious Activity Detected!</h2>
+        <p className="text-xl opacity-90 mb-8 max-w-lg text-center">
+          Leaving the exam window or unauthorized keystrokes have been recorded.
         </p>
-        <p className="detection-strikes">1 strike</p>
-        <p className="detection-countdown">Returning to exam in {detectionReturn}</p>
+        <div className="px-6 py-3 bg-red-900/50 rounded-full font-bold text-lg mb-8">
+          1 Strike Recorded
+        </div>
+        <p className="text-lg font-medium opacity-80 animate-pulse">
+          Returning to exam in {detectionReturn} seconds...
+        </p>
       </div>
     </div>
   )

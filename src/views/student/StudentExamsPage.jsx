@@ -1,62 +1,71 @@
-import { useCallback, useEffect, useReducer, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button.jsx'
-import {
-  CLASSES_CHANGED_EVENT,
-  CLASSES_STORAGE_KEY,
-  ensureClassAccessCodes,
-  ensureClassesMigrated,
-  getClasses,
-} from '@/lib/classesExams.js'
-import {
-  enrollByAccessCode,
-  getEnrolledClassIds,
-  STUDENT_ENROLLMENTS_EVENT,
-} from '@/lib/studentEnrollments.js'
+import { useSession } from '@/context/SessionContext.jsx'
 import '../../pages/student-ui/enrolled_classes.css'
 
 export default function StudentExamsPage() {
+  const { sessionMode, activeAccount } = useSession()
   const [joinCode, setJoinCode] = useState('')
   const [joinMsg, setJoinMsg] = useState(null)
-  const [, rerender] = useReducer((x) => x + 1, 0)
-  const refresh = useCallback(() => rerender(), [])
+  const [enrolled, setEnrolled] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  const getHeaders = useCallback(() => {
+    const headers = { 'Content-Type': 'application/json' }
+    if (sessionMode === 'demo') {
+      headers['x-demo-account'] = activeAccount?.id || 'student'
+    }
+    return headers
+  }, [sessionMode, activeAccount])
+
+  const fetchClasses = useCallback(async () => {
+    try {
+      const res = await fetch('/api/student/classes', { 
+        headers: getHeaders(),
+        credentials: 'include'
+      })
+      if (!res.ok) throw new Error('Failed to fetch classes')
+      const data = await res.json()
+      setEnrolled(data)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
+  }, [getHeaders])
 
   useEffect(() => {
-    ensureClassesMigrated()
-    ensureClassAccessCodes()
-  }, [])
+    fetchClasses()
+  }, [fetchClasses])
 
-  useEffect(() => {
-    const onStorage = (e) => {
-      if (e.key === CLASSES_STORAGE_KEY) refresh()
-    }
-    window.addEventListener('storage', onStorage)
-    window.addEventListener(CLASSES_CHANGED_EVENT, refresh)
-    window.addEventListener(STUDENT_ENROLLMENTS_EVENT, refresh)
-    return () => {
-      window.removeEventListener('storage', onStorage)
-      window.removeEventListener(CLASSES_CHANGED_EVENT, refresh)
-      window.removeEventListener(STUDENT_ENROLLMENTS_EVENT, refresh)
-    }
-  }, [refresh])
-
-  const enrolledIds = getEnrolledClassIds()
-  const all = getClasses()
-  const enrolled = all.filter((c) => enrolledIds.includes(String(c.id)))
-
-  function submitJoin(e) {
+  async function submitJoin(e) {
     e.preventDefault()
     setJoinMsg(null)
-    const res = enrollByAccessCode(joinCode)
-    if (!res.ok) {
-      setJoinMsg({ type: 'err', text: res.error })
-      return
+
+    try {
+      const res = await fetch('/api/student/enroll', {
+        method: 'POST',
+        headers: getHeaders(),
+        credentials: 'include',
+        body: JSON.stringify({ accessCode: joinCode })
+      })
+      const data = await res.json()
+
+      if (!res.ok) {
+        setJoinMsg({ type: 'err', text: data.error || 'Failed to enroll' })
+        return
+      }
+
+      setJoinMsg({
+        type: 'ok',
+        text: data.already ? `You are already in ${data.className}.` : `Added to ${data.className}.`,
+      })
+      setJoinCode('')
+      fetchClasses()
+    } catch (err) {
+      setJoinMsg({ type: 'err', text: 'Network error. Try again.' })
     }
-    setJoinMsg({
-      type: 'ok',
-      text: res.already ? `You are already in ${res.className}.` : `Added to ${res.className}.`,
-    })
-    setJoinCode('')
   }
 
   return (
@@ -82,7 +91,7 @@ export default function StudentExamsPage() {
                 onChange={(ev) => setJoinCode(ev.target.value.toUpperCase())}
               />
             </label>
-            <Button type="submit">Enroll</Button>
+            <Button type="submit" disabled={!joinCode.trim()}>Enroll</Button>
           </form>
           {joinMsg ? (
             <p className={`stu-enroll-msg stu-enroll-msg--${joinMsg.type === 'ok' ? 'ok' : 'err'}`}>{joinMsg.text}</p>
@@ -90,7 +99,9 @@ export default function StudentExamsPage() {
         </div>
       </div>
 
-      {enrolled.length === 0 ? (
+      {loading ? (
+        <div className="stu-empty">Loading enrolled classes...</div>
+      ) : enrolled.length === 0 ? (
         <div className="stu-empty">
           You are not enrolled in any class yet. Enter the access code your instructor shared (often on the course
           syllabus), then open the class card below once it appears.
