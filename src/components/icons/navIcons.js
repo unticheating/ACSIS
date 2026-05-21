@@ -1,0 +1,11 @@
+/** Sidebar / mobile nav — animated icons from https://itshover.com (via shadcn registry). */
+export { default as LayoutDashboardIcon } from '@/components/ui/layout-dashboard-icon.jsx'
+export { default as BookIcon } from '@/components/ui/book-icon.jsx'
+export { default as TriangleAlertIcon } from '@/components/ui/triangle-alert-icon.jsx'
+export { default as ChartBarIcon } from '@/components/ui/chart-bar-icon.jsx'
+export { default as ChartLineIcon } from '@/components/ui/chart-line-icon.jsx'
+export { default as FileDescriptionIcon } from '@/components/ui/file-description-icon.jsx'
+export { default as ShieldCheckIcon } from '@/components/ui/shield-check.jsx'
+export { default as UsersIcon } from '@/components/ui/users-icon.jsx'
+export { default as GearIcon } from '@/components/ui/gear-icon.jsx'
+export { default as GlobeIcon } from '@/components/ui/globe-icon.jsx'

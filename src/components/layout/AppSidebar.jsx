@@ -1,5 +1,5 @@
 import { PanelLeftClose } from 'lucide-react'
-import { useLayoutEffect, useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import AccountMenu from '@/components/layout/AccountMenu.jsx'
 import PlpLogo from '@/components/brand/PlpLogo.jsx'
@@ -9,6 +9,25 @@ const COLLAPSED_STORAGE_KEY = 'acsis.sidebarCollapsed'
 const MOBILE_MQ = '(max-width: 767px)'
 
 const itemClass = ({ isActive }) => `nav-item${isActive ? ' active' : ''}`
+
+/** @param {{ to: string, label: string, end?: boolean, icon: import('react').ComponentType, onNavClick: (e: import('react').MouseEvent) => void }} props */
+function SidebarNavItem({ to, label, end, icon: Icon, onNavClick }) {
+  const iconRef = useRef(null)
+
+  return (
+    <NavLink
+      to={to}
+      end={Boolean(end)}
+      className={itemClass}
+      onClick={onNavClick}
+      onMouseEnter={() => iconRef.current?.startAnimation?.()}
+      onMouseLeave={() => iconRef.current?.stopAnimation?.()}
+    >
+      <Icon ref={iconRef} size={16} strokeWidth={2} className="admin-nav-icon" aria-hidden />
+      <span className="acsis-nav-label">{label}</span>
+    </NavLink>
+  )
+}
 
 function readInitialCollapsed() {
   if (typeof window === 'undefined') return false
@@ -107,17 +126,15 @@ export default function AppSidebar({ items, settingsPath = null }) {
       </div>
 
       <nav className="sidebar-nav">
-        {items.map(({ to, label, end, icon: Icon }) => (
-          <NavLink
+        {items.map(({ to, label, end, icon }) => (
+          <SidebarNavItem
             key={to}
             to={to}
-            end={Boolean(end)}
-            className={itemClass}
-            onClick={stopExpandWhenCollapsed}
-          >
-            <Icon size={16} strokeWidth={2} className="admin-nav-icon" aria-hidden />
-            <span className="acsis-nav-label">{label}</span>
-          </NavLink>
+            label={label}
+            end={end}
+            icon={icon}
+            onNavClick={stopExpandWhenCollapsed}
+          />
         ))}
       </nav>
 

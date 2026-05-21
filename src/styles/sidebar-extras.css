@@ -220,6 +220,11 @@ html.acsis-sidebar-collapsed .nav-item .admin-nav-icon {
   height: 20px;
 }
 
+.nav-item .admin-nav-icon {
+  flex-shrink: 0;
+  display: block;
+}
+
 html.acsis-sidebar-collapsed .nav-item:hover {
   background: #f0faf4;
   color: #16a34a;
