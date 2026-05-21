@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import AuthImmersiveShell from '@/components/auth/AuthImmersiveShell.jsx'
 import { useSession } from '@/context/SessionContext.jsx'
-import { AUTH_ERROR_MESSAGES, loginWithPassword, startGoogleSignIn } from '@/lib/authApi.js'
+import { AUTH_ERROR_MESSAGES, startGoogleSignIn } from '@/lib/authApi.js'
+import { acsisToastError } from '@/lib/acsisToast.js'
 import '../styles/acsis-immersive.css'
 
 export default function LoginPage() {
@@ -12,13 +13,11 @@ export default function LoginPage() {
   const { refreshAuth, authUser, authLoading, isAuthenticated, activeAccount } = useSession()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [banner, setBanner] = useState(null)
-  const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
     const errorCode = searchParams.get('error')
     if (errorCode) {
-      setBanner(AUTH_ERROR_MESSAGES[errorCode] || 'Sign-in could not be completed.')
+      acsisToastError(AUTH_ERROR_MESSAGES[errorCode] || 'Sign-in could not be completed.')
       searchParams.delete('error')
       searchParams.delete('auth')
       setSearchParams(searchParams, { replace: true })
@@ -38,43 +37,37 @@ export default function LoginPage() {
     }
   }, [refreshAuth, searchParams])
 
+  useEffect(() => {
+    if (authUser && !authUser.portal) {
+      acsisToastError(AUTH_ERROR_MESSAGES.no_membership)
+    }
+  }, [authUser])
+
   function onGoogle() {
     startGoogleSignIn()
   }
 
-  async function onAdminLogin(e) {
+  function onEmailContinue(e) {
     e.preventDefault()
-    setBanner(null)
-    setSubmitting(true)
-    try {
-      await loginWithPassword(email, password)
-      const user = await refreshAuth()
-      if (user?.entryPath) {
-        navigate(user.entryPath, { replace: true })
-      } else {
-        setBanner('Login succeeded but no portal was assigned. Contact your administrator.')
-      }
-    } catch (err) {
-      setBanner(err instanceof Error ? err.message : 'Login failed.')
-    } finally {
-      setSubmitting(false)
+    const trimmed = email.trim()
+    if (!trimmed) {
+      acsisToastError('Enter your ACSIS registered email.')
+      return
     }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      acsisToastError('Enter a valid email address.')
+      return
+    }
+    if (!password) {
+      acsisToastError('Enter your password.')
+      return
+    }
+    navigate('/verify', { state: { email: trimmed, password } })
   }
 
   return (
     <AuthImmersiveShell>
       <div className="acsis-immersive__auth-stack">
-        {banner ? (
-          <p className="acsis-immersive__error" role="alert">
-            {banner}
-          </p>
-        ) : null}
-        {authUser && !authUser.portal ? (
-          <p className="acsis-immersive__error" role="alert">
-            {AUTH_ERROR_MESSAGES.no_membership}
-          </p>
-        ) : null}
-
         <p className="acsis-immersive__hint">Sign in with your @plpasig.edu.ph Google account</p>
         <button type="button" className="acsis-immersive__btn-google" onClick={onGoogle}>
           <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden>
@@ -100,37 +93,39 @@ export default function LoginPage() {
 
         <div className="acsis-immersive__or">OR</div>
 
-        <p className="acsis-immersive__alt-signin">Login with your ACSIS registered account</p>
-
-        <form onSubmit={onAdminLogin} className="acsis-immersive__credential-form">
+        <form
+          onSubmit={onEmailContinue}
+          className="acsis-immersive__credential-form"
+          noValidate
+        >
           <div className="acsis-immersive__field">
-            <label htmlFor="acsis-admin-email">Email</label>
+            <label htmlFor="acsis-email">Login with your ACSIS registered email.</label>
             <input
-              id="acsis-admin-email"
+              id="acsis-email"
               className="acsis-immersive__input"
               type="email"
               autoComplete="username"
               value={email}
               onChange={(ev) => setEmail(ev.target.value)}
               placeholder="you@plpasig.edu.ph"
-              required
+              aria-required="true"
             />
           </div>
           <div className="acsis-immersive__field">
-            <label htmlFor="acsis-admin-password">Password</label>
+            <label htmlFor="acsis-password">Password</label>
             <input
-              id="acsis-admin-password"
+              id="acsis-password"
               className="acsis-immersive__input"
               type="password"
               autoComplete="current-password"
               value={password}
               onChange={(ev) => setPassword(ev.target.value)}
               placeholder="Enter your password"
-              required
+              aria-required="true"
             />
           </div>
-          <button type="submit" className="acsis-immersive__btn-primary" disabled={submitting}>
-            {submitting ? 'Signing in…' : 'Log in'}
+          <button type="submit" className="acsis-immersive__btn-primary">
+            Continue
           </button>
         </form>
 

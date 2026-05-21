@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import AuthImmersiveShell from '@/components/auth/AuthImmersiveShell.jsx'
-import { pickAccountFromEmail } from '@/lib/demoAuth.js'
+import { AUTH_ERROR_MESSAGES, loginWithPassword } from '@/lib/authApi.js'
+import { acsisToastError } from '@/lib/acsisToast.js'
 import { useSession } from '@/context/SessionContext.jsx'
 import '../styles/acsis-immersive.css'
 
@@ -14,18 +15,19 @@ function emptyDigits() {
 export default function VerifyEmailPage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { switchAccount } = useSession()
+  const { refreshAuth } = useSession()
   const email = String(location.state?.email || '').trim()
+  const password = String(location.state?.password || '')
   const [digits, setDigits] = useState(emptyDigits)
-  const [error, setError] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
   const inputsRef = useRef([])
 
   useEffect(() => {
-    if (!email) navigate('/', { replace: true })
-  }, [email, navigate])
+    if (!email || !password) navigate('/', { replace: true })
+  }, [email, password, navigate])
 
   useEffect(() => {
-    if (email) focusIndex(0)
+    if (email) inputsRef.current[0]?.focus()
   }, [email])
 
   function focusIndex(i) {
@@ -43,7 +45,6 @@ export default function VerifyEmailPage() {
   }
 
   function onDigitChange(index, ev) {
-    setError(null)
     setDigitAt(index, ev.target.value)
   }
 
@@ -71,26 +72,37 @@ export default function VerifyEmailPage() {
     ev.preventDefault()
     const pasted = ev.clipboardData.getData('text').replace(/\D/g, '').slice(0, CODE_LENGTH)
     if (!pasted) return
-    setError(null)
     const next = emptyDigits()
     for (let i = 0; i < pasted.length; i++) next[i] = pasted[i]
     setDigits(next)
     focusIndex(Math.min(pasted.length, CODE_LENGTH - 1))
   }
 
-  function onSubmit(ev) {
+  async function onSubmit(ev) {
     ev.preventDefault()
     const code = digits.join('')
     if (code.length !== CODE_LENGTH) {
-      setError('Enter the 5-digit code from your email.')
+      acsisToastError('Enter the 5-digit code from your email.')
       return
     }
-    const account = pickAccountFromEmail(email)
-    if (account) switchAccount(account)
-    else navigate('/student/my-classes')
+
+    setSubmitting(true)
+    try {
+      await loginWithPassword(email, password)
+      const user = await refreshAuth()
+      if (user?.entryPath) {
+        navigate(user.entryPath, { replace: true })
+      } else {
+        acsisToastError(AUTH_ERROR_MESSAGES.no_membership)
+      }
+    } catch (err) {
+      acsisToastError(err instanceof Error ? err.message : 'Sign-in failed.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
-  if (!email) return null
+  if (!email || !password) return null
 
   return (
     <AuthImmersiveShell>
@@ -100,13 +112,7 @@ export default function VerifyEmailPage() {
           <span className="acsis-immersive__verify-email">{email}</span>
         </p>
 
-        {error ? (
-          <p className="acsis-immersive__error" role="alert">
-            {error}
-          </p>
-        ) : null}
-
-        <form onSubmit={onSubmit} className="acsis-immersive__verify-form">
+        <form onSubmit={onSubmit} className="acsis-immersive__verify-form" noValidate>
           <div
             className="acsis-immersive__code-row"
             role="group"
@@ -133,8 +139,8 @@ export default function VerifyEmailPage() {
             ))}
           </div>
 
-          <button type="submit" className="acsis-immersive__btn-primary">
-            Submit
+          <button type="submit" className="acsis-immersive__btn-primary" disabled={submitting}>
+            {submitting ? 'Signing in…' : 'Submit'}
           </button>
         </form>
 

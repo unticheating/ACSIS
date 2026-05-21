@@ -1,0 +1,126 @@
+/* Sonner toasts — bottom center, matches .acsis-immersive__error on login */
+
+[data-sonner-toaster] {
+  z-index: 9999 !important;
+}
+
+[data-sonner-toaster][data-y-position='bottom'] {
+  left: 50% !important;
+  right: auto !important;
+  transform: translateX(-50%);
+  width: min(420px, calc(100vw - 32px));
+}
+
+[data-sonner-toaster][data-y-position='bottom'] [data-sonner-toast] {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.acsis-toast {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 10px 12px 10px 14px;
+  font-family: var(--font-app, 'Google Sans', system-ui, sans-serif);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  color: #ecfdf5;
+  background: rgba(15, 31, 22, 0.94);
+  border: 1px solid rgba(74, 222, 128, 0.25);
+}
+
+/* Message first (Sonner renders close button before content in DOM) */
+.acsis-toast [data-content] {
+  order: 1;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+.acsis-toast__title {
+  font-weight: 600;
+  color: inherit;
+}
+
+.acsis-toast__description {
+  color: rgba(220, 252, 231, 0.85);
+}
+
+/* Same look as .acsis-immersive__error */
+.acsis-toast--error {
+  color: #fecaca;
+  background: rgba(127, 29, 29, 0.92);
+  border-color: rgba(248, 113, 113, 0.45);
+}
+
+.acsis-toast--error .acsis-toast__title,
+.acsis-toast--error .acsis-toast__description {
+  color: #fecaca;
+}
+
+.acsis-toast--success {
+  color: #ecfdf5;
+  background: rgba(21, 128, 61, 0.92);
+  border-color: rgba(74, 222, 128, 0.45);
+}
+
+.acsis-toast--info,
+.acsis-toast--warning {
+  color: #ecfdf5;
+  background: rgba(15, 31, 22, 0.94);
+  border-color: rgba(74, 222, 128, 0.25);
+}
+
+.acsis-toast [data-close-button],
+.acsis-toast__close {
+  order: 2;
+  flex-shrink: 0;
+  align-self: center;
+  margin-left: auto !important;
+  position: static !important;
+  inset: auto !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  transform: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 24px !important;
+  height: 24px !important;
+  min-width: 24px !important;
+  min-height: 24px !important;
+  padding: 0 !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-radius: 6px !important;
+  background: rgba(0, 0, 0, 0.2) !important;
+  color: inherit !important;
+  opacity: 0.85;
+  cursor: pointer;
+}
+
+.acsis-toast [data-close-button] svg,
+.acsis-toast__close svg {
+  display: block;
+  width: 14px !important;
+  height: 14px !important;
+  flex-shrink: 0;
+}
+
+.acsis-toast [data-close-button]:hover,
+.acsis-toast__close:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.35) !important;
+}
+
+.acsis-toast--error [data-close-button],
+.acsis-toast--error .acsis-toast__close {
+  border-color: rgba(248, 113, 113, 0.35) !important;
+}

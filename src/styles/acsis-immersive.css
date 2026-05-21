@@ -12,6 +12,8 @@
   --acsis-immersive-danger: #f87171;
   --acsis-immersive-input-border: rgba(74, 222, 128, 0.45);
   --acsis-immersive-panel: rgba(0, 24, 8, 0.35);
+  /* Auth: gap below subtitle before form (increase to move form lower) */
+  --acsis-auth-brand-gap: clamp(56px, 9vh, 88px);
 
   min-height: 100vh;
   min-height: 100dvh;
@@ -82,7 +84,7 @@
   text-align: center;
 }
 
-/* Auth login / verify — brand fixed at top, form centered in remaining viewport */
+/* Auth login / verify — brand at top, form sits lower in the viewport */
 .acsis-immersive__panel:has(.acsis-immersive__brand) {
   flex: 1;
   min-height: 0;
@@ -105,10 +107,9 @@
 .acsis-immersive__panel:has(.acsis-immersive__brand) .acsis-immersive__content {
   flex: 1;
   min-height: 0;
-  justify-content: center;
-  /* Extra bottom space shifts the block above true vertical center (eye level) */
-  padding-top: 0;
-  padding-bottom: clamp(96px, 18vh, 180px);
+  justify-content: flex-start;
+  padding-top: var(--acsis-auth-brand-gap);
+  padding-bottom: 32px;
 }
 
 /* Email + Login + demo footer — same column width as Google button (320px) */
