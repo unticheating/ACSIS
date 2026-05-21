@@ -38,9 +38,9 @@ function readInitialCollapsed() {
 
 export default function AppSidebar({ items, settingsPath = null }) {
   const { accounts, activeAccount, switchAccount, logout, sessionMode } = useSession()
+  const isApiSession = sessionMode === 'auth'
   const { theme, toggleTheme } = useTheme()
-  const otherAccounts =
-    sessionMode === 'demo' ? accounts.filter((a) => a.id !== activeAccount.id) : []
+  const otherAccounts = isApiSession ? [] : accounts.filter((a) => a.id !== activeAccount.id)
   const [collapsed, setCollapsed] = useState(readInitialCollapsed)
 
   useLayoutEffect(() => {

@@ -27,6 +27,16 @@ export async function logoutAuth() {
   return parseJson(res)
 }
 
+export async function loginWithPassword(email, password) {
+  const res = await fetch(`${API_BASE}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ email, password }),
+  })
+  return parseJson(res)
+}
+
 export async function fetchAuthConfig() {
   const res = await fetch(`${API_BASE}/api/auth/config`, { credentials: 'include' })
   return parseJson(res)

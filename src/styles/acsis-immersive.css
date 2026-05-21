@@ -122,6 +122,18 @@
   color: var(--acsis-immersive-fg-muted);
 }
 
+.acsis-immersive__alt-signin {
+  margin: 0 0 14px;
+  font-size: 0.875rem;
+  color: var(--acsis-immersive-fg-muted);
+  text-align: center;
+}
+
+.acsis-immersive__credential-form {
+  width: 100%;
+  text-align: left;
+}
+
 .acsis-immersive__error {
   margin: 0 0 12px;
   padding: 10px 12px;

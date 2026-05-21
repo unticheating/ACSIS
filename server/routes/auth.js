@@ -9,10 +9,10 @@ import {
   setSessionCookie,
   verifySession,
 } from '../lib/session.js'
+import { authenticateAdministrator } from '../lib/passwordAuth.js'
 import {
   buildSessionWithoutDatabase,
   findOrCreateGoogleUser,
-  parseNameFromGoogleProfile,
   resolveUserPortal,
 } from '../lib/users.js'
 
@@ -107,6 +107,23 @@ router.get('/google/callback', async (req, res) => {
   } catch (err) {
     console.error('[auth/google/callback]', err)
     return redirectWithError(res, 'auth_failed')
+  }
+})
+
+router.post('/login', async (req, res) => {
+  const email = typeof req.body?.email === 'string' ? req.body.email : ''
+  const password = typeof req.body?.password === 'string' ? req.body.password : ''
+
+  try {
+    const result = await authenticateAdministrator(getPool(), email, password)
+    if (!result.ok) {
+      return res.status(result.status).json({ error: result.error })
+    }
+    setSessionCookie(res, result.session)
+    return res.json({ ok: true, user: result.session })
+  } catch (err) {
+    console.error('[auth/login]', err)
+    return res.status(500).json({ error: 'Login failed. Please try again.' })
   }
 })
 

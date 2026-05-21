@@ -1,33 +1,18 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { demoAccounts, useSession } from '@/context/SessionContext.jsx'
-import { AUTH_ERROR_MESSAGES, startGoogleSignIn } from '@/lib/authApi.js'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { useSession } from '@/context/SessionContext.jsx'
+import { AUTH_ERROR_MESSAGES, loginWithPassword, startGoogleSignIn } from '@/lib/authApi.js'
 import '../styles/acsis-immersive.css'
-
-function pickAccountFromEmail(email) {
-  const e = String(email || '').toLowerCase().trim()
-  if (!e) return demoAccounts.find((a) => a.id === 'student')
-  if (
-    e.includes('superadmin') ||
-    e.includes('super-admin') ||
-    e.includes('acsissuper') ||
-    e.includes('platform@')
-  ) {
-    return demoAccounts.find((a) => a.id === 'super')
-  }
-  if (e.includes('acsisadmin') || e.includes('admin@')) return demoAccounts.find((a) => a.id === 'admin')
-  if (e.includes('faculty') || e.includes('alvarez') || e.includes('juanito'))
-    return demoAccounts.find((a) => a.id === 'faculty')
-  return demoAccounts.find((a) => a.id === 'student')
-}
 
 export default function LoginPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
-  const { switchAccount, refreshAuth, authUser, authLoading, isAuthenticated, activeAccount } =
-    useSession()
-  const [email, setEmail] = useState('acsisadmin@gmail.com')
+  const { refreshAuth, authUser, authLoading, isAuthenticated, activeAccount } = useSession()
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [banner, setBanner] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
     const errorCode = searchParams.get('error')
@@ -41,10 +26,10 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (authLoading) return
-    if (searchParams.get('auth') === 'success' && isAuthenticated && activeAccount.entryPath) {
+    if (isAuthenticated && activeAccount.entryPath && location.pathname === '/') {
       navigate(activeAccount.entryPath, { replace: true })
     }
-  }, [authLoading, isAuthenticated, activeAccount.entryPath, navigate, searchParams])
+  }, [authLoading, isAuthenticated, activeAccount.entryPath, navigate])
 
   useEffect(() => {
     if (searchParams.get('auth') === 'success') {
@@ -56,11 +41,23 @@ export default function LoginPage() {
     startGoogleSignIn()
   }
 
-  function onLogin(e) {
+  async function onAdminLogin(e) {
     e.preventDefault()
-    const account = pickAccountFromEmail(email)
-    if (account) switchAccount(account)
-    else navigate('/student/my-classes')
+    setBanner(null)
+    setSubmitting(true)
+    try {
+      await loginWithPassword(email, password)
+      const user = await refreshAuth()
+      if (user?.entryPath) {
+        navigate(user.entryPath, { replace: true })
+      } else {
+        setBanner('Login succeeded but no portal was assigned. Contact your administrator.')
+      }
+    } catch (err) {
+      setBanner(err instanceof Error ? err.message : 'Login failed.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -114,30 +111,43 @@ export default function LoginPage() {
 
             <div className="acsis-immersive__or">OR</div>
 
-            <form onSubmit={onLogin}>
+            <p className="acsis-immersive__alt-signin">Login with your ACSIS registered account</p>
+
+            <form onSubmit={onAdminLogin} className="acsis-immersive__credential-form">
               <div className="acsis-immersive__field">
-                <label htmlFor="acsis-email">Demo sign-in (development only)</label>
+                <label htmlFor="acsis-admin-email">Email</label>
                 <input
-                  id="acsis-email"
+                  id="acsis-admin-email"
                   className="acsis-immersive__input"
                   type="email"
                   autoComplete="username"
                   value={email}
                   onChange={(ev) => setEmail(ev.target.value)}
                   placeholder="you@plpasig.edu.ph"
+                  required
                 />
               </div>
-              <button type="submit" className="acsis-immersive__btn-primary">
-                Demo login
+              <div className="acsis-immersive__field">
+                <label htmlFor="acsis-admin-password">Password</label>
+                <input
+                  id="acsis-admin-password"
+                  className="acsis-immersive__input"
+                  type="password"
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(ev) => setPassword(ev.target.value)}
+                  placeholder="Enter your password"
+                  required
+                />
+              </div>
+              <button
+                type="submit"
+                className="acsis-immersive__btn-primary"
+                disabled={submitting}
+              >
+                {submitting ? 'Signing in…' : 'Log in'}
               </button>
             </form>
-
-            <p className="acsis-immersive__footer">
-              Production: use Google with <code>@plpasig.edu.ph</code>. Demo:{' '}
-              <code>superadmin@acsis.dev</code> → Super admin · <code>acsisadmin@gmail.com</code> →
-              Institution admin · faculty-style email → Faculty · other → Student.{' '}
-              <Link to="/dev/portals">Portal picker</Link>
-            </p>
           </div>
         </div>
       </main>

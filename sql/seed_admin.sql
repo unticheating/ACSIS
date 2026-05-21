@@ -1,0 +1,16 @@
+-- Example institution admin (run after acsis.sql + migrations).
+-- Replace the bcrypt hash: node server/scripts/hash-password.mjs 'YourPassword'
+
+-- INSERT INTO users (first_name, last_name, email, password, is_super_admin)
+-- VALUES (
+--     'PLP',
+--     'Administrator',
+--     'admin@plpasig.edu.ph',
+--     '$2b$12$REPLACE_WITH_BCRYPT_HASH',
+--     FALSE
+-- );
+--
+-- Then link to institution (adjust institution_id if not 1):
+-- INSERT INTO institution_members (institution_id, uid, role)
+-- SELECT 1, uid, 'admin' FROM users WHERE email = 'admin@plpasig.edu.ph'
+-- ON CONFLICT DO NOTHING;

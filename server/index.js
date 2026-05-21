@@ -35,6 +35,8 @@ app.listen(config.port, () => {
   console.log(`  Google callback: ${config.google.callbackUrl}`)
   console.log(`  Allowed email domain: @${config.allowedEmailDomain}`)
   if (!config.databaseUrl) {
-    console.warn('  DATABASE_URL not set — Google sign-in works in dev mode without PostgreSQL')
+    console.warn('  DATABASE_URL not set — password login uses ADMIN_DEV_* from .env')
+  } else {
+    console.log('  Database: connected via DATABASE_URL (ADMIN_DEV_* is ignored for login)')
   }
 })

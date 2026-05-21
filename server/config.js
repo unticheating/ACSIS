@@ -27,6 +27,8 @@ export const config = {
   allowedEmailDomain: (process.env.ALLOWED_EMAIL_DOMAIN || 'plpasig.edu.ph').toLowerCase(),
   sessionSecret: process.env.SESSION_SECRET || 'dev-only-change-in-production',
   databaseUrl: process.env.DATABASE_URL || '',
+  adminDevEmail: process.env.ADMIN_DEV_EMAIL || '',
+  adminDevPassword: process.env.ADMIN_DEV_PASSWORD || '',
 }
 
 export function assertAuthConfig() {

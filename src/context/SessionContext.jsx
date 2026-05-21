@@ -72,7 +72,7 @@ function loadAccountId() {
 
 function loadSessionMode() {
   const mode = localStorage.getItem(STORAGE_SESSION_MODE)
-  if (mode === 'demo' || mode === 'google') return mode
+  if (mode === 'demo' || mode === 'auth' || mode === 'google') return mode === 'google' ? 'auth' : mode
   return null
 }
 
@@ -80,7 +80,7 @@ function loadSessionMode() {
 function accountFromAuthUser(user) {
   if (!user?.portal || !user.entryPath) return null
   return {
-    id: `google-${user.uid}`,
+    id: `auth-${user.uid}`,
     displayName: user.displayName,
     roleLabel: user.roleLabel || 'User',
     portal: user.portal,
@@ -109,11 +109,12 @@ export function SessionProvider({ children }) {
         if (cancelled) return
         if (data.authenticated && data.user) {
           setAuthUser(data.user)
-          setSessionMode('google')
-          localStorage.setItem(STORAGE_SESSION_MODE, 'google')
+          setSessionMode('auth')
+          localStorage.setItem(STORAGE_SESSION_MODE, 'auth')
         } else {
           setAuthUser(null)
-          if (localStorage.getItem(STORAGE_SESSION_MODE) === 'google') {
+          const stored = localStorage.getItem(STORAGE_SESSION_MODE)
+          if (stored === 'auth' || stored === 'google') {
             localStorage.removeItem(STORAGE_SESSION_MODE)
             setSessionMode(null)
           }
@@ -137,12 +138,12 @@ export function SessionProvider({ children }) {
   const googleAccount = useMemo(() => accountFromAuthUser(authUser), [authUser])
 
   const activeAccount = useMemo(() => {
-    if (sessionMode === 'google' && googleAccount) return googleAccount
+    if (sessionMode === 'auth' && googleAccount) return googleAccount
     return demoAccount
   }, [sessionMode, googleAccount, demoAccount])
 
   const isAuthenticated =
-    (sessionMode === 'google' && Boolean(authUser?.portal)) ||
+    (sessionMode === 'auth' && Boolean(authUser?.portal)) ||
     (sessionMode === 'demo' && Boolean(demoAccount))
 
   useEffect(() => {
@@ -201,8 +202,8 @@ export function SessionProvider({ children }) {
     const data = await fetchAuthMe()
     if (data.authenticated && data.user) {
       setAuthUser(data.user)
-      setSessionMode('google')
-      localStorage.setItem(STORAGE_SESSION_MODE, 'google')
+      setSessionMode('auth')
+      localStorage.setItem(STORAGE_SESSION_MODE, 'auth')
       return data.user
     }
     setAuthUser(null)
