@@ -3,6 +3,7 @@ import cors from 'cors'
 import express from 'express'
 import { assertAuthConfig, config } from './config.js'
 import authRouter from './routes/auth.js'
+import adminUsersRouter from './routes/adminUsers.js'
 
 try {
   if (config.google.clientId && config.google.clientSecret) {
@@ -28,6 +29,7 @@ app.get('/api/health', (_req, res) => {
 })
 
 app.use('/api/auth', authRouter)
+app.use('/api/admin/users', adminUsersRouter)
 
 app.listen(config.port, () => {
   console.log(`ACSIS auth API listening on http://localhost:${config.port}`)

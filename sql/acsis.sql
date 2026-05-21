@@ -129,6 +129,9 @@ CREATE TABLE institution_members (
     uid            INT NOT NULL REFERENCES users (uid) ON DELETE CASCADE,
     role           institution_user_role NOT NULL,
     school_id      VARCHAR(50) DEFAULT NULL,
+    year_level     VARCHAR(50) DEFAULT NULL,
+    section        VARCHAR(50) DEFAULT NULL,
+    is_pending     BOOLEAN NOT NULL DEFAULT FALSE,
     is_active      BOOLEAN NOT NULL DEFAULT TRUE,
     joined_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (institution_id, uid) -- one membership per user per institution

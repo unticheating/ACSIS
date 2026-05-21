@@ -1358,6 +1358,158 @@ body {
     font-weight: 500;
 }
 
+.um-status-badge--inactive {
+    background: #f3f4f6;
+    color: #6b7280;
+}
+
+.um-status-badge--pending {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.um-banner-error {
+    margin: 0 0 16px;
+    padding: 12px 14px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #991b1b;
+    background: #fef2f2;
+    border: 1px solid rgba(248, 113, 113, 0.45);
+    border-radius: 10px;
+}
+
+.um-loading {
+    padding: 24px 14px;
+    text-align: center;
+    color: #6b7280;
+    font-size: 14px;
+}
+
+.um-optional {
+    font-weight: 400;
+    color: #9ca3af;
+}
+
+.um-form-check {
+    flex-direction: row !important;
+    align-items: center;
+    gap: 8px !important;
+    font-weight: 500 !important;
+}
+
+.um-form-check input {
+    width: auto;
+}
+
+.um-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: #fff;
+    border: 1px solid #e5ebe7;
+    border-radius: 99px;
+    min-width: min(280px, 100%);
+}
+
+.um-search input {
+    border: none;
+    outline: none;
+    font-size: 13px;
+    font-family: inherit;
+    width: 100%;
+    min-width: 180px;
+    background: transparent;
+    color: #1a2e22;
+}
+
+.um-search input::placeholder {
+    color: #9ca3af;
+}
+
+.um-muted {
+    color: #9ca3af !important;
+}
+
+.um-meta-sep {
+    color: #c4cfc8;
+}
+
+.um-empty {
+    text-align: center;
+    color: #9ca3af !important;
+    padding: 28px 14px !important;
+}
+
+.um-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.um-action-link {
+    padding: 0;
+    border: none;
+    background: none;
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #16a34a;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.um-action-link--muted {
+    color: #6b7280;
+}
+
+.um-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.um-form-grid label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #374151;
+}
+
+.um-field-hint {
+    font-size: 11px;
+    font-weight: 400;
+    color: #9ca3af;
+    margin-top: 2px;
+}
+
+.um-form-full {
+    grid-column: 1 / -1;
+}
+
+.um-form-grid input,
+.um-form-grid select {
+    padding: 10px 12px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+}
+
+.btn--ghost {
+    background: #fff;
+    color: #374151;
+    border: 1px solid #e5e7eb;
+}
+
+.btn--ghost:hover {
+    background: #f9fafb;
+}
+
 /* Teacher/student route roots use .acsis-view (no name clash with shell) */
 .content-body > .acsis-view {
     display: block;

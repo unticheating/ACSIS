@@ -7,6 +7,7 @@ import TeacherLayout from './layouts/TeacherLayout.jsx'
 import AdminDashboardPage from './views/admin/AdminDashboardPage.jsx'
 import AdminExaminationsPage from './views/admin/AdminExaminationsPage.jsx'
 import AdminPlaceholderPage from './views/admin/AdminPlaceholderPage.jsx'
+import AdminUserManagementPage from './views/admin/AdminUserManagementPage.jsx'
 import AdminSettingsPage from './views/admin/AdminSettingsPage.jsx'
 import DevPortalsPage from './views/DevPortalsPage.jsx'
 import LoginPage from './views/LoginPage.jsx'
@@ -84,7 +85,7 @@ export default function App() {
         <Route path="examinations" element={<Navigate to="/admin/classes" replace />} />
         <Route path="monitoring" element={<AdminPlaceholderPage title="Monitoring" />} />
         <Route path="violations" element={<AdminPlaceholderPage title="Violation records" />} />
-        <Route path="users" element={<AdminPlaceholderPage title="User management" />} />
+        <Route path="users" element={<AdminUserManagementPage basePath="/admin" />} />
         <Route path="reports" element={<AdminPlaceholderPage title="Reports" />} />
         <Route path="settings" element={<AdminSettingsPage basePath="/admin" />} />
       </Route>
@@ -103,7 +104,7 @@ export default function App() {
         <Route path="examinations" element={<Navigate to="/super-admin/classes" replace />} />
         <Route path="monitoring" element={<AdminPlaceholderPage title="Monitoring" />} />
         <Route path="violations" element={<AdminPlaceholderPage title="Violation records" />} />
-        <Route path="users" element={<AdminPlaceholderPage title="User management" />} />
+        <Route path="users" element={<AdminUserManagementPage basePath="/super-admin" />} />
         <Route path="reports" element={<AdminPlaceholderPage title="Reports" />} />
         <Route path="settings" element={<AdminSettingsPage basePath="/super-admin" />} />
       </Route>
