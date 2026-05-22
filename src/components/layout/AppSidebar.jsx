@@ -1,33 +1,15 @@
 import { PanelLeftClose } from 'lucide-react'
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import AccountMenu from '@/components/layout/AccountMenu.jsx'
-import PlpLogo from '@/components/brand/PlpLogo.jsx'
+import InstitutionLogo from '@/components/brand/InstitutionLogo.jsx'
+import { useInstitutionTheme } from '@/context/InstitutionThemeContext.jsx'
 
 const COLLAPSED_CLASS = 'acsis-sidebar-collapsed'
 const COLLAPSED_STORAGE_KEY = 'acsis.sidebarCollapsed'
 const MOBILE_MQ = '(max-width: 767px)'
 
 const itemClass = ({ isActive }) => `nav-item${isActive ? ' active' : ''}`
-
-/** @param {{ to: string, label: string, end?: boolean, icon: import('react').ComponentType, onNavClick: (e: import('react').MouseEvent) => void }} props */
-function SidebarNavItem({ to, label, end, icon: Icon, onNavClick }) {
-  const iconRef = useRef(null)
-
-  return (
-    <NavLink
-      to={to}
-      end={Boolean(end)}
-      className={itemClass}
-      onClick={onNavClick}
-      onMouseEnter={() => iconRef.current?.startAnimation?.()}
-      onMouseLeave={() => iconRef.current?.stopAnimation?.()}
-    >
-      <Icon ref={iconRef} size={16} strokeWidth={2} className="admin-nav-icon" aria-hidden />
-      <span className="acsis-nav-label">{label}</span>
-    </NavLink>
-  )
-}
 
 function readInitialCollapsed() {
   if (typeof window === 'undefined') return false
@@ -53,6 +35,7 @@ function readInitialCollapsed() {
  * @param {{ items: { to: string, label: string, end?: boolean, icon: import('react').ComponentType }[], settingsPath?: string | null }} props
  */
 export default function AppSidebar({ items, settingsPath = null }) {
+  const { institution, logo } = useInstitutionTheme()
   const [collapsed, setCollapsed] = useState(readInitialCollapsed)
 
   useLayoutEffect(() => {
@@ -103,11 +86,10 @@ export default function AppSidebar({ items, settingsPath = null }) {
       className={`sidebar acsis-sidebar-desktop${collapsed ? ' acsis-sidebar--collapsed-expandable' : ''}`}
       id="main-sidebar"
       onClick={handleCollapsedSidebarClick}
-      title={collapsed ? 'Click to expand sidebar' : undefined}
     >
       <div className="acsis-sidebar-header">
-        <div className="acsis-logo-mark" title="Pamantasan ng Lungsod ng Pasig">
-          <PlpLogo className="acsis-logo-img" width={36} height={36} alt="" />
+        <div className="acsis-logo-mark" title={institution.institutionName}>
+          <InstitutionLogo logo={logo} width={36} height={36} alt="" />
         </div>
         {!collapsed ? (
           <button
@@ -119,22 +101,27 @@ export default function AppSidebar({ items, settingsPath = null }) {
             }}
             title="Collapse sidebar"
             aria-expanded
+            aria-label="Collapse sidebar"
           >
             <PanelLeftClose size={18} strokeWidth={2} aria-hidden />
           </button>
         ) : null}
       </div>
 
-      <nav className="sidebar-nav">
-        {items.map(({ to, label, end, icon }) => (
-          <SidebarNavItem
+      <nav className="sidebar-nav" aria-label="Main navigation">
+        {items.map(({ to, label, end, icon: Icon }) => (
+          <NavLink
             key={to}
             to={to}
-            label={label}
-            end={end}
-            icon={icon}
-            onNavClick={stopExpandWhenCollapsed}
-          />
+            end={Boolean(end)}
+            className={itemClass}
+            onClick={stopExpandWhenCollapsed}
+            aria-label={collapsed ? label : undefined}
+            data-tooltip={collapsed ? label : undefined}
+          >
+            <Icon size={16} strokeWidth={2} className="admin-nav-icon" aria-hidden />
+            <span className="acsis-nav-label">{label}</span>
+          </NavLink>
         ))}
       </nav>
 

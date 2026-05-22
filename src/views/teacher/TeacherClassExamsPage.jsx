@@ -68,7 +68,7 @@ export default function TeacherClassExamsPage() {
 
   if (loading) {
     return (
-      <div className="acsis-mc-view">
+      <div className="acsis-mc-view acsis-view">
         <p className="acsis-mc-sub">Loading...</p>
       </div>
     )
@@ -76,7 +76,7 @@ export default function TeacherClassExamsPage() {
 
   if (error || !cls) {
     return (
-      <div className="acsis-mc-view">
+      <div className="acsis-mc-view acsis-view">
         <p className="acsis-mc-sub">This class could not be found.</p>
         <Link to="/teacher/my-classes" className="acsis-stream-back">
           ← Back to My Classes
@@ -109,7 +109,7 @@ export default function TeacherClassExamsPage() {
   }
 
   return (
-    <div className="acsis-mc-view">
+    <div className="acsis-mc-view acsis-view">
       <Link to="/teacher/my-classes" className="acsis-stream-back">
         ← My Classes
       </Link>
@@ -121,13 +121,15 @@ export default function TeacherClassExamsPage() {
         </p>
       </div>
 
-      <div className="acsis-mc-head" style={{ marginBottom: 12 }}>
-        <h2 className="acsis-mc-title" style={{ fontSize: '1.15rem', marginBottom: 0 }}>
-          Exams
-        </h2>
-        <Link to={createHref} className="acsis-link-create">
-          Create exam
-        </Link>
+      <div className="acsis-mc-head acsis-mc-head--compact">
+        <div className="acsis-mc-head__intro">
+          <h2 className="acsis-mc-title acsis-mc-title--section">Exams</h2>
+        </div>
+        <div className="acsis-mc-head__actions">
+          <Link to={createHref} className="acsis-link-create">
+            Create exam
+          </Link>
+        </div>
       </div>
 
       <div className="acsis-mc-tabs" role="tablist" aria-label="Filter exams">

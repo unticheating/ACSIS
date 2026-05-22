@@ -50,16 +50,15 @@
 
 /* Dark mode — matches `html.dark` from ThemeContext + shell-dark.css */
 html.dark {
-  --bg-canvas: #0b1710;
-  --bg-surface: #12261b;
-  --bg-surface-muted: hsl(142 22% 14%);
+  --bg-canvas: var(--acsis-canvas, #0b1710);
+  --bg-surface: var(--acsis-dark-surface, #12261b);
+  --bg-surface-muted: var(--acsis-dark-surface-muted, hsl(142 22% 14%));
   --fg-default: hsl(138 25% 92%);
   --fg-muted: hsl(140 15% 68%);
   --border-default: hsl(142 18% 22%);
-  --border-muted: rgba(74, 222, 128, 0.18);
-  --brand-mark: #4ade80;
-  --brand-plp: var(--brand-mark);
-  --brand-acsis: var(--brand-mark);
+  --border-muted: var(--acsis-shell-border, rgba(74, 222, 128, 0.18));
+  --brand-plp: var(--brand-mark, #4ade80);
+  --brand-acsis: var(--brand-mark, #4ade80);
   --brand-page: #c5e4d4;
 }
 
@@ -80,11 +79,17 @@ html[data-theme='ocean'] {
   .acsis-class-card,
   .acsis-stream-item,
   .nav-item,
+  html.acsis-sidebar-collapsed .nav-item[data-tooltip]::after,
   .acsis-btn-primary,
   .acsis-btn-ghost,
   .acsis-link-create,
   .activate-btn {
     transition-duration: 0.01ms !important;
+  }
+
+  html.acsis-sidebar-collapsed .nav-item[data-tooltip]:hover::after,
+  html.acsis-sidebar-collapsed .nav-item[data-tooltip]:focus-visible::after {
+    transform: translateY(-50%);
   }
 
   .acsis-summary-stat:hover,

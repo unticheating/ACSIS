@@ -11,6 +11,7 @@ import './index.css'
 import './styles/acsis-toast.css'
 import App from './App.jsx'
 import { Toaster } from './components/ui/sonner.jsx'
+import { InstitutionThemeProvider } from './context/InstitutionThemeContext.jsx'
 import { SessionProvider } from './context/SessionContext.jsx'
 import { ThemeProvider } from './context/ThemeContext.jsx'
 
@@ -19,8 +20,10 @@ createRoot(document.getElementById('root')).render(
     <BrowserRouter>
       <ThemeProvider>
         <SessionProvider>
-          <App />
-          <Toaster />
+          <InstitutionThemeProvider>
+            <App />
+            <Toaster />
+          </InstitutionThemeProvider>
         </SessionProvider>
       </ThemeProvider>
     </BrowserRouter>

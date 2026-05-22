@@ -45,7 +45,7 @@ export default function TeacherExamDetailPage() {
 
   if (loading) {
     return (
-      <div className="acsis-mc-view acsis-exam-detail">
+      <div className="acsis-mc-view acsis-view acsis-exam-detail">
         <p className="acsis-mc-sub">Loading exam details...</p>
       </div>
     )
@@ -53,7 +53,7 @@ export default function TeacherExamDetailPage() {
 
   if (error || !hit) {
     return (
-      <div className="acsis-mc-view acsis-exam-detail">
+      <div className="acsis-mc-view acsis-view acsis-exam-detail">
         <Link to={`/teacher/my-classes/${classId}`} className="acsis-stream-back">
           ← Back to class
         </Link>
@@ -105,7 +105,7 @@ export default function TeacherExamDetailPage() {
   const createHref = `/teacher/create-exam?${qs.toString()}`
 
   return (
-    <div className="acsis-mc-view acsis-exam-detail">
+    <div className="acsis-mc-view acsis-view acsis-exam-detail">
       <Link to={streamHref} className="acsis-stream-back">
         ← Back to class stream
       </Link>

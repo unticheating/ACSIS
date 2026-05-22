@@ -5,6 +5,7 @@ import { assertAuthConfig, config } from './config.js'
 import authRouter from './routes/auth.js'
 import adminUsersRouter from './routes/adminUsers.js'
 import adminClassesRouter from './routes/adminClasses.js'
+import adminSettingsRouter from './routes/adminSettings.js'
 import teacherClassesRouter from './routes/teacherClasses.js'
 import studentRouter from './routes/student.js'
 
@@ -25,7 +26,7 @@ app.use(
   }),
 )
 app.use(cookieParser())
-app.use(express.json())
+app.use(express.json({ limit: '3mb' }))
 
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true })
@@ -34,6 +35,7 @@ app.get('/api/health', (_req, res) => {
 app.use('/api/auth', authRouter)
 app.use('/api/admin/users', adminUsersRouter)
 app.use('/api/admin/classes', adminClassesRouter)
+app.use('/api/admin/settings', adminSettingsRouter)
 app.use('/api/teacher/classes', teacherClassesRouter)
 app.use('/api/student', studentRouter)
 

@@ -1,0 +1,14 @@
+.acsis-route-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 8rem;
+  padding: 1.5rem;
+  color: #6b7280;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+html.dark .acsis-route-fallback {
+  color: #9cbcaa;
+}

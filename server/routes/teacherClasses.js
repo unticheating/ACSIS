@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getTeacherClasses, getTeacherDashboard } from '../controllers/classController.js';
+import { createTeacherClass, getTeacherClasses, getTeacherDashboard } from '../controllers/classController.js';
 import { createTeacherExam, getTeacherClassStream, publishTeacherExam, deleteTeacherExam, getTeacherExamSession } from '../controllers/examController.js';
 import { requireAuth } from '../lib/sessionAuth.js';
 
@@ -15,6 +15,7 @@ router.use((req, res, next) => {
 
 router.get('/dashboard', getTeacherDashboard);
 router.get('/', getTeacherClasses);
+router.post('/', createTeacherClass);
 
 // Exam routes for a specific class
 router.get('/:classId/exams', getTeacherClassStream);

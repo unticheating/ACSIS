@@ -33,9 +33,9 @@
     min-height: var(--acsis-mobile-top-height);
     padding: 0 12px;
     box-sizing: border-box;
-    background: #fff;
-    border-bottom: 1px solid rgba(22, 101, 52, 0.1);
-    box-shadow: 0 2px 12px rgba(15, 60, 35, 0.06);
+    background: var(--acsis-sidebar-bg, #fafdfb);
+    border-bottom: 1px solid var(--acsis-sidebar-border, #b8d4c4);
+    box-shadow: 0 1px 0 rgba(15, 60, 35, 0.04), 0 4px 16px rgba(15, 60, 35, 0.08);
   }
 
   .acsis-mobile-top-bar__brand {
@@ -158,9 +158,9 @@
     min-height: var(--acsis-bottom-nav-height);
     padding: 10px 8px;
     padding-bottom: calc(10px + env(safe-area-inset-bottom, 0));
-    background: #fff;
-    border-top: 1px solid rgba(22, 101, 52, 0.12);
-    box-shadow: 0 -4px 20px rgba(15, 60, 35, 0.08);
+    background: var(--acsis-sidebar-bg, #fafdfb);
+    border-top: 1px solid var(--acsis-sidebar-border, #b8d4c4);
+    box-shadow: 0 -1px 0 rgba(15, 60, 35, 0.04), 0 -4px 20px rgba(15, 60, 35, 0.1);
   }
 
   /* 1:1 square — icon + label inside the highlight box */
@@ -185,21 +185,23 @@
     text-align: center;
     overflow: hidden;
     -webkit-tap-highlight-color: transparent;
-    transition:
-      background 0.15s ease,
-      color 0.15s ease,
-      box-shadow 0.15s ease;
   }
 
-  .acsis-bottom-nav__item:hover:not(.is-active) {
-    color: #166534;
-    background: #f0fdf4;
+  html:not(.dark) .acsis-bottom-nav__item:hover:not(.is-active) {
+    transition: background 0.1s ease, color 0.1s ease;
+    color: var(--acsis-brand-muted-text, #166534);
+    background: var(--acsis-brand-muted-bg, #f0fdf4);
   }
 
-  .acsis-bottom-nav__item.is-active {
-    color: #ffffff;
-    background: #16a34a;
-    box-shadow: 0 4px 12px rgba(22, 163, 74, 0.35);
+  html:not(.dark) .acsis-bottom-nav__item.is-active {
+    color: var(--acsis-nav-active-fg, #ffffff);
+    background: var(--acsis-nav-active-fill, var(--acsis-brand, #16a34a));
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--acsis-brand, #16a34a) 35%, transparent);
+  }
+
+  html:not(.dark) .acsis-bottom-nav__item.is-active .acsis-bottom-nav__icon,
+  html:not(.dark) .acsis-bottom-nav__item.is-active .acsis-bottom-nav__label {
+    color: var(--acsis-nav-active-icon, #ffffff);
   }
 
   .acsis-bottom-nav__icon-wrap {
@@ -225,7 +227,7 @@
     padding: 0 2px;
     color: inherit;
     font-size: 0.6875rem;
-    font-weight: 600;
+    font-weight: 500;
     line-height: 1.2;
     letter-spacing: 0.01em;
     overflow: hidden;

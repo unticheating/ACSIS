@@ -1,51 +1,53 @@
 import {
-  BookIcon,
-  ChartBarIcon,
-  ChartLineIcon,
-  FileDescriptionIcon,
-  GearIcon,
-  GlobeIcon,
-  LayoutDashboardIcon,
-  ShieldCheckIcon,
-  TriangleAlertIcon,
-  UsersIcon,
-} from '../components/icons/navIcons.js'
+  AlertCircle,
+  BarChart3,
+  ClipboardList,
+  FileText,
+  LayoutDashboard,
+  LayoutGrid,
+  ScrollText,
+  Settings,
+  Shield,
+  TrendingUp,
+  UsersRound,
+  Building2,
+} from 'lucide-react'
 import { getClassById, getExamInClass } from '../lib/classesExams.js'
 
 /** Navigation only — chrome (names, avatars) comes from SessionContext. */
 export const shellConfig = {
   teacher: {
     nav: [
-      { to: '/teacher', label: 'Dashboard', end: true, icon: LayoutDashboardIcon },
-      { to: '/teacher/my-classes', label: 'My Classes', mobileLabel: 'Classes', icon: BookIcon },
-      { to: '/teacher/detections', label: 'Detections', icon: TriangleAlertIcon },
-      { to: '/teacher/reports', label: 'Reports', icon: ChartBarIcon },
+      { to: '/teacher', label: 'Dashboard', end: true, icon: LayoutGrid },
+      { to: '/teacher/my-classes', label: 'My Classes', mobileLabel: 'Classes', icon: ClipboardList },
+      { to: '/teacher/detections', label: 'Detections', icon: AlertCircle },
+      { to: '/teacher/reports', label: 'Reports', icon: BarChart3 },
     ],
   },
   student: {
     nav: [
-      { to: '/student/my-classes', label: 'Enrolled classes', mobileLabel: 'Classes', icon: BookIcon },
-      { to: '/student/performance', label: 'Performance', mobileLabel: 'Performance', icon: ChartLineIcon },
-      { to: '/student/reports', label: 'Reports', mobileLabel: 'Reports', icon: FileDescriptionIcon },
+      { to: '/student/my-classes', label: 'Enrolled classes', mobileLabel: 'Classes', icon: ClipboardList },
+      { to: '/student/performance', label: 'Performance', mobileLabel: 'Performance', icon: TrendingUp },
+      { to: '/student/reports', label: 'Reports', mobileLabel: 'Reports', icon: ScrollText },
     ],
   },
   admin: {
     nav: [
-      { to: '/admin', label: 'Dashboard', end: true, icon: LayoutDashboardIcon },
-      { to: '/admin/classes', label: 'Classes', icon: FileDescriptionIcon },
-      { to: '/admin/violations', label: 'Violation Records', mobileLabel: 'Violations', icon: ShieldCheckIcon },
-      { to: '/admin/users', label: 'User Management', mobileLabel: 'Users', icon: UsersIcon },
-      { to: '/admin/settings', label: 'System Settings', mobileLabel: 'Settings', icon: GearIcon },
+      { to: '/admin', label: 'Dashboard', end: true, icon: LayoutDashboard },
+      { to: '/admin/classes', label: 'Classes', icon: FileText },
+      { to: '/admin/violations', label: 'Violation Records', mobileLabel: 'Violations', icon: Shield },
+      { to: '/admin/users', label: 'User Management', mobileLabel: 'Users', icon: UsersRound },
+      { to: '/admin/settings', label: 'Institution settings', mobileLabel: 'Settings', icon: Settings },
     ],
   },
   /** Platform scope (multi-tenant) — same shell pattern as institution admin for the demo. */
   super_admin: {
     nav: [
-      { to: '/super-admin', label: 'Platform', end: true, icon: LayoutDashboardIcon },
-      { to: '/super-admin/institutions', label: 'Institutions', mobileLabel: 'Schools', icon: GlobeIcon },
-      { to: '/super-admin/analytics', label: 'System Analytics', mobileLabel: 'Analytics', icon: ChartBarIcon },
-      { to: '/super-admin/users', label: 'User Management', mobileLabel: 'Users', icon: UsersIcon },
-      { to: '/super-admin/settings', label: 'System Settings', mobileLabel: 'Settings', icon: GearIcon },
+      { to: '/super-admin', label: 'Platform', end: true, icon: LayoutDashboard },
+      { to: '/super-admin/institutions', label: 'Institutions', mobileLabel: 'Schools', icon: Building2 },
+      { to: '/super-admin/analytics', label: 'System Analytics', mobileLabel: 'Analytics', icon: BarChart3 },
+      { to: '/super-admin/users', label: 'User Management', mobileLabel: 'Users', icon: UsersRound },
+      { to: '/super-admin/settings', label: 'System Settings', mobileLabel: 'Settings', icon: Settings },
     ],
   },
 }

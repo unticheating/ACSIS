@@ -1,38 +1,52 @@
+import { lazy } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import ProtectedRoute from './components/auth/ProtectedRoute.jsx'
-import AdminLayout from './layouts/AdminLayout.jsx'
-import StudentLayout from './layouts/StudentLayout.jsx'
-import SuperAdminLayout from './layouts/SuperAdminLayout.jsx'
-import TeacherLayout from './layouts/TeacherLayout.jsx'
-import AdminDashboardPage from './views/admin/AdminDashboardPage.jsx'
-import AdminExaminationsPage from './views/admin/AdminExaminationsPage.jsx'
-import AdminPlaceholderPage from './views/admin/AdminPlaceholderPage.jsx'
-import AdminUserManagementPage from './views/admin/AdminUserManagementPage.jsx'
-import AdminSettingsPage from './views/admin/AdminSettingsPage.jsx'
-import DevPortalsPage from './views/DevPortalsPage.jsx'
+import LazyPage from './components/layout/LazyPage.jsx'
 import LoginPage from './views/LoginPage.jsx'
 import VerifyEmailPage from './views/VerifyEmailPage.jsx'
-import StudentClassStreamPage from './views/student/StudentClassStreamPage.jsx'
-import StudentExamResultPage from './views/student/StudentExamResultPage.jsx'
-import StudentExamSessionPage from './views/student/StudentExamSessionPage.jsx'
-import StudentExamsPage from './views/student/StudentExamsPage.jsx'
-import StudentPerformancePage from './views/student/StudentPerformancePage.jsx'
-import StudentReportsPage from './views/student/StudentReportsPage.jsx'
-import TeacherCreateExamPage from './views/teacher/TeacherCreateExamPage.jsx'
-import TeacherDashboardPage from './views/teacher/TeacherDashboardPage.jsx'
-import TeacherDetectionsPage from './views/teacher/TeacherDetectionsPage.jsx'
-import TeacherClassExamsPage from './views/teacher/TeacherClassExamsPage.jsx'
-import TeacherExamDetailPage from './views/teacher/TeacherExamDetailPage.jsx'
-import TeacherMyClassesPage from './views/teacher/TeacherMyClassesPage.jsx'
-import TeacherReportsPage from './views/teacher/TeacherReportsPage.jsx'
-import SuperAdminDashboardPage from './views/super-admin/SuperAdminDashboardPage.jsx'
+
+const AdminLayout = lazy(() => import('./layouts/AdminLayout.jsx'))
+const StudentLayout = lazy(() => import('./layouts/StudentLayout.jsx'))
+const SuperAdminLayout = lazy(() => import('./layouts/SuperAdminLayout.jsx'))
+const TeacherLayout = lazy(() => import('./layouts/TeacherLayout.jsx'))
+
+const AdminDashboardPage = lazy(() => import('./views/admin/AdminDashboardPage.jsx'))
+const AdminExaminationsPage = lazy(() => import('./views/admin/AdminExaminationsPage.jsx'))
+const AdminPlaceholderPage = lazy(() => import('./views/admin/AdminPlaceholderPage.jsx'))
+const AdminUserManagementPage = lazy(() => import('./views/admin/AdminUserManagementPage.jsx'))
+const AdminSettingsPage = lazy(() => import('./views/admin/AdminSettingsPage.jsx'))
+const DevPortalsPage = lazy(() => import('./views/DevPortalsPage.jsx'))
+
+const StudentClassStreamPage = lazy(() => import('./views/student/StudentClassStreamPage.jsx'))
+const StudentExamResultPage = lazy(() => import('./views/student/StudentExamResultPage.jsx'))
+const StudentExamSessionPage = lazy(() => import('./views/student/StudentExamSessionPage.jsx'))
+const StudentExamsPage = lazy(() => import('./views/student/StudentExamsPage.jsx'))
+const StudentPerformancePage = lazy(() => import('./views/student/StudentPerformancePage.jsx'))
+const StudentReportsPage = lazy(() => import('./views/student/StudentReportsPage.jsx'))
+
+const TeacherCreateExamPage = lazy(() => import('./views/teacher/TeacherCreateExamPage.jsx'))
+const TeacherDashboardPage = lazy(() => import('./views/teacher/TeacherDashboardPage.jsx'))
+const TeacherDetectionsPage = lazy(() => import('./views/teacher/TeacherDetectionsPage.jsx'))
+const TeacherClassExamsPage = lazy(() => import('./views/teacher/TeacherClassExamsPage.jsx'))
+const TeacherExamDetailPage = lazy(() => import('./views/teacher/TeacherExamDetailPage.jsx'))
+const TeacherMyClassesPage = lazy(() => import('./views/teacher/TeacherMyClassesPage.jsx'))
+const TeacherReportsPage = lazy(() => import('./views/teacher/TeacherReportsPage.jsx'))
+
+const SuperAdminDashboardPage = lazy(() => import('./views/super-admin/SuperAdminDashboardPage.jsx'))
 
 export default function App() {
   return (
     <Routes>
       <Route path="/" element={<LoginPage />} />
       <Route path="/verify" element={<VerifyEmailPage />} />
-      <Route path="/dev/portals" element={<DevPortalsPage />} />
+      <Route
+        path="/dev/portals"
+        element={
+          <LazyPage>
+            <DevPortalsPage />
+          </LazyPage>
+        }
+      />
       <Route
         path="/teacher"
         element={
@@ -52,8 +66,22 @@ export default function App() {
         <Route path="live-monitoring" element={<Navigate to="/teacher/detections" replace />} />
       </Route>
       <Route path="/student/exam/lobby" element={<Navigate to="/student/exam/session" replace />} />
-      <Route path="/student/exam/session" element={<StudentExamSessionPage />} />
-      <Route path="/student/exam/result" element={<StudentExamResultPage />} />
+      <Route
+        path="/student/exam/session"
+        element={
+          <LazyPage>
+            <StudentExamSessionPage />
+          </LazyPage>
+        }
+      />
+      <Route
+        path="/student/exam/result"
+        element={
+          <LazyPage>
+            <StudentExamResultPage />
+          </LazyPage>
+        }
+      />
       <Route
         path="/student"
         element={

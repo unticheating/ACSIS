@@ -1,16 +1,15 @@
 import React, { useEffect, useState, useMemo } from 'react'
-import { Clock, Eye, AlertTriangle, ShieldAlert, MonitorPlay, X } from 'lucide-react'
-import { SummaryStatCard, SummaryStatGrid } from '@/components/dashboard/SummaryStatCard.jsx'
+import { Clock, AlertTriangle, ShieldAlert, MonitorPlay, X } from 'lucide-react'
 import { apiFetch } from '@/lib/apiFetch.js'
+import '../../styles/teacher-detections-live.css'
 
-// Generate 40 mock students
 function generateMockStudents() {
   const firstNames = ['John', 'Jane', 'Alex', 'Emma', 'Liam', 'Olivia', 'Noah', 'Ava', 'Ethan', 'Sophia', 'Mason', 'Isabella', 'William', 'Mia', 'James', 'Charlotte', 'Benjamin', 'Amelia', 'Lucas', 'Harper']
   const lastNames = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis', 'Rodriguez', 'Martinez', 'Hernandez', 'Lopez', 'Gonzalez', 'Wilson', 'Anderson', 'Thomas', 'Taylor', 'Moore', 'Jackson', 'Martin']
 
   const students = []
   for (let i = 0; i < 40; i++) {
-    const isPresent = Math.random() > 0.15; // 85% present
+    const isPresent = Math.random() > 0.15
     let status = 'empty'
     let strikes = 0
     let violations = []
@@ -38,10 +37,17 @@ function generateMockStudents() {
       schoolId: `2024-${String(Math.floor(Math.random() * 9000) + 1000)}`,
       status,
       strikes,
-      violations
+      violations,
     })
   }
   return students
+}
+
+function seatModifier(status) {
+  if (status === 'empty') return 'acsis-detections-seat--empty'
+  if (status === 'void') return 'acsis-detections-seat--void'
+  if (status === 'warning') return 'acsis-detections-seat--warning'
+  return 'acsis-detections-seat--good'
 }
 
 export default function TeacherDetectionsPage() {
@@ -51,23 +57,21 @@ export default function TeacherDetectionsPage() {
   const students = useMemo(() => generateMockStudents(), [])
   const [selectedStudent, setSelectedStudent] = useState(null)
 
-  // Fetch the currently active exam from the database API
   useEffect(() => {
     async function findActiveExam() {
       try {
         const res = await apiFetch('/api/teacher/classes')
         if (!res.ok) return
         const classes = await res.json()
-        // For each class, fetch its exams and find the first active one
         for (const cls of classes) {
           const exRes = await apiFetch(`/api/teacher/classes/${cls.id}/exams`)
           if (!exRes.ok) continue
           const clsData = await exRes.json()
-          const activeExam = (clsData.exams || []).find(
-            (e) => ['waiting', 'open'].includes((e.status || '').toLowerCase()),
+          const found = (clsData.exams || []).find((e) =>
+            ['waiting', 'open'].includes((e.status || '').toLowerCase()),
           )
-          if (activeExam) {
-            setActiveExam({ ...activeExam, className: clsData.name })
+          if (found) {
+            setActiveExam({ ...found, className: clsData.name })
             return
           }
         }
@@ -78,7 +82,6 @@ export default function TeacherDetectionsPage() {
     findActiveExam()
   }, [])
 
-  // Timer logic
   useEffect(() => {
     const interval = setInterval(() => {
       setSeconds((prev) => prev + 1)
@@ -94,181 +97,191 @@ export default function TeacherDetectionsPage() {
 
   if (!activeExam) {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col p-8">
-        <div className="flex items-center gap-3 mb-8">
-          <MonitorPlay className="w-8 h-8 text-gray-400" />
-          <h1 className="text-3xl font-bold text-gray-800 tracking-tight">Live Monitoring</h1>
+      <div className="acsis-detections-live acsis-detections-live--empty acsis-view">
+        <div className="flex items-center gap-3 mb-6">
+          <MonitorPlay className="w-8 h-8 text-gray-400 shrink-0" aria-hidden />
+          <h1 className="text-xl sm:text-3xl font-bold text-gray-800 tracking-tight">Live Monitoring</h1>
         </div>
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-16 text-center max-w-2xl mx-auto mt-12">
-          <ShieldAlert className="w-16 h-16 text-gray-300 mx-auto mb-6" />
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">No Active Exams</h2>
-          <p className="text-gray-500 text-lg">
-            Activate an exam from the 'My Classes' page to begin live monitoring your students.
+        <div className="acsis-detections-empty-card bg-white rounded-2xl shadow-sm border border-gray-200 text-center max-w-2xl mx-auto">
+          <ShieldAlert className="w-14 h-14 sm:w-16 sm:h-16 text-gray-300 mx-auto mb-4 sm:mb-6" aria-hidden />
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-3 sm:mb-4">No Active Exams</h2>
+          <p className="text-gray-500 text-base sm:text-lg px-2">
+            Activate an exam from the &apos;My Classes&apos; page to begin live monitoring your students.
           </p>
         </div>
       </div>
     )
   }
 
-  const presentStudents = students.filter(s => s.status !== 'empty')
-  const warnings = presentStudents.filter(s => s.status === 'warning').length
-  const voids = presentStudents.filter(s => s.status === 'void').length
+  const presentStudents = students.filter((s) => s.status !== 'empty')
+  const warnings = presentStudents.filter((s) => s.status === 'warning').length
+  const voids = presentStudents.filter((s) => s.status === 'void').length
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col pb-12">
-
-      {/* Header Area */}
-      <div className="bg-white border-b border-gray-200 px-8 py-6 mb-8">
-        <div className="flex items-center justify-between max-w-[1400px] mx-auto">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <span className="relative flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+    <div className="acsis-detections-live acsis-view">
+      <header className="acsis-detections-header">
+        <div className="acsis-detections-header__inner">
+          <div className="acsis-detections-header__intro">
+            <div className="acsis-detections-header__title-row">
+              <span className="relative flex h-3 w-3 shrink-0" aria-hidden>
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
               </span>
-              <h1 className="text-2xl font-bold text-gray-900">Live Monitoring</h1>
+              <h1 className="acsis-detections-header__title">Live Monitoring</h1>
             </div>
-            <p className="text-gray-500 font-medium">{activeExam.title}</p>
+            <p className="acsis-detections-header__exam">{activeExam.title}</p>
           </div>
 
-          <div className="flex gap-4">
-            <div className="bg-orange-50 border border-orange-200 rounded-xl px-6 py-3 flex flex-col items-center min-w-[120px]">
-              <span className="text-orange-600 font-bold text-2xl leading-none mb-1">{warnings}</span>
-              <span className="text-orange-800 text-xs font-semibold uppercase tracking-wider">Warnings</span>
+          <div className="acsis-detections-header__stats">
+            <div className="acsis-detections-stat acsis-detections-stat--warnings">
+              <span className="acsis-detections-stat__value">{warnings}</span>
+              <span className="acsis-detections-stat__label">Warnings</span>
             </div>
-            <div className="bg-red-50 border border-red-200 rounded-xl px-6 py-3 flex flex-col items-center min-w-[120px]">
-              <span className="text-red-600 font-bold text-2xl leading-none mb-1">{voids}</span>
-              <span className="text-red-800 text-xs font-semibold uppercase tracking-wider">Voided</span>
+            <div className="acsis-detections-stat acsis-detections-stat--voids">
+              <span className="acsis-detections-stat__value">{voids}</span>
+              <span className="acsis-detections-stat__label">Voided</span>
             </div>
-            <div className="bg-gray-900 rounded-xl px-6 py-3 flex items-center gap-3 text-white min-w-[160px]">
-              <Clock className="w-5 h-5 text-gray-400" />
-              <span className="font-mono text-2xl font-semibold tracking-tight">{formatTime(seconds)}</span>
+            <div className="acsis-detections-stat acsis-detections-stat--timer">
+              <Clock className="w-5 h-5 text-gray-400 shrink-0" aria-hidden />
+              <span className="acsis-detections-stat__timer">{formatTime(seconds)}</span>
             </div>
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* Virtual Classroom Area */}
-      <div className="flex-1 max-w-[1400px] w-full mx-auto px-8">
-
-        {/* The Board */}
-        <div className="w-full max-w-4xl mx-auto h-24 bg-white border-4 border-gray-300 rounded-lg shadow-sm flex items-center justify-center mb-16 relative">
-          <div className="absolute top-full w-full h-4 flex justify-around px-8 opacity-20">
-            <div className="w-2 h-full bg-gray-400"></div>
-            <div className="w-2 h-full bg-gray-400"></div>
+      <div className="acsis-detections-body">
+        <div className="acsis-detections-board w-full bg-white border-4 border-gray-300 rounded-lg shadow-sm flex items-center justify-center relative box-border">
+          <div className="absolute top-full w-full h-4 flex justify-around px-8 opacity-20 pointer-events-none" aria-hidden>
+            <div className="w-2 h-full bg-gray-400" />
+            <div className="w-2 h-full bg-gray-400" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-400 tracking-widest uppercase">Front of Classroom (Teacher's Desk)</h2>
+          <h2 className="text-sm sm:text-xl md:text-2xl font-bold text-gray-400 tracking-wide sm:tracking-widest uppercase text-center px-2 py-3">
+            Front of Classroom
+          </h2>
         </div>
 
-        {/* Seating Grid (4 cols, gap, 4 cols) */}
-        <div className="grid grid-cols-[repeat(4,1fr)_3rem_repeat(4,1fr)] gap-y-6 gap-x-4">
+        <div className="acsis-detections-seating">
           {students.map((student, idx) => {
-            // Insert empty space for the 5th column (the walkway)
-            const isWalkwayCol = (idx % 8) === 4;
-
-            const isGood = student.status === 'good';
-            const isWarning = student.status === 'warning';
-            const isVoid = student.status === 'void';
-            const isEmpty = student.status === 'empty';
-
-            let cardClasses = "relative aspect-[4/3] rounded-xl border-2 flex flex-col p-3 transition-all cursor-pointer group ";
-            let icon = null;
-
-            if (isEmpty) {
-              cardClasses += "border-dashed border-gray-300 bg-gray-50/50 cursor-default";
-            } else if (isVoid) {
-              cardClasses += "border-red-500 bg-red-50 hover:bg-red-100 shadow-sm";
-              icon = <ShieldAlert className="w-5 h-5 text-red-500" />;
-            } else if (isWarning) {
-              cardClasses += "border-orange-400 bg-orange-50 hover:bg-orange-100 shadow-sm";
-              icon = <AlertTriangle className="w-5 h-5 text-orange-500" />;
-            } else {
-              cardClasses += "border-green-400 bg-green-50 hover:bg-green-100 shadow-sm";
-              icon = <div className="w-3 h-3 bg-green-500 rounded-full" />;
-            }
-
-            const initials = !isEmpty ? `${student.firstName[0]}${student.lastName[0]}` : '';
-
-            const seatCard = (
-              <div
-                key={student.id}
-                className={cardClasses}
-                onClick={() => !isEmpty && setSelectedStudent(student)}
-              >
-                {!isEmpty ? (
-                  <>
-                    <div className="flex justify-between items-start mb-auto">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${isVoid ? 'bg-red-200 text-red-800' :
-                        isWarning ? 'bg-orange-200 text-orange-800' :
-                          'bg-green-200 text-green-800'
-                        }`}>
-                        {initials}
-                      </div>
-                      {icon}
-                    </div>
-                    <div>
-                      <div className="font-semibold text-sm truncate text-gray-900">{student.firstName}</div>
-                      <div className="text-xs text-gray-500 truncate">{student.lastName}</div>
-                    </div>
-                    {/* Strikes Indicator */}
-                    {(isWarning || isVoid) && (
-                      <div className="absolute -top-2 -right-2 bg-gray-900 text-white text-[10px] font-bold px-2 py-0.5 rounded-full border-2 border-white shadow-sm">
-                        {student.strikes} {student.strikes === 1 ? 'strike' : 'strikes'}
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="flex items-center justify-center w-full h-full">
-                    <span className="text-gray-400 text-sm font-medium">Empty</span>
-                  </div>
-                )}
-              </div>
-            )
+            const isWalkwayCol = idx % 8 === 4
+            const isEmpty = student.status === 'empty'
+            const initials = !isEmpty ? `${student.firstName[0]}${student.lastName[0]}` : ''
 
             return (
               <React.Fragment key={student.id}>
-                {isWalkwayCol && <div className="col-span-1" /* Walkway gap */ />}
-                {seatCard}
+                {isWalkwayCol ? <div className="acsis-detections-walkway" aria-hidden /> : null}
+                <div
+                  role={isEmpty ? undefined : 'button'}
+                  tabIndex={isEmpty ? undefined : 0}
+                  className={`acsis-detections-seat ${seatModifier(student.status)}`}
+                  onClick={() => !isEmpty && setSelectedStudent(student)}
+                  onKeyDown={(e) => {
+                    if (!isEmpty && (e.key === 'Enter' || e.key === ' ')) {
+                      e.preventDefault()
+                      setSelectedStudent(student)
+                    }
+                  }}
+                >
+                  {!isEmpty ? (
+                    <>
+                      <div className="acsis-detections-seat__top">
+                        <div
+                          className={`acsis-detections-seat__avatar ${
+                            student.status === 'void'
+                              ? 'bg-red-200 text-red-800'
+                              : student.status === 'warning'
+                                ? 'bg-orange-200 text-orange-800'
+                                : 'bg-green-200 text-green-800'
+                          }`}
+                        >
+                          {initials}
+                        </div>
+                        {student.status === 'void' ? (
+                          <ShieldAlert className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 shrink-0" aria-hidden />
+                        ) : student.status === 'warning' ? (
+                          <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-orange-500 shrink-0" aria-hidden />
+                        ) : (
+                          <div className="w-3 h-3 bg-green-500 rounded-full shrink-0" aria-hidden />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="acsis-detections-seat__name">{student.firstName}</div>
+                        <div className="acsis-detections-seat__last">{student.lastName}</div>
+                      </div>
+                      {(student.status === 'warning' || student.status === 'void') && (
+                        <span className="acsis-detections-seat__strikes">
+                          {student.strikes} {student.strikes === 1 ? 'strike' : 'strikes'}
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <span className="acsis-detections-seat__empty-label">Empty</span>
+                  )}
+                </div>
               </React.Fragment>
             )
           })}
         </div>
       </div>
 
-      {/* Student Details Modal */}
-      {selectedStudent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className={`p-6 text-white flex justify-between items-start ${selectedStudent.status === 'void' ? 'bg-red-600' :
-              selectedStudent.status === 'warning' ? 'bg-orange-500' :
-                'bg-green-600'
-              }`}>
-              <div>
-                <h3 className="text-2xl font-bold">{selectedStudent.firstName} {selectedStudent.lastName}</h3>
-                <p className="opacity-90">{selectedStudent.schoolId}</p>
+      {selectedStudent ? (
+        <div
+          className="acsis-detections-modal-backdrop"
+          role="presentation"
+          onClick={() => setSelectedStudent(null)}
+        >
+          <div
+            className="acsis-detections-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="detections-student-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              className={`p-4 sm:p-6 text-white flex justify-between items-start gap-3 ${
+                selectedStudent.status === 'void'
+                  ? 'bg-red-600'
+                  : selectedStudent.status === 'warning'
+                    ? 'bg-orange-500'
+                    : 'bg-green-600'
+              }`}
+            >
+              <div className="min-w-0">
+                <h3 id="detections-student-title" className="text-lg sm:text-2xl font-bold truncate">
+                  {selectedStudent.firstName} {selectedStudent.lastName}
+                </h3>
+                <p className="opacity-90 text-sm sm:text-base">{selectedStudent.schoolId}</p>
               </div>
               <button
+                type="button"
                 onClick={() => setSelectedStudent(null)}
-                className="p-1 hover:bg-white/20 rounded-lg transition-colors"
+                className="p-1 hover:bg-white/20 rounded-lg transition-colors shrink-0"
+                aria-label="Close"
               >
-                <X className="w-6 h-6" />
+                <X className="w-6 h-6" aria-hidden />
               </button>
             </div>
 
-            <div className="p-6">
-              <div className="mb-6 flex items-center justify-between pb-6 border-b border-gray-100">
+            <div className="p-4 sm:p-6">
+              <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-gray-100">
                 <div>
                   <div className="text-sm text-gray-500 font-medium mb-1">Current Status</div>
-                  <div className={`font-bold text-lg ${selectedStudent.status === 'void' ? 'text-red-600' :
-                    selectedStudent.status === 'warning' ? 'text-orange-600' :
-                      'text-green-600'
-                    }`}>
-                    {selectedStudent.status === 'void' ? 'Exam Voided' :
-                      selectedStudent.status === 'warning' ? 'Warning Issued' :
-                        'Doing Well'}
+                  <div
+                    className={`font-bold text-base sm:text-lg ${
+                      selectedStudent.status === 'void'
+                        ? 'text-red-600'
+                        : selectedStudent.status === 'warning'
+                          ? 'text-orange-600'
+                          : 'text-green-600'
+                    }`}
+                  >
+                    {selectedStudent.status === 'void'
+                      ? 'Exam Voided'
+                      : selectedStudent.status === 'warning'
+                        ? 'Warning Issued'
+                        : 'Doing Well'}
                   </div>
                 </div>
-                <div className="text-right">
+                <div className="sm:text-right">
                   <div className="text-sm text-gray-500 font-medium mb-1">Strikes</div>
                   <div className="font-bold text-xl text-gray-900">{selectedStudent.strikes} / 3</div>
                 </div>
@@ -276,12 +289,20 @@ export default function TeacherDetectionsPage() {
 
               <div>
                 <h4 className="font-semibold text-gray-900 mb-3">Violation Log</h4>
-                {selectedStudent.violations && selectedStudent.violations.length > 0 ? (
+                {selectedStudent.violations?.length > 0 ? (
                   <ul className="space-y-3">
                     {selectedStudent.violations.map((v, i) => (
-                      <li key={i} className="flex items-start gap-3 text-sm text-gray-700 bg-gray-50 p-3 rounded-lg border border-gray-100">
-                        <AlertTriangle className={`w-4 h-4 mt-0.5 ${selectedStudent.status === 'void' ? 'text-red-500' : 'text-orange-500'}`} />
-                        {v}
+                      <li
+                        key={i}
+                        className="flex items-start gap-3 text-sm text-gray-700 bg-gray-50 p-3 rounded-lg border border-gray-100"
+                      >
+                        <AlertTriangle
+                          className={`w-4 h-4 mt-0.5 shrink-0 ${
+                            selectedStudent.status === 'void' ? 'text-red-500' : 'text-orange-500'
+                          }`}
+                          aria-hidden
+                        />
+                        <span>{v}</span>
                       </li>
                     ))}
                   </ul>
@@ -293,18 +314,18 @@ export default function TeacherDetectionsPage() {
               </div>
             </div>
 
-            <div className="p-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
+            <div className="p-4 bg-gray-50 border-t border-gray-100 flex justify-end">
               <button
+                type="button"
                 onClick={() => setSelectedStudent(null)}
-                className="px-5 py-2 text-gray-700 font-medium hover:bg-gray-200 rounded-lg transition-colors"
+                className="px-5 py-2 text-gray-700 font-medium hover:bg-gray-200 rounded-lg transition-colors min-h-[44px]"
               >
                 Close
               </button>
             </div>
           </div>
         </div>
-      )}
-
+      ) : null}
     </div>
   )
 }

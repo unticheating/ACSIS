@@ -1,5 +1,6 @@
 import { Navigate } from 'react-router-dom'
 import AuthLoadingSkeleton from '@/components/layout/AuthLoadingSkeleton.jsx'
+import LazyPage from '@/components/layout/LazyPage.jsx'
 import { useSession } from '@/context/SessionContext.jsx'
 
 /**
@@ -20,5 +21,5 @@ export default function ProtectedRoute({ children, portal }) {
     return <Navigate to={activeAccount.entryPath} replace />
   }
 
-  return children
+  return <LazyPage>{children}</LazyPage>
 }

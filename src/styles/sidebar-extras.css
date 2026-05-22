@@ -20,7 +20,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 12px 12px 10px;
-  border-bottom: 1px solid var(--gray-200);
+  border-bottom: 1px solid var(--acsis-sidebar-border, #b8d4c4);
   gap: 8px;
   flex-shrink: 0;
 }
@@ -178,6 +178,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-weight: inherit;
 }
 
 /* ── Collapsed (icon rail) ── */
@@ -196,11 +197,16 @@ html.acsis-sidebar-collapsed .acsis-sidebar-header {
   padding-top: 10px;
 }
 
+html.acsis-sidebar-collapsed .sidebar {
+  overflow: visible;
+}
+
 html.acsis-sidebar-collapsed .sidebar-nav {
   align-items: center;
   padding-left: 10px;
   padding-right: 10px;
   gap: 4px;
+  overflow: visible;
 }
 
 html.acsis-sidebar-collapsed .nav-item {
@@ -225,23 +231,61 @@ html.acsis-sidebar-collapsed .nav-item .admin-nav-icon {
   display: block;
 }
 
-html.acsis-sidebar-collapsed .nav-item:hover {
-  background: #f0faf4;
-  color: #16a34a;
+html:not(.dark).acsis-sidebar-collapsed .nav-item:hover:not(.active) {
+  background: var(--acsis-brand-muted-bg, #f0faf4);
+  color: var(--acsis-brand, #16a34a);
 }
 
-html.acsis-sidebar-collapsed .nav-item:hover .admin-nav-icon {
-  color: #16a34a;
+html:not(.dark).acsis-sidebar-collapsed .nav-item:hover:not(.active) .admin-nav-icon {
+  color: var(--acsis-brand, #16a34a);
 }
 
-html.acsis-sidebar-collapsed .nav-item.active {
-  background: #16a34a;
+html:not(.dark).acsis-sidebar-collapsed .nav-item.active {
+  background: var(--acsis-brand, #16a34a);
   color: #ffffff;
-  box-shadow: 0 4px 12px rgba(22, 163, 74, 0.35);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--acsis-brand, #16a34a) 35%, transparent);
 }
 
-html.acsis-sidebar-collapsed .nav-item.active .admin-nav-icon {
+html:not(.dark).acsis-sidebar-collapsed .nav-item.active .admin-nav-icon {
   color: #ffffff;
+}
+
+/* Collapsed rail: label tooltip on hover */
+html.acsis-sidebar-collapsed .nav-item[data-tooltip] {
+  position: relative;
+}
+
+html.acsis-sidebar-collapsed .nav-item[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  z-index: 120;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #1a2e22;
+  color: #ffffff;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  box-shadow: 0 4px 14px rgba(15, 60, 35, 0.18);
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-50%) translateX(-4px);
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease,
+    visibility 0.15s ease;
+}
+
+html.acsis-sidebar-collapsed .nav-item[data-tooltip]:hover::after,
+html.acsis-sidebar-collapsed .nav-item[data-tooltip]:focus-visible::after {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(-50%) translateX(0);
 }
 
 html.acsis-sidebar-collapsed .acsis-profile-card,

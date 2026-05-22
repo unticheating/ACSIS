@@ -76,6 +76,57 @@ export async function requireAuth(req, res, next) {
  * @param {import('express').Response} res
  * @param {import('express').NextFunction} next
  */
+/**
+ * Institution-scoped admin only (not platform super admin).
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ */
+export async function requireInstitutionAdminOnly(req, res, next) {
+  const session = req.authSession
+  if (!session) {
+    return res.status(401).json({ error: 'Not authenticated.' })
+  }
+
+  if (session.isSuperAdmin || session.portal === 'super_admin') {
+    return res.status(403).json({
+      error: 'Institution settings are managed by each school administrator.',
+    })
+  }
+
+  if (session.portal !== 'admin') {
+    return res.status(403).json({ error: 'Administrator access required.' })
+  }
+
+  if (!isDatabaseEnabled()) {
+    return res.status(503).json({ error: 'DATABASE_URL is not configured.' })
+  }
+
+  const pool = getPool()
+  if (!pool) {
+    return res.status(503).json({ error: 'Database unavailable.' })
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT im.institution_id
+       FROM institution_members im
+       JOIN institutions i ON i.institution_id = im.institution_id
+       WHERE im.uid = $1 AND im.role = 'admin' AND im.is_active = TRUE AND i.is_active = TRUE
+       LIMIT 1`,
+      [session.uid],
+    )
+    if (!rows[0]) {
+      return res.status(403).json({ error: 'You are not an institution administrator.' })
+    }
+    req.institutionId = rows[0].institution_id
+    return next()
+  } catch (err) {
+    console.error('[requireInstitutionAdminOnly]', err)
+    return res.status(503).json({ error: 'Database error.' })
+  }
+}
+
 export async function requireInstitutionAdmin(req, res, next) {
   const session = req.authSession
   if (!session) {

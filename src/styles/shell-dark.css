@@ -2,18 +2,18 @@
 
 html.dark {
   color-scheme: dark;
+  /* Emerald defaults — other palettes override via institutionThemeApply */
   --acsis-canvas: #0b1710;
+  --acsis-sidebar-bg: #0f1f16;
+  --acsis-dark-surface: #12261b;
+  --acsis-dark-surface-muted: hsl(142 22% 14%);
+  --acsis-shell-border: rgba(74, 222, 128, 0.18);
+  --acsis-shell-border-subtle: rgba(74, 222, 128, 0.12);
+  --acsis-content-header-bg: rgba(15, 31, 22, 0.92);
   --acsis-nav-fg: #b8d4c4;
   --acsis-nav-icon: #7a9d8a;
-  --acsis-nav-hover-bg: rgba(34, 197, 94, 0.12);
-  --acsis-nav-hover-fg: #ecfdf5;
-  --acsis-nav-active-bg: linear-gradient(
-    135deg,
-    rgba(22, 163, 74, 0.35) 0%,
-    rgba(21, 128, 61, 0.25) 100%
-  );
-  --acsis-nav-active-fg: #ecfdf5;
-  --acsis-nav-active-shadow: 0 1px 0 rgba(74, 222, 128, 0.15);
+  --acsis-nav-hover-bg: color-mix(in srgb, var(--acsis-brand, #16a34a) 14%, transparent);
+  --acsis-nav-active-shadow: 0 0 0 1px color-mix(in srgb, var(--acsis-brand, #16a34a) 38%, transparent);
 }
 
 html.dark body,
@@ -27,13 +27,13 @@ html.dark .acsis-app {
 }
 
 html.dark .sidebar {
-  background: #0f1f16;
-  border-right-color: rgba(74, 222, 128, 0.12);
-  box-shadow: 4px 0 32px rgba(0, 0, 0, 0.35);
+  background: var(--acsis-sidebar-bg, #0f1f16);
+  border-right: 1px solid var(--acsis-shell-border, rgba(74, 222, 128, 0.18));
+  box-shadow: 2px 0 0 rgba(0, 0, 0, 0.2), 4px 0 24px rgba(0, 0, 0, 0.35);
 }
 
 html.dark .sidebar-top {
-  border-bottom-color: rgba(74, 222, 128, 0.1);
+  border-bottom-color: var(--acsis-shell-border-subtle, rgba(74, 222, 128, 0.1));
 }
 
 html.dark .admin-name {
@@ -53,25 +53,45 @@ html.dark .nav-item .admin-nav-icon {
   color: var(--acsis-nav-icon);
 }
 
-html.dark .nav-item:hover {
+html.dark .nav-item:hover:not(.active) {
   background: var(--acsis-nav-hover-bg);
-  color: var(--acsis-nav-hover-fg);
+  color: var(--acsis-nav-hover-fg, #ecfdf5);
 }
 
-html.dark .nav-item:hover i,
-html.dark .nav-item:hover .admin-nav-icon {
-  color: var(--acsis-nav-hover-fg);
+html.dark .nav-item:hover:not(.active) i,
+html.dark .nav-item:hover:not(.active) .admin-nav-icon {
+  color: var(--acsis-nav-hover-fg, #ecfdf5);
 }
 
 html.dark .nav-item.active {
-  background: var(--acsis-nav-active-bg);
-  color: var(--acsis-nav-active-fg);
+  background: var(--acsis-nav-active-fill, color-mix(in srgb, var(--acsis-brand, #16a34a) 28%, transparent));
+  color: var(--acsis-nav-active-fg, #ecfdf5);
   box-shadow: var(--acsis-nav-active-shadow);
 }
 
 html.dark .nav-item.active i,
 html.dark .nav-item.active .admin-nav-icon {
-  color: var(--acsis-nav-active-fg);
+  color: var(--acsis-nav-active-icon, var(--acsis-nav-active-fg, #ecfdf5));
+}
+
+/* Collapsed rail — must not live only in mobile @media (desktop uses icon rail too) */
+html.dark.acsis-sidebar-collapsed .nav-item:hover:not(.active) {
+  background: var(--acsis-nav-hover-bg);
+  color: var(--acsis-nav-hover-fg, #ecfdf5);
+}
+
+html.dark.acsis-sidebar-collapsed .nav-item:hover:not(.active) .admin-nav-icon {
+  color: var(--acsis-nav-hover-fg, #ecfdf5);
+}
+
+html.dark.acsis-sidebar-collapsed .nav-item.active {
+  background: var(--acsis-nav-active-fill, color-mix(in srgb, var(--acsis-brand, #16a34a) 28%, transparent));
+  color: var(--acsis-nav-active-fg, #ecfdf5);
+  box-shadow: var(--acsis-nav-active-shadow);
+}
+
+html.dark.acsis-sidebar-collapsed .nav-item.active .admin-nav-icon {
+  color: var(--acsis-nav-active-icon, var(--acsis-nav-active-fg, #ecfdf5));
 }
 
 html.dark .logout-btn {
@@ -93,8 +113,8 @@ html.dark .acsis-page {
 }
 
 html.dark .content-header {
-  background: rgba(15, 31, 22, 0.92);
-  border-color: rgba(74, 222, 128, 0.12);
+  background: var(--acsis-content-header-bg, rgba(15, 31, 22, 0.92));
+  border-color: var(--acsis-shell-border-subtle, rgba(74, 222, 128, 0.12));
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
 }
 
@@ -124,25 +144,25 @@ html.dark .content-body {
 }
 
 html.dark .acsis-sidebar-header {
-  border-bottom-color: rgba(74, 222, 128, 0.12);
+  border-bottom-color: var(--acsis-shell-border-subtle, rgba(74, 222, 128, 0.12));
 }
 
 html.dark .acsis-collapse-btn {
   background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(74, 222, 128, 0.15);
+  border-color: var(--acsis-shell-border-subtle, rgba(74, 222, 128, 0.15));
   color: #b8d4c4;
 }
 
 html.dark .acsis-collapse-btn:hover {
-  background: rgba(34, 197, 94, 0.15);
-  color: #86efac;
-  border-color: rgba(34, 197, 94, 0.35);
+  background: color-mix(in srgb, var(--acsis-brand, #16a34a) 18%, transparent);
+  color: var(--acsis-nav-active-icon, #86efac);
+  border-color: color-mix(in srgb, var(--acsis-brand, #16a34a) 35%, transparent);
 }
 
 html.dark .acsis-profile-card--trigger,
 html.dark .acsis-profile-card {
   background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(74, 222, 128, 0.12);
+  border-color: var(--acsis-shell-border-subtle, rgba(74, 222, 128, 0.12));
 }
 
 html.dark .acsis-profile-card--trigger:hover {
@@ -165,7 +185,7 @@ html.dark .acsis-profile-role {
 /* Student enrolled / stream (enrolled_classes.css) */
 html.dark .stu-stream-item {
   background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(74, 222, 128, 0.12);
+  border-color: var(--acsis-shell-border-subtle, rgba(74, 222, 128, 0.12));
   box-shadow: none;
 }
 
@@ -200,12 +220,12 @@ html.dark .stu-empty {
 
 html.dark .stu-enroll-join-box {
   background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(74, 222, 128, 0.15);
+  border-color: var(--acsis-shell-border-subtle, rgba(74, 222, 128, 0.15));
 }
 
 html.dark .stu-class-card {
   background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(74, 222, 128, 0.12);
+  border-color: var(--acsis-shell-border-subtle, rgba(74, 222, 128, 0.12));
 }
 
 html.dark .stu-class-card h3 {
@@ -223,7 +243,7 @@ html.dark .content-body {
 
 html.dark .panel {
   background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(74, 222, 128, 0.12);
+  border-color: var(--acsis-shell-border-subtle, rgba(74, 222, 128, 0.12));
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
 }
 
@@ -238,7 +258,7 @@ html.dark .panel-view-all {
 }
 
 html.dark .panel-view-all:hover {
-  color: #86efac;
+  color: var(--brand-mark, #86efac);
 }
 
 html.dark .exam-item {
@@ -257,7 +277,7 @@ html.dark .exam-timer {
 
 html.dark .detected-item {
   background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(74, 222, 128, 0.1);
+  border-color: var(--acsis-shell-border-subtle, rgba(74, 222, 128, 0.1));
 }
 
 html.dark .detected-item:hover {
@@ -279,12 +299,12 @@ html.dark .view-info-link:hover {
 
 html.dark .table-wrapper {
   background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(74, 222, 128, 0.12);
+  border-color: var(--acsis-shell-border-subtle, rgba(74, 222, 128, 0.12));
 }
 
 html.dark .table thead tr {
   background: rgba(22, 101, 52, 0.35);
-  border-bottom-color: rgba(74, 222, 128, 0.15);
+  border-bottom-color: var(--acsis-shell-border-subtle, rgba(74, 222, 128, 0.15));
 }
 
 html.dark .table th {
@@ -302,7 +322,7 @@ html.dark .table tbody tr:hover td {
 
 html.dark .card {
   background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(74, 222, 128, 0.12);
+  border-color: var(--acsis-shell-border-subtle, rgba(74, 222, 128, 0.12));
 }
 
 html.dark .card-label {
@@ -329,7 +349,7 @@ html.dark .super-admin-intro strong {
 
 html.dark .super-admin-link {
   background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(74, 222, 128, 0.12);
+  border-color: var(--acsis-shell-border-subtle, rgba(74, 222, 128, 0.12));
   color: #ecfdf5;
 }
 
@@ -354,15 +374,59 @@ html.dark .admin-settings-mode.is-active {
   color: #ecfdf5;
 }
 
+html.dark .admin-settings-palette {
+  background: hsl(142 22% 14%);
+  border-color: hsl(142 18% 22%);
+}
+
+html.dark .admin-settings-logo-preview {
+  background: hsl(142 22% 14%);
+  border-color: hsl(142 18% 22%);
+}
+
+html.dark .admin-settings-logo-btn {
+  background: hsl(142 22% 14%);
+  border-color: hsl(142 18% 22%);
+  color: var(--fg-default);
+}
+
+html.dark .admin-settings-label {
+  color: var(--fg-muted);
+}
+
+html.dark .admin-settings-field input {
+  background: hsl(142 22% 12%);
+  border-color: hsl(142 18% 22%);
+  color: var(--fg-default);
+}
+
+html.dark .admin-settings-logo-hint,
+html.dark .admin-settings-hint {
+  color: hsl(140 15% 58%);
+}
+
+html.dark .admin-settings-palette__name {
+  color: var(--fg-default);
+}
+
 html.dark .admin-settings-back a {
-  color: #86efac;
+  color: var(--brand-mark, #86efac);
+}
+
+html.dark .admin-settings-palette.is-active {
+  border-color: var(--acsis-brand, #16a34a);
+  box-shadow: 0 0 0 1px var(--acsis-brand, #16a34a);
+}
+
+html.dark .admin-settings-palette__badge {
+  color: var(--brand-mark, #86efac);
 }
 
 /* Teacher dashboard */
 html.dark .td-dashboard {
   --white: rgba(255, 255, 255, 0.06);
   --gray-100: rgba(255, 255, 255, 0.08);
-  --gray-200: rgba(74, 222, 128, 0.12);
+  --gray-200: var(--acsis-shell-border-subtle, rgba(74, 222, 128, 0.12));
   --gray-500: #9cbcaa;
   --gray-600: #c5e4d4;
   --gray-800: #ecfdf5;
@@ -370,7 +434,7 @@ html.dark .td-dashboard {
 
 html.dark .td-dashboard .stat-card {
   background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(74, 222, 128, 0.15);
+  border-color: var(--acsis-shell-border-subtle, rgba(74, 222, 128, 0.15));
   box-shadow: none;
 }
 
@@ -403,7 +467,7 @@ html.dark .acsis-mc-tab--active {
 /* Teacher create exam (scoped wrapper) */
 html.dark .acsis-create-exam .card {
   background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(74, 222, 128, 0.15);
+  border-color: var(--acsis-shell-border-subtle, rgba(74, 222, 128, 0.15));
   color: #dceee4;
 }
 
@@ -427,9 +491,9 @@ html.dark .acsis-create-exam .form-group textarea {
 
 @media (max-width: 767px) {
   html.dark .acsis-mobile-top-bar {
-    background: #0f1f16;
-    border-bottom-color: rgba(74, 222, 128, 0.12);
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+    background: var(--acsis-sidebar-bg, #0f1f16);
+    border-bottom: 1px solid var(--acsis-shell-border, rgba(74, 222, 128, 0.18));
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2), 0 4px 16px rgba(0, 0, 0, 0.35);
   }
 
   html.dark .acsis-mobile-top-bar__breadcrumb .brand-plp,
@@ -447,13 +511,13 @@ html.dark .acsis-create-exam .form-group textarea {
 
   html.dark .acsis-mobile-account-trigger {
     background: rgba(255, 255, 255, 0.06);
-    border-color: rgba(74, 222, 128, 0.15);
+    border-color: var(--acsis-shell-border-subtle, rgba(74, 222, 128, 0.15));
   }
 
   html.dark .acsis-mobile-bottom-nav {
-    background: #0f1f16;
-    border-top-color: rgba(74, 222, 128, 0.12);
-    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.35);
+    background: var(--acsis-sidebar-bg, #0f1f16);
+    border-top: 1px solid var(--acsis-shell-border, rgba(74, 222, 128, 0.18));
+    box-shadow: 0 -1px 0 rgba(0, 0, 0, 0.2), 0 -4px 20px rgba(0, 0, 0, 0.35);
   }
 
   html.dark .acsis-bottom-nav__item {
@@ -465,7 +529,7 @@ html.dark .acsis-create-exam .form-group textarea {
   }
 
   html.dark .acsis-bottom-nav__item:hover:not(.is-active) {
-    color: var(--acsis-nav-hover-fg);
+    color: var(--acsis-nav-hover-fg, #ecfdf5);
     background: var(--acsis-nav-hover-bg);
   }
 
@@ -474,25 +538,20 @@ html.dark .acsis-create-exam .form-group textarea {
   }
 
   html.dark .acsis-bottom-nav__item.is-active {
-    color: var(--acsis-nav-active-fg);
-    background: var(--acsis-nav-active-bg);
-    box-shadow: var(--acsis-nav-active-shadow);
+    color: var(--acsis-nav-active-fg, #ecfdf5);
+    background: var(--acsis-nav-active-fill, color-mix(in srgb, var(--acsis-brand, #16a34a) 28%, transparent));
+    box-shadow: var(--acsis-nav-active-shadow, 0 0 0 1px color-mix(in srgb, var(--acsis-brand, #16a34a) 38%, transparent));
   }
 
   html.dark .acsis-bottom-nav__item.is-active .acsis-bottom-nav__icon,
   html.dark .acsis-bottom-nav__item.is-active .acsis-bottom-nav__label {
-    color: var(--acsis-nav-active-fg);
+    color: var(--acsis-nav-active-icon, var(--acsis-nav-active-fg, #ecfdf5));
   }
 
-  html.dark.acsis-sidebar-collapsed .nav-item:hover {
-    background: var(--acsis-nav-hover-bg);
-    color: var(--acsis-nav-hover-fg);
-  }
-
-  html.dark.acsis-sidebar-collapsed .nav-item.active {
-    background: var(--acsis-nav-active-bg);
-    color: var(--acsis-nav-active-fg);
-    box-shadow: var(--acsis-nav-active-shadow);
+  html.dark.acsis-sidebar-collapsed .nav-item[data-tooltip]::after {
+    background: #ecfdf5;
+    color: #0f1f16;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
   }
 }
 
@@ -550,7 +609,7 @@ html.dark .stat-card.red {
 /* Monitoring stat rows */
 html.dark .monitor-stat-card {
   background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(74, 222, 128, 0.12);
+  border-color: var(--acsis-shell-border-subtle, rgba(74, 222, 128, 0.12));
 }
 
 html.dark .monitor-stat-label {
@@ -601,7 +660,7 @@ html.dark .acsis-class-card__footer {
 html.dark .acsis-view .panel,
 html.dark .acsis-empty-panel {
   background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(74, 222, 128, 0.12);
+  border-color: var(--acsis-shell-border-subtle, rgba(74, 222, 128, 0.12));
   color: #dceee4;
 }
 
@@ -628,7 +687,7 @@ html.dark .alert-sub {
 html.dark .student-detail-card,
 html.dark .tab-panel.panel {
   background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(74, 222, 128, 0.12);
+  border-color: var(--acsis-shell-border-subtle, rgba(74, 222, 128, 0.12));
 }
 
 html.dark .tab-btn {
@@ -657,7 +716,11 @@ html.dark .detections-page h2 {
 
 /* Dev portals picker */
 html.dark .acsis-dev-portals {
-  background: linear-gradient(135deg, #0b1710 0%, #0f1f16 100%) !important;
+  background: linear-gradient(
+    135deg,
+    var(--acsis-canvas, #0b1710) 0%,
+    var(--acsis-sidebar-bg, #0f1f16) 100%
+  ) !important;
 }
 
 html.dark .acsis-dev-portals h1 {

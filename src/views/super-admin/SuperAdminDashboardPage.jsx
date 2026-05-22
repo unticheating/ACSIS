@@ -1,6 +1,12 @@
-import { Link } from 'react-router-dom'
-import { BarChart3, Building2, Settings } from 'lucide-react'
 import { SummaryStatCard, SummaryStatGrid } from '@/components/dashboard/SummaryStatCard.jsx'
+import QuickActionLink from '@/components/icons/QuickActionLink.jsx'
+import {
+  ChartBarIcon,
+  FileDescriptionIcon,
+  GearIcon,
+  GlobeIcon,
+  UsersIcon,
+} from '@/components/icons/hoverIcons.js'
 import '../../pages/admin-ui/style.css'
 
 /** Platform home — separate from institution admin dashboard. */
@@ -35,22 +41,18 @@ export default function SuperAdminDashboardPage() {
             <span className="panel-title">Quick links</span>
           </div>
           <div className="super-admin-links">
-            <Link to={`${base}/institutions`} className="super-admin-link">
-              <Building2 size={20} strokeWidth={2} aria-hidden className="super-admin-link__icon" />
-              <span>Institutions</span>
-            </Link>
-            <Link to={`${base}/users`} className="super-admin-link">
-              <Building2 size={20} strokeWidth={2} aria-hidden className="super-admin-link__icon" />
-              <span>User management</span>
-            </Link>
-            <Link to={`${base}/settings`} className="super-admin-link">
-              <Settings size={20} strokeWidth={2} aria-hidden className="super-admin-link__icon" />
-              <span>System settings</span>
-            </Link>
-            <Link to={`${base}/analytics`} className="super-admin-link">
-              <BarChart3 size={20} strokeWidth={2} aria-hidden className="super-admin-link__icon" />
-              <span>System analytics</span>
-            </Link>
+            <QuickActionLink to={`${base}/institutions`} icon={GlobeIcon}>
+              Institutions
+            </QuickActionLink>
+            <QuickActionLink to={`${base}/users`} icon={UsersIcon}>
+              User management
+            </QuickActionLink>
+            <QuickActionLink to={`${base}/settings`} icon={GearIcon}>
+              System settings
+            </QuickActionLink>
+            <QuickActionLink to={`${base}/analytics`} icon={ChartBarIcon}>
+              System analytics
+            </QuickActionLink>
           </div>
         </div>
       </div>

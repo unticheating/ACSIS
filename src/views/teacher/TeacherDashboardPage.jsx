@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
-import { ClipboardList, FileText, Users } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { SummaryStatCard, SummaryStatGrid } from '@/components/dashboard/SummaryStatCard.jsx'
+import AnimatedHoverIcon from '@/components/icons/AnimatedHoverIcon.jsx'
+import { BookIcon, ChartBarIcon, UsersIcon } from '@/components/icons/hoverIcons.js'
 import { apiFetch } from '@/lib/apiFetch.js'
 
 export default function TeacherDashboardPage() {
@@ -30,19 +31,19 @@ export default function TeacherDashboardPage() {
           label="My Classes"
           value={totalClasses}
           tone="success"
-          icon={<FileText width={28} height={28} strokeWidth={1.5} aria-hidden />}
+          icon={<AnimatedHoverIcon icon={BookIcon} size={28} strokeWidth={1.5} />}
         />
         <SummaryStatCard
           label="Active Exams"
           value={activeExams}
           tone="success"
-          icon={<ClipboardList width={28} height={28} strokeWidth={1.5} aria-hidden />}
+          icon={<AnimatedHoverIcon icon={ChartBarIcon} size={28} strokeWidth={1.5} />}
         />
         <SummaryStatCard
           label="Total Students"
           value={totalStudents}
           tone="success"
-          icon={<Users width={28} height={28} strokeWidth={1.5} aria-hidden />}
+          icon={<AnimatedHoverIcon icon={UsersIcon} size={28} strokeWidth={1.5} />}
         />
       </SummaryStatGrid>
     </div>

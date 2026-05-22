@@ -121,9 +121,15 @@
   color: #bbf7d0;
 }
 
-.acsis-summary-stat__icon svg {
+.acsis-summary-stat__icon svg,
+.acsis-summary-stat__icon .acsis-hover-icon svg {
   width: 40px;
   height: 40px;
+}
+
+.acsis-hover-icon {
+  display: inline-flex;
+  line-height: 0;
 }
 
 .acsis-summary-stat--danger .acsis-summary-stat__icon {

@@ -10,6 +10,7 @@ import {
   verifySession,
 } from '../lib/session.js'
 import { authenticateAdministrator } from '../lib/passwordAuth.js'
+import { getBrandingForUser } from '../lib/institutionTheme.js'
 import {
   buildSessionWithoutDatabase,
   findOrCreateGoogleUser,
@@ -127,14 +128,25 @@ router.post('/login', async (req, res) => {
   }
 })
 
-router.get('/me', (req, res) => {
+router.get('/me', async (req, res) => {
   const session = readSession(req)
   if (!session) {
     return res.status(401).json({ authenticated: false })
   }
+
+  let branding = null
+  const pool = getPool()
+  if (pool && session.uid) {
+    try {
+      branding = await getBrandingForUser(pool, session.uid, session.isSuperAdmin)
+    } catch (err) {
+      console.error('[auth/me] branding lookup failed:', err)
+    }
+  }
+
   return res.json({
     authenticated: true,
-    user: session,
+    user: { ...session, branding },
     databaseConnected: isDatabaseEnabled(),
   })
 })
