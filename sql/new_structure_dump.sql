@@ -2,12 +2,12 @@
 -- PostgreSQL database dump
 --
 
-\restrict QEYHb9deBBEzCqN9uvdBndwQ4QK2vNVwqHcbzSmz2EyliW7Ey67B8Px0O3smqIF
+\restrict D3efzGSQsqYZEEHEEoeGDdRXDIuwdMasj9B74q3va7AO3N9J5cYwH40b4Cp2eFU
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
 
--- Started on 2026-05-23 03:16:08
+-- Started on 2026-05-23 03:45:18
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -1656,6 +1656,8 @@ INSERT INTO public.classes VALUES (10, 1, 888, 'Integ', NULL, '2024-2025', '1st'
 --
 
 INSERT INTO public.email_verification_codes VALUES (1, 1000, 'superadmin@acsis.dev', '$2b$10$JGatffM6R1JmH9Lvwj6leOcgV8M2Wn3UxNjyia9JTbxHrginIKO5m', '2026-05-23 03:14:35.666+08', NULL, '2026-05-23 02:59:35.672889+08');
+INSERT INTO public.email_verification_codes VALUES (2, 1003, 'benitez_richelledorothy@plpasig.edu.ph', '$2b$10$KL3dcvU3Jppjn4gYCQJX6.puWs6azTIIBnipFEqrmGDENhpFAXqGi', '2026-05-23 03:56:42.268+08', '2026-05-23 03:42:58.483134+08', '2026-05-23 03:41:42.27273+08');
+INSERT INTO public.email_verification_codes VALUES (3, 1003, 'benitez_richelledorothy@plpasig.edu.ph', '$2b$10$qTm6xt6RcVhLLbZ4EFePe.yrvxR5ZKAjEjqq7xKJR5Q./fDCVqS1u', '2026-05-23 03:58:46.788+08', '2026-05-23 03:44:04.981933+08', '2026-05-23 03:43:46.793338+08');
 
 
 --
@@ -1707,6 +1709,7 @@ INSERT INTO public.institution_members VALUES (1, 1, 1, 'admin', '23-47879', tru
 INSERT INTO public.institution_members VALUES (888, 1, 888, 'faculty', '23-45687', true, '2026-05-22 04:30:10.808+08', false);
 INSERT INTO public.institution_members VALUES (2, 1, 2, 'faculty', '19-45478', true, '2026-05-22 04:50:18.806+08', false);
 INSERT INTO public.institution_members VALUES (999, 1, 999, 'student', '23-01256', true, '2026-05-22 04:30:10.792+08', false);
+INSERT INTO public.institution_members VALUES (1000, 1, 1003, 'student', NULL, true, '2026-05-23 03:41:42.067019+08', false);
 
 
 --
@@ -1772,6 +1775,7 @@ INSERT INTO public.questions VALUES (19, 9, 'awdawdw', 'identification', 1.00, 2
 --
 
 INSERT INTO public.students VALUES (1, 999, NULL, '1st Year', 'A');
+INSERT INTO public.students VALUES (2, 1000, NULL, NULL, NULL);
 
 
 --
@@ -1818,6 +1822,7 @@ INSERT INTO public.users VALUES (888, 'Demo', NULL, 'Teacher', NULL, NULL, 'teac
 INSERT INTO public.users VALUES (2, 'CARL AJ', 'MASIPAG AKO', 'JUNIO', NULL, NULL, 'junio_carlaj@plpasig.edu.ph', NULL, '107099310791384241180', 'https://lh3.googleusercontent.com/a/ACg8ocKFyGYFYm9JVeoHNvr6dqUn60_aUhsQUL1eBpwSnvzUh2qD_xM=s96-c', false, '2026-05-22 04:50:18.806+08');
 INSERT INTO public.users VALUES (999, 'Demo', NULL, 'Student', NULL, NULL, 'student@plpasig.edu.ph', '$2b$12$Fj2E8sbVklxoi0lpZVms8uYyvCBhL/o6pe37e08XixCcF.ak9UdGa', NULL, NULL, false, '2026-05-22 04:30:10.788+08');
 INSERT INTO public.users VALUES (1000, 'ACSIS', NULL, 'Super Admin', NULL, NULL, 'superadmin@acsis.dev', '$2b$12$7Yygm3qVU/NYSDAGXiiw2eotRqQwqNeJoxIijtLPnGO9dXTPH/Mqi', NULL, NULL, true, '2026-05-22 19:35:08.913225+08');
+INSERT INTO public.users VALUES (1003, 'RICHELLE DOROTHY', NULL, 'BENITEZ', NULL, NULL, 'benitez_richelledorothy@plpasig.edu.ph', '', '109936860963595421786', 'https://lh3.googleusercontent.com/a/ACg8ocISjE0HfBBm764qkuqfsiY-I6nXdTLrNQO_uJgdVvXXGO9OqwAx=s96-c', false, '2026-05-23 03:20:24.726632+08');
 
 
 --
@@ -1889,7 +1894,7 @@ SELECT pg_catalog.setval('public.departments_dept_id_seq', 1, false);
 -- Name: email_verification_codes_verification_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.email_verification_codes_verification_id_seq', 1, true);
+SELECT pg_catalog.setval('public.email_verification_codes_verification_id_seq', 3, true);
 
 
 --
@@ -1934,7 +1939,7 @@ SELECT pg_catalog.setval('public.faculty_faculty_id_seq', 1, false);
 -- Name: institution_members_member_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.institution_members_member_id_seq', 999, true);
+SELECT pg_catalog.setval('public.institution_members_member_id_seq', 1000, true);
 
 
 --
@@ -1988,7 +1993,7 @@ SELECT pg_catalog.setval('public.student_answers_answer_id_seq', 1, true);
 -- Name: students_student_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.students_student_id_seq', 1, true);
+SELECT pg_catalog.setval('public.students_student_id_seq', 2, true);
 
 
 --
@@ -2024,7 +2029,7 @@ SELECT pg_catalog.setval('public.themes_theme_id_seq', 6, true);
 -- Name: users_uid_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.users_uid_seq', 1002, true);
+SELECT pg_catalog.setval('public.users_uid_seq', 1003, true);
 
 
 --
@@ -2892,11 +2897,11 @@ ALTER TABLE ONLY public.teaching_terms
     ADD CONSTRAINT teaching_terms_member_id_fkey FOREIGN KEY (member_id) REFERENCES public.institution_members(member_id) ON DELETE CASCADE;
 
 
--- Completed on 2026-05-23 03:16:08
+-- Completed on 2026-05-23 03:45:18
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict QEYHb9deBBEzCqN9uvdBndwQ4QK2vNVwqHcbzSmz2EyliW7Ey67B8Px0O3smqIF
+\unrestrict D3efzGSQsqYZEEHEEoeGDdRXDIuwdMasj9B74q3va7AO3N9J5cYwH40b4Cp2eFU
 

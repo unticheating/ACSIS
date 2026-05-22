@@ -1,3 +1,5 @@
+import { upsertStudentProfile } from './studentProfile.js'
+
 /** @typedef {'admin' | 'teacher' | 'student' | 'super_admin'} Portal */
 
 /**
@@ -107,12 +109,18 @@ export async function ensureGoogleStudentMembership(pool, uid, isSuperAdmin) {
   )
   if (existing[0]) return
 
-  await pool.query(
+  const inserted = await pool.query(
     `INSERT INTO institution_members (
-       institution_id, uid, role, school_id, year_level, section, is_active, is_pending
-     ) VALUES ($1, $2, 'student', NULL, NULL, NULL, TRUE, FALSE)`,
+       institution_id, uid, role, school_id, is_active, is_pending
+     ) VALUES ($1, $2, 'student', NULL, TRUE, FALSE)
+     RETURNING member_id`,
     [institutionId, uid],
   )
+
+  const memberId = inserted.rows[0]?.member_id
+  if (memberId) {
+    await upsertStudentProfile(pool, memberId, {})
+  }
 }
 
 /**
