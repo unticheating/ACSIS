@@ -68,6 +68,22 @@ async function beginEmailVerification(pool, uid, email, res) {
   return mailResult
 }
 
+/**
+ * @param {import('pg').Pool} pool
+ * @param {number} uid
+ * @param {import('express').Response} res
+ * @param {{ googleSub?: string }} [opts]
+ */
+async function finishLoginWithoutVerification(pool, uid, res, opts = {}) {
+  const session = await buildSessionFromUid(pool, uid, opts)
+  if (!session.entryPath) {
+    return { ok: false, status: 403, error: 'Your account is not assigned to an institution yet.' }
+  }
+  setSessionCookie(res, session)
+  clearPendingVerifyCookie(res)
+  return { ok: true, session }
+}
+
 router.get('/google', (_req, res) => {
   if (!config.google.clientId || !config.google.clientSecret) {
     return res.status(503).json({
@@ -116,6 +132,19 @@ router.get('/google/callback', async (req, res) => {
       return redirectWithError(res, 'no_membership')
     }
 
+    if (!config.emailVerificationEnabled) {
+      const finished = await finishLoginWithoutVerification(pool, user.uid, res, {
+        googleSub: profile.sub,
+      })
+      if (!finished.ok) {
+        return redirectWithError(res, 'no_membership')
+      }
+      const redirectUrl = new URL(config.frontendUrl)
+      redirectUrl.pathname = finished.session.entryPath
+      redirectUrl.searchParams.set('auth', 'success')
+      return res.redirect(redirectUrl.toString())
+    }
+
     clearSessionCookie(res)
     await beginEmailVerification(pool, user.uid, user.email, res)
     return redirectToVerify(res, user.email)
@@ -144,9 +173,22 @@ router.post('/start-verification', async (req, res) => {
       return res.status(403).json({ error: 'Your account is not assigned to an institution yet.' })
     }
 
+    if (!config.emailVerificationEnabled) {
+      const finished = await finishLoginWithoutVerification(pool, result.session.uid, res)
+      if (!finished.ok) {
+        return res.status(finished.status).json({ error: finished.error })
+      }
+      return res.json({
+        ok: true,
+        email: finished.session.email,
+        verificationRequired: false,
+        user: finished.session,
+      })
+    }
+
     clearSessionCookie(res)
     const mailResult = await beginEmailVerification(pool, result.session.uid, result.session.email, res)
-    const payload = { ok: true, email: result.session.email }
+    const payload = { ok: true, email: result.session.email, verificationRequired: true }
     if (!isSmtpConfigured() || mailResult.devLogged) {
       payload.devHint =
         'SMTP is not configured or email failed. Check the API terminal for the verification code.'
@@ -298,7 +340,7 @@ router.get('/config', (_req, res) => {
     googleEnabled: Boolean(config.google.clientId && config.google.clientSecret),
     allowedEmailDomain: config.allowedEmailDomain,
     databaseConnected: isDatabaseEnabled(),
-    emailVerificationEnabled: isDatabaseEnabled(),
+    emailVerificationEnabled: isDatabaseEnabled() && config.emailVerificationEnabled,
     smtpConfigured: isSmtpConfigured(),
   })
 })

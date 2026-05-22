@@ -13,6 +13,15 @@ function required(name, fallback = undefined) {
   return value
 }
 
+/** @param {string | undefined} raw @param {boolean} defaultValue */
+function parseEnvBool(raw, defaultValue) {
+  if (raw === undefined || raw === '') return defaultValue
+  const v = String(raw).trim().toLowerCase()
+  if (['1', 'true', 'yes', 'on'].includes(v)) return true
+  if (['0', 'false', 'no', 'off'].includes(v)) return false
+  return defaultValue
+}
+
 export const config = {
   port: Number(process.env.PORT || 3001),
   nodeEnv: process.env.NODE_ENV || 'development',
@@ -29,6 +38,11 @@ export const config = {
   databaseUrl: process.env.DATABASE_URL || '',
   adminDevEmail: process.env.ADMIN_DEV_EMAIL || '',
   adminDevPassword: process.env.ADMIN_DEV_PASSWORD || '',
+  /** Post-login email OTP. Default: on in production, off in development. Set EMAIL_VERIFICATION_ENABLED=true|false to override. */
+  emailVerificationEnabled: parseEnvBool(
+    process.env.EMAIL_VERIFICATION_ENABLED,
+    (process.env.NODE_ENV || 'development') === 'production',
+  ),
   smtp: {
     host: (process.env.SMTP_HOST || '').trim(),
     port: Number(process.env.SMTP_PORT || 587),

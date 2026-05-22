@@ -60,5 +60,11 @@ app.listen(config.port, async () => {
   } else {
     console.log('  Database: connected via DATABASE_URL (ADMIN_DEV_* is ignored for login)')
   }
-  await logSmtpStatus()
+  if (!config.emailVerificationEnabled) {
+    console.warn(
+      '  Email OTP: disabled (EMAIL_VERIFICATION_ENABLED=false or dev default) — sign-in skips /verify',
+    )
+  } else {
+    await logSmtpStatus()
+  }
 })

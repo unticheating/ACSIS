@@ -92,7 +92,12 @@ export default function LoginPage() {
     }
 
     try {
-      await startEmailVerification(trimmed, password)
+      const data = await startEmailVerification(trimmed, password)
+      if (data.verificationRequired === false && data.user?.entryPath) {
+        const user = await refreshAuth()
+        navigate(user?.entryPath || data.user.entryPath, { replace: true })
+        return
+      }
       navigate(`/verify?email=${encodeURIComponent(trimmed)}`, { replace: true })
     } catch (err) {
       acsisToastError(err instanceof Error ? err.message : 'Could not send verification code.')
