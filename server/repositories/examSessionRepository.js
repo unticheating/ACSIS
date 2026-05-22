@@ -4,7 +4,7 @@ import { getExamSessionUserColumn } from '../lib/schemaCompat.js'
 export async function getExamForJoinQuery(classId, examId) {
   const pool = getPool()
   const { rows } = await pool.query(
-    `SELECT exam_id, title, password, time_limit, status
+    `SELECT exam_id, title, password, time_limit, status, updated_at
      FROM exams
      WHERE exam_id = $1 AND class_id = $2 AND is_archived = FALSE`,
     [examId, classId],

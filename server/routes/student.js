@@ -1,9 +1,5 @@
 import { Router } from 'express';
 import { enroll, getClasses } from '../controllers/studentController.js';
-<<<<<<< Updated upstream
-import { getStudentClassStream, getStudentExamSession } from '../controllers/examController.js';
-import { requireAuth, requireStudentMember } from '../lib/sessionAuth.js';
-=======
 import {
   getStudentClassStream,
   getStudentExamSession,
@@ -12,8 +8,7 @@ import {
   submitStudentExam,
   getStudentPerformance,
 } from '../controllers/examController.js';
-import { requireAuth } from '../lib/sessionAuth.js';
->>>>>>> Stashed changes
+import { requireAuth, requireStudentMember } from '../lib/sessionAuth.js';
 
 const router = Router();
 

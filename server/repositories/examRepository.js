@@ -87,13 +87,64 @@ export async function updateExamStatusQuery(classId, examId, status) {
   return result.rowCount > 0;
 }
 
-export async function deleteExamQuery(classId, examId) {
+/** Deletes exam and dependent rows (FK-safe when sessions/answers exist). */
+export async function deleteExamQuery(classId, examId, teacherMemberId = null) {
   const pool = getPool();
-  const result = await pool.query(
-    `DELETE FROM exams WHERE exam_id = $2 AND class_id = $1 RETURNING exam_id`,
-    [classId, examId]
-  );
-  return result.rowCount > 0;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    let ownerSql = `SELECT e.exam_id FROM exams e
+       JOIN classes c ON e.class_id = c.class_id
+       WHERE e.exam_id = $1 AND e.class_id = $2`;
+    const ownerParams = [examId, classId];
+    if (teacherMemberId != null) {
+      ownerSql += ' AND c.member_id = $3';
+      ownerParams.push(teacherMemberId);
+    }
+    const owner = await client.query(ownerSql, ownerParams);
+    if (owner.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return false;
+    }
+
+    await client.query(
+      `DELETE FROM cheating_logs
+       WHERE session_id IN (SELECT session_id FROM exam_sessions WHERE exam_id = $1)`,
+      [examId],
+    );
+    await client.query(
+      `DELETE FROM exam_results
+       WHERE session_id IN (SELECT session_id FROM exam_sessions WHERE exam_id = $1)`,
+      [examId],
+    );
+    await client.query(
+      `DELETE FROM student_answers
+       WHERE session_id IN (SELECT session_id FROM exam_sessions WHERE exam_id = $1)`,
+      [examId],
+    );
+    await client.query(`DELETE FROM exam_sessions WHERE exam_id = $1`, [examId]);
+    await client.query(`DELETE FROM report_logs WHERE exam_id = $1`, [examId]);
+    await client.query(
+      `DELETE FROM choices
+       WHERE question_id IN (SELECT question_id FROM questions WHERE exam_id = $1)`,
+      [examId],
+    );
+    await client.query(`DELETE FROM questions WHERE exam_id = $1`, [examId]);
+
+    const result = await client.query(
+      `DELETE FROM exams WHERE exam_id = $1 AND class_id = $2 RETURNING exam_id`,
+      [examId, classId],
+    );
+
+    await client.query('COMMIT');
+    return result.rowCount > 0;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 export async function getExamWithQuestionsQuery(classId, examId, requireActive = false) {

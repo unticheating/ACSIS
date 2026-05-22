@@ -2,14 +2,20 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { SummaryStatCard, SummaryStatGrid } from '@/components/dashboard/SummaryStatCard.jsx'
 import { fetchAdminDashboard, formatRelativeTime } from '@/lib/adminDashboardApi.js'
+import { issueViolationTicket } from '@/lib/adminViolationsApi.js'
 import '../../pages/admin-ui/style.css'
 
 export default function AdminDashboardPage({ basePath = '/admin' }) {
   const [stats, setStats] = useState({ ongoingExams: 0, totalExams: 0, detectedStudents: 0 })
   const [ongoingExams, setOngoingExams] = useState([])
   const [detectedStudents, setDetectedStudents] = useState([])
+  const [hasMoreOngoing, setHasMoreOngoing] = useState(false)
+  const [hasMoreDetected, setHasMoreDetected] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [ticketingId, setTicketingId] = useState(null)
+
+  const previewLimit = 5
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -17,8 +23,10 @@ export default function AdminDashboardPage({ basePath = '/admin' }) {
     try {
       const data = await fetchAdminDashboard()
       setStats(data.stats || {})
-      setOngoingExams(data.ongoingExams || [])
-      setDetectedStudents(data.detectedStudents || [])
+      setOngoingExams((data.ongoingExams || []).slice(0, previewLimit))
+      setDetectedStudents((data.detectedStudents || []).slice(0, previewLimit))
+      setHasMoreOngoing(Boolean(data.hasMoreOngoingExams))
+      setHasMoreDetected(Boolean(data.hasMoreDetectedStudents))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load dashboard.')
     } finally {
@@ -30,9 +38,18 @@ export default function AdminDashboardPage({ basePath = '/admin' }) {
     load()
   }, [load])
 
-  function ticketViolation(sessionId) {
-    if (window.confirm('Issue a ticket violation for this student session?')) {
-      window.alert(`Ticket recorded for session ${sessionId} (workflow can be extended later).`)
+  async function ticketViolation(sessionId, alreadyTicketed) {
+    if (alreadyTicketed) return
+    if (!window.confirm('Issue an official violation ticket for this student session?')) return
+
+    setTicketingId(sessionId)
+    try {
+      await issueViolationTicket(sessionId)
+      await load()
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Failed to issue ticket.')
+    } finally {
+      setTicketingId(null)
     }
   }
 
@@ -76,7 +93,9 @@ export default function AdminDashboardPage({ basePath = '/admin' }) {
           <div className="panel-header">
             <span className="panel-title">On-Going Examinations</span>
             <Link to={`${basePath}/classes`} className="panel-view-all">
-              View All
+              {hasMoreOngoing && stats.ongoingExams > ongoingExams.length
+                ? `View All (${stats.ongoingExams})`
+                : 'View All'}
             </Link>
           </div>
           <div className="exam-list">
@@ -90,8 +109,12 @@ export default function AdminDashboardPage({ basePath = '/admin' }) {
               ongoingExams.map((exam) => (
                 <div key={exam.id} className="exam-item">
                   <div className="exam-info">
-                    <div className="exam-name">{exam.name}</div>
-                    <div className="exam-by">by {exam.by}</div>
+                    <div className="exam-name" title={exam.name}>
+                      {exam.name}
+                    </div>
+                    <div className="exam-by" title={exam.by ? `by ${exam.by}` : undefined}>
+                      by {exam.by}
+                    </div>
                   </div>
                   <div className="exam-timer-wrap">
                     <div className="exam-timer">{exam.status}</div>
@@ -108,7 +131,9 @@ export default function AdminDashboardPage({ basePath = '/admin' }) {
           <div className="panel-header">
             <span className="panel-title">Detected Students</span>
             <Link to={`${basePath}/violations`} className="panel-view-all">
-              View All
+              {hasMoreDetected && stats.detectedStudents > detectedStudents.length
+                ? `View All (${stats.detectedStudents})`
+                : 'View All'}
             </Link>
           </div>
           <div className="detected-list">
@@ -122,20 +147,25 @@ export default function AdminDashboardPage({ basePath = '/admin' }) {
               detectedStudents.map((student) => (
                 <div key={student.sessionId} className="detected-item">
                   <div className="detected-info">
-                    <div className="detected-name">
+                    <div className="detected-name" title={`${student.strikes} — ${student.studentName}`}>
                       {student.strikes} — {student.studentName}
                     </div>
-                    <div className="detected-sub">
+                    <div className="detected-sub" title={`${student.examTitle} · ${student.subtitle}`}>
                       {student.examTitle} · {student.subtitle}
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    className="view-info-link"
-                    onClick={() => ticketViolation(student.sessionId)}
-                  >
-                    Issue ticket
-                  </button>
+                  {student.ticketIssued || student.status === 'ticketed' ? (
+                    <span className="violation-status-badge vstatus-ticketed">Ticketed</span>
+                  ) : (
+                    <button
+                      type="button"
+                      className="view-info-link ticket-btn"
+                      disabled={ticketingId === student.sessionId}
+                      onClick={() => ticketViolation(student.sessionId, false)}
+                    >
+                      {ticketingId === student.sessionId ? 'Issuing…' : 'Issue ticket'}
+                    </button>
+                  )}
                 </div>
               ))
             )}

@@ -10,6 +10,8 @@ import {
   closeTeacherExam,
   getTeacherExamResults,
   getTeacherExamSessionDetail,
+  getTeacherActiveMonitoring,
+  getTeacherMonitoringSnapshot,
   listTeacherReportExams,
 } from '../controllers/examController.js';
 import { requireAuth } from '../lib/sessionAuth.js';
@@ -26,6 +28,7 @@ router.use((req, res, next) => {
 
 router.get('/dashboard', getTeacherDashboard);
 router.get('/reports/exams', listTeacherReportExams);
+router.get('/monitoring/active', getTeacherActiveMonitoring);
 router.get('/', getTeacherClasses);
 router.post('/', createTeacherClass);
 
@@ -34,6 +37,7 @@ router.get('/:classId/exams', getTeacherClassStream);
 router.post('/:classId/exams', createTeacherExam);
 router.get('/:classId/exams/:examId', getTeacherExamSession);
 router.get('/:classId/exams/:examId/results', getTeacherExamResults);
+router.get('/:classId/exams/:examId/monitoring', getTeacherMonitoringSnapshot);
 router.get('/:classId/exams/:examId/results/:sessionId', getTeacherExamSessionDetail);
 router.put('/:classId/exams/:examId', publishTeacherExam);
 router.put('/:classId/exams/:examId/start', startTeacherExam);

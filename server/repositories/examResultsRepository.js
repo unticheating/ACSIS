@@ -27,6 +27,7 @@ export async function listExamSessionsForExamQuery(classId, examId) {
        er.raw_score AS "rawScore",
        er.total_points AS "totalPoints",
        er.percentage,
+       sm.member_id AS "memberId",
        sm.school_id AS "schoolId",
        u.uid,
        u.first_name,
@@ -46,6 +47,7 @@ export async function listExamSessionsForExamQuery(classId, examId) {
 
   return rows.map((r) => ({
     sessionId: r.sessionId,
+    memberId: r.memberId,
     status: r.status,
     warningCount: Number(r.warningCount || 0),
     startedAt: r.startedAt,
@@ -114,6 +116,71 @@ export async function listStudentPerformanceQuery(studentMemberId) {
     [studentMemberId],
   )
   return rows
+}
+
+/** One live exam per teacher: open beats waiting, then most recently updated. */
+export async function getTeacherActiveMonitoringExamQuery(teacherMemberId) {
+  const pool = getPool()
+  const { rows } = await pool.query(
+    `SELECT
+       e.exam_id AS id,
+       e.title,
+       e.status,
+       e.password AS code,
+       e.time_limit AS duration,
+       e.updated_at AS "updatedAt",
+       c.class_id AS "classId",
+       c.class_name AS "className"
+     FROM exams e
+     JOIN classes c ON e.class_id = c.class_id
+     WHERE c.member_id = $1 AND c.is_active = TRUE AND e.is_archived = FALSE
+       AND e.status IN ('open', 'waiting')
+     ORDER BY
+       CASE e.status WHEN 'open' THEN 0 WHEN 'waiting' THEN 1 ELSE 2 END,
+       e.updated_at DESC
+     LIMIT 1`,
+    [teacherMemberId],
+  )
+  return rows[0] || null
+}
+
+export async function closeOtherTeacherOngoingExamsQuery(teacherMemberId, classId, examId) {
+  const pool = getPool()
+  await pool.query(
+    `UPDATE exams e
+     SET status = 'closed', updated_at = NOW()
+     FROM classes c
+     WHERE e.class_id = c.class_id
+       AND c.member_id = $1
+       AND c.is_active = TRUE
+       AND e.is_archived = FALSE
+       AND e.status IN ('open', 'waiting')
+       AND NOT (e.exam_id = $3 AND c.class_id = $2)`,
+    [teacherMemberId, classId, examId],
+  )
+}
+
+export async function listClassEnrolledStudentsQuery(classId) {
+  const pool = getPool()
+  const { rows } = await pool.query(
+    `SELECT
+       sm.member_id AS "memberId",
+       sm.school_id AS "schoolId",
+       u.first_name,
+       u.middle_name,
+       u.last_name
+     FROM class_enrollments ce
+     JOIN institution_members sm ON ce.member_id = sm.member_id
+     JOIN users u ON sm.uid = u.uid
+     WHERE ce.class_id = $1
+     ORDER BY u.last_name, u.first_name`,
+    [classId],
+  )
+  return rows.map((r) => ({
+    memberId: r.memberId,
+    schoolId: r.schoolId || '',
+    studentName: formatStudentName(r) || 'Unknown student',
+  }))
 }
 
 export async function listExamsForTeacherReportsQuery(memberId) {

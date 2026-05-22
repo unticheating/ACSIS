@@ -1,5 +1,9 @@
 import { Router } from 'express'
-import { getViolationSessionDetailService, listViolationsService } from '../services/adminService.js'
+import {
+  getViolationSessionDetailService,
+  issueViolationTicketService,
+  listViolationsService,
+} from '../services/adminService.js'
 import { requireAuth, requireInstitutionAdmin } from '../lib/sessionAuth.js'
 
 const router = Router()
@@ -15,6 +19,22 @@ router.get('/', async (req, res) => {
     violations: result.violations,
     count: result.count,
     maxWarnings: result.maxWarnings,
+  })
+})
+
+router.post('/:sessionId/ticket', async (req, res) => {
+  const result = await issueViolationTicketService(
+    req.institutionId,
+    req.params.sessionId,
+    req.memberId,
+  )
+  if (!result.ok) {
+    return res.status(result.status || 500).json({ error: result.error })
+  }
+  return res.json({
+    ok: true,
+    sessionId: result.sessionId,
+    ticketIssuedAt: result.ticketIssuedAt,
   })
 })
 

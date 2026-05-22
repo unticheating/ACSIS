@@ -1,14 +1,153 @@
 import { getClassByIdQuery } from '../repositories/classRepository.js'
 import {
+  closeOtherTeacherOngoingExamsQuery,
   getExamSubmissionStatsQuery,
+  getTeacherActiveMonitoringExamQuery,
   listCheatingLogsForExamQuery,
   listCheatingLogsForSessionQuery,
+  listClassEnrolledStudentsQuery,
   listExamSessionsForExamQuery,
   listExamsForTeacherReportsQuery,
   listStudentAnswersForSessionQuery,
   listStudentPerformanceQuery,
 } from '../repositories/examResultsRepository.js'
 import { getExamForJoinQuery } from '../repositories/examSessionRepository.js'
+import { EXAM_STATUS } from '../lib/examStatus.js'
+
+function mapMonitoringExamMeta(examRow) {
+  const status = (examRow.status || '').toLowerCase()
+  const duration =
+    examRow.time_limit != null && examRow.time_limit !== ''
+      ? Number(examRow.time_limit)
+      : null
+  return {
+    id: examRow.exam_id,
+    title: examRow.title,
+    status: examRow.status,
+    code: examRow.password,
+    duration: Number.isFinite(duration) && duration > 0 ? duration : null,
+    openedAt: status === EXAM_STATUS.OPEN && examRow.updated_at ? examRow.updated_at : null,
+    updatedAt: examRow.updated_at || null,
+  }
+}
+
+function buildMonitoringRoster(enrolled, sessions) {
+  const byMember = new Map()
+  for (const s of sessions) {
+    if (s.memberId != null) byMember.set(Number(s.memberId), s)
+  }
+  return enrolled.map((student) => {
+    const sess = byMember.get(Number(student.memberId))
+    if (!sess) {
+      return {
+        memberId: student.memberId,
+        studentName: student.studentName,
+        schoolId: student.schoolId,
+        sessionId: null,
+        status: null,
+        warningCount: 0,
+        joined: false,
+      }
+    }
+    return {
+      memberId: student.memberId,
+      studentName: sess.studentName || student.studentName,
+      schoolId: sess.schoolId || student.schoolId,
+      sessionId: sess.sessionId,
+      status: sess.status,
+      warningCount: sess.warningCount,
+      joined: true,
+      submittedAt: sess.submittedAt,
+      violationCount: sess.violationCount,
+    }
+  })
+}
+
+export async function getTeacherActiveMonitoringService(teacherMemberId) {
+  try {
+    const active = await getTeacherActiveMonitoringExamQuery(teacherMemberId)
+    if (!active) {
+      return { ok: true, activeExam: null }
+    }
+    const snapshot = await getTeacherMonitoringSnapshotService(
+      active.classId,
+      active.id,
+      teacherMemberId,
+    )
+    if (!snapshot.ok) return snapshot
+    return {
+      ok: true,
+      activeExam: {
+        id: active.id,
+        title: active.title,
+        status: active.status,
+        code: active.code,
+        classId: active.classId,
+        className: active.className,
+        duration:
+          active.duration != null && active.duration !== ''
+            ? Number(active.duration)
+            : null,
+        openedAt:
+          (active.status || '').toLowerCase() === EXAM_STATUS.OPEN && active.updatedAt
+            ? active.updatedAt
+            : null,
+        updatedAt: active.updatedAt,
+      },
+      ...snapshot,
+    }
+  } catch (err) {
+    console.error('[examResultsService.getTeacherActiveMonitoring]', err)
+    return { ok: false, status: 500, error: 'Failed to load live monitoring.' }
+  }
+}
+
+export async function getTeacherMonitoringSnapshotService(classId, examId, _teacherMemberId) {
+  try {
+    const cls = await getClassByIdQuery(classId)
+    if (!cls) {
+      return { ok: false, status: 404, error: 'Class not found.' }
+    }
+
+    const exam = await getExamForJoinQuery(classId, examId)
+    if (!exam) {
+      return { ok: false, status: 404, error: 'Exam not found.' }
+    }
+
+    const [sessions, stats, violations, enrolled] = await Promise.all([
+      listExamSessionsForExamQuery(classId, examId),
+      getExamSubmissionStatsQuery(examId),
+      listCheatingLogsForExamQuery(examId),
+      listClassEnrolledStudentsQuery(classId),
+    ])
+
+    const roster = buildMonitoringRoster(enrolled, sessions)
+
+    return {
+      ok: true,
+      exam: mapMonitoringExamMeta(exam),
+      stats: {
+        enrolled: Number(stats.enrolled || 0),
+        joined: Number(stats.joined || 0),
+        submitted: Number(stats.submitted || 0),
+      },
+      sessions,
+      roster,
+      violations: violations.map((v) => ({
+        id: v.id,
+        sessionId: v.sessionId,
+        eventType: v.eventType,
+        details: v.details,
+        occurredAt: v.occurredAt,
+        studentName: v.studentName,
+        schoolId: v.schoolId,
+      })),
+    }
+  } catch (err) {
+    console.error('[examResultsService.getTeacherMonitoringSnapshot]', err)
+    return { ok: false, status: 500, error: 'Failed to load monitoring data.' }
+  }
+}
 
 export async function getTeacherExamResultsService(classId, examId, teacherMemberId) {
   try {
@@ -30,12 +169,7 @@ export async function getTeacherExamResultsService(classId, examId, teacherMembe
 
     return {
       ok: true,
-      exam: {
-        id: exam.exam_id,
-        title: exam.title,
-        status: exam.status,
-        code: exam.password,
-      },
+      exam: mapMonitoringExamMeta(exam),
       stats: {
         enrolled: Number(stats.enrolled || 0),
         joined: Number(stats.joined || 0),

@@ -1,13 +1,23 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Clock, AlertTriangle, ShieldAlert, MonitorPlay, X } from 'lucide-react'
-import { apiFetch } from '@/lib/apiFetch.js'
+import { useDetectionsToolbar } from '@/context/DetectionsToolbarContext.jsx'
 import {
-  fetchTeacherExamResults,
+  fetchTeacherActiveMonitoring,
   fetchTeacherExamSessionDetail,
+  fetchTeacherMonitoringSnapshot,
 } from '@/lib/teacherExamResultsApi.js'
+import { MAX_EXAM_WARNINGS } from '@/lib/examAntiCheat.js'
+import { computeExamTimeDisplay } from '@/lib/examCountdown.js'
+import {
+  arrangeSeatsBySettings,
+  buildSeatGridFromRoster,
+  DEFAULT_SEAT_SETTINGS,
+  loadSeatSettings,
+  moveSeatAt,
+  saveSeatLayout,
+  saveSeatSettings,
+} from '@/lib/detectionsSeatLayout.js'
 import '../../styles/teacher-detections-live.css'
-
-const SEAT_COUNT = 40
 
 function splitName(fullName) {
   const parts = String(fullName || 'Student').trim().split(/\s+/)
@@ -31,62 +41,166 @@ function violationsBySession(violations) {
   return map
 }
 
-function sessionToSeat(session, violationLabels = []) {
-  const { firstName, lastName } = splitName(session.studentName)
-  const strikes = Number(session.warningCount || 0)
-  let status = 'good'
-  if (session.status === 'submitted') status = 'good'
-  else if (strikes >= 3) status = 'void'
-  else if (strikes >= 1) status = 'warning'
+/** Seat color: absent | submitted | ongoing | warn1 | warn2 | warn3 */
+function resolveSeatTone(entry) {
+  if (!entry.joined) return 'absent'
+  const strikes = Number(entry.warningCount || 0)
+  if (entry.status === 'submitted') return 'submitted'
+  if (strikes >= MAX_EXAM_WARNINGS) return 'warn3'
+  if (strikes === 2) return 'warn2'
+  if (strikes === 1) return 'warn1'
+  return 'ongoing'
+}
+
+function statusLabelForTone(tone) {
+  const map = {
+    absent: 'Enrolled — not joined yet',
+    ongoing: 'Active — no warnings',
+    warn1: '1 warning',
+    warn2: '2 warnings',
+    warn3: 'Max warnings (3+)',
+    submitted: 'Exam submitted',
+  }
+  return map[tone] || tone
+}
+
+function rosterEntryToSeat(entry, violationLabels = []) {
+  const { firstName, lastName } = splitName(entry.studentName)
+  const strikes = Number(entry.warningCount || 0)
+  const tone = resolveSeatTone(entry)
   return {
-    id: `session-${session.sessionId}`,
-    sessionId: session.sessionId,
-    sessionStatus: session.status,
+    id: entry.sessionId ? `session-${entry.sessionId}` : `member-${entry.memberId}`,
+    sessionId: entry.sessionId,
+    memberId: entry.memberId,
+    sessionStatus: entry.status,
+    joined: entry.joined,
     firstName,
     lastName,
-    schoolId: session.schoolId || '',
-    status,
+    schoolId: entry.schoolId || '',
+    tone,
     strikes,
     violations: violationLabels,
   }
 }
 
-function buildSeatGrid(sessions, vMap) {
-  const seats = sessions.map((s) => sessionToSeat(s, vMap.get(s.sessionId) || []))
-  while (seats.length < SEAT_COUNT) {
-    seats.push({ id: `empty-${seats.length}`, status: 'empty', strikes: 0, violations: [] })
-  }
-  return seats.slice(0, SEAT_COUNT)
+function rosterToSeats(roster, vMap) {
+  return (roster || []).map((r) =>
+    rosterEntryToSeat(r, r.sessionId ? vMap.get(r.sessionId) || [] : []),
+  )
 }
 
-function seatModifier(status) {
-  if (status === 'empty') return 'acsis-detections-seat--empty'
-  if (status === 'void') return 'acsis-detections-seat--void'
-  if (status === 'warning') return 'acsis-detections-seat--warning'
-  return 'acsis-detections-seat--good'
+function seatModifier(tone) {
+  if (tone === 'empty') return 'acsis-detections-seat--empty'
+  return `acsis-detections-seat--${tone}`
+}
+
+function seatInitials(student) {
+  const f = student.firstName?.[0] || ''
+  const l = student.lastName?.[0] || ''
+  return (f + l).toUpperCase() || '?'
 }
 
 export default function TeacherDetectionsPage() {
-  const [seconds, setSeconds] = useState(0)
   const [activeExam, setActiveExam] = useState(null)
-  const [students, setStudents] = useState(() => buildSeatGrid([]))
+  const [clockTick, setClockTick] = useState(0)
+  const [students, setStudents] = useState([])
   const [selectedStudent, setSelectedStudent] = useState(null)
-  const [violationTotal, setViolationTotal] = useState(0)
+  const [dragSourceIdx, setDragSourceIdx] = useState(null)
+  const [dragOverIdx, setDragOverIdx] = useState(null)
+  const [seatSettings, setSeatSettings] = useState(() => ({ ...DEFAULT_SEAT_SETTINGS }))
+  const dragMovedRef = useRef(false)
+  const monitoringRef = useRef(null)
 
-  const refreshSessions = useCallback(async (exam) => {
-    if (!exam?.classId || !exam?.id) return
-    try {
-      const data = await fetchTeacherExamResults(exam.classId, exam.id)
-      const joined = (data.sessions || []).filter(
-        (s) => s.status === 'in_progress' || s.status === 'submitted',
-      )
+  const applySettingsLayout = useCallback(
+    (settings, exam = activeExam) => {
+      const data = monitoringRef.current
+      if (!data || !exam?.classId || !exam?.id) return
       const vMap = violationsBySession(data.violations)
-      setViolationTotal((data.violations || []).length)
-      setStudents(buildSeatGrid(joined, vMap))
-    } catch (err) {
-      console.error('[Detections] Failed to load sessions:', err)
+      const rosterSeats = rosterToSeats(data.roster || [], vMap)
+      const grid = arrangeSeatsBySettings(rosterSeats, settings)
+      setStudents(grid)
+      saveSeatLayout(exam.classId, exam.id, grid)
+    },
+    [activeExam],
+  )
+
+  const applyMonitoringData = useCallback((data, exam) => {
+    monitoringRef.current = data
+    const vMap = violationsBySession(data.violations)
+    const rosterSeats = rosterToSeats(data.roster || [], vMap)
+    const settings =
+      exam?.classId != null && exam?.id != null
+        ? loadSeatSettings(exam.classId, exam.id)
+        : { ...DEFAULT_SEAT_SETTINGS }
+    setSeatSettings(settings)
+    setStudents(
+      buildSeatGridFromRoster(rosterSeats, exam?.classId ?? null, exam?.id ?? null, settings),
+    )
+    if (data.exam && exam) {
+      setActiveExam((prev) => ({
+        ...(prev || exam),
+        status: data.exam.status ?? prev?.status ?? exam.status,
+        duration: data.exam.duration ?? prev?.duration ?? exam.duration,
+        openedAt: data.exam.openedAt ?? prev?.openedAt ?? exam.openedAt,
+        updatedAt: data.exam.updatedAt ?? prev?.updatedAt ?? exam.updatedAt,
+      }))
     }
   }, [])
+
+  const handleFillModeChange = useCallback(
+    (fillMode) => {
+      if (!activeExam?.classId || !activeExam?.id) return
+      const next = { ...seatSettings, fillMode }
+      setSeatSettings(next)
+      saveSeatSettings(activeExam.classId, activeExam.id, next)
+      applySettingsLayout(next, activeExam)
+    },
+    [activeExam, seatSettings, applySettingsLayout],
+  )
+
+  const { setToolbar } = useDetectionsToolbar() || {}
+
+  useEffect(() => {
+    if (!setToolbar || !activeExam) {
+      setToolbar?.(null)
+      return undefined
+    }
+    setToolbar({
+      seatSettings,
+      onFillModeChange: handleFillModeChange,
+    })
+    return () => setToolbar(null)
+  }, [activeExam, seatSettings, handleFillModeChange, setToolbar])
+
+  const handleSeatDrop = useCallback(
+    (fromIdx, toIdx) => {
+      if (fromIdx === toIdx) return
+      dragMovedRef.current = true
+      setStudents((prev) => {
+        const next = moveSeatAt(prev, fromIdx, toIdx)
+        if (activeExam?.classId != null && activeExam?.id != null) {
+          saveSeatLayout(activeExam.classId, activeExam.id, next)
+        }
+        return next
+      })
+      setDragSourceIdx(null)
+      setDragOverIdx(null)
+    },
+    [activeExam],
+  )
+
+  const refreshSessions = useCallback(
+    async (exam) => {
+      if (!exam?.classId || !exam?.id) return
+      try {
+        const data = await fetchTeacherMonitoringSnapshot(exam.classId, exam.id)
+        applyMonitoringData(data, exam)
+      } catch (err) {
+        console.error('[Detections] Failed to load sessions:', err)
+      }
+    },
+    [applyMonitoringData],
+  )
 
   async function openStudentDetail(student) {
     if (!student?.sessionId || !activeExam?.classId || !activeExam?.id) {
@@ -112,31 +226,18 @@ export default function TeacherDetectionsPage() {
   }
 
   useEffect(() => {
-    async function findActiveExam() {
+    async function loadActiveExam() {
       try {
-        const res = await apiFetch('/api/teacher/classes')
-        if (!res.ok) return
-        const classes = await res.json()
-        for (const cls of classes) {
-          const exRes = await apiFetch(`/api/teacher/classes/${cls.id}/exams`)
-          if (!exRes.ok) continue
-          const clsData = await exRes.json()
-          const found = (clsData.exams || []).find((e) =>
-            ['waiting', 'open'].includes((e.status || '').toLowerCase()),
-          )
-          if (found) {
-            const exam = { ...found, classId: cls.id, className: clsData.name }
-            setActiveExam(exam)
-            await refreshSessions(exam)
-            return
-          }
-        }
+        const data = await fetchTeacherActiveMonitoring()
+        if (!data.activeExam) return
+        setActiveExam(data.activeExam)
+        applyMonitoringData(data, data.activeExam)
       } catch (err) {
         console.error('[Detections] Failed to fetch active exam:', err)
       }
     }
-    findActiveExam()
-  }, [refreshSessions])
+    loadActiveExam()
+  }, [applyMonitoringData])
 
   useEffect(() => {
     if (!activeExam?.classId || !activeExam?.id) return undefined
@@ -145,17 +246,15 @@ export default function TeacherDetectionsPage() {
   }, [activeExam, refreshSessions])
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setSeconds((prev) => prev + 1)
-    }, 1000)
-    return () => clearInterval(interval)
-  }, [])
+    if (!activeExam) return undefined
+    const interval = window.setInterval(() => setClockTick((t) => t + 1), 1000)
+    return () => window.clearInterval(interval)
+  }, [activeExam])
 
-  const formatTime = (totalSeconds) => {
-    const m = String(Math.floor(totalSeconds / 60)).padStart(2, '0')
-    const s = String(totalSeconds % 60).padStart(2, '0')
-    return `${m}:${s}`
-  }
+  const examTime = useMemo(
+    () => computeExamTimeDisplay(activeExam),
+    [activeExam, clockTick],
+  )
 
   if (!activeExam) {
     return (
@@ -175,9 +274,8 @@ export default function TeacherDetectionsPage() {
     )
   }
 
-  const presentStudents = students.filter((s) => s.status !== 'empty')
-  const warnings = presentStudents.filter((s) => s.status === 'warning').length
-  const voids = presentStudents.filter((s) => s.status === 'void').length
+  const presentStudents = students.filter((s) => s.tone !== 'empty')
+  const countByTone = (tone) => presentStudents.filter((s) => s.tone === tone).length
 
   return (
     <div className="acsis-detections-live acsis-view">
@@ -191,25 +289,45 @@ export default function TeacherDetectionsPage() {
               </span>
               <h1 className="acsis-detections-header__title">Live Monitoring</h1>
             </div>
-            <p className="acsis-detections-header__exam">{activeExam.title}</p>
-            <p className="text-xs text-gray-500 mt-1">
-              {students.filter((s) => s.status !== 'empty').length} student(s) joined · {violationTotal}{' '}
-              violation log(s). Events are recorded when students leave the tab during a live exam.
+            <p className="acsis-detections-header__exam">
+              {activeExam.title}
+              {activeExam.className ? ` · ${activeExam.className}` : ''}
             </p>
           </div>
 
           <div className="acsis-detections-header__stats">
-            <div className="acsis-detections-stat acsis-detections-stat--warnings">
-              <span className="acsis-detections-stat__value">{warnings}</span>
-              <span className="acsis-detections-stat__label">Warnings</span>
+            <div className="acsis-detections-stat acsis-detections-stat--absent">
+              <span className="acsis-detections-stat__value">{countByTone('absent')}</span>
+              <span className="acsis-detections-stat__label">Not joined</span>
             </div>
-            <div className="acsis-detections-stat acsis-detections-stat--voids">
-              <span className="acsis-detections-stat__value">{voids}</span>
-              <span className="acsis-detections-stat__label">Voided</span>
+            <div className="acsis-detections-stat acsis-detections-stat--ongoing">
+              <span className="acsis-detections-stat__value">{countByTone('ongoing')}</span>
+              <span className="acsis-detections-stat__label">Active</span>
             </div>
-            <div className="acsis-detections-stat acsis-detections-stat--timer">
-              <Clock className="w-5 h-5 text-gray-400 shrink-0" aria-hidden />
-              <span className="acsis-detections-stat__timer">{formatTime(seconds)}</span>
+            <div className="acsis-detections-stat acsis-detections-stat--warn1">
+              <span className="acsis-detections-stat__value">{countByTone('warn1')}</span>
+              <span className="acsis-detections-stat__label">1 warn</span>
+            </div>
+            <div className="acsis-detections-stat acsis-detections-stat--warn2">
+              <span className="acsis-detections-stat__value">{countByTone('warn2')}</span>
+              <span className="acsis-detections-stat__label">2 warns</span>
+            </div>
+            <div className="acsis-detections-stat acsis-detections-stat--warn3">
+              <span className="acsis-detections-stat__value">{countByTone('warn3')}</span>
+              <span className="acsis-detections-stat__label">3 warns</span>
+            </div>
+            <div className="acsis-detections-stat acsis-detections-stat--submitted">
+              <span className="acsis-detections-stat__value">{countByTone('submitted')}</span>
+              <span className="acsis-detections-stat__label">Done</span>
+            </div>
+            <div
+              className={`acsis-detections-stat acsis-detections-stat--timer${examTime.isLow ? ' acsis-detections-stat--timer-low' : ''}`}
+            >
+              <span className="acsis-detections-stat__value acsis-detections-stat__timer">
+                <Clock className="acsis-detections-stat__clock" aria-hidden />
+                {examTime.display}
+              </span>
+              <span className="acsis-detections-stat__label">{examTime.label}</span>
             </div>
           </div>
         </div>
@@ -226,20 +344,58 @@ export default function TeacherDetectionsPage() {
           </h2>
         </div>
 
+        <p className="acsis-detections-drag-hint">Drag a student to another seat to match your classroom layout.</p>
+
         <div className="acsis-detections-seating">
           {students.map((student, idx) => {
             const isWalkwayCol = idx % 8 === 4
-            const isEmpty = student.status === 'empty'
-            const initials = !isEmpty ? `${student.firstName[0]}${student.lastName[0]}` : ''
+            const isEmpty = student.tone === 'empty'
+            const initials = !isEmpty ? seatInitials(student) : ''
+            const tone = student.tone
+            const isDragging = dragSourceIdx === idx
+            const isDropTarget = dragOverIdx === idx && dragSourceIdx != null && dragSourceIdx !== idx
 
             return (
-              <React.Fragment key={student.id}>
+              <React.Fragment key={`seat-${idx}-${student.id}`}>
                 {isWalkwayCol ? <div className="acsis-detections-walkway" aria-hidden /> : null}
                 <div
                   role={isEmpty ? undefined : 'button'}
                   tabIndex={isEmpty ? undefined : 0}
-                  className={`acsis-detections-seat ${seatModifier(student.status)}`}
+                  draggable={!isEmpty}
+                  className={`acsis-detections-seat ${seatModifier(tone)}${isDragging ? ' acsis-detections-seat--dragging' : ''}${isDropTarget ? ' acsis-detections-seat--drop-target' : ''}${!isEmpty ? ' acsis-detections-seat--draggable' : ''}`}
+                  title={
+                    isEmpty
+                      ? 'Drop student here'
+                      : `${statusLabelForTone(tone)} — drag to move seat`
+                  }
+                  onDragStart={(e) => {
+                    if (isEmpty) return
+                    e.dataTransfer.setData('text/plain', String(idx))
+                    e.dataTransfer.effectAllowed = 'move'
+                    setDragSourceIdx(idx)
+                  }}
+                  onDragEnd={() => {
+                    setDragSourceIdx(null)
+                    setDragOverIdx(null)
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault()
+                    e.dataTransfer.dropEffect = 'move'
+                    if (dragSourceIdx !== idx) setDragOverIdx(idx)
+                  }}
+                  onDragLeave={() => {
+                    setDragOverIdx((prev) => (prev === idx ? null : prev))
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    const from = Number(e.dataTransfer.getData('text/plain'))
+                    if (!Number.isNaN(from)) handleSeatDrop(from, idx)
+                  }}
                   onClick={() => {
+                    if (dragMovedRef.current) {
+                      dragMovedRef.current = false
+                      return
+                    }
                     if (!isEmpty) openStudentDetail(student)
                   }}
                   onKeyDown={(e) => {
@@ -252,34 +408,14 @@ export default function TeacherDetectionsPage() {
                   {!isEmpty ? (
                     <>
                       <div className="acsis-detections-seat__top">
-                        <div
-                          className={`acsis-detections-seat__avatar ${
-                            student.status === 'void'
-                              ? 'bg-red-200 text-red-800'
-                              : student.status === 'warning'
-                                ? 'bg-orange-200 text-orange-800'
-                                : 'bg-green-200 text-green-800'
-                          }`}
-                        >
+                        <div className={`acsis-detections-seat__avatar acsis-detections-seat__avatar--${tone}`}>
                           {initials}
                         </div>
-                        {student.status === 'void' ? (
-                          <ShieldAlert className="w-4 h-4 sm:w-5 sm:h-5 text-red-500 shrink-0" aria-hidden />
-                        ) : student.status === 'warning' ? (
-                          <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-orange-500 shrink-0" aria-hidden />
-                        ) : (
-                          <div className="w-3 h-3 bg-green-500 rounded-full shrink-0" aria-hidden />
-                        )}
                       </div>
                       <div className="min-w-0">
                         <div className="acsis-detections-seat__name">{student.firstName}</div>
                         <div className="acsis-detections-seat__last">{student.lastName}</div>
                       </div>
-                      {(student.status === 'warning' || student.status === 'void') && (
-                        <span className="acsis-detections-seat__strikes">
-                          {student.strikes} {student.strikes === 1 ? 'strike' : 'strikes'}
-                        </span>
-                      )}
                     </>
                   ) : (
                     <span className="acsis-detections-seat__empty-label">Empty</span>
@@ -305,13 +441,7 @@ export default function TeacherDetectionsPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <div
-              className={`p-4 sm:p-6 text-white flex justify-between items-start gap-3 ${
-                selectedStudent.status === 'void'
-                  ? 'bg-red-600'
-                  : selectedStudent.status === 'warning'
-                    ? 'bg-orange-500'
-                    : 'bg-green-600'
-              }`}
+              className={`p-4 sm:p-6 text-white flex justify-between items-start gap-3 acsis-detections-modal__header acsis-detections-modal__header--${selectedStudent.tone}`}
             >
               <div className="min-w-0">
                 <h3 id="detections-student-title" className="text-lg sm:text-2xl font-bold truncate">
@@ -333,20 +463,8 @@ export default function TeacherDetectionsPage() {
               <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-gray-100">
                 <div>
                   <div className="text-sm text-gray-500 font-medium mb-1">Current Status</div>
-                  <div
-                    className={`font-bold text-base sm:text-lg ${
-                      selectedStudent.status === 'void'
-                        ? 'text-red-600'
-                        : selectedStudent.status === 'warning'
-                          ? 'text-orange-600'
-                          : 'text-green-600'
-                    }`}
-                  >
-                    {selectedStudent.status === 'void'
-                      ? 'Exam Voided'
-                      : selectedStudent.status === 'warning'
-                        ? 'Warning Issued'
-                        : 'Doing Well'}
+                  <div className={`font-bold text-base sm:text-lg acsis-detections-modal__status acsis-detections-modal__status--${selectedStudent.tone}`}>
+                    {statusLabelForTone(selectedStudent.tone)}
                   </div>
                 </div>
                 <div className="sm:text-right">
@@ -365,9 +483,7 @@ export default function TeacherDetectionsPage() {
                         className="flex items-start gap-3 text-sm text-gray-700 bg-gray-50 p-3 rounded-lg border border-gray-100"
                       >
                         <AlertTriangle
-                          className={`w-4 h-4 mt-0.5 shrink-0 ${
-                            selectedStudent.status === 'void' ? 'text-red-500' : 'text-orange-500'
-                          }`}
+                          className={`w-4 h-4 mt-0.5 shrink-0 acsis-detections-modal__violation-icon acsis-detections-modal__violation-icon--${selectedStudent.tone}`}
                           aria-hidden
                         />
                         <span>{v}</span>

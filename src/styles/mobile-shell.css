@@ -46,6 +46,13 @@
     flex: 1;
   }
 
+  .acsis-mobile-top-bar__actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
   .acsis-mobile-top-bar__logo {
     width: clamp(32px, 9vw, 40px);
     height: clamp(32px, 9vw, 40px);

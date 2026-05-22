@@ -19,6 +19,13 @@ export async function fetchAdminViolationDetail(sessionId) {
   return parseJson(res)
 }
 
+export async function issueViolationTicket(sessionId) {
+  const res = await apiFetch(`/api/admin/violations/${sessionId}/ticket`, {
+    method: 'POST',
+  })
+  return parseJson(res)
+}
+
 export function formatViolationDateTime(value) {
   if (!value) return '—'
   const d = new Date(value)

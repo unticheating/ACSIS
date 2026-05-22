@@ -6,6 +6,7 @@ import {
   deleteExamQuery,
   getExamWithQuestionsQuery
 } from '../repositories/examRepository.js';
+import { closeOtherTeacherOngoingExamsQuery } from '../repositories/examResultsRepository.js';
 import { getClassByIdQuery } from '../repositories/classRepository.js';
 import { checkEnrollment } from '../repositories/studentRepository.js';
 import { nextStatusAfterClose, nextStatusAfterPublish } from '../lib/examStatus.js';
@@ -90,7 +91,7 @@ export async function getClassExamsService(classId, requireActive = false, stude
   }
 }
 
-export async function publishExamService(classId, examId) {
+export async function publishExamService(classId, examId, teacherMemberId = null) {
   try {
     const exam = await getExamWithQuestionsQuery(classId, examId, false);
     if (!exam) {
@@ -100,6 +101,10 @@ export async function publishExamService(classId, examId) {
     const nextStatus = nextStatusAfterPublish(exam.status);
     if (!nextStatus) {
       return { ok: false, status: 400, error: 'Only draft exams can be published.' };
+    }
+
+    if (teacherMemberId) {
+      await closeOtherTeacherOngoingExamsQuery(teacherMemberId, classId, examId);
     }
 
     if (!exam.code) {
@@ -146,11 +151,11 @@ export async function closeExamService(classId, examId) {
   }
 }
 
-export async function deleteExamService(classId, examId) {
+export async function deleteExamService(classId, examId, teacherMemberId = null) {
   try {
-    const success = await deleteExamQuery(classId, examId);
+    const success = await deleteExamQuery(classId, examId, teacherMemberId);
     if (!success) {
-      return { ok: false, status: 404, error: 'Exam not found.' };
+      return { ok: false, status: 404, error: 'Exam not found or you do not have permission.' };
     }
     return { ok: true };
   } catch (err) {

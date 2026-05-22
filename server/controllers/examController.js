@@ -16,8 +16,10 @@ import {
 } from '../services/examSessionService.js';
 import {
   getStudentPerformanceService,
+  getTeacherActiveMonitoringService,
   getTeacherExamResultsService,
   getTeacherExamSessionDetailService,
+  getTeacherMonitoringSnapshotService,
   listTeacherReportExamsService,
 } from '../services/examResultsService.js';
 
@@ -81,7 +83,7 @@ export async function getTeacherClassStream(req, res) {
 
 export async function publishTeacherExam(req, res) {
   const { classId, examId } = req.params;
-  const result = await publishExamService(classId, examId);
+  const result = await publishExamService(classId, examId, req.memberId);
   
   if (!result.ok) {
     return res.status(result.status || 500).json({ error: result.error });
@@ -91,7 +93,7 @@ export async function publishTeacherExam(req, res) {
 
 export async function deleteTeacherExam(req, res) {
   const { classId, examId } = req.params;
-  const result = await deleteExamService(classId, examId);
+  const result = await deleteExamService(classId, examId, req.memberId);
   
   if (!result.ok) {
     return res.status(result.status || 500).json({ error: result.error });
@@ -211,7 +213,7 @@ export async function closeTeacherExam(req, res) {
 export async function startTeacherExam(req, res) {
   const { classId, examId } = req.params;
   try {
-    const result = await startExamService(classId, examId);
+    const result = await startExamService(classId, examId, req.memberId);
     if (!result.ok) {
       return res.status(result.status || 500).json({ error: result.error });
     }
@@ -245,6 +247,23 @@ export async function getTeacherExamResults(req, res) {
 export async function getTeacherExamSessionDetail(req, res) {
   const { classId, examId, sessionId } = req.params;
   const result = await getTeacherExamSessionDetailService(classId, examId, sessionId);
+  if (!result.ok) {
+    return res.status(result.status || 500).json({ error: result.error });
+  }
+  return res.json(result);
+}
+
+export async function getTeacherActiveMonitoring(req, res) {
+  const result = await getTeacherActiveMonitoringService(req.memberId);
+  if (!result.ok) {
+    return res.status(result.status || 500).json({ error: result.error });
+  }
+  return res.json(result);
+}
+
+export async function getTeacherMonitoringSnapshot(req, res) {
+  const { classId, examId } = req.params;
+  const result = await getTeacherMonitoringSnapshotService(classId, examId, req.memberId);
   if (!result.ok) {
     return res.status(result.status || 500).json({ error: result.error });
   }

@@ -121,7 +121,10 @@ export default function TeacherClassExamsPage() {
     if (!window.confirm(`Delete “${title || 'this exam'}”? This cannot be undone.`)) return
     try {
       const res = await apiFetch(`/api/teacher/classes/${classId}/exams/${examId}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error('Failed to delete')
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(typeof data.error === 'string' ? data.error : 'Failed to delete exam.')
+      }
       refresh()
     } catch (err) {
       alert(err.message)
@@ -246,7 +249,10 @@ export default function TeacherClassExamsPage() {
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             className="text-destructive focus:text-destructive"
-                            onSelect={() => removeExam(cls.id, exam.id, exam.title)}
+                            onSelect={(e) => {
+                              e.preventDefault()
+                              removeExam(cls.id, exam.id, exam.title)
+                            }}
                           >
                             Delete exam
                           </DropdownMenuItem>

@@ -1,4 +1,5 @@
 import { getPool } from '../db.js'
+import { ensureExamSessionTicketColumns } from '../lib/ensureTicketSchema.js'
 import { getExamSessionUserColumn } from '../lib/schemaCompat.js'
 
 async function sessionMemberJoin(esAlias = 'es', smAlias = 'sm') {
@@ -38,7 +39,7 @@ export async function getAdminDashboardStatsQuery(institutionId) {
   return rows[0]
 }
 
-export async function listOngoingExamsQuery(institutionId, limit = 10) {
+export async function listOngoingExamsQuery(institutionId, limit = 5) {
   const pool = getPool()
   const { rows } = await pool.query(
     `SELECT
@@ -64,7 +65,8 @@ export async function listOngoingExamsQuery(institutionId, limit = 10) {
   return rows
 }
 
-export async function listDetectedStudentsQuery(institutionId, maxWarnings, limit = 10) {
+export async function listDetectedStudentsQuery(institutionId, maxWarnings, limit = 5) {
+  await ensureExamSessionTicketColumns()
   const pool = getPool()
   const memberJoin = await sessionMemberJoin('es', 'sm')
   const { rows } = await pool.query(
@@ -84,7 +86,9 @@ export async function listDetectedStudentsQuery(institutionId, maxWarnings, limi
         WHERE cl.session_id = es.session_id
         ORDER BY cl.occurred_at DESC
         LIMIT 1) AS "lastEventAt",
+       es.ticket_issued_at AS "ticketIssuedAt",
        CASE
+         WHEN es.ticket_issued_at IS NOT NULL THEN 'ticketed'
          WHEN es.warning_count >= $2 THEN 'flagged'
          ELSE 'warned'
        END AS status
@@ -101,11 +105,34 @@ export async function listDetectedStudentsQuery(institutionId, maxWarnings, limi
   return rows.map((r) => ({
     ...r,
     studentName: r.studentName?.trim() || 'Unknown student',
+    ticketIssued: Boolean(r.ticketIssuedAt),
     subtitle:
-      r.status === 'flagged'
-        ? `Flagged (${r.strikes} warnings, max ${maxWarnings})`
-        : `Warned (${r.strikes} warning${r.strikes === 1 ? '' : 's'})`,
+      r.status === 'ticketed'
+        ? `Ticket issued (${r.strikes} strike${r.strikes === 1 ? '' : 's'})`
+        : r.status === 'flagged'
+          ? `Flagged (${r.strikes} warnings, max ${maxWarnings})`
+          : `Warned (${r.strikes} warning${r.strikes === 1 ? '' : 's'})`,
   }))
+}
+
+export async function issueViolationTicketQuery(institutionId, sessionId, adminMemberId) {
+  await ensureExamSessionTicketColumns()
+  const pool = getPool()
+  const { rows } = await pool.query(
+    `UPDATE exam_sessions es
+     SET ticket_issued_at = NOW(),
+         ticket_issued_by = $3
+     FROM exams e
+     JOIN classes c ON e.class_id = c.class_id
+     WHERE es.exam_id = e.exam_id
+       AND es.session_id = $1
+       AND c.institution_id = $2
+       AND c.is_active = TRUE
+       AND es.ticket_issued_at IS NULL
+     RETURNING es.session_id AS "sessionId", es.ticket_issued_at AS "ticketIssuedAt"`,
+    [sessionId, institutionId, adminMemberId],
+  )
+  return rows[0] || null
 }
 
 export async function getViolationSessionDetailQuery(institutionId, sessionId) {
@@ -118,6 +145,7 @@ export async function getViolationSessionDetailQuery(institutionId, sessionId) {
        es.warning_count AS strikes,
        es.started_at AS "startedAt",
        es.submitted_at AS "submittedAt",
+       es.ticket_issued_at AS "ticketIssuedAt",
        sm.school_id AS "schoolId",
        TRIM(su.first_name || ' ' || COALESCE(su.middle_name || ' ', '') || su.last_name) AS student,
        e.exam_id AS "examId",
@@ -158,6 +186,8 @@ export async function getViolationSessionDetailQuery(institutionId, sessionId) {
     strikes: Number(row.strikes || 0),
     startedAt: row.startedAt,
     submittedAt: row.submittedAt,
+    ticketIssuedAt: row.ticketIssuedAt,
+    ticketIssued: Boolean(row.ticketIssuedAt),
     schoolId: row.schoolId || '',
     student: row.student?.trim() || 'Unknown student',
     examId: row.examId,
@@ -179,6 +209,7 @@ export async function getViolationSessionDetailQuery(institutionId, sessionId) {
 }
 
 export async function listViolationsQuery(institutionId, maxWarnings) {
+  await ensureExamSessionTicketColumns()
   const pool = getPool()
   const memberJoin = await sessionMemberJoin('es', 'sm')
   const { rows } = await pool.query(
@@ -189,7 +220,9 @@ export async function listViolationsQuery(institutionId, maxWarnings) {
        e.title AS exam,
        es.started_at AS "sessionStarted",
        (SELECT MAX(cl.occurred_at) FROM cheating_logs cl WHERE cl.session_id = es.session_id) AS "lastViolationAt",
+       es.ticket_issued_at AS "ticketIssuedAt",
        CASE
+         WHEN es.ticket_issued_at IS NOT NULL THEN 'Ticketed'
          WHEN es.warning_count >= $2 THEN 'Flagged'
          WHEN es.warning_count > 0 THEN 'Warned'
          ELSE 'Clear'
@@ -212,6 +245,7 @@ export async function listViolationsQuery(institutionId, maxWarnings) {
     exam: r.exam,
     strikes: Number(r.strikes || 0),
     status: r.status,
+    ticketIssued: Boolean(r.ticketIssuedAt),
     date: r.lastViolationAt || r.sessionStarted,
   }))
 }

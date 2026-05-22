@@ -16,6 +16,7 @@ import {
   upsertStudentAnswerQuery,
 } from '../repositories/examSessionRepository.js'
 import { getExamWithQuestionsQuery } from '../repositories/examRepository.js'
+import { closeOtherTeacherOngoingExamsQuery } from '../repositories/examResultsRepository.js'
 import { checkEnrollment } from '../repositories/studentRepository.js'
 
 function mapExamMeta(row) {
@@ -128,7 +129,7 @@ export async function getStudentExamSessionService(classId, examId, studentMembe
   return { ok: true, ...payload }
 }
 
-export async function startExamService(classId, examId) {
+export async function startExamService(classId, examId, teacherMemberId = null) {
   const exam = await getExamForJoinQuery(classId, examId)
   if (!exam) {
     return { ok: false, status: 404, error: 'Exam not found.' }
@@ -137,6 +138,10 @@ export async function startExamService(classId, examId) {
   const next = nextStatusAfterStart(exam.status)
   if (!next) {
     return { ok: false, status: 400, error: 'Only exams in the lobby (waiting) can be started.' }
+  }
+
+  if (teacherMemberId) {
+    await closeOtherTeacherOngoingExamsQuery(teacherMemberId, classId, examId)
   }
 
   const updated = await updateExamStatusByIdQuery(classId, examId, next)

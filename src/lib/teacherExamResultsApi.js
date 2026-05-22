@@ -26,3 +26,15 @@ export async function fetchTeacherExamSessionDetail(classId, examId, sessionId) 
   )
   return parseJson(res)
 }
+
+/** Single active exam for this teacher (open preferred over waiting lobby). */
+export async function fetchTeacherActiveMonitoring() {
+  const res = await apiFetch('/api/teacher/classes/monitoring/active')
+  return parseJson(res)
+}
+
+/** Live detections: enrolled roster merged with sessions and violation logs. */
+export async function fetchTeacherMonitoringSnapshot(classId, examId) {
+  const res = await apiFetch(`/api/teacher/classes/${classId}/exams/${examId}/monitoring`)
+  return parseJson(res)
+}

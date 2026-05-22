@@ -1,9 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-
-const NEEDS_JOIN_CLASS_KEY = 'acsis.needsJoinClass'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button.jsx'
-<<<<<<< Updated upstream
 import {
   Dialog,
   DialogContent,
@@ -14,11 +11,10 @@ import {
 } from '@/components/ui/dialog.jsx'
 import { Input } from '@/components/ui/input.jsx'
 import { Label } from '@/components/ui/label.jsx'
-import { useSession } from '@/context/SessionContext.jsx'
-=======
 import { apiFetch } from '@/lib/apiFetch.js'
->>>>>>> Stashed changes
 import '../../pages/student-ui/enrolled_classes.css'
+
+const NEEDS_JOIN_CLASS_KEY = 'acsis.needsJoinClass'
 
 export default function StudentExamsPage() {
   const [joinCode, setJoinCode] = useState('')
@@ -27,31 +23,14 @@ export default function StudentExamsPage() {
   const [enrolled, setEnrolled] = useState([])
   const [loading, setLoading] = useState(true)
 
-<<<<<<< Updated upstream
   const [needsJoinClass, setNeedsJoinClass] = useState(
     () => sessionStorage.getItem(NEEDS_JOIN_CLASS_KEY) === '1',
   )
   const showJoinModal = !loading && enrolled.length === 0 && needsJoinClass
 
-  const getHeaders = useCallback(() => {
-    const headers = { 'Content-Type': 'application/json' }
-    if (sessionMode === 'demo') {
-      headers['x-demo-account'] = activeAccount?.id || 'student'
-    }
-    return headers
-  }, [sessionMode, activeAccount])
-
-  const fetchClasses = useCallback(async () => {
-    try {
-      const res = await fetch('/api/student/classes', {
-        headers: getHeaders(),
-        credentials: 'include',
-      })
-=======
   const fetchClasses = useCallback(async () => {
     try {
       const res = await apiFetch('/api/student/classes')
->>>>>>> Stashed changes
       if (!res.ok) throw new Error('Failed to fetch classes')
       const data = await res.json()
       setEnrolled(data)
@@ -76,14 +55,8 @@ export default function StudentExamsPage() {
     try {
       const res = await apiFetch('/api/student/enroll', {
         method: 'POST',
-<<<<<<< Updated upstream
-        headers: getHeaders(),
-        credentials: 'include',
-        body: JSON.stringify({ accessCode: code }),
-=======
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accessCode: joinCode }),
->>>>>>> Stashed changes
+        body: JSON.stringify({ accessCode: code }),
       })
       const data = await res.json()
 
@@ -180,10 +153,7 @@ export default function StudentExamsPage() {
               (PLP). You must join at least one class to use ACSIS as a student.
             </DialogDescription>
           </DialogHeader>
-          <form
-            onSubmit={submitJoin}
-            className="flex flex-col gap-4"
-          >
+          <form onSubmit={submitJoin} className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
               <Label htmlFor="stu-class-code">Class code</Label>
               <Input

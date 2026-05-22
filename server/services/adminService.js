@@ -10,27 +10,37 @@ import {
   listMonitoringActivityQuery,
   listOngoingExamsQuery,
   getViolationSessionDetailQuery,
+  issueViolationTicketQuery,
   listViolationsQuery,
   updateClassQuery,
 } from '../repositories/adminRepository.js'
 import { listAdminClassesQuery } from '../repositories/classRepository.js'
 
+/** Max rows shown per list on the admin dashboard preview. */
+export const ADMIN_DASHBOARD_PREVIEW_LIMIT = 5
+
 export async function getAdminDashboardService(institutionId) {
   try {
     const maxWarnings = await getInstitutionMaxWarnings(institutionId)
+    const limit = ADMIN_DASHBOARD_PREVIEW_LIMIT
     const [stats, ongoingExams, detectedStudents] = await Promise.all([
       getAdminDashboardStatsQuery(institutionId),
-      listOngoingExamsQuery(institutionId),
-      listDetectedStudentsQuery(institutionId, maxWarnings),
+      listOngoingExamsQuery(institutionId, limit),
+      listDetectedStudentsQuery(institutionId, maxWarnings, limit),
     ])
+    const ongoingTotal = Number(stats?.ongoingExams || 0)
+    const detectedTotal = Number(stats?.detectedStudents || 0)
     return {
       ok: true,
       data: {
         stats: {
-          ongoingExams: Number(stats?.ongoingExams || 0),
+          ongoingExams: ongoingTotal,
           totalExams: Number(stats?.totalExams || 0),
-          detectedStudents: Number(stats?.detectedStudents || 0),
+          detectedStudents: detectedTotal,
         },
+        previewLimit: limit,
+        hasMoreOngoingExams: ongoingTotal > ongoingExams.length,
+        hasMoreDetectedStudents: detectedTotal > detectedStudents.length,
         ongoingExams: ongoingExams.map((e) => ({
           id: e.id,
           name: e.title,
@@ -57,6 +67,23 @@ export async function listViolationsService(institutionId) {
   } catch (err) {
     console.error('[adminService.listViolations]', err)
     return { ok: false, error: 'Database error.' }
+  }
+}
+
+export async function issueViolationTicketService(institutionId, sessionId, adminMemberId) {
+  try {
+    const sid = Number(sessionId)
+    if (!Number.isFinite(sid)) {
+      return { ok: false, status: 400, error: 'Invalid session id.' }
+    }
+    const row = await issueViolationTicketQuery(institutionId, sid, adminMemberId)
+    if (!row) {
+      return { ok: false, status: 404, error: 'Session not found or ticket already issued.' }
+    }
+    return { ok: true, sessionId: row.sessionId, ticketIssuedAt: row.ticketIssuedAt }
+  } catch (err) {
+    console.error('[adminService.issueViolationTicket]', err)
+    return { ok: false, status: 500, error: 'Failed to issue ticket.' }
   }
 }
 
