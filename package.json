@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "dev:api": "npm run dev --prefix server",
+    "install:all": "npm install && npm install --prefix server",
     "build": "vite build",
     "preview": "vite preview"
   },
@@ -26,7 +27,8 @@
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.1.1",
     "sonner": "^2.0.7",
-    "tailwind-merge": "^2.6.1"
+    "tailwind-merge": "^2.6.1",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",

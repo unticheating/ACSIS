@@ -3,8 +3,20 @@ import { getPool } from '../db.js';
 export async function findClassByAccessCode(code) {
   const pool = getPool();
   const result = await pool.query(
-    'SELECT * FROM classes WHERE UPPER(access_code) = UPPER($1) AND is_active = TRUE',
+    `SELECT class_id, class_name, institution_id, member_id, school_year, semester, access_code
+     FROM classes WHERE UPPER(access_code) = UPPER($1) AND is_active = TRUE`,
     [code]
+  );
+  return result.rows[0] || null;
+}
+
+export async function getStudentMember(memberId) {
+  const pool = getPool();
+  const result = await pool.query(
+    `SELECT member_id, institution_id, role
+     FROM institution_members
+     WHERE member_id = $1 AND is_active = TRUE AND is_pending = FALSE`,
+    [memberId],
   );
   return result.rows[0] || null;
 }

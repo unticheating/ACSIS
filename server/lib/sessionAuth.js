@@ -72,10 +72,57 @@ export async function requireAuth(req, res, next) {
 }
 
 /**
+ * Student routes: require an active student institution_members row.
  * @param {import('express').Request} req
  * @param {import('express').Response} res
  * @param {import('express').NextFunction} next
  */
+export async function requireStudentMember(req, res, next) {
+  if (req.headers['x-demo-account'] === 'student') {
+    req.authSession = req.authSession || { uid: 999, roleLabel: 'Student Demo', portal: 'student' }
+    req.memberId = 999
+    return next()
+  }
+
+  const session = req.authSession || readSession(req)
+  if (!session?.uid) {
+    return res.status(401).json({ error: 'Not authenticated.' })
+  }
+  req.authSession = session
+
+  if (!isDatabaseEnabled()) {
+    req.memberId = session.uid
+    return next()
+  }
+
+  const pool = getPool()
+  if (!pool) {
+    req.memberId = session.uid
+    return next()
+  }
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT im.member_id
+       FROM institution_members im
+       JOIN institutions i ON i.institution_id = im.institution_id
+       WHERE im.uid = $1 AND im.role = 'student' AND im.is_active = TRUE AND im.is_pending = FALSE
+         AND i.is_active = TRUE
+       ORDER BY im.joined_at ASC
+       LIMIT 1`,
+      [session.uid],
+    )
+    if (!rows[0]) {
+      return res.status(403).json({ error: 'Student account required. Sign in with your @plpasig.edu.ph Google account.' })
+    }
+    req.memberId = rows[0].member_id
+    return next()
+  } catch (err) {
+    console.error('[requireStudentMember]', err)
+    return res.status(503).json({ error: 'Database error.' })
+  }
+}
+
 /**
  * Institution-scoped admin only (not platform super admin).
  * @param {import('express').Request} req

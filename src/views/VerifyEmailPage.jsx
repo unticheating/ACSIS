@@ -1,12 +1,26 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import AuthImmersiveShell from '@/components/auth/AuthImmersiveShell.jsx'
-import { AUTH_ERROR_MESSAGES, loginWithPassword } from '@/lib/authApi.js'
-import { acsisToastError } from '@/lib/acsisToast.js'
+import {
+  fetchVerificationPending,
+  resendVerificationCode,
+  verifyEmailCode,
+} from '@/lib/authApi.js'
+import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
 import { useSession } from '@/context/SessionContext.jsx'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog.jsx'
+import { Button } from '@/components/ui/button.jsx'
 import '../styles/acsis-immersive.css'
 
-const CODE_LENGTH = 5
+const CODE_LENGTH = 6
+const NEEDS_JOIN_CLASS_KEY = 'acsis.needsJoinClass'
 
 function emptyDigits() {
   return Array.from({ length: CODE_LENGTH }, () => '')
@@ -14,17 +28,38 @@ function emptyDigits() {
 
 export default function VerifyEmailPage() {
   const navigate = useNavigate()
-  const location = useLocation()
+  const [searchParams] = useSearchParams()
   const { refreshAuth } = useSession()
-  const email = String(location.state?.email || '').trim()
-  const password = String(location.state?.password || '')
+  const [email, setEmail] = useState(String(searchParams.get('email') || '').trim())
   const [digits, setDigits] = useState(emptyDigits)
   const [submitting, setSubmitting] = useState(false)
+  const [resending, setResending] = useState(false)
+  const [devHint, setDevHint] = useState(null)
+  const [showSuccess, setShowSuccess] = useState(false)
+  const [entryPath, setEntryPath] = useState('/student/my-classes')
+  const [needsJoinClass, setNeedsJoinClass] = useState(false)
   const inputsRef = useRef([])
 
   useEffect(() => {
-    if (!email || !password) navigate('/', { replace: true })
-  }, [email, password, navigate])
+    let cancelled = false
+    ;(async () => {
+      try {
+        const data = await fetchVerificationPending()
+        if (cancelled) return
+        if (!data.pending) {
+          navigate('/', { replace: true })
+          return
+        }
+        setEmail(data.email || email)
+        if (data.devHint) setDevHint(data.devHint)
+      } catch {
+        if (!cancelled) navigate('/', { replace: true })
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [navigate, email])
 
   useEffect(() => {
     if (email) inputsRef.current[0]?.focus()
@@ -82,27 +117,47 @@ export default function VerifyEmailPage() {
     ev.preventDefault()
     const code = digits.join('')
     if (code.length !== CODE_LENGTH) {
-      acsisToastError('Enter the 5-digit code from your email.')
+      acsisToastError(`Enter the ${CODE_LENGTH}-digit code from your email.`)
       return
     }
 
     setSubmitting(true)
     try {
-      await loginWithPassword(email, password)
-      const user = await refreshAuth()
-      if (user?.entryPath) {
-        navigate(user.entryPath, { replace: true })
-      } else {
-        acsisToastError(AUTH_ERROR_MESSAGES.no_membership)
-      }
+      const data = await verifyEmailCode(code)
+      await refreshAuth()
+      setEntryPath(data.user?.entryPath || '/student/my-classes')
+      setNeedsJoinClass(Boolean(data.needsJoinClass))
+      setShowSuccess(true)
     } catch (err) {
-      acsisToastError(err instanceof Error ? err.message : 'Sign-in failed.')
+      acsisToastError(err instanceof Error ? err.message : 'Verification failed.')
     } finally {
       setSubmitting(false)
     }
   }
 
-  if (!email || !password) return null
+  async function onResend() {
+    setResending(true)
+    try {
+      const data = await resendVerificationCode()
+      acsisToastSuccess('A new verification code was sent to your email.')
+      if (data.devHint) setDevHint(data.devHint)
+      setDigits(emptyDigits())
+      focusIndex(0)
+    } catch (err) {
+      acsisToastError(err instanceof Error ? err.message : 'Could not resend code.')
+    } finally {
+      setResending(false)
+    }
+  }
+
+  function onSuccessContinue() {
+    if (needsJoinClass) {
+      sessionStorage.setItem(NEEDS_JOIN_CLASS_KEY, '1')
+    }
+    navigate(entryPath, { replace: true })
+  }
+
+  if (!email) return null
 
   return (
     <AuthImmersiveShell>
@@ -111,6 +166,8 @@ export default function VerifyEmailPage() {
           A verification code was sent to your email
           <span className="acsis-immersive__verify-email">{email}</span>
         </p>
+
+        {devHint ? <p className="acsis-immersive__verify-dev-hint">{devHint}</p> : null}
 
         <form onSubmit={onSubmit} className="acsis-immersive__verify-form" noValidate>
           <div
@@ -140,14 +197,39 @@ export default function VerifyEmailPage() {
           </div>
 
           <button type="submit" className="acsis-immersive__btn-primary" disabled={submitting}>
-            {submitting ? 'Signing in…' : 'Submit'}
+            {submitting ? 'Verifying…' : 'Submit'}
           </button>
         </form>
 
         <p className="acsis-immersive__verify-back">
-          <Link to="/">Use a different email</Link>
+          <button type="button" className="acsis-immersive__link-btn" onClick={onResend} disabled={resending}>
+            {resending ? 'Sending…' : 'Resend code'}
+          </button>
+          {' · '}
+          <Link to="/">Use a different account</Link>
         </p>
       </div>
+
+      <Dialog open={showSuccess} onOpenChange={() => {}}>
+        <DialogContent
+          className="stu-join-dialog"
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle className="text-[#166534]">Sign-in successful</DialogTitle>
+            <DialogDescription>
+              Your email was verified. You can continue to ACSIS
+              {needsJoinClass ? ' and join your first class with your instructor\'s class code.' : '.'}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" onClick={onSuccessContinue} className="w-full sm:w-auto">
+              Continue
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AuthImmersiveShell>
   )
 }

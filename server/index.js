@@ -8,6 +8,7 @@ import adminClassesRouter from './routes/adminClasses.js'
 import adminSettingsRouter from './routes/adminSettings.js'
 import teacherClassesRouter from './routes/teacherClasses.js'
 import studentRouter from './routes/student.js'
+import { logSmtpStatus } from './lib/sendEmail.js'
 
 try {
   if (config.google.clientId && config.google.clientSecret) {
@@ -39,7 +40,7 @@ app.use('/api/admin/settings', adminSettingsRouter)
 app.use('/api/teacher/classes', teacherClassesRouter)
 app.use('/api/student', studentRouter)
 
-app.listen(config.port, () => {
+app.listen(config.port, async () => {
   console.log(`ACSIS auth API listening on http://localhost:${config.port}`)
   console.log(`  Frontend: ${config.frontendUrl}`)
   console.log(`  Google callback: ${config.google.callbackUrl}`)
@@ -49,4 +50,5 @@ app.listen(config.port, () => {
   } else {
     console.log('  Database: connected via DATABASE_URL (ADMIN_DEV_* is ignored for login)')
   }
+  await logSmtpStatus()
 })

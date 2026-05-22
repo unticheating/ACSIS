@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import AuthImmersiveShell from '@/components/auth/AuthImmersiveShell.jsx'
 import { useSession } from '@/context/SessionContext.jsx'
-import { AUTH_ERROR_MESSAGES, startGoogleSignIn, loginWithPassword } from '@/lib/authApi.js'
+import { AUTH_ERROR_MESSAGES, startGoogleSignIn, loginWithPassword, startEmailVerification } from '@/lib/authApi.js'
 import { acsisToastError } from '@/lib/acsisToast.js'
 import '../styles/acsis-immersive.css'
 
@@ -33,9 +33,16 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (searchParams.get('auth') === 'success') {
-      refreshAuth().catch(() => { })
+      refreshAuth().catch(() => {})
     }
   }, [refreshAuth, searchParams])
+
+  useEffect(() => {
+    const verifyEmail = searchParams.get('email')
+    if (verifyEmail && location.pathname === '/') {
+      navigate(`/verify?email=${encodeURIComponent(verifyEmail)}`, { replace: true })
+    }
+  }, [searchParams, location.pathname, navigate])
 
   useEffect(() => {
     if (authUser && !authUser.portal) {
@@ -84,7 +91,12 @@ export default function LoginPage() {
       return
     }
 
-    navigate('/verify', { state: { email: trimmed, password } })
+    try {
+      await startEmailVerification(trimmed, password)
+      navigate(`/verify?email=${encodeURIComponent(trimmed)}`, { replace: true })
+    } catch (err) {
+      acsisToastError(err instanceof Error ? err.message : 'Could not send verification code.')
+    }
   }
 
   return (

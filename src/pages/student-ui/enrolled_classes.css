@@ -1,5 +1,19 @@
 /* Student: enrolled class list + Gmail-style in-class banner + exam stream */
 
+.stu-my-classes--first-visit .stu-my-classes__content {
+  filter: blur(6px);
+  pointer-events: none;
+  user-select: none;
+}
+
+.stu-join-dialog {
+  max-width: 28rem;
+}
+
+.stu-join-dialog > button.absolute {
+  display: none;
+}
+
 .stu-enroll-hero {
   display: flex;
   flex-direction: column;

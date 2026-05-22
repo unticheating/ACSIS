@@ -1,12 +1,12 @@
 import { Router } from 'express';
 import { enroll, getClasses } from '../controllers/studentController.js';
 import { getStudentClassStream, getStudentExamSession } from '../controllers/examController.js';
-import { requireAuth } from '../lib/sessionAuth.js';
+import { requireAuth, requireStudentMember } from '../lib/sessionAuth.js';
 
 const router = Router();
 
-// All student routes require authentication
 router.use(requireAuth);
+router.use(requireStudentMember);
 
 router.post('/enroll', enroll);
 router.get('/classes', getClasses);

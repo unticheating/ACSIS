@@ -86,6 +86,36 @@ export async function findOrCreateGoogleUser(pool, profile) {
 }
 
 /**
+ * First-time Google sign-in: enroll user at the active institution as a student
+ * when they have no membership yet (admin-added faculty/admin rows are left as-is).
+ * @param {import('pg').Pool} pool
+ * @param {number} uid
+ * @param {boolean} isSuperAdmin
+ */
+export async function ensureGoogleStudentMembership(pool, uid, isSuperAdmin) {
+  if (isSuperAdmin) return
+
+  const { rows: instRows } = await pool.query(
+    `SELECT institution_id FROM institutions WHERE is_active = TRUE ORDER BY institution_id ASC LIMIT 1`,
+  )
+  if (!instRows[0]) return
+
+  const institutionId = instRows[0].institution_id
+  const { rows: existing } = await pool.query(
+    `SELECT member_id FROM institution_members WHERE institution_id = $1 AND uid = $2`,
+    [institutionId, uid],
+  )
+  if (existing[0]) return
+
+  await pool.query(
+    `INSERT INTO institution_members (
+       institution_id, uid, role, school_id, year_level, section, is_active, is_pending
+     ) VALUES ($1, $2, 'student', NULL, NULL, NULL, TRUE, FALSE)`,
+    [institutionId, uid],
+  )
+}
+
+/**
  * @param {import('pg').Pool} pool
  * @param {number} uid
  * @returns {Promise<{ portal: Portal | null, roleLabel: string | null, entryPath: string | null, membershipStatus: 'pending' | 'active' }>}
@@ -104,8 +134,10 @@ export async function resolveUserPortal(pool, uid, isSuperAdmin) {
     `SELECT im.role
      FROM institution_members im
      JOIN institutions i ON i.institution_id = im.institution_id
-     WHERE im.uid = $1 AND im.is_active = TRUE AND i.is_active = TRUE
-     ORDER BY im.joined_at ASC
+     WHERE im.uid = $1 AND im.is_active = TRUE AND im.is_pending = FALSE AND i.is_active = TRUE
+     ORDER BY
+       CASE im.role WHEN 'admin' THEN 1 WHEN 'faculty' THEN 2 ELSE 3 END,
+       im.joined_at ASC
      LIMIT 1`,
     [uid],
   )
@@ -147,6 +179,40 @@ export async function resolveUserPortal(pool, uid, isSuperAdmin) {
 /**
  * @param {import('google-auth-library').TokenPayload} profile
  */
+/**
+ * @param {import('pg').Pool} pool
+ * @param {number} uid
+ * @param {{ googleSub?: string }} [opts]
+ */
+export async function buildSessionFromUid(pool, uid, opts = {}) {
+  const { rows } = await pool.query(
+    `SELECT uid, first_name, last_name, email, is_super_admin, google_sub, avatar_url
+     FROM users WHERE uid = $1`,
+    [uid],
+  )
+  const user = rows[0]
+  if (!user) {
+    throw new Error('User not found')
+  }
+
+  const portalInfo = await resolveUserPortal(pool, uid, user.is_super_admin)
+  const displayName = `${user.first_name} ${user.last_name}`.trim() || user.email
+
+  return {
+    uid: user.uid,
+    email: user.email,
+    googleSub: opts.googleSub || user.google_sub || '',
+    displayName,
+    avatarLetter: displayName.charAt(0).toUpperCase(),
+    avatarUrl: user.avatar_url,
+    isSuperAdmin: user.is_super_admin,
+    portal: portalInfo.portal,
+    roleLabel: portalInfo.roleLabel,
+    entryPath: portalInfo.entryPath,
+    membershipStatus: portalInfo.membershipStatus,
+  }
+}
+
 export function buildSessionWithoutDatabase(profile) {
   const { displayName } = parseNameFromGoogleProfile(profile)
   const letter = (displayName || profile.email || '?').charAt(0).toUpperCase()

@@ -42,6 +42,40 @@ export async function fetchAuthConfig() {
   return parseJson(res)
 }
 
+export async function fetchVerificationPending() {
+  const res = await fetch(`${API_BASE}/api/auth/verification-pending`, { credentials: 'include' })
+  if (res.status === 401) return { pending: false }
+  return parseJson(res)
+}
+
+export async function startEmailVerification(email, password) {
+  const res = await fetch(`${API_BASE}/api/auth/start-verification`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ email, password }),
+  })
+  return parseJson(res)
+}
+
+export async function verifyEmailCode(code) {
+  const res = await fetch(`${API_BASE}/api/auth/verify-email`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ code }),
+  })
+  return parseJson(res)
+}
+
+export async function resendVerificationCode() {
+  const res = await fetch(`${API_BASE}/api/auth/resend-verification`, {
+    method: 'POST',
+    credentials: 'include',
+  })
+  return parseJson(res)
+}
+
 export const AUTH_ERROR_MESSAGES = {
   invalid_domain: 'Only @plpasig.edu.ph Google accounts can sign in.',
   email_not_verified: 'Your Google email is not verified. Use a verified PLPASIG account.',

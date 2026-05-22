@@ -29,6 +29,14 @@ export const config = {
   databaseUrl: process.env.DATABASE_URL || '',
   adminDevEmail: process.env.ADMIN_DEV_EMAIL || '',
   adminDevPassword: process.env.ADMIN_DEV_PASSWORD || '',
+  smtp: {
+    host: (process.env.SMTP_HOST || '').trim(),
+    port: Number(process.env.SMTP_PORT || 587),
+    secure: process.env.SMTP_SECURE === 'true',
+    user: (process.env.SMTP_USER || '').trim(),
+    pass: (process.env.SMTP_PASS || '').replace(/\s/g, ''),
+    from: (process.env.SMTP_FROM || '').trim() || 'ACSIS <noreply@plpasig.edu.ph>',
+  },
 }
 
 export function assertAuthConfig() {
