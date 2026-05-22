@@ -1,0 +1,108 @@
+/**
+ * ACSIS Light Mode — institution-aware hovers and accents.
+ * Requires applyInstitutionTheme() (sets --acsis-brand-* on <html>).
+ */
+
+/* ── Admin: classes accordion ── */
+html:not(.dark) .admin-class-row {
+  background: var(--bg-surface, #fff);
+  border-color: var(--border-default, #e5e7eb);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease;
+}
+
+html:not(.dark) .admin-class-row__trigger:hover {
+  background: var(--acsis-brand-subtle, color-mix(in srgb, var(--acsis-brand, #334155) 10%, #f1f5f9));
+}
+
+html:not(.dark) .admin-class-row--open {
+  border-color: var(--acsis-brand, #334155);
+  box-shadow: 0 2px 14px color-mix(in srgb, var(--acsis-brand, #334155) 14%, transparent);
+}
+
+html:not(.dark) .admin-class-row--open .admin-class-row__chevron {
+  color: var(--acsis-brand, #334155);
+}
+
+html:not(.dark) .admin-exam-row__trigger:hover {
+  background: var(--acsis-brand-subtle, color-mix(in srgb, var(--acsis-brand) 8%, #f8fafc));
+}
+
+/* ── Teacher: class cards ── */
+html:not(.dark) .acsis-class-card:hover {
+  border-color: var(--acsis-brand-ring, color-mix(in srgb, var(--acsis-brand) 28%, #e5e7eb));
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--acsis-brand) 12%, rgba(15, 23, 42, 0.08));
+}
+
+html:not(.dark) .acsis-class-card__menu-btn:hover {
+  background: var(--acsis-brand-subtle, color-mix(in srgb, var(--acsis-brand) 12%, #f3f4f6));
+  color: var(--acsis-brand, #334155);
+}
+
+html:not(.dark) .acsis-stream-item:hover {
+  border-color: var(--acsis-brand-ring, color-mix(in srgb, var(--acsis-brand) 25%, #e8eaed));
+}
+
+/* ── Sidebar (light) — clearer hover ── */
+html:not(.dark) .nav-item:hover:not(.active) {
+  background: var(--acsis-nav-hover-bg, color-mix(in srgb, var(--acsis-brand) 12%, transparent));
+  color: var(--acsis-nav-hover-fg, var(--acsis-brand, #334155));
+}
+
+html:not(.dark) .nav-item:hover:not(.active) i,
+html:not(.dark) .nav-item:hover:not(.active) .admin-nav-icon {
+  color: var(--acsis-nav-hover-fg, var(--acsis-brand, #334155));
+}
+
+/* ── Teacher reports tabs / actions ── */
+html:not(.dark) .reports-page .tab-btn:hover:not(.active) {
+  background: var(--acsis-brand-subtle, color-mix(in srgb, var(--acsis-brand) 10%, #e5e7eb));
+  color: var(--acsis-brand, #334155);
+}
+
+html:not(.dark) .reports-page .tab-btn.active {
+  background: var(--acsis-brand-600, var(--acsis-brand, #334155));
+  color: #fff;
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--acsis-brand) 30%, transparent);
+}
+
+html:not(.dark) .reports-page .btn-green,
+html:not(.dark) .reports-page .btn-action.btn-green {
+  background: var(--acsis-brand-600, var(--acsis-brand, #334155));
+}
+
+html:not(.dark) .reports-page .btn-green:hover,
+html:not(.dark) .reports-page .btn-action.btn-green:hover {
+  background: var(--acsis-brand-500, var(--acsis-brand, #334155));
+}
+
+html:not(.dark) .reports-page .text-green,
+html:not(.dark) .reports-page .stat-val.text-green,
+html:not(.dark) .reports-page .score-val.text-green {
+  color: var(--acsis-brand, #334155);
+}
+
+/* ── Student class cards hover ── */
+html:not(.dark) .stu-class-card:hover .text-primary,
+html:not(.dark) .stu-class-card:hover [class*='group-hover:text-primary'] {
+  color: var(--acsis-brand, #334155);
+}
+
+html:not(.dark) .stu-stream-item:hover {
+  border-color: var(--acsis-brand-ring, color-mix(in srgb, var(--acsis-brand) 25%, #e8eaed));
+}
+
+/* ── Inputs / selects focus (shadcn + native) ── */
+html:not(.dark) input:focus-visible,
+html:not(.dark) select:focus-visible,
+html:not(.dark) textarea:focus-visible {
+  border-color: var(--acsis-brand, hsl(var(--ring)));
+  outline-color: var(--acsis-brand, hsl(var(--ring)));
+}
+
+html:not(.dark) select option:checked {
+  background: var(--acsis-brand-muted-bg, color-mix(in srgb, var(--acsis-brand) 18%, #fff));
+  color: var(--fg-default, #111827);
+}

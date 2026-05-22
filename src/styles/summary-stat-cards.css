@@ -33,9 +33,9 @@
   gap: 12px;
   padding: 22px 24px;
   border-radius: 14px;
-  border: 1px solid rgba(22, 101, 52, 0.12);
+  border: 1px solid var(--border-muted, color-mix(in srgb, var(--acsis-brand, #334155) 12%, #e5e7eb));
   background: var(--bg-surface, #fff);
-  box-shadow: 0 1px 3px rgba(15, 60, 35, 0.06);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
   overflow: hidden;
   transition:
     box-shadow 0.2s ease,
@@ -50,15 +50,19 @@
   left: 0;
   width: 100%;
   height: 3px;
-  background: linear-gradient(90deg, #22c55e, #bbf7d0);
+  background: linear-gradient(
+    90deg,
+    var(--acsis-brand-600, var(--acsis-brand, #334155)),
+    var(--acsis-brand-100, color-mix(in srgb, var(--acsis-brand) 40%, #fff))
+  );
   opacity: 0;
   transition: opacity 0.2s ease;
 }
 
 .acsis-summary-stat:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(15, 60, 35, 0.1);
-  border-color: rgba(22, 163, 74, 0.22);
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--acsis-brand, #334155) 12%, rgba(15, 23, 42, 0.1));
+  border-color: var(--acsis-brand-ring, color-mix(in srgb, var(--acsis-brand) 28%, #e5e7eb));
 }
 
 .acsis-summary-stat:hover::after {
@@ -66,7 +70,11 @@
 }
 
 .acsis-summary-stat--success::after {
-  background: linear-gradient(90deg, #16a34a, #4ade80);
+  background: linear-gradient(
+    90deg,
+    var(--acsis-brand-600, var(--acsis-brand)),
+    var(--acsis-brand-500, var(--acsis-brand))
+  );
 }
 
 .acsis-summary-stat--danger::after {
@@ -97,16 +105,20 @@
   font-weight: 800;
   line-height: 1;
   letter-spacing: -0.03em;
-  color: var(--accent-primary-hover, #15803d);
+  color: var(--acsis-brand-600, var(--acsis-brand, #334155));
   font-variant-numeric: tabular-nums;
 }
 
 .acsis-summary-stat--success .acsis-summary-stat__value {
-  color: #16a34a;
+  color: var(--acsis-brand-600, var(--acsis-brand, #334155));
 }
 
 .acsis-summary-stat--danger .acsis-summary-stat__value {
-  color: #dc2626;
+  color: var(--acsis-danger, #dc2626);
+}
+
+.acsis-summary-stat--danger .acsis-summary-stat__label {
+  color: var(--fg-muted, #6b7280);
 }
 
 .acsis-summary-stat__hint {
@@ -118,7 +130,7 @@
 .acsis-summary-stat__icon {
   flex-shrink: 0;
   margin-top: 2px;
-  color: #bbf7d0;
+  color: var(--acsis-brand-100, color-mix(in srgb, var(--acsis-brand) 35%, #fff));
 }
 
 .acsis-summary-stat__icon svg,
@@ -136,7 +148,6 @@
   color: #fecaca;
 }
 
-/* Link-wrapped stat (e.g. dev portals) */
 a.acsis-summary-stat {
   text-decoration: none;
   color: inherit;

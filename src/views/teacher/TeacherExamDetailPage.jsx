@@ -246,8 +246,11 @@ export default function TeacherExamDetailPage() {
           When this exam is on-going, students join with the code above. Submissions below update automatically.
         </p>
 
-        <section style={{ marginTop: 28, borderTop: '1px solid #e5e7eb', paddingTop: 20 }}>
-          <h2 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: 8 }}>Student submissions</h2>
+        <section
+          className="acsis-exam-detail__submissions"
+          style={{ marginTop: 28, borderTop: '1px solid var(--border-default, #e5e7eb)', paddingTop: 20 }}
+        >
+          <h2 className="acsis-exam-detail__section-title">Student submissions</h2>
           {results?.stats ? (
             <p className="acsis-mc-sub" style={{ marginBottom: 12 }}>
               {results.stats.submitted} submitted · {results.stats.joined} joined · {results.stats.enrolled} enrolled

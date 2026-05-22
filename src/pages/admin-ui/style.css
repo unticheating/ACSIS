@@ -72,7 +72,7 @@ body {
     width: 38px;
     height: 38px;
     border-radius: 50%;
-    background: #16a34a;
+    background: var(--acsis-brand, #16a34a);
     color: #fff;
     font-size: 15px;
     font-weight: 700;
@@ -313,17 +313,17 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
     width: 2.25rem;
     height: 2.25rem;
     border-radius: 0.5rem;
-    border: 1px solid #e5e7eb;
-    background: #fff;
-    color: #4b5563;
+    border: 1px solid var(--border-default, #e5e7eb);
+    background: var(--bg-surface, #fff);
+    color: var(--fg-muted, #4b5563);
     cursor: pointer;
     transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
 .acsis-detections-settings-btn:hover {
-    background: #f9fafb;
-    color: #111827;
-    border-color: #d1d5db;
+    background: var(--acsis-brand-muted-bg, #f9fafb);
+    color: var(--fg-default, #111827);
+    border-color: var(--acsis-brand-ring, #d1d5db);
 }
 
 .acsis-detections-settings-btn:focus-visible {
@@ -377,7 +377,7 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
 .content-header-block h1 {
     font-size: 19px;
     font-weight: 700;
-    color: #166534;
+    color: var(--acsis-brand-muted-text, var(--acsis-brand, #334155));
     margin-bottom: 2px;
     letter-spacing: -0.03em;
 }
@@ -489,7 +489,7 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
 .card-value {
     font-size: 36px;
     font-weight: 700;
-    color: #16a34a;
+    color: var(--acsis-brand, #16a34a);
     line-height: 1;
 }
 
@@ -548,7 +548,7 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
 }
 
 .panel-view-all:hover {
-    color: #16a34a;
+    color: var(--acsis-brand, #16a34a);
 }
 
 .admin-dash-preview-more {
@@ -560,7 +560,7 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
 }
 
 .admin-dash-preview-more a {
-    color: #16a34a;
+    color: var(--acsis-brand, #16a34a);
     font-weight: 600;
     text-decoration: none;
 }
@@ -641,7 +641,7 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
 .panel .exam-list .exam-timer {
     font-size: 14px;
     font-weight: 600;
-    color: #16a34a;
+    color: var(--acsis-brand, #16a34a);
     margin-bottom: 4px;
     letter-spacing: -0.01em;
     text-transform: capitalize;
@@ -687,7 +687,7 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
 .exam-timer {
     font-size: 14px;
     font-weight: 600;
-    color: #16a34a;
+    color: var(--acsis-brand, #16a34a);
     margin-bottom: 4px;
     letter-spacing: -0.01em;
 }
@@ -837,7 +837,7 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
 }
 
 .view-info-link:hover {
-    color: #16a34a;
+    color: var(--acsis-brand, #16a34a);
 }
 
 .ticket-btn {
@@ -863,26 +863,29 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
    BUTTON
 ======================== */
 .btn {
-    background: #16a34a;
-    color: white;
+    background: var(--acsis-brand-600, var(--acsis-brand, #16a34a));
+    color: #fff;
     padding: 10px 18px;
     border: none;
-    border-radius: 8px;
+    border-radius: 10px;
     cursor: pointer;
-    font-weight: 500;
+    font-weight: 600;
     font-size: 13px;
     display: flex;
     align-items: center;
     gap: 6px;
-    transition: background 0.15s;
+    transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
     white-space: nowrap;
     flex-shrink: 0;
     font-family: inherit;
     letter-spacing: -0.01em;
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--acsis-brand, #16a34a) 30%, transparent);
 }
 
 .btn:hover {
-    background: #15803d;
+    background: var(--acsis-brand-500, var(--acsis-brand, #16a34a));
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px color-mix(in srgb, var(--acsis-brand, #16a34a) 40%, transparent);
 }
 
 /* ========================
@@ -909,7 +912,7 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
 .table th {
     text-align: left;
     padding: 12px 18px;
-    color: #166534;
+    color: var(--acsis-brand-muted-text, var(--acsis-brand, #334155));
     font-size: 10.5px;
     font-weight: 600;
     letter-spacing: 0.07em;
@@ -989,7 +992,7 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
 .subject-title {
     font-size: 15px;
     font-weight: 600;
-    color: #166534;
+    color: var(--acsis-brand-muted-text, var(--acsis-brand, #334155));
     margin-bottom: 3px;
     letter-spacing: -0.02em;
 }
@@ -1023,7 +1026,7 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
 
 .tag.green {
     background: #dcfce7;
-    color: #166534;
+    color: var(--acsis-brand-muted-text, var(--acsis-brand, #334155));
 }
 
 .tag.blue {
@@ -1044,7 +1047,7 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
 .section-header h2 {
     font-size: 19px;
     font-weight: 700;
-    color: #166534;
+    color: var(--acsis-brand-muted-text, var(--acsis-brand, #334155));
     letter-spacing: -0.03em;
 }
 /* ========================
@@ -1109,7 +1112,7 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
 }
 
 .status-ongoing {
-    background: #16a34a;
+    background: var(--acsis-brand, #16a34a);
     color: #fff;
 }
 
@@ -1153,8 +1156,8 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
 
 .exam-manage-btn:hover {
     background: #f0faf4;
-    border-color: #16a34a;
-    color: #16a34a;
+    border-color: var(--acsis-brand, #16a34a);
+    color: var(--acsis-brand, #16a34a);
 }
 
 .exam-progress-bar {
@@ -1171,11 +1174,11 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
 }
 
 .exam-progress-fill.status-ongoing {
-    background: #16a34a;
+    background: var(--acsis-brand, #16a34a);
 }
 
 .exam-progress-fill.status-completed {
-    background: #16a34a;
+    background: var(--acsis-brand, #16a34a);
 }
 
 .exam-progress-fill.status-scheduled {
@@ -1225,7 +1228,7 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
 
 .monitor-stat-icon.green {
     background: #dcfce7;
-    color: #16a34a;
+    color: var(--acsis-brand, #16a34a);
 }
 
 .monitor-stat-icon.red {
@@ -1287,7 +1290,7 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
 
 .dot-alert   { background: #ef4444; box-shadow: 0 0 0 3px rgba(239,68,68,0.15); }
 .dot-warning { background: #f59e0b; box-shadow: 0 0 0 3px rgba(245,158,11,0.15); }
-.dot-active  { background: #16a34a; box-shadow: 0 0 0 3px rgba(22,163,74,0.15); }
+.dot-active  { background: var(--acsis-brand, #16a34a); box-shadow: 0 0 0 3px rgba(22,163,74,0.15); }
 
 .activity-name {
     font-size: 13.5px;
@@ -1349,8 +1352,8 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
 
 .view-btn:hover {
     background: #f0faf4;
-    border-color: #16a34a;
-    color: #16a34a;
+    border-color: var(--acsis-brand, #16a34a);
+    color: var(--acsis-brand, #16a34a);
 }
 
 /* ========================
@@ -1548,8 +1551,8 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
 }
 
 .admin-class-row--open {
-    border-color: #86efac;
-    box-shadow: 0 2px 12px rgba(22, 163, 74, 0.08);
+    border-color: var(--acsis-brand, #334155);
+    box-shadow: 0 2px 12px color-mix(in srgb, var(--acsis-brand, #334155) 12%, transparent);
 }
 
 .admin-class-row__trigger {
@@ -1567,7 +1570,7 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
 }
 
 .admin-class-row__trigger:hover {
-    background: #f8fafc;
+    background: var(--acsis-brand-subtle, color-mix(in srgb, var(--acsis-brand, #334155) 10%, #f1f5f9));
 }
 
 .admin-class-row__title {
@@ -1602,7 +1605,7 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
 
 .admin-class-row--open .admin-class-row__chevron {
     transform: rotate(180deg);
-    color: #16a34a;
+    color: var(--acsis-brand, #334155);
 }
 
 .admin-class-row__body {
@@ -1742,13 +1745,14 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
 }
 
 .um-tab.active {
-    background: #16a34a;
+    background: var(--acsis-brand-600, var(--acsis-brand, #16a34a));
     color: #fff;
-    box-shadow: 0 2px 6px rgba(22, 163, 74, 0.28);
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--acsis-brand, #16a34a) 35%, transparent);
 }
 
 .um-tab:not(.active):hover {
-    background: #dcfce7;
+    background: var(--acsis-brand-muted-bg, #dcfce7);
+    color: var(--acsis-brand, #16a34a);
 }
 
 .um-topbar-right {
@@ -1811,7 +1815,7 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
     display: inline-block;
     padding: 3px 12px;
     background: #dcfce7;
-    color: #166534;
+    color: var(--acsis-brand-muted-text, var(--acsis-brand, #334155));
     border-radius: 99px;
     font-size: 11.5px;
     font-weight: 500;
@@ -1914,7 +1918,7 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
     font: inherit;
     font-size: 12.5px;
     font-weight: 600;
-    color: #16a34a;
+    color: var(--acsis-brand-muted-text, var(--acsis-brand, #16a34a));
     cursor: pointer;
     text-decoration: underline;
     text-underline-offset: 2px;
@@ -2028,7 +2032,7 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
 }
 
 .super-admin-link__icon {
-    color: #16a34a;
+    color: var(--acsis-brand, #16a34a);
     flex-shrink: 0;
 }
 

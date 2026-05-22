@@ -184,9 +184,9 @@ html.dark .acsis-profile-role {
 
 /* Student enrolled / stream (enrolled_classes.css) */
 html.dark .stu-stream-item {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: var(--acsis-shell-border-subtle, rgba(74, 222, 128, 0.12));
-  box-shadow: none;
+  background: var(--bg-surface, #1a1a1a);
+  border-color: var(--border-default, #2a2a2a);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
 }
 
 html.dark .stu-stream-item__title {
@@ -198,8 +198,8 @@ html.dark .stu-stream-item__meta {
 }
 
 html.dark .stu-gmail-banner {
-  background: rgba(22, 101, 52, 0.2);
-  border-color: rgba(74, 222, 128, 0.2);
+  background: color-mix(in srgb, var(--acsis-brand, #1d4ed8) 12%, var(--bg-surface, #1a1a1a));
+  border-color: color-mix(in srgb, var(--acsis-brand) 25%, var(--border-default, #2a2a2a));
 }
 
 html.dark .stu-gmail-banner__body strong {
@@ -460,7 +460,7 @@ html.dark .acsis-mc-tab {
 }
 
 html.dark .acsis-mc-tab--active {
-  background: #15803d;
+  background: var(--acsis-brand-600, var(--acsis-brand, #16a34a));
   color: #fff;
 }
 
@@ -562,9 +562,14 @@ html.dark .acsis-summary-stat {
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
 }
 
-html.dark .acsis-summary-stat:hover {
-  border-color: rgba(74, 222, 128, 0.28);
+html.dark .acsis-summary-stat:hover:not(.acsis-summary-stat--danger) {
+  border-color: color-mix(in srgb, var(--acsis-brand, #16a34a) 28%, transparent);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+
+html.dark .acsis-summary-stat--danger:hover {
+  border-color: rgba(248, 113, 113, 0.4);
+  box-shadow: 0 6px 20px rgba(220, 38, 38, 0.2);
 }
 
 html.dark .acsis-summary-stat__label {

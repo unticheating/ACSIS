@@ -24,8 +24,8 @@
 
 /* ── Header ── */
 .acsis-detections-header {
-  background: #fff;
-  border-bottom: 1px solid var(--acsis-sidebar-border, #b8d4c4);
+  background: var(--bg-surface, #fff);
+  border-bottom: 1px solid var(--border-default, var(--acsis-sidebar-border, #b8d4c4));
   padding: 1rem var(--acsis-main-pad-x, 14px);
   margin-bottom: 1rem;
   box-sizing: border-box;
@@ -67,7 +67,7 @@
 .acsis-detections-header__title {
   font-size: 1.25rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--fg-default, #111827);
   line-height: 1.2;
 }
 
@@ -80,7 +80,7 @@
 .acsis-detections-header__exam {
   font-size: 0.875rem;
   font-weight: 500;
-  color: #6b7280;
+  color: var(--fg-muted, #6b7280);
   margin: 0;
 }
 
@@ -755,8 +755,10 @@
   max-height: min(90vh, 100dvh);
   overflow: auto;
   border-radius: 1rem 1rem 0 0;
-  background: #fff;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  background: var(--bg-surface, #fff);
+  border: 1px solid var(--border-default, #e5e7eb);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
+  color: var(--fg-default, #111827);
 }
 
 @media (min-width: 640px) {

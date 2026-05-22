@@ -146,12 +146,12 @@ export default function StudentClassStreamPage() {
                   </div>
                   <div className="flex flex-wrap items-center justify-end gap-2">
                     <span
-                      className={`rounded-full px-2.5 py-1 text-xs font-bold uppercase tracking-wide ${
+                      className={`stu-pill ${
                         exam.sessionStatus === 'submitted'
-                          ? 'bg-blue-100 text-blue-800'
+                          ? 'stu-pill--done'
                           : isExamEnterableByStudent(exam.status, exam.sessionStatus)
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-gray-100 text-gray-600'
+                            ? 'stu-pill--live'
+                            : 'stu-pill--muted'
                       }`}
                     >
                       {labelForStudentExam(exam)}
@@ -159,7 +159,7 @@ export default function StudentClassStreamPage() {
                     {isExamEnterableByStudent(exam.status, exam.sessionStatus) ? (
                       <button
                         type="button"
-                        className="stu-stream-enter shrink-0 rounded-full bg-green-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition hover:bg-green-700"
+                        className="stu-stream-enter"
                         onClick={() => {
                           setJoinExamId(exam.id)
                           setJoinCode('')
@@ -186,17 +186,17 @@ export default function StudentClassStreamPage() {
         >
           <form
             onSubmit={submitExamCode}
-            className="w-full max-w-sm rounded-xl bg-white p-6 shadow-lg border border-gray-200"
+            className="w-full max-w-sm rounded-xl bg-card p-6 shadow-lg border border-border"
           >
-            <h2 id="join-exam-title" className="text-lg font-semibold text-gray-900">
+            <h2 id="join-exam-title" className="text-lg font-semibold text-foreground">
               Enter exam code
             </h2>
-            <p className="mt-1 text-sm text-gray-600">
+            <p className="mt-1 text-sm text-muted-foreground">
               Your instructor will give you a short code after publishing the exam.
             </p>
             <input
               type="text"
-              className="mt-4 w-full rounded-lg border border-gray-300 px-3 py-2 text-center font-mono text-lg tracking-widest uppercase"
+              className="mt-4 w-full rounded-lg border border-input bg-background px-3 py-2 text-center font-mono text-lg tracking-widest uppercase text-foreground"
               placeholder="e.g. ABC123"
               value={joinCode}
               onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
@@ -212,7 +212,7 @@ export default function StudentClassStreamPage() {
             <div className="mt-5 flex gap-2 justify-end">
               <button
                 type="button"
-                className="rounded-lg px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
+                className="rounded-lg px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-accent"
                 onClick={() => setJoinExamId(null)}
               >
                 Cancel
@@ -220,7 +220,7 @@ export default function StudentClassStreamPage() {
               <button
                 type="submit"
                 disabled={joining || !joinCode.trim()}
-                className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
               >
                 {joining ? 'Checking…' : 'Join lobby'}
               </button>

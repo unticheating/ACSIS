@@ -4,14 +4,14 @@ const STORAGE_KEY = 'acsis-theme'
 
 /** @returns {'light' | 'dark'} */
 function readStoredTheme() {
-  if (typeof window === 'undefined') return 'light'
+  if (typeof window === 'undefined') return 'dark'
   try {
     const v = window.localStorage.getItem(STORAGE_KEY)
     if (v === 'dark' || v === 'light') return v
   } catch {
     /* ignore */
   }
-  return 'light'
+  return 'dark'
 }
 
 function applyDocumentClass(theme) {

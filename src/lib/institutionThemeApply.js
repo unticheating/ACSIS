@@ -1,7 +1,16 @@
 /**
- * Apply institution palette to document CSS variables (shell + tokens).
+ * Apply institution palette to document CSS variables (shell + tokens + shadcn).
  * @typedef {{ primaryColor: string, secondaryColor: string, baseColor?: string, themeName?: string }} ThemeColors
  */
+
+import {
+  buildBrandScale,
+  hexToHslComponents,
+  hexToRgba,
+  normalizeHex,
+  shade,
+  tint,
+} from './institutionColorScale.js'
 
 const STORAGE_DEMO_THEME = 'acsis.demoThemeId'
 const STORAGE_DEMO_INSTITUTION = 'acsis.demoInstitution'
@@ -13,59 +22,53 @@ const DEFAULT_DEMO_INSTITUTION = {
   maxWarnings: 3,
 }
 
-/** @param {string} hex */
-function normalizeHex(hex) {
-  const h = hex.trim().replace(/^#/, '')
-  if (h.length === 3) {
-    return `#${h[0]}${h[0]}${h[1]}${h[1]}${h[2]}${h[2]}`.toUpperCase()
-  }
-  if (h.length === 6) return `#${h}`.toUpperCase()
-  return '#16A34A'
+/** Neutral dark palette — institution color is accent-only */
+export const DARK_NEUTRALS = {
+  canvas: '#0A0A0A',
+  sidebar: '#111111',
+  surface: '#1A1A1A',
+  surfaceMuted: '#171717',
+  elevated: '#212121',
+  rowAlt: '#1F1F1F',
+  border: '#2A2A2A',
+  borderSubtle: '#252525',
+  fgPrimary: '#F5F5F5',
+  fgSecondary: '#A3A3A3',
+  fgMuted: '#6B7280',
 }
 
-/** @param {string} hex @param {number} amount 0–1 mix toward white */
-function tint(hex, amount) {
-  const n = normalizeHex(hex).slice(1)
-  const r = parseInt(n.slice(0, 2), 16)
-  const g = parseInt(n.slice(2, 4), 16)
-  const b = parseInt(n.slice(4, 6), 16)
-  const mix = (c) => Math.round(c + (255 - c) * amount)
-  return `#${[mix(r), mix(g), mix(b)].map((x) => x.toString(16).padStart(2, '0')).join('')}`
-}
-
-/** @param {string} hex @param {number} amount 0–1 mix toward black */
-function shade(hex, amount) {
-  const n = normalizeHex(hex).slice(1)
-  const r = parseInt(n.slice(0, 2), 16)
-  const g = parseInt(n.slice(2, 4), 16)
-  const b = parseInt(n.slice(4, 6), 16)
-  const mix = (c) => Math.round(c * (1 - amount))
-  return `#${[mix(r), mix(g), mix(b)].map((x) => x.toString(16).padStart(2, '0')).join('')}`
-}
-
-/** @param {string} hex @param {number} alpha 0–1 */
-function hexToRgba(hex, alpha) {
-  const n = normalizeHex(hex).slice(1)
-  const r = parseInt(n.slice(0, 2), 16)
-  const g = parseInt(n.slice(2, 4), 16)
-  const b = parseInt(n.slice(4, 6), 16)
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`
-}
-
-/** @returns {boolean} */
-export function isDocumentDark() {
-  if (typeof document === 'undefined') return false
-  return document.documentElement.classList.contains('dark')
-}
-
-const DARK_SHELL_VARS = [
+const THEME_CSS_KEYS = [
+  '--acsis-brand',
+  '--acsis-brand-50',
+  '--acsis-brand-100',
+  '--acsis-brand-500',
+  '--acsis-brand-600',
+  '--acsis-brand-700',
+  '--acsis-brand-hover',
+  '--acsis-brand-muted-bg',
+  '--acsis-brand-muted-text',
+  '--acsis-brand-subtle',
+  '--acsis-brand-ring',
+  '--acsis-nav-active-fill',
+  '--acsis-nav-active-fg',
+  '--acsis-nav-active-icon',
+  '--acsis-nav-hover-fg',
+  '--acsis-nav-hover-bg',
+  '--acsis-nav-active-shadow',
   '--acsis-canvas',
+  '--acsis-canvas-light',
   '--acsis-sidebar-bg',
   '--acsis-dark-surface',
   '--acsis-dark-surface-muted',
+  '--acsis-dark-elevated',
+  '--acsis-dark-row-alt',
   '--bg-canvas',
   '--bg-surface',
   '--bg-surface-muted',
+  '--bg-elevated',
+  '--fg-default',
+  '--fg-muted',
+  '--fg-subtle',
   '--border-default',
   '--border-muted',
   '--acsis-shell-border',
@@ -73,83 +76,195 @@ const DARK_SHELL_VARS = [
   '--acsis-nav-fg',
   '--acsis-nav-icon',
   '--acsis-content-header-bg',
+  '--accent-primary',
+  '--accent-primary-hover',
+  '--focus-ring',
+  '--brand-mark',
+  '--background',
+  '--foreground',
+  '--card',
+  '--card-foreground',
+  '--primary',
+  '--primary-foreground',
+  '--secondary',
+  '--secondary-foreground',
+  '--muted',
+  '--muted-foreground',
+  '--accent',
+  '--accent-foreground',
+  '--border',
+  '--input',
+  '--ring',
 ]
 
-/** @param {ThemeColors} theme */
-function isEmeraldTheme(theme) {
-  const name = theme.themeName?.toLowerCase?.() || ''
-  if (name === 'emerald') return true
-  return normalizeHex(theme.primaryColor) === '#16A34A'
-}
-
-/**
- * Dark backgrounds tinted from institution secondary/primary (not for Emerald).
- * @param {string} primary
- * @param {string} secondary
- */
-function computeDarkShellSurfaces(primary, secondary) {
-  const canvas = shade(secondary, 0.92)
-  const sidebar = shade(secondary, 0.89)
-  const surface = shade(secondary, 0.86)
-  const surfaceMuted = shade(secondary, 0.82)
-  const { r, g, b } = hexToRgb(surface)
-  return {
-    canvas,
-    sidebar,
-    surface,
-    surfaceMuted,
-    shellBorder: hexToRgba(primary, 0.2),
-    shellBorderSubtle: hexToRgba(primary, 0.12),
-    borderDefault: shade(secondary, 0.72),
-    navFg: tint(secondary, 0.4),
-    navIcon: tint(secondary, 0.28),
-    headerBg: `rgba(${r}, ${g}, ${b}, 0.92)`,
-  }
-}
-
-/** @param {string} hex */
-function hexToRgb(hex) {
-  const n = normalizeHex(hex).slice(1)
-  return {
-    r: parseInt(n.slice(0, 2), 16),
-    g: parseInt(n.slice(2, 4), 16),
-    b: parseInt(n.slice(4, 6), 16),
-  }
+/** @returns {boolean} */
+export function isDocumentDark() {
+  if (typeof document === 'undefined') return false
+  return document.documentElement.classList.contains('dark')
 }
 
 /**
  * @param {HTMLElement} root
- * @param {ThemeColors} theme
  * @param {string} primary
- * @param {string} secondary
+ */
+function applyBrandScale(root, primary) {
+  const scale = buildBrandScale(primary)
+  root.style.setProperty('--acsis-brand', scale[500])
+  root.style.setProperty('--acsis-brand-50', scale[50])
+  root.style.setProperty('--acsis-brand-100', scale[100])
+  root.style.setProperty('--acsis-brand-500', scale[500])
+  root.style.setProperty('--acsis-brand-600', scale[600])
+  root.style.setProperty('--acsis-brand-700', scale[700])
+  root.style.setProperty('--acsis-brand-hover', scale[600])
+  root.style.setProperty('--accent-primary', scale[500])
+  root.style.setProperty('--accent-primary-hover', scale[600])
+  root.style.setProperty('--focus-ring', scale[500])
+}
+
+/**
+ * @param {HTMLElement} root
+ * @param {string} primary
  * @param {boolean} isDark
  */
-function applyDarkShellSurfaces(root, theme, primary, secondary, isDark) {
-  if (!isDark) {
-    DARK_SHELL_VARS.forEach((key) => root.style.removeProperty(key))
+function applyNavTokens(root, primary, isDark) {
+  if (isDark) {
+    root.style.setProperty('--acsis-brand-muted-bg', hexToRgba(primary, 0.14))
+    root.style.setProperty('--acsis-brand-muted-text', tint(primary, 0.5))
+    root.style.setProperty('--acsis-brand-subtle', hexToRgba(primary, 0.08))
+    root.style.setProperty('--acsis-brand-ring', hexToRgba(primary, 0.38))
+    root.style.setProperty('--acsis-nav-active-fill', hexToRgba(primary, 0.22))
+    root.style.setProperty('--acsis-nav-active-fg', DARK_NEUTRALS.fgPrimary)
+    root.style.setProperty('--acsis-nav-active-icon', tint(primary, 0.55))
+    root.style.setProperty('--acsis-nav-hover-fg', DARK_NEUTRALS.fgPrimary)
+    root.style.setProperty('--acsis-nav-hover-bg', hexToRgba(primary, 0.1))
+    root.style.setProperty(
+      '--acsis-nav-active-shadow',
+      `0 0 0 1px ${hexToRgba(primary, 0.45)}, 0 4px 16px ${hexToRgba(primary, 0.12)}`,
+    )
+    root.style.setProperty('--brand-mark', tint(primary, 0.48))
     return
   }
 
-  if (isEmeraldTheme(theme)) {
-    DARK_SHELL_VARS.forEach((key) => root.style.removeProperty(key))
+  root.style.setProperty('--acsis-brand-muted-bg', tint(primary, 0.92))
+  root.style.setProperty('--acsis-brand-muted-text', shade(primary, 0.35))
+  root.style.setProperty('--acsis-brand-subtle', tint(primary, 0.96))
+  root.style.setProperty('--acsis-brand-ring', hexToRgba(primary, 0.35))
+  root.style.setProperty('--acsis-nav-active-fill', primary)
+  root.style.setProperty('--acsis-nav-active-fg', '#ffffff')
+  root.style.setProperty('--acsis-nav-active-icon', '#ffffff')
+  root.style.setProperty('--acsis-nav-hover-fg', shade(primary, 0.15))
+  root.style.setProperty('--acsis-nav-hover-bg', hexToRgba(primary, 0.12))
+  root.style.setProperty(
+    '--acsis-nav-active-shadow',
+    `0 4px 14px ${hexToRgba(primary, 0.35)}`,
+  )
+  root.style.setProperty('--brand-mark', shade(primary, 0.55))
+}
+
+/**
+ * @param {HTMLElement} root
+ * @param {string} primary
+ */
+function applyDarkNeutralSurfaces(root, primary) {
+  const n = DARK_NEUTRALS
+  root.style.setProperty('--acsis-canvas', n.canvas)
+  root.style.setProperty('--acsis-sidebar-bg', n.sidebar)
+  root.style.setProperty('--acsis-dark-surface', n.surface)
+  root.style.setProperty('--acsis-dark-surface-muted', n.surfaceMuted)
+  root.style.setProperty('--acsis-dark-elevated', n.elevated)
+  root.style.setProperty('--acsis-dark-row-alt', n.rowAlt)
+  root.style.setProperty('--bg-canvas', n.canvas)
+  root.style.setProperty('--bg-surface', n.surface)
+  root.style.setProperty('--bg-surface-muted', n.surfaceMuted)
+  root.style.setProperty('--bg-elevated', n.elevated)
+  root.style.setProperty('--fg-default', n.fgPrimary)
+  root.style.setProperty('--fg-muted', n.fgSecondary)
+  root.style.setProperty('--fg-subtle', n.fgMuted)
+  root.style.setProperty('--border-default', n.border)
+  root.style.setProperty('--border-muted', n.borderSubtle)
+  root.style.setProperty('--acsis-shell-border', hexToRgba(primary, 0.22))
+  root.style.setProperty('--acsis-shell-border-subtle', hexToRgba(primary, 0.12))
+  root.style.setProperty('--acsis-nav-fg', n.fgSecondary)
+  root.style.setProperty('--acsis-nav-icon', n.fgMuted)
+  root.style.setProperty('--acsis-content-header-bg', `color-mix(in srgb, ${n.sidebar} 92%, transparent)`)
+  root.style.setProperty('--brand-page', n.fgPrimary)
+}
+
+/**
+ * @param {HTMLElement} root
+ * @param {string} primary
+ * @param {string} secondary
+ * @param {string} [baseColor]
+ */
+function applyLightSurfaces(root, primary, secondary, baseColor) {
+  const surface = baseColor ? normalizeHex(baseColor) : '#FFFFFF'
+  root.style.setProperty('--acsis-canvas', secondary)
+  root.style.setProperty('--acsis-canvas-light', secondary)
+  root.style.setProperty('--acsis-sidebar-bg', tint(secondary, 0.35))
+  root.style.setProperty('--bg-canvas', secondary)
+  root.style.setProperty('--bg-surface', surface)
+  root.style.setProperty('--bg-surface-muted', tint(secondary, 0.5))
+  root.style.setProperty('--bg-elevated', surface)
+  root.style.setProperty('--fg-default', '#111827')
+  root.style.setProperty('--fg-muted', '#6b7280')
+  root.style.setProperty('--fg-subtle', '#9ca3af')
+  root.style.setProperty('--border-default', '#e5e7eb')
+  root.style.setProperty('--border-muted', hexToRgba(primary, 0.14))
+  root.style.setProperty('--acsis-shell-border', hexToRgba(primary, 0.2))
+  root.style.setProperty('--acsis-shell-border-subtle', hexToRgba(primary, 0.1))
+  root.style.setProperty('--acsis-nav-fg', '#4b5563')
+  root.style.setProperty('--acsis-nav-icon', '#6b7280')
+  root.style.setProperty('--acsis-content-header-bg', 'transparent')
+  root.style.setProperty('--brand-page', '#111827')
+}
+
+/**
+ * Sync shadcn/Tailwind HSL tokens with institution primary.
+ * @param {HTMLElement} root
+ * @param {string} primary
+ * @param {boolean} isDark
+ */
+function applyShadcnTokens(root, primary, isDark) {
+  const { h, s } = hexToHslComponents(primary)
+  const sat = Math.min(s, 78)
+
+  const primaryL = Math.min(Math.max(38, Math.min(sat, 50) > 15 ? 40 : 32), 46)
+  const ringL = Math.min(primaryL + 4, 50)
+
+  if (isDark) {
+    root.style.setProperty('--background', '0 0% 4%')
+    root.style.setProperty('--foreground', '0 0% 96%')
+    root.style.setProperty('--card', '0 0% 10%')
+    root.style.setProperty('--card-foreground', '0 0% 96%')
+    root.style.setProperty('--primary', `${h} ${sat}% ${primaryL}%`)
+    root.style.setProperty('--primary-foreground', '0 0% 100%')
+    root.style.setProperty('--secondary', '0 0% 13%')
+    root.style.setProperty('--secondary-foreground', '0 0% 90%')
+    root.style.setProperty('--muted', '0 0% 11%')
+    root.style.setProperty('--muted-foreground', '0 0% 64%')
+    root.style.setProperty('--accent', `${h} ${Math.max(sat - 10, 20)}% 16%`)
+    root.style.setProperty('--accent-foreground', '0 0% 96%')
+    root.style.setProperty('--border', '0 0% 16%')
+    root.style.setProperty('--input', '0 0% 16%')
+    root.style.setProperty('--ring', `${h} ${sat}% ${ringL}%`)
     return
   }
 
-  const s = computeDarkShellSurfaces(primary, secondary)
-  root.style.setProperty('--acsis-canvas', s.canvas)
-  root.style.setProperty('--acsis-sidebar-bg', s.sidebar)
-  root.style.setProperty('--acsis-dark-surface', s.surface)
-  root.style.setProperty('--acsis-dark-surface-muted', s.surfaceMuted)
-  root.style.setProperty('--bg-canvas', s.canvas)
-  root.style.setProperty('--bg-surface', s.surface)
-  root.style.setProperty('--bg-surface-muted', s.surfaceMuted)
-  root.style.setProperty('--border-default', s.borderDefault)
-  root.style.setProperty('--border-muted', s.shellBorder)
-  root.style.setProperty('--acsis-shell-border', s.shellBorder)
-  root.style.setProperty('--acsis-shell-border-subtle', s.shellBorderSubtle)
-  root.style.setProperty('--acsis-nav-fg', s.navFg)
-  root.style.setProperty('--acsis-nav-icon', s.navIcon)
-  root.style.setProperty('--acsis-content-header-bg', s.headerBg)
+  root.style.setProperty('--background', '0 0% 100%')
+  root.style.setProperty('--foreground', '222 47% 11%')
+  root.style.setProperty('--card', '0 0% 100%')
+  root.style.setProperty('--card-foreground', '222 47% 11%')
+  root.style.setProperty('--primary', `${h} ${sat}% ${primaryL}%`)
+  root.style.setProperty('--primary-foreground', '0 0% 100%')
+  root.style.setProperty('--secondary', '210 20% 96%')
+  root.style.setProperty('--secondary-foreground', '222 47% 11%')
+  root.style.setProperty('--muted', '210 20% 96%')
+  root.style.setProperty('--muted-foreground', '215 16% 47%')
+  root.style.setProperty('--accent', `${h} ${Math.max(sat - 15, 12)}% 94%`)
+  root.style.setProperty('--accent-foreground', `${h} ${sat}% ${Math.max(primaryL - 12, 22)}%`)
+  root.style.setProperty('--border', '214 32% 91%')
+  root.style.setProperty('--input', '214 32% 91%')
+  root.style.setProperty('--ring', `${h} ${sat}% ${ringL}%`)
 }
 
 /**
@@ -161,75 +276,26 @@ export function applyInstitutionTheme(theme, isDark = isDocumentDark()) {
 
   const primary = normalizeHex(theme.primaryColor)
   const secondary = normalizeHex(theme.secondaryColor)
-  const hover = shade(primary, 0.12)
-  const brandMark = isDark ? tint(primary, 0.5) : primary
-  const mutedBg = isDark ? hexToRgba(primary, 0.16) : tint(primary, 0.92)
-  const mutedText = isDark ? tint(primary, 0.55) : shade(primary, 0.35)
-  const navActiveBg = isDark ? hexToRgba(primary, 0.28) : primary
-  const navActiveBorder = isDark
-    ? `color-mix(in srgb, ${primary} 38%, transparent)`
-    : `color-mix(in srgb, ${primary} 35%, transparent)`
-  const navActiveFg = isDark ? tint(primary, 0.75) : '#ffffff'
-  const navActiveIcon = isDark ? tint(primary, 0.82) : '#ffffff'
-  const navHoverFg = isDark ? tint(primary, 0.58) : primary
-
+  const baseColor = theme.baseColor ? normalizeHex(theme.baseColor) : undefined
   const root = document.documentElement
-  root.style.setProperty('--acsis-brand', primary)
-  root.style.setProperty('--acsis-brand-hover', hover)
-  root.style.setProperty('--acsis-brand-muted-bg', mutedBg)
-  root.style.setProperty('--acsis-brand-muted-text', mutedText)
-  root.style.setProperty('--acsis-nav-active-fill', navActiveBg)
-  root.style.setProperty('--acsis-nav-active-fg', navActiveFg)
-  root.style.setProperty('--acsis-nav-active-icon', navActiveIcon)
-  root.style.setProperty('--acsis-nav-hover-fg', navHoverFg)
-  root.style.setProperty('--acsis-nav-active-shadow', isDark ? `0 0 0 1px ${navActiveBorder}` : `0 4px 14px ${navActiveBorder}`)
-  root.style.setProperty('--acsis-canvas-light', secondary)
-  root.style.setProperty('--accent-primary', primary)
-  root.style.setProperty('--accent-primary-hover', hover)
-  root.style.setProperty('--focus-ring', primary)
-  root.style.setProperty('--brand-mark', brandMark)
-  root.dataset.institutionTheme = theme.themeName?.toLowerCase?.() || ''
 
-  applyDarkShellSurfaces(root, theme, primary, secondary, isDark)
+  applyBrandScale(root, primary)
+  applyNavTokens(root, primary, isDark)
+  applyShadcnTokens(root, primary, isDark)
 
-  if (!isDark) {
-    root.style.setProperty('--acsis-canvas', secondary)
+  if (isDark) {
+    applyDarkNeutralSurfaces(root, primary)
+  } else {
+    applyLightSurfaces(root, primary, secondary, baseColor)
   }
+
+  root.dataset.institutionTheme = theme.themeName?.toLowerCase?.() || ''
 }
 
 export function clearInstitutionTheme() {
   if (typeof document === 'undefined') return
   const root = document.documentElement
-  ;[
-    '--acsis-brand',
-    '--acsis-brand-hover',
-    '--acsis-brand-muted-bg',
-    '--acsis-brand-muted-text',
-    '--acsis-nav-active-fill',
-    '--acsis-nav-active-fg',
-    '--acsis-nav-active-icon',
-    '--acsis-nav-hover-fg',
-    '--acsis-nav-active-shadow',
-    '--acsis-canvas',
-    '--acsis-canvas-light',
-    '--acsis-sidebar-bg',
-    '--acsis-dark-surface',
-    '--acsis-dark-surface-muted',
-    '--bg-canvas',
-    '--bg-surface',
-    '--bg-surface-muted',
-    '--border-default',
-    '--border-muted',
-    '--acsis-shell-border',
-    '--acsis-shell-border-subtle',
-    '--acsis-nav-fg',
-    '--acsis-nav-icon',
-    '--acsis-content-header-bg',
-    '--accent-primary',
-    '--accent-primary-hover',
-    '--focus-ring',
-    '--brand-mark',
-  ].forEach((key) => root.style.removeProperty(key))
+  THEME_CSS_KEYS.forEach((key) => root.style.removeProperty(key))
   delete root.dataset.institutionTheme
 }
 

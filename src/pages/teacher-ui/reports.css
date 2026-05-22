@@ -10,7 +10,7 @@
 }
 
 /* Typography Utilities */
-.text-green { color: #16a34a; }
+.text-green { color: var(--acsis-brand-muted-text, var(--acsis-brand, #16a34a)); }
 .text-red { color: #dc2626; }
 .text-dark { color: #111827; }
 .text-gray { color: #6b7280; }
@@ -99,9 +99,9 @@
 }
 
 .tab-btn.active {
-  background: #16a34a;
+  background: var(--acsis-brand-600, var(--acsis-brand, #334155));
   color: white;
-  box-shadow: 0 2px 4px rgba(22, 163, 74, 0.2);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--acsis-brand, #334155) 28%, transparent);
 }
 
 .action-group {
@@ -136,7 +136,11 @@
 }
 
 .btn-green {
-  background: #16a34a;
+  background: var(--acsis-brand-600, var(--acsis-brand, #334155));
+}
+
+.btn-green:hover {
+  background: var(--acsis-brand-500, var(--acsis-brand, #334155));
 }
 
 /* Tab Content Areas */

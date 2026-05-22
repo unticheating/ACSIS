@@ -108,24 +108,21 @@ export default function TeacherReportsPage() {
         {!currentExam && (
           <div className="panel" style={{ maxWidth: '100%', marginBottom: '24px' }}>
             <div className="report-header" style={{ marginBottom: '20px' }}>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#111827', margin: '0 0 6px' }}>
-                Performance Report
-              </h3>
-              <p style={{ fontSize: '0.85rem', color: '#6b7280', margin: 0 }}>
+              <h3 className="text-xl font-bold text-foreground m-0 mb-1.5">Performance Report</h3>
+              <p className="text-sm text-muted-foreground m-0">
                 Select an exam to view scores and violations from the database.
               </p>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxWidth: '800px' }}>
-              <label htmlFor="exam-select" style={{ fontSize: '0.85rem', fontWeight: 700, color: '#374151' }}>
+            <div className="flex flex-col gap-2 max-w-[800px]">
+              <label htmlFor="exam-select" className="text-sm font-semibold text-foreground">
                 Select Exam
               </label>
               <select
                 id="exam-select"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="acsis-reports-exam-select flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 value={selectedExamId}
                 onChange={(e) => setSelectedExamId(e.target.value)}
-                style={{ borderColor: '#d1d5db' }}
                 disabled={loadingExams}
               >
                 <option value="">Choose an exam...</option>

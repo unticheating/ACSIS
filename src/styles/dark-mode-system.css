@@ -1,0 +1,779 @@
+/**
+ * ACSIS Dark Mode Design System
+ * Neutral charcoal surfaces + institution color (--acsis-brand) for accents only.
+ * Loaded after shell-dark.css and admin-ui/style.css.
+ */
+
+/* ── Global typography & surfaces ── */
+html.dark {
+  color-scheme: dark;
+}
+
+html.dark body,
+html.dark #root {
+  background-color: var(--acsis-canvas, #0a0a0a) !important;
+  color: var(--fg-default, #f5f5f5);
+}
+
+html.dark .acsis-app,
+html.dark .acsis-main,
+html.dark .acsis-page,
+html.dark .content-body {
+  background: var(--acsis-canvas, #0a0a0a);
+  color: var(--fg-default, #f5f5f5);
+}
+
+/* ── Cards & panels (all roles) ── */
+html.dark .panel,
+html.dark .card,
+html.dark .table-wrapper,
+html.dark .acsis-empty-panel,
+html.dark .acsis-view .panel,
+html.dark .student-detail-card,
+html.dark .tab-panel.panel,
+html.dark .monitor-stat-card,
+html.dark .acsis-summary-stat,
+html.dark .acsis-class-card,
+html.dark .stu-class-card,
+html.dark .stu-stream-item,
+html.dark .stu-enroll-join-box,
+html.dark .super-admin-link,
+html.dark .admin-settings-palette,
+html.dark .admin-settings-logo-preview,
+html.dark .admin-settings-logo-btn,
+html.dark .detected-item {
+  background: var(--bg-surface, #1a1a1a) !important;
+  border: 1px solid var(--border-default, #2a2a2a) !important;
+  border-radius: 14px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 2px 12px rgba(0, 0, 0, 0.35) !important;
+  color: var(--fg-default, #f5f5f5);
+}
+
+html.dark .panel:hover,
+html.dark .acsis-class-card:hover,
+html.dark .acsis-summary-stat:hover,
+html.dark .detected-item:hover,
+html.dark .super-admin-link:hover {
+  border-color: var(--acsis-brand-ring, color-mix(in srgb, var(--acsis-brand) 38%, #2a2a2a)) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 6px 20px rgba(0, 0, 0, 0.45) !important;
+}
+
+html.dark .panel-title,
+html.dark .exam-name,
+html.dark .detected-name,
+html.dark .card-value,
+html.dark .acsis-mc-title,
+html.dark .acsis-class-card__name,
+html.dark .stu-class-card h3,
+html.dark .stu-stream-item__title,
+html.dark .reports-page h1,
+html.dark .reports-page h2,
+html.dark .reports-page h3 {
+  color: var(--fg-default, #f5f5f5) !important;
+}
+
+html.dark .panel-view-all,
+html.dark .exam-by,
+html.dark .exam-timer-sub,
+html.dark .exam-progress,
+html.dark .card-label,
+html.dark .acsis-mc-sub,
+html.dark .acsis-class-card__meta,
+html.dark .um-email,
+html.dark .admin-placeholder-lead,
+html.dark .admin-settings-lead {
+  color: var(--fg-muted, #a3a3a3) !important;
+}
+
+/* ── Tables ── */
+html.dark .table-wrapper {
+  overflow: hidden;
+}
+
+html.dark .table thead tr {
+  background: var(--acsis-brand-muted-bg, color-mix(in srgb, var(--acsis-brand) 14%, #1a1a1a)) !important;
+  border-bottom: 1px solid var(--border-default, #2a2a2a) !important;
+}
+
+html.dark .table th {
+  color: var(--acsis-brand-muted-text, var(--fg-default)) !important;
+  font-weight: 600;
+}
+
+html.dark .table td {
+  color: var(--fg-default, #f5f5f5) !important;
+  border-color: var(--border-muted, #252525) !important;
+}
+
+html.dark .table tbody tr:nth-child(even) td {
+  background: var(--acsis-dark-row-alt, #1f1f1f);
+}
+
+html.dark .table tbody tr:hover td {
+  background: var(--acsis-brand-subtle, color-mix(in srgb, var(--acsis-brand) 8%, #1a1a1a)) !important;
+}
+
+/* ── Buttons (admin shell) ── */
+html.dark .btn-primary,
+html.dark .acsis-btn-primary,
+html.dark .activate-btn,
+html.dark button[type='submit'].btn-primary {
+  background: var(--acsis-brand-600, var(--acsis-brand)) !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--acsis-brand) 35%, transparent);
+  transition:
+    background var(--motion-fast, 160ms) var(--ease-out),
+    transform var(--motion-fast, 160ms) var(--ease-out),
+    box-shadow var(--motion-fast, 160ms) var(--ease-out);
+}
+
+html.dark .btn-primary:hover,
+html.dark .acsis-btn-primary:hover,
+html.dark .activate-btn:hover:not(:disabled) {
+  background: var(--acsis-brand-500, var(--acsis-brand)) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--acsis-brand) 45%, transparent);
+}
+
+html.dark .btn-primary:disabled,
+html.dark .acsis-btn-primary:disabled {
+  background: var(--acsis-brand-700, var(--acsis-brand)) !important;
+  opacity: 0.45;
+  transform: none;
+}
+
+html.dark .btn-secondary,
+html.dark .acsis-btn-ghost,
+html.dark .btn--ghost {
+  background: var(--bg-elevated, #212121) !important;
+  color: var(--fg-default) !important;
+  border: 1px solid var(--border-default, #2a2a2a) !important;
+}
+
+html.dark .btn--ghost:hover {
+  background: var(--acsis-brand-subtle) !important;
+  color: var(--acsis-brand-muted-text, var(--fg-default)) !important;
+  border-color: var(--acsis-brand-ring) !important;
+}
+
+html.dark .btn-secondary:hover,
+html.dark .acsis-btn-ghost:hover {
+  border-color: var(--acsis-brand-ring) !important;
+  color: var(--acsis-brand-muted-text, var(--fg-default)) !important;
+}
+
+/* ── Sidebar ── */
+html.dark .sidebar {
+  background: var(--acsis-sidebar-bg, #111111) !important;
+  border-right: 1px solid var(--acsis-shell-border, #2a2a2a) !important;
+  box-shadow: 2px 0 24px rgba(0, 0, 0, 0.45);
+}
+
+html.dark .nav-item {
+  color: var(--acsis-nav-fg, #a3a3a3) !important;
+  border-radius: 12px;
+}
+
+html.dark .nav-item i,
+html.dark .nav-item .admin-nav-icon {
+  color: var(--acsis-nav-icon, #6b7280) !important;
+}
+
+html.dark .nav-item:hover:not(.active) {
+  background: var(--acsis-nav-hover-bg) !important;
+  color: var(--acsis-nav-hover-fg, #f5f5f5) !important;
+}
+
+html.dark .nav-item:hover:not(.active) i,
+html.dark .nav-item:hover:not(.active) .admin-nav-icon {
+  color: var(--acsis-nav-hover-fg, #f5f5f5) !important;
+}
+
+html.dark .nav-item.active {
+  background: var(--acsis-nav-active-fill) !important;
+  color: var(--acsis-nav-active-fg, #f5f5f5) !important;
+  box-shadow: var(--acsis-nav-active-shadow) !important;
+}
+
+html.dark .nav-item.active i,
+html.dark .nav-item.active .admin-nav-icon {
+  color: var(--acsis-nav-active-icon, var(--acsis-brand-muted-text)) !important;
+}
+
+html.dark .admin-name,
+html.dark .acsis-profile-name {
+  color: var(--fg-default, #f5f5f5) !important;
+}
+
+html.dark .admin-role,
+html.dark .acsis-profile-role {
+  color: var(--fg-muted, #a3a3a3) !important;
+}
+
+/* ── Tabs & settings palette ── */
+html.dark .tab-btn.active,
+html.dark .acsis-mc-tab--active,
+html.dark .admin-settings-mode.is-active {
+  background: var(--acsis-brand-muted-bg) !important;
+  color: var(--acsis-brand-muted-text, var(--fg-default)) !important;
+  border-color: var(--acsis-brand-ring) !important;
+}
+
+html.dark .tab-btn {
+  color: var(--fg-muted, #a3a3a3);
+}
+
+html.dark .tab-btn:hover:not(.active) {
+  background: var(--bg-elevated, #212121);
+  color: var(--fg-default);
+}
+
+html.dark .admin-settings-palette.is-active {
+  border-color: var(--acsis-brand, #d97706) !important;
+  box-shadow: 0 0 0 1px var(--acsis-brand), 0 4px 16px color-mix(in srgb, var(--acsis-brand) 25%, transparent) !important;
+}
+
+html.dark .admin-settings-palette__badge {
+  color: var(--acsis-brand-muted-text, var(--acsis-brand)) !important;
+}
+
+html.dark .admin-settings-field input,
+html.dark .admin-settings-field select,
+html.dark input[type='text'],
+html.dark input[type='email'],
+html.dark input[type='password'],
+html.dark input[type='search'],
+html.dark select,
+html.dark textarea {
+  background: var(--bg-elevated, #212121) !important;
+  border: 1px solid var(--border-default, #2a2a2a) !important;
+  color: var(--fg-default, #f5f5f5) !important;
+  border-radius: 10px;
+}
+
+html.dark .admin-settings-field input:focus,
+html.dark input:focus,
+html.dark select:focus,
+html.dark textarea:focus {
+  outline: none;
+  border-color: var(--acsis-brand, var(--focus-ring)) !important;
+  box-shadow: 0 0 0 2px var(--acsis-brand-subtle, color-mix(in srgb, var(--acsis-brand) 20%, transparent));
+}
+
+/* ── Breadcrumb ── */
+html.dark .breadcrumb .brand-plp,
+html.dark .breadcrumb .brand-acsis,
+html.dark .acsis-mobile-top-bar__breadcrumb .brand-plp,
+html.dark .acsis-mobile-top-bar__breadcrumb .brand-acsis {
+  color: var(--brand-mark, var(--acsis-brand-muted-text)) !important;
+}
+
+html.dark .breadcrumb .page-name,
+html.dark .acsis-mobile-top-bar__breadcrumb .page-name {
+  color: var(--brand-page, #f5f5f5) !important;
+}
+
+html.dark .breadcrumb .sep {
+  color: var(--fg-subtle, #6b7280) !important;
+}
+
+/* ── Stat values use institution accent (not danger / alert metrics) ── */
+html.dark .acsis-summary-stat:not(.acsis-summary-stat--danger) .acsis-summary-stat__value,
+html.dark .acsis-summary-stat--success .acsis-summary-stat__value,
+html.dark .card-value:not(.warnings),
+html.dark .td-dashboard .stat-card-value {
+  color: var(--acsis-brand-muted-text, var(--acsis-brand)) !important;
+}
+
+html.dark .acsis-summary-stat:not(.acsis-summary-stat--danger) .acsis-summary-stat__icon {
+  color: var(--acsis-brand-subtle, color-mix(in srgb, var(--acsis-brand) 35%, transparent)) !important;
+}
+
+/* Danger / integrity stats — always red (both themes) */
+html.dark .acsis-summary-stat--danger .acsis-summary-stat__value {
+  color: #f87171 !important;
+}
+
+html.dark .acsis-summary-stat--danger .acsis-summary-stat__icon {
+  color: rgba(248, 113, 113, 0.45) !important;
+}
+
+html.dark .acsis-summary-stat--danger:hover {
+  border-color: rgba(248, 113, 113, 0.4) !important;
+  box-shadow: 0 6px 20px rgba(220, 38, 38, 0.2) !important;
+}
+
+html:not(.dark) .acsis-summary-stat--danger .acsis-summary-stat__value {
+  color: #dc2626 !important;
+}
+
+html:not(.dark) .acsis-summary-stat--danger:hover {
+  border-color: rgba(220, 38, 38, 0.35) !important;
+  box-shadow: 0 8px 22px rgba(220, 38, 38, 0.12) !important;
+}
+
+html:not(.dark) .acsis-summary-stat--danger::after {
+  background: linear-gradient(90deg, #dc2626, #f87171) !important;
+}
+
+html.dark .card-value.warnings {
+  color: #f87171 !important;
+}
+
+/* ── Progress bars ── */
+html.dark .exam-progress-bar,
+html.dark .progress-fill,
+html.dark [role='progressbar'] > div {
+  background: var(--acsis-brand-muted-bg) !important;
+}
+
+html.dark .exam-progress-bar__fill,
+html.dark .progress-fill-inner {
+  background: var(--acsis-brand, var(--accent-primary)) !important;
+}
+
+/* ── Live monitoring ── */
+html.dark .acsis-detections-header {
+  background: var(--bg-surface, #1a1a1a) !important;
+  border-bottom: 1px solid var(--border-default, #2a2a2a) !important;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+}
+
+html.dark .acsis-detections-header__title {
+  color: var(--fg-default, #f5f5f5) !important;
+}
+
+html.dark .acsis-detections-header__exam {
+  color: var(--fg-muted, #a3a3a3) !important;
+}
+
+html.dark .acsis-detections-empty-card {
+  background: var(--bg-surface, #1a1a1a) !important;
+  border: 1px solid var(--border-default, #2a2a2a) !important;
+  border-radius: 16px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 4px 20px rgba(0, 0, 0, 0.35);
+}
+
+html.dark .acsis-detections-board {
+  background: var(--bg-elevated, #212121) !important;
+  border: 2px solid var(--border-default, #2a2a2a) !important;
+  border-radius: 12px;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+html.dark .acsis-detections-board h2 {
+  color: var(--fg-subtle, #6b7280) !important;
+}
+
+html.dark .acsis-detections-seat {
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+html.dark .acsis-detections-seat--empty {
+  background: var(--bg-surface-muted, #171717) !important;
+  border: 1px dashed var(--border-default, #2a2a2a) !important;
+  color: var(--fg-subtle, #6b7280) !important;
+}
+
+html.dark .acsis-detections-seat--ongoing {
+  border-color: color-mix(in srgb, var(--acsis-brand) 45%, #2a2a2a) !important;
+  background: var(--acsis-brand-subtle, color-mix(in srgb, var(--acsis-brand) 10%, #1a1a1a)) !important;
+}
+
+/* Live monitoring stat pills — dark surfaces + readable text (not white on pastel) */
+html.dark .acsis-detections-stat__label,
+html.dark .acsis-detections-stat__value {
+  color: inherit;
+}
+
+html.dark .acsis-detections-stat--absent {
+  background: var(--bg-elevated, #212121) !important;
+  border-color: var(--border-default) !important;
+  color: var(--fg-muted, #a3a3a3) !important;
+}
+
+html.dark .acsis-detections-stat--absent .acsis-detections-stat__value,
+html.dark .acsis-detections-stat--absent .acsis-detections-stat__label {
+  color: var(--fg-muted, #a3a3a3) !important;
+}
+
+html.dark .acsis-detections-stat--ongoing {
+  background: color-mix(in srgb, var(--acsis-brand, #16a34a) 18%, #1a1a1a) !important;
+  border-color: color-mix(in srgb, var(--acsis-brand, #16a34a) 45%, #2a2a2a) !important;
+  color: var(--acsis-brand-muted-text, #fbbf24) !important;
+}
+
+html.dark .acsis-detections-stat--ongoing .acsis-detections-stat__value,
+html.dark .acsis-detections-stat--ongoing .acsis-detections-stat__label {
+  color: var(--acsis-brand-muted-text, #fbbf24) !important;
+}
+
+html.dark .acsis-detections-stat--warn1 {
+  background: #3f4f1e !important;
+  border-color: #84cc16 !important;
+  color: #d9f99d !important;
+}
+
+html.dark .acsis-detections-stat--warn1 .acsis-detections-stat__value,
+html.dark .acsis-detections-stat--warn1 .acsis-detections-stat__label {
+  color: #d9f99d !important;
+}
+
+html.dark .acsis-detections-stat--warn2 {
+  background: #78350f !important;
+  border-color: #f59e0b !important;
+  color: #fde68a !important;
+}
+
+html.dark .acsis-detections-stat--warn2 .acsis-detections-stat__value,
+html.dark .acsis-detections-stat--warn2 .acsis-detections-stat__label {
+  color: #fde68a !important;
+}
+
+html.dark .acsis-detections-stat--warn3 {
+  background: #7f1d1d !important;
+  border-color: #f87171 !important;
+  color: #fecaca !important;
+}
+
+html.dark .acsis-detections-stat--warn3 .acsis-detections-stat__value,
+html.dark .acsis-detections-stat--warn3 .acsis-detections-stat__label {
+  color: #fecaca !important;
+}
+
+html.dark .acsis-detections-stat--submitted {
+  background: #1e3a5f !important;
+  border-color: #60a5fa !important;
+  color: #93c5fd !important;
+}
+
+html.dark .acsis-detections-stat--submitted .acsis-detections-stat__value,
+html.dark .acsis-detections-stat--submitted .acsis-detections-stat__label {
+  color: #93c5fd !important;
+}
+
+html.dark .acsis-detections-stat--timer .acsis-detections-stat__value,
+html.dark .acsis-detections-stat--timer .acsis-detections-stat__label {
+  color: #f5f5f5 !important;
+}
+
+html.dark .acsis-detections-settings-btn {
+  background: var(--bg-elevated, #212121) !important;
+  border-color: var(--border-default, #2a2a2a) !important;
+  color: var(--fg-muted, #a3a3a3) !important;
+}
+
+html.dark .acsis-detections-settings-btn:hover {
+  background: var(--acsis-brand-subtle) !important;
+  border-color: var(--acsis-brand-ring) !important;
+  color: var(--acsis-brand-muted-text, var(--fg-default)) !important;
+}
+
+/* User management */
+html.dark .um-tabs {
+  background: var(--bg-elevated, #212121) !important;
+  border: 1px solid var(--border-default, #2a2a2a);
+}
+
+html.dark .um-tab {
+  color: var(--fg-muted, #a3a3a3) !important;
+}
+
+html.dark .um-tab.active {
+  background: var(--acsis-brand-600, var(--acsis-brand)) !important;
+  color: #fff !important;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--acsis-brand) 35%, transparent) !important;
+}
+
+html.dark .um-tab:not(.active):hover {
+  background: var(--acsis-brand-subtle) !important;
+  color: var(--fg-default, #f5f5f5) !important;
+}
+
+html.dark .um-search {
+  background: var(--bg-elevated, #212121) !important;
+  border-color: var(--border-default, #2a2a2a) !important;
+}
+
+html.dark .um-search input {
+  color: var(--fg-default, #f5f5f5) !important;
+}
+
+html.dark .um-search input::placeholder {
+  color: var(--fg-subtle, #6b7280) !important;
+}
+
+html.dark .um-search svg {
+  color: var(--fg-subtle, #6b7280);
+}
+
+html.dark .um-table tbody tr:hover td {
+  background: var(--acsis-brand-subtle, color-mix(in srgb, var(--acsis-brand) 8%, #1a1a1a)) !important;
+}
+
+html.dark .um-table td {
+  color: var(--fg-muted, #a3a3a3) !important;
+  border-top-color: var(--border-muted, #252525) !important;
+}
+
+html.dark .um-name {
+  color: var(--fg-default, #f5f5f5) !important;
+}
+
+html.dark .um-status-badge {
+  background: color-mix(in srgb, var(--acsis-brand) 20%, #1a1a1a) !important;
+  color: var(--acsis-brand-muted-text, var(--acsis-brand)) !important;
+}
+
+html.dark .um-action-link {
+  color: var(--acsis-brand-muted-text, var(--acsis-brand)) !important;
+}
+
+/* Admin classes list */
+html.dark .admin-class-row {
+  background: var(--bg-surface, #1a1a1a) !important;
+  border-color: var(--border-default, #2a2a2a) !important;
+}
+
+html.dark .admin-class-row--open {
+  border-color: var(--acsis-brand-ring) !important;
+  box-shadow: 0 2px 12px color-mix(in srgb, var(--acsis-brand) 15%, transparent) !important;
+}
+
+html.dark .admin-class-row__trigger:hover {
+  background: var(--acsis-brand-subtle) !important;
+}
+
+html.dark .admin-class-row__title {
+  color: var(--fg-default, #f5f5f5) !important;
+}
+
+html.dark .admin-class-row__count {
+  background: var(--bg-elevated, #212121) !important;
+  color: var(--fg-muted, #a3a3a3) !important;
+  border: 1px solid var(--border-default, #2a2a2a);
+}
+
+html.dark .admin-class-row__body {
+  border-top-color: var(--border-default, #2a2a2a) !important;
+}
+
+html.dark .admin-exam-row {
+  background: var(--bg-elevated, #212121) !important;
+  border-color: var(--border-default, #2a2a2a) !important;
+}
+
+html.dark .admin-exam-row__trigger:hover {
+  background: var(--acsis-brand-subtle) !important;
+}
+
+html.dark .admin-exam-row__title {
+  color: var(--fg-default, #f5f5f5) !important;
+}
+
+/* Teacher tabs (my classes) */
+html.dark .acsis-mc-tab--active {
+  background: var(--acsis-brand-600, var(--acsis-brand)) !important;
+  color: #fff !important;
+}
+
+/* Reports */
+html.dark .reports-page .text-green,
+html.dark .reports-page .stat-val.text-green {
+  color: var(--acsis-brand-muted-text, var(--acsis-brand)) !important;
+}
+
+html.dark .acsis-reports-exam-select,
+html.dark .acsis-reports-exam-select option {
+  background: var(--bg-elevated, #212121) !important;
+  color: var(--fg-default, #f5f5f5) !important;
+}
+
+html.dark .acsis-reports-exam-select option:checked,
+html.dark .acsis-reports-exam-select option:hover {
+  background: var(--acsis-brand-muted-bg) !important;
+  color: var(--fg-default, #f5f5f5) !important;
+}
+
+/* Teacher / student class stream (my_classes + enrolled_classes) */
+html.dark .acsis-stream-banner,
+html.dark .acsis-stream-item,
+html.dark .acsis-exam-detail__card,
+html.dark .acsis-empty-panel,
+html.dark .stu-stream-item,
+html.dark .stu-gmail-banner,
+html.dark .stu-empty {
+  background: var(--bg-surface, #1a1a1a) !important;
+  border-color: var(--border-default, #2a2a2a) !important;
+}
+
+html.dark .acsis-stream-banner h1,
+html.dark .acsis-stream-item__title,
+html.dark .acsis-exam-detail__card h1,
+html.dark .stu-stream-item__title,
+html.dark .stu-gmail-banner__body strong {
+  color: var(--fg-default, #f5f5f5) !important;
+}
+
+html.dark .acsis-stream-banner p,
+html.dark .acsis-stream-item__meta,
+html.dark .stu-stream-item__meta,
+html.dark .stu-gmail-banner__body p {
+  color: var(--fg-muted, #a3a3a3) !important;
+}
+
+html.dark .acsis-exam-detail__meta-grid {
+  background: var(--bg-elevated, #212121) !important;
+  border-color: var(--border-default, #2a2a2a) !important;
+}
+
+html.dark .acsis-exam-detail__meta-grid dd {
+  color: var(--fg-default, #f5f5f5) !important;
+}
+
+html.dark .acsis-stream-back,
+html.dark .stu-stream-back {
+  color: var(--acsis-brand-muted-text, var(--acsis-brand)) !important;
+}
+
+html.dark .acsis-link-create,
+html.dark .acsis-mc-create-btn,
+html.dark .stu-stream-enter {
+  background: var(--acsis-brand-600, var(--acsis-brand)) !important;
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--acsis-brand) 35%, transparent) !important;
+}
+
+html.dark .acsis-pill--live,
+html.dark .stu-pill--live {
+  background: var(--acsis-brand-muted-bg) !important;
+  color: var(--acsis-brand-muted-text) !important;
+  border-color: var(--acsis-brand-ring) !important;
+}
+
+html.dark .stu-gmail-banner {
+  background: color-mix(in srgb, var(--acsis-brand) 12%, #1a1a1a) !important;
+  border-left-color: var(--acsis-brand) !important;
+}
+
+/* Live monitoring seats — no near-white cards */
+html.dark .acsis-detections-seat--warn1 {
+  background: color-mix(in srgb, #84cc16 22%, #1a1a1a) !important;
+  border-color: #84cc16 !important;
+}
+
+html.dark .acsis-detections-seat--warn2 {
+  background: color-mix(in srgb, #f59e0b 22%, #1a1a1a) !important;
+  border-color: #f59e0b !important;
+}
+
+html.dark .acsis-detections-seat--warn3 {
+  background: color-mix(in srgb, #ef4444 22%, #1a1a1a) !important;
+  border-color: #ef4444 !important;
+}
+
+html.dark .acsis-detections-seat--submitted {
+  background: color-mix(in srgb, #3b82f6 22%, #1a1a1a) !important;
+  border-color: #60a5fa !important;
+}
+
+html.dark .acsis-detections-seat__name,
+html.dark .acsis-detections-seat__last {
+  color: var(--fg-default, #f5f5f5) !important;
+}
+
+html.dark .acsis-detections-legend {
+  background: var(--bg-elevated, #212121) !important;
+  border-color: var(--border-default) !important;
+  color: var(--fg-muted) !important;
+}
+
+html.dark .acsis-detections-seat--ongoing:hover {
+  background: color-mix(in srgb, var(--acsis-brand) 16%, #1a1a1a) !important;
+}
+
+html.dark .acsis-detections-seat--absent {
+  background: var(--bg-surface-muted, #171717) !important;
+  border-color: var(--border-default) !important;
+}
+
+html.dark .acsis-detections-seat--absent:hover {
+  background: var(--bg-elevated, #212121) !important;
+}
+
+html.dark .acsis-detections-seat__name {
+  color: var(--fg-default, #f5f5f5) !important;
+}
+
+html.dark .acsis-detections-seat__meta {
+  color: var(--fg-muted, #a3a3a3) !important;
+}
+
+html.dark .acsis-detections-drag-hint {
+  color: var(--fg-subtle, #6b7280) !important;
+}
+
+html.dark .acsis-detections-modal {
+  background: var(--bg-surface, #1a1a1a) !important;
+  border: 1px solid var(--border-default, #2a2a2a);
+  color: var(--fg-default, #f5f5f5);
+}
+
+/* ── Shadcn / Tailwind utility fixes inside shell ── */
+html.dark .bg-white {
+  background-color: var(--bg-surface, #1a1a1a) !important;
+}
+
+html.dark .bg-gray-50,
+html.dark .bg-gray-100 {
+  background-color: var(--bg-elevated, #212121) !important;
+}
+
+html.dark .border-gray-100,
+html.dark .border-gray-200,
+html.dark .border-gray-300 {
+  border-color: var(--border-default, #2a2a2a) !important;
+}
+
+html.dark .text-gray-900,
+html.dark .text-gray-800,
+html.dark .text-gray-700 {
+  color: var(--fg-default, #f5f5f5) !important;
+}
+
+html.dark .text-gray-600,
+html.dark .text-gray-500,
+html.dark .text-gray-400 {
+  color: var(--fg-muted, #a3a3a3) !important;
+}
+
+html.dark .text-green-600,
+html.dark .text-green-400,
+html.dark .dark\:text-green-400 {
+  color: var(--acsis-brand-muted-text, var(--acsis-brand)) !important;
+}
+
+html.dark .bg-green-600,
+html.dark .hover\:bg-green-700:hover {
+  background-color: var(--acsis-brand-600, var(--acsis-brand)) !important;
+}
+
+html.dark .hover\:border-green-600\/40:hover,
+html.dark .dark\:hover\:border-green-500\/40:hover {
+  border-color: var(--acsis-brand-ring) !important;
+}
+
+/* ── Radix dropdowns & dialogs ── */
+html.dark [data-radix-popper-content-wrapper] [role='menu'],
+html.dark [data-radix-popper-content-wrapper] [role='dialog'],
+html.dark [data-state='open'].bg-popover {
+  background: var(--bg-elevated, #212121) !important;
+  border-color: var(--border-default, #2a2a2a) !important;
+  color: var(--fg-default, #f5f5f5);
+}

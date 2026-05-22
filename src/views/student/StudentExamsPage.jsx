@@ -97,9 +97,9 @@ export default function StudentExamsPage() {
       <div className="stu-my-classes__content" aria-hidden={showJoinModal || isManualOpen}>
         
         {/* Header Layout: Title and Description on the left, Enroll button on the far right */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-gray-100 dark:border-zinc-800/50">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-border">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-black dark:text-white">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
               Enrolled classes
             </h1>
             <p className="mt-1 max-w-[75ch] text-sm text-muted-foreground">
@@ -107,9 +107,9 @@ export default function StudentExamsPage() {
             </p>
           </div>
 
-          <Button 
+          <Button
             onClick={() => setIsManualOpen(true)}
-            className="bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl px-5 py-2.5 shadow-sm transition self-start sm:self-auto shrink-0"
+            className="font-semibold rounded-xl px-5 py-2.5 shadow-sm transition self-start sm:self-auto shrink-0 hover:-translate-y-px"
           >
             Enroll in a Class
           </Button>
@@ -128,19 +128,19 @@ export default function StudentExamsPage() {
               <Link 
                 key={c.id} 
                 to={`/student/my-classes/${encodeURIComponent(c.id)}`} 
-                className="stu-class-card block p-6 min-h-[150px] bg-white dark:bg-zinc-900/40 rounded-2xl border border-gray-200 dark:border-zinc-800 hover:border-green-600/40 dark:hover:border-green-500/40 transition-all shadow-sm hover:shadow-md"
+                className="stu-class-card group block p-6 min-h-[150px] rounded-2xl border border-border transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5"
               >
-                <h3 className="text-xl font-bold text-gray-900 dark:text-zinc-100 tracking-tight">
+                <h3 className="text-xl font-bold text-foreground tracking-tight">
                   {c.name}
                 </h3>
                 <p className="text-sm text-muted-foreground mt-2">
                   Academic Year: {c.academicYear} · {c.semester}
                 </p>
-                <div className="mt-5 pt-3 border-t border-gray-100 dark:border-zinc-800/60 flex items-center justify-between">
-                  <span className="text-xs font-semibold tracking-wider uppercase text-green-600 dark:text-green-400">
+                <div className="mt-5 pt-3 border-t border-border flex items-center justify-between">
+                  <span className="text-xs font-semibold tracking-wider uppercase text-primary">
                     {(c.exams || []).length} exam{(c.exams || []).length === 1 ? '' : 's'} posted
                   </span>
-                  <span className="text-xs text-muted-foreground group-hover:text-green-600 transition">
+                  <span className="text-xs text-muted-foreground group-hover:text-primary transition">
                     View Stream →
                   </span>
                 </div>

@@ -260,13 +260,13 @@ export default function TeacherDetectionsPage() {
     return (
       <div className="acsis-detections-live acsis-detections-live--empty acsis-view">
         <div className="flex items-center gap-3 mb-6">
-          <MonitorPlay className="w-8 h-8 text-gray-400 shrink-0" aria-hidden />
-          <h1 className="text-xl sm:text-3xl font-bold text-gray-800 tracking-tight">Live Monitoring</h1>
+          <MonitorPlay className="w-8 h-8 text-muted-foreground shrink-0" aria-hidden />
+          <h1 className="text-xl sm:text-3xl font-bold text-foreground tracking-tight">Live Monitoring</h1>
         </div>
-        <div className="acsis-detections-empty-card bg-white rounded-2xl shadow-sm border border-gray-200 text-center max-w-2xl mx-auto">
-          <ShieldAlert className="w-14 h-14 sm:w-16 sm:h-16 text-gray-300 mx-auto mb-4 sm:mb-6" aria-hidden />
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-3 sm:mb-4">No Active Exams</h2>
-          <p className="text-gray-500 text-base sm:text-lg px-2">
+        <div className="acsis-detections-empty-card text-center max-w-2xl mx-auto">
+          <ShieldAlert className="w-14 h-14 sm:w-16 sm:h-16 text-muted-foreground/50 mx-auto mb-4 sm:mb-6" aria-hidden />
+          <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-3 sm:mb-4">No Active Exams</h2>
+          <p className="text-muted-foreground text-base sm:text-lg px-2">
             Activate an exam from the &apos;My Classes&apos; page to begin live monitoring your students.
           </p>
         </div>
@@ -334,12 +334,12 @@ export default function TeacherDetectionsPage() {
       </header>
 
       <div className="acsis-detections-body">
-        <div className="acsis-detections-board w-full bg-white border-4 border-gray-300 rounded-lg shadow-sm flex items-center justify-center relative box-border">
+        <div className="acsis-detections-board w-full flex items-center justify-center relative box-border">
           <div className="absolute top-full w-full h-4 flex justify-around px-8 opacity-20 pointer-events-none" aria-hidden>
-            <div className="w-2 h-full bg-gray-400" />
-            <div className="w-2 h-full bg-gray-400" />
+            <div className="w-2 h-full bg-muted-foreground/40" />
+            <div className="w-2 h-full bg-muted-foreground/40" />
           </div>
-          <h2 className="text-sm sm:text-xl md:text-2xl font-bold text-gray-400 tracking-wide sm:tracking-widest uppercase text-center px-2 py-3">
+          <h2 className="text-sm sm:text-xl md:text-2xl font-bold text-muted-foreground tracking-wide sm:tracking-widest uppercase text-center px-2 py-3">
             Front of Classroom
           </h2>
         </div>
