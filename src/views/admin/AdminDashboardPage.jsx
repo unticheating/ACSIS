@@ -1,45 +1,38 @@
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { SummaryStatCard, SummaryStatGrid } from '@/components/dashboard/SummaryStatCard.jsx'
+import { fetchAdminDashboard, formatRelativeTime } from '@/lib/adminDashboardApi.js'
 import '../../pages/admin-ui/style.css'
 
-const demoExams = [
-  {
-    name: 'INFOSEC QUIZ #1',
-    by: 'JUANITO P. ALVAREZ JR.',
-    timer: '34:23',
-    sub: 'started less than a minute ago',
-    done: '0 / 35 Done',
-  },
-  {
-    name: 'INFOSEC QUIZ #2',
-    by: 'JUANITO P. ALVAREZ JR.',
-    timer: '34:23',
-    sub: 'started less than a minute ago',
-    done: '0 / 35 Done',
-  },
-]
-
-const demoDetected = [
-  {
-    id: 1,
-    strikes: 3,
-    name: 'RICHELLE DOROTHY BENITEZ',
-    exam: 'INFOSEC QUIZ #1',
-    sub: 'Flagged Positive by JUANITO ALVAREZ',
-  },
-  {
-    id: 2,
-    strikes: 1,
-    name: 'REX NAVARRO JR',
-    exam: 'INFOSEC QUIZ #1',
-    sub: 'Warned',
-  },
-]
-
 export default function AdminDashboardPage({ basePath = '/admin' }) {
-  function ticketViolation(id) {
-    if (window.confirm('Issue a ticket violation for this student?')) {
-      window.alert(`Ticket issued for student ID: ${id}`)
+  const [stats, setStats] = useState({ ongoingExams: 0, totalExams: 0, detectedStudents: 0 })
+  const [ongoingExams, setOngoingExams] = useState([])
+  const [detectedStudents, setDetectedStudents] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await fetchAdminDashboard()
+      setStats(data.stats || {})
+      setOngoingExams(data.ongoingExams || [])
+      setDetectedStudents(data.detectedStudents || [])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load dashboard.')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  function ticketViolation(sessionId) {
+    if (window.confirm('Issue a ticket violation for this student session?')) {
+      window.alert(`Ticket recorded for session ${sessionId} (workflow can be extended later).`)
     }
   }
 
@@ -55,10 +48,28 @@ export default function AdminDashboardPage({ basePath = '/admin' }) {
       </div>
 
       <div className="content-body">
+        {error ? (
+          <p className="um-banner-error" role="alert">
+            {error}
+          </p>
+        ) : null}
+
         <SummaryStatGrid>
-          <SummaryStatCard label="On-Going Examinations" value={0} tone="success" />
-          <SummaryStatCard label="Total Examinations" value={0} tone="success" />
-          <SummaryStatCard label="Detected Students" value={0} tone="danger" />
+          <SummaryStatCard
+            label="On-Going Examinations"
+            value={loading ? '…' : stats.ongoingExams}
+            tone="success"
+          />
+          <SummaryStatCard
+            label="Total Examinations"
+            value={loading ? '…' : stats.totalExams}
+            tone="success"
+          />
+          <SummaryStatCard
+            label="Detected Students"
+            value={loading ? '…' : stats.detectedStudents}
+            tone="danger"
+          />
         </SummaryStatGrid>
 
         <div className="panel">
@@ -69,19 +80,27 @@ export default function AdminDashboardPage({ basePath = '/admin' }) {
             </Link>
           </div>
           <div className="exam-list">
-            {demoExams.map((exam) => (
-              <div key={exam.name} className="exam-item">
-                <div className="exam-info">
-                  <div className="exam-name">{exam.name}</div>
-                  <div className="exam-by">{exam.by}</div>
+            {loading ? (
+              <p className="um-loading">Loading…</p>
+            ) : ongoingExams.length === 0 ? (
+              <p className="admin-placeholder-lead" style={{ padding: '1rem' }}>
+                No exams are open or waiting right now.
+              </p>
+            ) : (
+              ongoingExams.map((exam) => (
+                <div key={exam.id} className="exam-item">
+                  <div className="exam-info">
+                    <div className="exam-name">{exam.name}</div>
+                    <div className="exam-by">by {exam.by}</div>
+                  </div>
+                  <div className="exam-timer-wrap">
+                    <div className="exam-timer">{exam.status}</div>
+                    <div className="exam-timer-sub">{formatRelativeTime(exam.updatedAt) || 'recently'}</div>
+                  </div>
+                  <div className="exam-progress">{exam.done}</div>
                 </div>
-                <div className="exam-timer-wrap">
-                  <div className="exam-timer">{exam.timer}</div>
-                  <div className="exam-timer-sub">{exam.sub}</div>
-                </div>
-                <div className="exam-progress">{exam.done}</div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 
@@ -93,21 +112,33 @@ export default function AdminDashboardPage({ basePath = '/admin' }) {
             </Link>
           </div>
           <div className="detected-list">
-            {demoDetected.map((student) => (
-              <div key={student.id} className="detected-item">
-                <div className="detected-info">
-                  <div className="detected-name">
-                    {student.strikes} — {student.name}
+            {loading ? (
+              <p className="um-loading">Loading…</p>
+            ) : detectedStudents.length === 0 ? (
+              <p className="admin-placeholder-lead" style={{ padding: '1rem' }}>
+                No students with proctoring warnings.
+              </p>
+            ) : (
+              detectedStudents.map((student) => (
+                <div key={student.sessionId} className="detected-item">
+                  <div className="detected-info">
+                    <div className="detected-name">
+                      {student.strikes} — {student.studentName}
+                    </div>
+                    <div className="detected-sub">
+                      {student.examTitle} · {student.subtitle}
+                    </div>
                   </div>
-                  <div className="detected-sub">
-                    {student.exam} · {student.sub}
-                  </div>
+                  <button
+                    type="button"
+                    className="view-info-link"
+                    onClick={() => ticketViolation(student.sessionId)}
+                  >
+                    Issue ticket
+                  </button>
                 </div>
-                <button type="button" className="view-info-link" onClick={() => ticketViolation(student.id)}>
-                  Issue ticket
-                </button>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </div>

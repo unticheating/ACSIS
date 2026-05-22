@@ -1,8 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Clock, LayoutGrid, CheckCircle2, Circle, AlertTriangle } from 'lucide-react'
 import PlpLogo from '@/components/brand/PlpLogo.jsx'
-import { apiFetch } from '@/lib/apiFetch.js'
+import {
+  fetchStudentExamSession,
+  joinStudentExam,
+  logExamCheating,
+  submitExamAnswers,
+} from '@/lib/studentExamApi.js'
+import { PG_EXAM_STATUS, normalizeExamStatus } from '@/lib/examFlowUi.js'
+import { MAX_EXAM_WARNINGS, labelForCheatEvent } from '@/lib/examAntiCheat.js'
 
 import { useSession } from '@/context/SessionContext.jsx'
 // Removed legacy CSS import
@@ -26,7 +33,6 @@ function formatClock(totalSec) {
 }
 
 export default function StudentExamSessionPage() {
-  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const classId = searchParams.get('classId') || ''
   const examId = searchParams.get('examId') || ''
@@ -35,29 +41,75 @@ export default function StudentExamSessionPage() {
   const [hit, setHit] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [needsPassword, setNeedsPassword] = useState(false)
+  const [examPassword, setExamPassword] = useState('')
+  const [joining, setJoining] = useState(false)
+  const [scene, setScene] = useState('lobby')
+  const sceneRef = useRef(scene)
 
-  useEffect(() => {
-    async function loadExam() {
-      if (!classId || !examId) {
-        setLoading(false)
+  const loadSession = useCallback(async () => {
+    if (!classId || !examId) {
+      setLoading(false)
+      return
+    }
+    try {
+      const data = await fetchStudentExamSession(classId, examId)
+      if (!data.joined) {
+        setNeedsPassword(true)
+        setHit(null)
+        setError(null)
         return
       }
-      try {
-        const res = await apiFetch(`/api/student/classes/${classId}/exams/${examId}`)
-        if (!res.ok) {
-          const errData = await res.json()
-          throw new Error(errData.error || 'Failed to fetch exam.')
-        }
-        const data = await res.json()
-        setHit({ exam: data })
-      } catch (err) {
-        setError(err.message)
-      } finally {
-        setLoading(false)
+      setNeedsPassword(false)
+      setWarningCount(Number(data.warningCount || 0))
+      if (data.sessionStatus === 'submitted') {
+        setHit({ exam: data.exam })
+        setSubmitResult(data.result || null)
+        setScene('submitted')
+        setError(null)
+        return
       }
+      setHit({ exam: { ...data.exam, questions: data.questions || [] } })
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch exam.')
+    } finally {
+      setLoading(false)
     }
-    loadExam()
   }, [classId, examId])
+
+  useEffect(() => {
+    setLoading(true)
+    loadSession()
+  }, [loadSession])
+
+  useEffect(() => {
+    if (!hit?.exam || needsPassword) return undefined
+    const st = normalizeExamStatus(hit.exam.status)
+    if (st !== PG_EXAM_STATUS.WAITING) return undefined
+
+    const interval = window.setInterval(() => {
+      loadSession()
+    }, 2500)
+    return () => window.clearInterval(interval)
+  }, [hit?.exam?.status, needsPassword, loadSession])
+
+  async function submitExamPassword(e) {
+    e.preventDefault()
+    setJoining(true)
+    setError(null)
+    try {
+      await joinStudentExam(classId, examId, examPassword)
+      setNeedsPassword(false)
+      setLoading(true)
+      await loadSession()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Incorrect exam code.')
+    } finally {
+      setJoining(false)
+      setLoading(false)
+    }
+  }
 
   const examTitle = hit?.exam?.title || 'Examination'
   const durationMin = Number(hit?.exam?.duration || 35)
@@ -68,18 +120,46 @@ export default function StudentExamSessionPage() {
 
   const questions = hit?.exam?.questions || []
 
-  const [scene, setScene] = useState('lobby')
-  const sceneRef = useRef(scene)
+  const [countdownNum, setCountdownNum] = useState(COUNTDOWN_SEC)
+  const [secondsLeft, setSecondsLeft] = useState(durationMin * 60)
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
+  const [answers, setAnswers] = useState({})
+  const [submitResult, setSubmitResult] = useState(null)
+  const [submitError, setSubmitError] = useState(null)
+  const [warningCount, setWarningCount] = useState(0)
+  const [lastViolationLabel, setLastViolationLabel] = useState('')
+
+  const submitToServer = useCallback(async () => {
+    if (!classId || !examId) {
+      setScene('submitted')
+      return
+    }
+    const payload = questions.map((q) => ({
+      questionId: q.id,
+      answerText: answers[q.id] != null ? String(answers[q.id]) : '',
+    }))
+    setSubmitError(null)
+    try {
+      const result = await submitExamAnswers(classId, examId, payload)
+      setSubmitResult(result)
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Failed to submit exam.')
+      console.error(err)
+    }
+    setScene('submitted')
+  }, [answers, classId, examId, questions])
+
   useEffect(() => {
     sceneRef.current = scene
   }, [scene])
 
-  const [countdownNum, setCountdownNum] = useState(COUNTDOWN_SEC)
-  const [secondsLeft, setSecondsLeft] = useState(durationMin * 60)
-  
-  // Dynamic Exam State
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
-  const [answers, setAnswers] = useState({})
+  useEffect(() => {
+    if (!hit?.exam) return
+    const st = normalizeExamStatus(hit.exam.status)
+    if (st === PG_EXAM_STATUS.OPEN && questions.length > 0 && scene === 'lobby') {
+      setScene('countdown')
+    }
+  }, [hit?.exam?.status, questions.length, scene])
 
   const [detectionOpen, setDetectionOpen] = useState(false)
   const [detectionReturn, setDetectionReturn] = useState(DETECTION_RETURN_SEC)
@@ -97,43 +177,91 @@ export default function StudentExamSessionPage() {
     const id = window.setInterval(() => {
       setSecondsLeft((t) => {
         if (t <= 1) {
-          setScene('submitted')
+          submitToServer()
           return 0
         }
         return t - 1
       })
     }, 1000)
     return () => window.clearInterval(id)
-  }, [scene])
+  }, [scene, submitToServer])
 
-  const showDetectionThenResume = useCallback(
-    (returnTo, opts = {}) => {
+  const showViolationOverlay = useCallback((returnTo) => {
+    detectionRunningRef.current = true
+    returnSceneRef.current = returnTo
+    setDetectionReturn(DETECTION_RETURN_SEC)
+    setDetectionOpen(true)
+
+    let left = DETECTION_RETURN_SEC
+    const tick = () => {
+      setDetectionReturn(left)
+      if (left <= 0) {
+        setDetectionOpen(false)
+        window.setTimeout(() => {
+          setScene(returnSceneRef.current)
+          detectionRunningRef.current = false
+          postCooldownUntilRef.current = Date.now() + POST_DETECTION_COOLDOWN_MS
+        }, OVERLAY_FADE_MS)
+        return
+      }
+      left -= 1
+      window.setTimeout(tick, 1000)
+    }
+    tick()
+  }, [])
+
+  const recordViolation = useCallback(
+    async (eventType, details = null, opts = {}) => {
       if (detectionRunningRef.current) return
       if (!opts.skipCooldown && Date.now() < postCooldownUntilRef.current) return
+      if (!isExamScene(sceneRef.current)) return
+      if (!classId || !examId) return
+      if (!opts.skipCooldown) {
+        postCooldownUntilRef.current = Date.now() + 1500
+      }
 
-      detectionRunningRef.current = true
-      returnSceneRef.current = returnTo
-      setDetectionReturn(DETECTION_RETURN_SEC)
-      setDetectionOpen(true)
+      setLastViolationLabel(labelForCheatEvent(eventType))
 
-      let left = DETECTION_RETURN_SEC
-      const tick = () => {
-        setDetectionReturn(left)
-        if (left <= 0) {
-          setDetectionOpen(false)
-          window.setTimeout(() => {
-            setScene(returnSceneRef.current)
-            detectionRunningRef.current = false
-            postCooldownUntilRef.current = Date.now() + POST_DETECTION_COOLDOWN_MS
-          }, OVERLAY_FADE_MS)
+      let count = warningCount
+      try {
+        const res = await logExamCheating(classId, examId, eventType, details)
+        count = Number(res.warningCount ?? count + 1)
+        setWarningCount(count)
+
+        if (res.autoSubmitted) {
+          setSubmitResult({
+            rawScore: res.rawScore,
+            totalPoints: res.totalPoints,
+            percentage: res.percentage,
+          })
+          setSubmitError(null)
+          setScene('submitted')
           return
         }
-        left -= 1
-        window.setTimeout(tick, 1000)
+      } catch (err) {
+        console.error('[anti-cheat]', err)
+        const msg = err instanceof Error ? err.message : ''
+        if (msg.includes('not live') || msg.includes('Join the exam')) {
+          setLastViolationLabel(msg)
+          showViolationOverlay(sceneRef.current)
+          return
+        }
+        count = Math.min(MAX_EXAM_WARNINGS, warningCount + 1)
+        setWarningCount(count)
+        if (count >= MAX_EXAM_WARNINGS) {
+          await submitToServer()
+          return
+        }
       }
-      tick()
+
+      if (count >= MAX_EXAM_WARNINGS) {
+        await submitToServer()
+        return
+      }
+
+      showViolationOverlay(sceneRef.current)
     },
-    [],
+    [classId, examId, warningCount, showViolationOverlay, submitToServer],
   )
 
   const scheduleTabLeave = useCallback(() => {
@@ -147,9 +275,9 @@ export default function StudentExamSessionPage() {
     visibilityTimerRef.current = window.setTimeout(() => {
       visibilityTimerRef.current = null
       if (!document.hidden || !isExamScene(sceneRef.current) || detectionRunningRef.current) return
-      showDetectionThenResume(sceneRef.current)
+      recordViolation('alt_tab', 'Left exam tab or window')
     }, TAB_LEAVE_DEBOUNCE_MS)
-  }, [showDetectionThenResume])
+  }, [recordViolation])
 
   const cancelTabLeave = useCallback(() => {
     if (visibilityTimerRef.current) {
@@ -166,18 +294,66 @@ export default function StudentExamSessionPage() {
     function onKey(ev) {
       if (detectionRunningRef.current) return
       if (!isExamScene(sceneRef.current)) return
-      if (ev.code !== 'F8') return
+      if (ev.code === 'F8') {
+        ev.preventDefault()
+        recordViolation('devtools_open', 'F8 pressed', { skipCooldown: true })
+        return
+      }
+      if (ev.ctrlKey || ev.metaKey) {
+        if (ev.key === 'c' || ev.key === 'C') {
+          ev.preventDefault()
+          recordViolation('copy_attempt', 'Ctrl+C')
+        } else if (ev.key === 'v' || ev.key === 'V') {
+          ev.preventDefault()
+          recordViolation('paste_attempt', 'Ctrl+V')
+        } else if (ev.key === 'x' || ev.key === 'X') {
+          ev.preventDefault()
+          recordViolation('copy_attempt', 'Ctrl+X cut')
+        }
+      }
+    }
+    function onCopy(ev) {
+      if (!isExamScene(sceneRef.current)) return
       ev.preventDefault()
-      showDetectionThenResume(sceneRef.current, { skipCooldown: true })
+      recordViolation('copy_attempt', 'Copy')
+    }
+    function onCut(ev) {
+      if (!isExamScene(sceneRef.current)) return
+      ev.preventDefault()
+      recordViolation('copy_attempt', 'Cut')
+    }
+    function onPaste(ev) {
+      if (!isExamScene(sceneRef.current)) return
+      ev.preventDefault()
+      recordViolation('paste_attempt', 'Paste')
     }
     document.addEventListener('visibilitychange', onVis)
-    document.addEventListener('keydown', onKey)
+    document.addEventListener('keydown', onKey, true)
+    document.addEventListener('copy', onCopy, true)
+    document.addEventListener('cut', onCut, true)
+    document.addEventListener('paste', onPaste, true)
     return () => {
       document.removeEventListener('visibilitychange', onVis)
-      document.removeEventListener('keydown', onKey)
+      document.removeEventListener('keydown', onKey, true)
+      document.removeEventListener('copy', onCopy, true)
+      document.removeEventListener('cut', onCut, true)
+      document.removeEventListener('paste', onPaste, true)
       cancelTabLeave()
     }
-  }, [cancelTabLeave, scheduleTabLeave, showDetectionThenResume])
+  }, [cancelTabLeave, scheduleTabLeave, recordViolation])
+
+  useEffect(() => {
+    if (scene !== 'question') return undefined
+    const root = document.documentElement
+    if (root.requestFullscreen) {
+      root.requestFullscreen().catch(() => {})
+    }
+    return () => {
+      if (document.fullscreenElement && document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {})
+      }
+    }
+  }, [scene])
 
   useEffect(() => {
     if (scene !== 'lobby') return undefined
@@ -209,6 +385,49 @@ export default function StudentExamSessionPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <p className="text-gray-500 animate-pulse">Loading exam details...</p>
+      </div>
+    )
+  }
+
+  if (needsPassword && classId && examId) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+        <form
+          onSubmit={submitExamPassword}
+          className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 max-w-md w-full"
+        >
+          <h1 className="text-xl font-bold text-gray-900 mb-2">Enter exam code</h1>
+          <p className="text-sm text-gray-600 mb-4">
+            Type the code your instructor shared after publishing the exam.
+          </p>
+          <input
+            type="text"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-center font-mono text-lg tracking-widest uppercase mb-2"
+            placeholder="Exam code"
+            value={examPassword}
+            onChange={(e) => setExamPassword(e.target.value.toUpperCase())}
+            autoFocus
+            maxLength={12}
+          />
+          {error ? (
+            <p className="text-sm text-red-600 mb-3" role="alert">
+              {error}
+            </p>
+          ) : null}
+          <button
+            type="submit"
+            disabled={joining || !examPassword.trim()}
+            className="w-full rounded-lg bg-green-600 py-2.5 text-sm font-semibold text-white hover:bg-green-700 disabled:opacity-50"
+          >
+            {joining ? 'Joining…' : 'Join exam lobby'}
+          </button>
+          <Link
+            to={`/student/my-classes/${classId}`}
+            className="mt-4 block text-center text-sm text-gray-500 hover:text-gray-800"
+          >
+            ← Back to class
+          </Link>
+        </form>
       </div>
     )
   }
@@ -271,7 +490,12 @@ export default function StudentExamSessionPage() {
             <div className="mt-16 flex flex-col items-center gap-4">
               <div className="w-6 h-6 border-2 border-white/25 border-t-white rounded-full animate-spin" />
               <p className="text-white/90 font-medium tracking-wide">
-                Waiting for {instructorWait} to start the exam…
+                {normalizeExamStatus(hit.exam.status) === PG_EXAM_STATUS.WAITING
+                  ? `Waiting for ${instructorWait} to start the exam…`
+                  : 'Preparing your exam…'}
+              </p>
+              <p className="text-white/60 text-sm max-w-md">
+                You are in the lobby. The timer starts when your instructor goes live.
               </p>
             </div>
             
@@ -305,6 +529,25 @@ export default function StudentExamSessionPage() {
             <CheckCircle2 className="w-10 h-10 text-green-600" />
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-4">Exam Submitted Successfully!</h1>
+          {submitError ? (
+            <p className="text-red-600 text-sm mb-4" role="alert">
+              {submitError} — contact your instructor if this persists.
+            </p>
+          ) : null}
+          {submitResult?.percentage != null ? (
+            <p className="text-gray-800 text-lg font-semibold mb-2">
+              Score: {submitResult.percentage}% ({submitResult.rawScore}/{submitResult.totalPoints} points)
+            </p>
+          ) : submitResult?.rawScore != null ? (
+            <p className="text-gray-800 text-lg font-semibold mb-2">
+              Score: {submitResult.rawScore}/{submitResult.totalPoints} points
+            </p>
+          ) : null}
+          {warningCount >= MAX_EXAM_WARNINGS ? (
+            <p className="text-amber-700 text-sm font-medium mb-4">
+              Your exam was auto-submitted after {MAX_EXAM_WARNINGS} integrity warnings.
+            </p>
+          ) : null}
           <p className="text-gray-600 text-lg mb-8">
             Thank you for completing the exam. Your responses have been recorded and securely submitted to your instructor.
           </p>
@@ -318,17 +561,33 @@ export default function StudentExamSessionPage() {
 
   // Main Question Layout
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div
+      className="min-h-screen bg-gray-50 flex flex-col"
+      onContextMenu={(e) => {
+        e.preventDefault()
+        recordViolation('other', 'Right-click')
+      }}
+    >
       {/* Header */}
       <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 shrink-0 z-10 sticky top-0">
         <div className="flex items-center gap-3">
           <PlpLogo className="w-8 h-8" />
           <h1 className="font-semibold text-gray-800 hidden sm:block truncate max-w-md">{examTitle}</h1>
         </div>
-        {/* Mobile Timer (Hidden on Desktop) */}
-        <div className="flex lg:hidden items-center gap-2 px-4 py-1.5 bg-gray-100 rounded-full font-mono text-gray-700 font-semibold">
-          <Clock className="w-4 h-4" />
-          {formatClock(secondsLeft)}
+        <div className="flex items-center gap-2">
+          <div
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold ${
+              warningCount >= 2 ? 'bg-red-100 text-red-800' : warningCount >= 1 ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 text-gray-600'
+            }`}
+            title="Integrity warnings — 3 strikes auto-submits your exam"
+          >
+            <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden />
+            {warningCount} / {MAX_EXAM_WARNINGS} warnings
+          </div>
+          <div className="flex lg:hidden items-center gap-2 px-4 py-1.5 bg-gray-100 rounded-full font-mono text-gray-700 font-semibold">
+            <Clock className="w-4 h-4" />
+            {formatClock(secondsLeft)}
+          </div>
         </div>
       </header>
 
@@ -420,7 +679,9 @@ export default function StudentExamSessionPage() {
                       type="text"
                       className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 transition-all text-lg"
                       value={answers[currentQ.id] || ''}
-                      onChange={(e) => setAnswers(prev => ({ ...prev, [currentQ.id]: e.target.value }))}
+                      onChange={(e) =>
+                        setAnswers((prev) => ({ ...prev, [currentQ.id]: e.target.value.toUpperCase() }))
+                      }
                       placeholder="Your answer..."
                       autoComplete="off"
                       spellCheck="false"
@@ -457,7 +718,7 @@ export default function StudentExamSessionPage() {
                   ) : (
                     <button 
                       type="button" 
-                      onClick={() => setScene('submitted')}
+                      onClick={() => submitToServer()}
                       className="px-6 py-2.5 rounded-lg font-medium bg-green-600 text-white hover:bg-green-700 active:bg-green-800 transition-colors shadow-sm"
                     >
                       Submit Exam
@@ -545,7 +806,7 @@ export default function StudentExamSessionPage() {
             </div>
             <button 
               type="button" 
-              onClick={() => setScene('submitted')}
+              onClick={() => submitToServer()}
               className="w-full px-6 py-3.5 rounded-xl font-semibold bg-gray-900 text-white hover:bg-gray-800 active:bg-black transition-colors shadow-sm"
             >
               Finish & Submit
@@ -564,12 +825,14 @@ export default function StudentExamSessionPage() {
         aria-modal="true"
       >
         <AlertTriangle className="w-20 h-20 mb-6 text-white" />
-        <h2 className="text-4xl font-bold mb-4">Suspicious Activity Detected!</h2>
-        <p className="text-xl opacity-90 mb-8 max-w-lg text-center">
-          Leaving the exam window or unauthorized keystrokes have been recorded.
+        <h2 className="text-4xl font-bold mb-4">Warning — Suspicious Activity!</h2>
+        <p className="text-xl opacity-90 mb-4 max-w-lg text-center">
+          {lastViolationLabel || 'A proctoring rule was violated.'} This incident was logged for your instructor and
+          administrator.
         </p>
         <div className="px-6 py-3 bg-red-900/50 rounded-full font-bold text-lg mb-8">
-          1 Strike Recorded
+          Strike {warningCount} of {MAX_EXAM_WARNINGS}
+          {warningCount >= MAX_EXAM_WARNINGS - 1 ? ' — one more ends your exam' : ''}
         </div>
         <p className="text-lg font-medium opacity-80 animate-pulse">
           Returning to exam in {detectionReturn} seconds...

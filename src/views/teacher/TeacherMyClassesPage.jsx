@@ -140,6 +140,8 @@ export default function TeacherMyClassesPage() {
         window.alert(data.error || 'Failed to create class.')
         return
       }
+      const codeMsg = data.accessCode ? `\n\nClass access code for students: ${data.accessCode}` : ''
+      window.alert(`Class created.${codeMsg}`)
       setCreateOpen(false)
       setCreateName('')
       setCreateAy('2025-2026')

@@ -15,6 +15,9 @@ const AdminExaminationsPage = lazy(() => import('./views/admin/AdminExaminations
 const AdminPlaceholderPage = lazy(() => import('./views/admin/AdminPlaceholderPage.jsx'))
 const AdminUserManagementPage = lazy(() => import('./views/admin/AdminUserManagementPage.jsx'))
 const AdminSettingsPage = lazy(() => import('./views/admin/AdminSettingsPage.jsx'))
+const AdminViolationsPage = lazy(() => import('./views/admin/AdminViolationsPage.jsx'))
+const AdminMonitoringPage = lazy(() => import('./views/admin/AdminMonitoringPage.jsx'))
+const AdminReportsPage = lazy(() => import('./views/admin/AdminReportsPage.jsx'))
 const DevPortalsPage = lazy(() => import('./views/DevPortalsPage.jsx'))
 
 const StudentClassStreamPage = lazy(() => import('./views/student/StudentClassStreamPage.jsx'))
@@ -112,10 +115,10 @@ export default function App() {
         <Route path="subjects" element={<AdminPlaceholderPage title="Subjects" />} />
         <Route path="classes" element={<AdminExaminationsPage />} />
         <Route path="examinations" element={<Navigate to="/admin/classes" replace />} />
-        <Route path="monitoring" element={<AdminPlaceholderPage title="Monitoring" />} />
-        <Route path="violations" element={<AdminPlaceholderPage title="Violation records" />} />
+        <Route path="monitoring" element={<AdminMonitoringPage />} />
+        <Route path="violations" element={<AdminViolationsPage />} />
         <Route path="users" element={<AdminUserManagementPage basePath="/admin" />} />
-        <Route path="reports" element={<AdminPlaceholderPage title="Reports" />} />
+        <Route path="reports" element={<AdminReportsPage />} />
         <Route path="settings" element={<AdminSettingsPage basePath="/admin" />} />
       </Route>
       <Route

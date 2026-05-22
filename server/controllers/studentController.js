@@ -22,10 +22,7 @@ export async function enroll(req, res) {
 export async function getClasses(req, res) {
   try {
     const classes = await getEnrolledClasses(req.memberId);
-    // Include an empty exams array for each class so the frontend doesn't break
-    // Since we are only building class enrollment right now, exams will be empty.
-    const withExams = classes.map(c => ({ ...c, exams: [] }));
-    return res.json(withExams);
+    return res.json(classes);
   } catch (err) {
     console.error('[studentController.getClasses]', err);
     return res.status(500).json({ error: 'Internal server error.' });

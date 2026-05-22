@@ -1,8 +1,14 @@
+<<<<<<< Updated upstream
+=======
+import { getExamsByClassIdQuery } from '../repositories/examRepository.js'
+import { getStudentSessionsForExamsQuery } from '../repositories/examSessionRepository.js'
+>>>>>>> Stashed changes
 import {
   checkEnrollment,
   enrollStudent,
   findClassByAccessCode,
   getEnrolledClasses as getClassesRepo,
+<<<<<<< Updated upstream
   getStudentMember,
 } from '../repositories/studentRepository.js';
 
@@ -24,17 +30,45 @@ export async function enrollByAccessCode(memberId, code) {
 
   if (targetClass.institution_id !== student.institution_id) {
     return { ok: false, error: 'This class code does not belong to your school.' };
+=======
+} from '../repositories/studentRepository.js'
+
+export async function enrollByAccessCode(memberId, code) {
+  const targetClass = await findClassByAccessCode(code)
+  if (!targetClass) {
+    return { ok: false, error: 'Invalid or inactive access code.' }
+>>>>>>> Stashed changes
   }
 
-  const isEnrolled = await checkEnrollment(memberId, targetClass.class_id);
+  const isEnrolled = await checkEnrollment(memberId, targetClass.class_id)
   if (isEnrolled) {
-    return { ok: true, already: true, className: targetClass.class_name };
+    return { ok: true, already: true, className: targetClass.class_name }
   }
 
-  await enrollStudent(memberId, targetClass.class_id);
-  return { ok: true, already: false, className: targetClass.class_name };
+  await enrollStudent(memberId, targetClass.class_id)
+  return { ok: true, already: false, className: targetClass.class_name }
 }
 
 export async function getEnrolledClasses(memberId) {
-  return await getClassesRepo(memberId);
+  const classes = await getClassesRepo(memberId)
+  const withExams = await Promise.all(
+    classes.map(async (c) => {
+      const exams = await getExamsByClassIdQuery(c.id, true)
+      if (!exams.length) return { ...c, exams }
+      const examIds = exams.map((e) => e.id)
+      const sessions = await getStudentSessionsForExamsQuery(examIds, memberId)
+      const byExam = new Map(sessions.map((s) => [Number(s.exam_id), s]))
+      const enriched = exams.map((exam) => {
+        const sess = byExam.get(Number(exam.id))
+        if (!sess) return exam
+        return {
+          ...exam,
+          sessionStatus: sess.status,
+          percentage: sess.percentage != null ? Number(sess.percentage) : null,
+        }
+      })
+      return { ...c, exams: enriched }
+    }),
+  )
+  return withExams
 }

@@ -1,51 +1,110 @@
 import { useEffect, useState, useMemo } from 'react'
-import { getAllExamsWithClassMeta } from '@/lib/classesExams.js'
+import { fetchTeacherExamResults, fetchTeacherReportExams } from '@/lib/teacherExamResultsApi.js'
 import '../../pages/teacher-ui/reports.css'
+
+function formatDate(iso) {
+  if (!iso) return '—'
+  try {
+    return new Date(iso).toLocaleString()
+  } catch {
+    return '—'
+  }
+}
 
 export default function TeacherReportsPage() {
   const [selectedExamId, setSelectedExamId] = useState('')
   const [activeTab, setActiveTab] = useState('detailed')
   const [allExams, setAllExams] = useState([])
+  const [loadingExams, setLoadingExams] = useState(true)
+  const [loadingReport, setLoadingReport] = useState(false)
+  const [reportError, setReportError] = useState(null)
+  const [stats, setStats] = useState(null)
+  const [sessions, setSessions] = useState([])
+  const [violations, setViolations] = useState([])
 
-  // DEVS: Populate these states based on the selectedExamId
-  const [reportDetails, setReportDetails] = useState([]) // Student detailed performance
-  const [violations, setViolations] = useState([]) // List of cheating logs
-
-  // Fetch all exams from local storage/backend on mount
   useEffect(() => {
-    const exams = getAllExamsWithClassMeta()
-    // Optional: Filter to only show 'Completed' or 'Closed' exams
-    // const closedExams = exams.filter(e => e.status.toLowerCase() === 'closed')
-    setAllExams(exams)
+    let cancelled = false
+    async function load() {
+      setLoadingExams(true)
+      try {
+        const exams = await fetchTeacherReportExams()
+        if (!cancelled) setAllExams(exams)
+      } catch (err) {
+        if (!cancelled) setAllExams([])
+        console.error(err)
+      } finally {
+        if (!cancelled) setLoadingExams(false)
+      }
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
-  // DEVS: Trigger data fetch when an exam is selected
+  const currentExam = useMemo(() => {
+    return allExams.find((e) => String(e.id) === String(selectedExamId))
+  }, [allExams, selectedExamId])
+
   useEffect(() => {
-    if (selectedExamId) {
-      // fetchReportData(selectedExamId).then(data => setReportDetails(data))
-      // fetchViolations(selectedExamId).then(data => setViolations(data))
+    if (!currentExam?.classId || !currentExam?.id) {
+      setStats(null)
+      setSessions([])
+      setViolations([])
+      return undefined
     }
-  }, [selectedExamId])
+
+    let cancelled = false
+    async function loadReport() {
+      setLoadingReport(true)
+      setReportError(null)
+      try {
+        const data = await fetchTeacherExamResults(currentExam.classId, currentExam.id)
+        if (cancelled) return
+        setStats(data.stats || null)
+        setSessions(data.sessions || [])
+        setViolations(data.violations || [])
+      } catch (err) {
+        if (!cancelled) {
+          setReportError(err instanceof Error ? err.message : 'Failed to load report.')
+          setStats(null)
+          setSessions([])
+          setViolations([])
+        }
+      } finally {
+        if (!cancelled) setLoadingReport(false)
+      }
+    }
+
+    loadReport()
+    const interval = window.setInterval(loadReport, 8000)
+    return () => {
+      cancelled = true
+      window.clearInterval(interval)
+    }
+  }, [currentExam?.classId, currentExam?.id])
 
   const handleExport = (format) => {
     window.alert(`Preparing ${format} download. The file will be saved shortly.`)
-    // DEVS: Connect to backend export API here
   }
 
   const handleChangeExam = () => {
-    setSelectedExamId('') 
-    setActiveTab('detailed') 
+    setSelectedExamId('')
+    setActiveTab('detailed')
   }
 
-  const currentExam = useMemo(() => {
-    return allExams.find(e => String(e.id) === String(selectedExamId))
-  }, [allExams, selectedExamId])
+  const submittedSessions = sessions.filter((s) => s.status === 'submitted')
+  const avgScore =
+    submittedSessions.filter((s) => s.percentage != null).length > 0
+      ? Math.round(
+          submittedSessions.reduce((sum, s) => sum + Number(s.percentage || 0), 0) /
+            submittedSessions.filter((s) => s.percentage != null).length,
+        )
+      : null
 
   return (
     <div className="acsis-view reports-page">
       <div className="container" style={{ padding: 0 }}>
-        
-        {/* VIEW 1: EXAM SELECTION PANEL */}
         {!currentExam && (
           <div className="panel" style={{ maxWidth: '100%', marginBottom: '24px' }}>
             <div className="report-header" style={{ marginBottom: '20px' }}>
@@ -53,10 +112,10 @@ export default function TeacherReportsPage() {
                 Performance Report
               </h3>
               <p style={{ fontSize: '0.85rem', color: '#6b7280', margin: 0 }}>
-                Select an exam to view detailed performance report with scores and violations.
+                Select an exam to view scores and violations from the database.
               </p>
             </div>
-            
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxWidth: '800px' }}>
               <label htmlFor="exam-select" style={{ fontSize: '0.85rem', fontWeight: 700, color: '#374151' }}>
                 Select Exam
@@ -67,11 +126,13 @@ export default function TeacherReportsPage() {
                 value={selectedExamId}
                 onChange={(e) => setSelectedExamId(e.target.value)}
                 style={{ borderColor: '#d1d5db' }}
+                disabled={loadingExams}
               >
                 <option value="">Choose an exam...</option>
-                {allExams.map(exam => (
+                {allExams.map((exam) => (
                   <option key={exam.id} value={exam.id}>
-                    {exam.title || 'Untitled Exam'} ({exam.classGroup?.name || 'No Class'})
+                    {exam.title || 'Untitled Exam'} ({exam.className || 'Class'}) — {exam.submittedCount ?? 0}{' '}
+                    submitted
                   </option>
                 ))}
               </select>
@@ -79,70 +140,94 @@ export default function TeacherReportsPage() {
           </div>
         )}
 
-        {/* VIEW 2: DETAILED REPORT PANEL */}
         {currentExam && (
           <>
-            {/* Top Context and Controls Card */}
             <div className="panel">
               <div className="exam-title-row">
                 <div>
                   <h2>{currentExam.title}</h2>
-                  <p>{currentExam.classGroup?.name} • {currentExam.questionCount} questions</p>
+                  <p>
+                    {currentExam.className} · {stats ? `${stats.submitted}/${stats.enrolled} submitted` : 'Loading…'}
+                  </p>
                 </div>
-                <button className="btn-ghost-text" onClick={handleChangeExam}>Change Exam</button>
+                <button type="button" className="btn-ghost-text" onClick={handleChangeExam}>
+                  Change Exam
+                </button>
               </div>
-              
+
               <div className="tabs-and-actions-row">
                 <div className="tabs-group">
-                  <button 
-                    className={`tab-btn ${activeTab === 'summary' ? 'active' : ''}`} 
+                  <button
+                    type="button"
+                    className={`tab-btn ${activeTab === 'summary' ? 'active' : ''}`}
                     onClick={() => setActiveTab('summary')}
                   >
                     Summary
                   </button>
-                  <button 
-                    className={`tab-btn ${activeTab === 'violations' ? 'active' : ''}`} 
+                  <button
+                    type="button"
+                    className={`tab-btn ${activeTab === 'violations' ? 'active' : ''}`}
                     onClick={() => setActiveTab('violations')}
                   >
                     Violations
                   </button>
-                  <button 
-                    className={`tab-btn ${activeTab === 'detailed' ? 'active' : ''}`} 
+                  <button
+                    type="button"
+                    className={`tab-btn ${activeTab === 'detailed' ? 'active' : ''}`}
                     onClick={() => setActiveTab('detailed')}
                   >
                     Detailed
                   </button>
                 </div>
-                
+
                 <div className="action-group">
-                  <button className="btn-action btn-blue" onClick={() => handleExport('CSV')}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                      <polyline points="7 10 12 15 17 10"></polyline>
-                      <line x1="12" y1="15" x2="12" y2="3"></line>
-                    </svg>
+                  <button type="button" className="btn-action btn-blue" onClick={() => handleExport('CSV')}>
                     Download CSV
                   </button>
-                  <button className="btn-action btn-green" onClick={() => handleExport('PDF')}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-                      <polyline points="6 9 6 2 18 2 18 9"></polyline>
-                      <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
-                      <rect x="6" y="14" width="12" height="8"></rect>
-                    </svg>
+                  <button type="button" className="btn-action btn-green" onClick={() => handleExport('PDF')}>
                     Print PDF
                   </button>
                 </div>
               </div>
             </div>
 
-            {/* Tab Content Areas */}
+            {reportError ? (
+              <p className="text-sm text-red-600 px-1" role="alert">
+                {reportError}
+              </p>
+            ) : null}
+            {loadingReport && !stats ? (
+              <p className="text-sm text-gray-500 px-1">Loading report data…</p>
+            ) : null}
+
             {activeTab === 'summary' && (
               <div className="tab-panel active panel">
                 <div className="report-header">
                   <h3>Summary Report</h3>
                   <p>{currentExam.title}</p>
                 </div>
-                <p className="text-gray">Overview metrics will appear here.</p>
+                {stats ? (
+                  <div className="sdc-stats" style={{ maxWidth: 520 }}>
+                    <div className="sdc-stat">
+                      <div className="stat-val">{stats.enrolled}</div>
+                      <div className="stat-lbl">Enrolled</div>
+                    </div>
+                    <div className="sdc-stat">
+                      <div className="stat-val">{stats.joined}</div>
+                      <div className="stat-lbl">Joined</div>
+                    </div>
+                    <div className="sdc-stat">
+                      <div className="stat-val text-green">{stats.submitted}</div>
+                      <div className="stat-lbl">Submitted</div>
+                    </div>
+                    <div className="sdc-stat">
+                      <div className="stat-val">{avgScore != null ? `${avgScore}%` : '—'}</div>
+                      <div className="stat-lbl">Class average</div>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-gray">No summary data yet.</p>
+                )}
               </div>
             )}
 
@@ -152,19 +237,31 @@ export default function TeacherReportsPage() {
                   <h3>Violations Report</h3>
                   <p>{currentExam.title}</p>
                 </div>
-                
+
                 <div className="violation-alert-box">
-                  <div className="alert-title">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
-                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-                      <line x1="12" y1="9" x2="12" y2="13"></line>
-                      <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                    </svg>
-                    Total Violations Detected
-                  </div>
+                  <div className="alert-title">Total Violations Detected</div>
                   <div className="alert-count">{violations.length}</div>
-                  <div className="alert-sub">Waiting for violation data...</div>
+                  <div className="alert-sub">From proctoring logs for this exam</div>
                 </div>
+
+                {violations.length === 0 ? (
+                  <p className="text-sm text-gray-500">No violations logged for this exam.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {violations.map((v) => (
+                      <li
+                        key={v.id}
+                        className="text-sm border border-gray-100 rounded-lg p-3 bg-gray-50 flex flex-wrap justify-between gap-2"
+                      >
+                        <span>
+                          <strong>{v.studentName}</strong> ({v.schoolId || '—'}) — {v.eventType}
+                          {v.details ? `: ${v.details}` : ''}
+                        </span>
+                        <span className="text-gray-500">{formatDate(v.occurredAt)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             )}
 
@@ -175,13 +272,46 @@ export default function TeacherReportsPage() {
                   <p>{currentExam.title}</p>
                 </div>
 
-                {reportDetails.length === 0 ? (
-                  <p className="text-sm text-gray-500">No student submissions available for this exam yet.</p>
+                {sessions.length === 0 ? (
+                  <p className="text-sm text-gray-500">No student sessions yet. Students must join and submit the exam.</p>
                 ) : (
-                  reportDetails.map((student, idx) => (
-                    <div key={idx} className="student-detail-card">
-                      {/* DEVS: Map real student data here using the layout classes provided in CSS */}
-                      <p>Student card placeholder</p>
+                  sessions.map((student) => (
+                    <div key={student.sessionId} className="student-detail-card">
+                      <div className="sdc-header">
+                        <div className="sdc-info">
+                          <h4>{student.studentName}</h4>
+                          <span>{student.schoolId || '—'} · {student.status}</span>
+                        </div>
+                        <div className="sdc-score">
+                          {student.status === 'submitted' && student.percentage != null ? (
+                            <>
+                              <div className="score-val text-green">{student.percentage}%</div>
+                              <div className="score-lbl">
+                                {student.rawScore}/{student.totalPoints} pts
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="score-val text-gray">—</div>
+                              <div className="score-lbl">Not submitted</div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      <div className="sdc-stats">
+                        <div className="sdc-stat">
+                          <div className="stat-val">{student.answerCount}</div>
+                          <div className="stat-lbl">Answers saved</div>
+                        </div>
+                        <div className="sdc-stat">
+                          <div className="stat-val text-red">{student.warningCount}</div>
+                          <div className="stat-lbl">Warnings</div>
+                        </div>
+                        <div className="sdc-stat">
+                          <div className="stat-val">{formatDate(student.submittedAt)}</div>
+                          <div className="stat-lbl">Submitted</div>
+                        </div>
+                      </div>
                     </div>
                   ))
                 )}
@@ -189,7 +319,6 @@ export default function TeacherReportsPage() {
             )}
           </>
         )}
-
       </div>
     </div>
   )

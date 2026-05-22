@@ -1,7 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { apiFetch } from '@/lib/apiFetch.js'
-import { isExamDraft, isExamOngoing, labelForPgExamStatus } from '@/lib/examFlowUi.js'
+import { fetchTeacherExamResults } from '@/lib/teacherExamResultsApi.js'
+import {
+  isExamDraft,
+  isExamOngoing,
+  labelForPgExamStatus,
+  PG_EXAM_STATUS,
+  normalizeExamStatus,
+} from '@/lib/examFlowUi.js'
 import '../../pages/teacher-ui/my_classes.css'
 
 async function copyExamCode(code) {
@@ -21,6 +28,8 @@ export default function TeacherExamDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [refreshTick, setRefreshTick] = useState(0)
+  const [results, setResults] = useState(null)
+  const [resultsLoading, setResultsLoading] = useState(false)
 
   useEffect(() => {
     async function fetchExam() {
@@ -41,6 +50,28 @@ export default function TeacherExamDetailPage() {
       }
     }
     fetchExam()
+  }, [classId, examId, refreshTick])
+
+  useEffect(() => {
+    if (!classId || !examId) return undefined
+    let cancelled = false
+    async function loadResults() {
+      setResultsLoading(true)
+      try {
+        const data = await fetchTeacherExamResults(classId, examId)
+        if (!cancelled) setResults(data)
+      } catch {
+        if (!cancelled) setResults(null)
+      } finally {
+        if (!cancelled) setResultsLoading(false)
+      }
+    }
+    loadResults()
+    const interval = window.setInterval(loadResults, 6000)
+    return () => {
+      cancelled = true
+      window.clearInterval(interval)
+    }
   }, [classId, examId, refreshTick])
 
   if (loading) {
@@ -75,11 +106,45 @@ export default function TeacherExamDetailPage() {
       const res = await apiFetch(`/api/teacher/classes/${classId}/exams/${examId}`, {
         method: 'PUT'
       })
+      const data = await res.json()
       if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error || 'Failed to publish exam.')
+        throw new Error(data.error || 'Failed to publish exam.')
+      }
+      if (data.code) {
+        window.alert(`Exam published.\n\nShare this code with students: ${data.code}`)
       }
       setRefreshTick(t => t + 1)
+    } catch (err) {
+      alert(err.message)
+    }
+  }
+
+  async function endExam() {
+    if (!window.confirm('End this exam? Students will no longer be able to enter or submit.')) return
+    try {
+      const res = await apiFetch(`/api/teacher/classes/${classId}/exams/${examId}/close`, {
+        method: 'PUT',
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Failed to end exam.')
+      }
+      setRefreshTick((t) => t + 1)
+    } catch (err) {
+      alert(err.message)
+    }
+  }
+
+  async function startExam() {
+    try {
+      const res = await apiFetch(`/api/teacher/classes/${classId}/exams/${examId}/start`, {
+        method: 'PUT',
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Failed to start exam.')
+      }
+      setRefreshTick((t) => t + 1)
     } catch (err) {
       alert(err.message)
     }
@@ -156,7 +221,17 @@ export default function TeacherExamDetailPage() {
           </button>
           {draft ? (
             <button type="button" className="acsis-btn-primary" onClick={publish}>
-              Publish exam
+              Publish exam (share code)
+            </button>
+          ) : null}
+          {normalizeExamStatus(exam.status) === PG_EXAM_STATUS.WAITING ? (
+            <button type="button" className="acsis-btn-primary" onClick={startExam}>
+              Start exam (go live)
+            </button>
+          ) : null}
+          {active ? (
+            <button type="button" className="acsis-btn-ghost" onClick={endExam}>
+              End exam (close for students)
             </button>
           ) : null}
           <Link to={createHref} className="acsis-btn-ghost" style={{ textDecoration: 'none', display: 'inline-block' }}>
@@ -168,9 +243,55 @@ export default function TeacherExamDetailPage() {
         </div>
 
         <p className="acsis-mc-sub" style={{ marginTop: 22, fontSize: '0.8125rem', lineHeight: 1.5 }}>
-          When this exam is on-going, students join with the code above. Use Detections and Reports in the sidebar to
-          follow sessions and results.
+          When this exam is on-going, students join with the code above. Submissions below update automatically.
         </p>
+
+        <section style={{ marginTop: 28, borderTop: '1px solid #e5e7eb', paddingTop: 20 }}>
+          <h2 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: 8 }}>Student submissions</h2>
+          {results?.stats ? (
+            <p className="acsis-mc-sub" style={{ marginBottom: 12 }}>
+              {results.stats.submitted} submitted · {results.stats.joined} joined · {results.stats.enrolled} enrolled
+            </p>
+          ) : null}
+          {resultsLoading && !results ? (
+            <p className="acsis-mc-sub">Loading submissions…</p>
+          ) : null}
+          {!resultsLoading && (!results?.sessions || results.sessions.length === 0) ? (
+            <p className="acsis-mc-sub">No students have joined or submitted yet.</p>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', fontSize: '0.875rem', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid #e5e7eb', textAlign: 'left' }}>
+                    <th style={{ padding: '8px 6px' }}>Student</th>
+                    <th style={{ padding: '8px 6px' }}>Status</th>
+                    <th style={{ padding: '8px 6px' }}>Score</th>
+                    <th style={{ padding: '8px 6px' }}>Warnings</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(results?.sessions || []).map((s) => (
+                    <tr key={s.sessionId} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                      <td style={{ padding: '8px 6px' }}>
+                        {s.studentName}
+                        {s.schoolId ? (
+                          <span style={{ display: 'block', fontSize: '0.75rem', color: '#6b7280' }}>{s.schoolId}</span>
+                        ) : null}
+                      </td>
+                      <td style={{ padding: '8px 6px' }}>{s.status}</td>
+                      <td style={{ padding: '8px 6px' }}>
+                        {s.status === 'submitted' && s.percentage != null
+                          ? `${s.percentage}% (${s.rawScore}/${s.totalPoints})`
+                          : '—'}
+                      </td>
+                      <td style={{ padding: '8px 6px' }}>{s.warningCount}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
       </div>
     </div>
   )

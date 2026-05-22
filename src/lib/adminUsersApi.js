@@ -1,4 +1,4 @@
-const API_BASE = ''
+import { apiFetch } from './apiFetch.js'
 
 async function parseJson(res) {
   const data = await res.json().catch(() => ({}))
@@ -10,25 +10,23 @@ async function parseJson(res) {
 }
 
 export async function fetchAdminUsers() {
-  const res = await fetch(`${API_BASE}/api/admin/users`, { credentials: 'include' })
+  const res = await apiFetch('/api/admin/users')
   return parseJson(res)
 }
 
 export async function createAdminUser(payload) {
-  const res = await fetch(`${API_BASE}/api/admin/users`, {
+  const res = await apiFetch('/api/admin/users', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
     body: JSON.stringify(payload),
   })
   return parseJson(res)
 }
 
 export async function updateAdminUser(uid, payload) {
-  const res = await fetch(`${API_BASE}/api/admin/users/${uid}`, {
+  const res = await apiFetch(`/api/admin/users/${uid}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
     body: JSON.stringify(payload),
   })
   return parseJson(res)

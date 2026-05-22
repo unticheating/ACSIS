@@ -1,0 +1,250 @@
+import { getPool } from '../db.js'
+import { normalizeExamPassword } from '../lib/examCodes.js'
+import { EXAM_STATUS, nextStatusAfterStart } from '../lib/examStatus.js'
+import {
+  createExamSessionQuery,
+  findChoiceIdByTextQuery,
+  findExamSessionQuery,
+  getExamForJoinQuery,
+  getSessionForStudentQuery,
+  gradeSessionAnswersQuery,
+  incrementSessionWarningQuery,
+  insertCheatingLogQuery,
+  isValidCheatEvent,
+  markSessionSubmittedQuery,
+  updateExamStatusByIdQuery,
+  upsertStudentAnswerQuery,
+} from '../repositories/examSessionRepository.js'
+import { getExamWithQuestionsQuery } from '../repositories/examRepository.js'
+import { checkEnrollment } from '../repositories/studentRepository.js'
+
+function mapExamMeta(row) {
+  return {
+    id: row.exam_id,
+    title: row.title,
+    duration: row.time_limit,
+    status: row.status,
+    code: row.password,
+  }
+}
+
+export async function joinExamService(classId, examId, studentMemberId, passwordInput) {
+  const enrolled = await checkEnrollment(studentMemberId, classId)
+  if (!enrolled) {
+    return { ok: false, status: 403, error: 'NOT_ENROLLED' }
+  }
+
+  const exam = await getExamForJoinQuery(classId, examId)
+  if (!exam) {
+    return { ok: false, status: 404, error: 'Exam not found.' }
+  }
+
+  const status = (exam.status || '').toLowerCase()
+  if (status === EXAM_STATUS.DRAFT) {
+    return { ok: false, status: 403, error: 'This exam is not published yet.' }
+  }
+  if (status === EXAM_STATUS.CLOSED) {
+    return { ok: false, status: 403, error: 'This exam has ended.' }
+  }
+
+  const expected = normalizeExamPassword(exam.password)
+  const given = normalizeExamPassword(passwordInput)
+  if (!expected) {
+    return { ok: false, status: 400, error: 'This exam has no code set. Ask your instructor to republish it.' }
+  }
+  if (!given || given !== expected) {
+    return { ok: false, status: 401, error: 'Incorrect exam code.' }
+  }
+
+  let session = await findExamSessionQuery(examId, studentMemberId)
+  if (session?.status === 'submitted') {
+    return { ok: false, status: 400, error: 'You already submitted this exam.' }
+  }
+  if (!session) {
+    session = await createExamSessionQuery(examId, studentMemberId)
+  }
+
+  return {
+    ok: true,
+    sessionId: session.session_id,
+    sessionStatus: session.status,
+    exam: mapExamMeta(exam),
+  }
+}
+
+export async function getStudentExamSessionService(classId, examId, studentMemberId) {
+  const enrolled = await checkEnrollment(studentMemberId, classId)
+  if (!enrolled) {
+    return { ok: false, status: 403, error: 'NOT_ENROLLED' }
+  }
+
+  const examRow = await getExamForJoinQuery(classId, examId)
+  if (!examRow) {
+    return { ok: false, status: 404, error: 'Exam not found.' }
+  }
+
+  const status = (examRow.status || '').toLowerCase()
+  if (status === EXAM_STATUS.DRAFT) {
+    return { ok: false, status: 403, error: 'This exam is not published yet.' }
+  }
+
+  const session = await findExamSessionQuery(examId, studentMemberId)
+  const examMeta = mapExamMeta(examRow)
+  const payload = {
+    joined: Boolean(session),
+    sessionId: session?.session_id ?? null,
+    sessionStatus: session?.status ?? null,
+    warningCount: session?.warning_count ?? 0,
+    exam: examMeta,
+    questions: [],
+    result: null,
+  }
+
+  if (session?.status === 'submitted') {
+    const pool = getPool()
+    const { rows } = await pool.query(
+      `SELECT raw_score, total_points, percentage
+       FROM exam_results WHERE session_id = $1`,
+      [session.session_id],
+    )
+    if (rows[0]) {
+      payload.result = {
+        rawScore: Number(rows[0].raw_score),
+        totalPoints: Number(rows[0].total_points),
+        percentage: Number(rows[0].percentage),
+      }
+    }
+    return { ok: true, ...payload }
+  }
+
+  if (status === EXAM_STATUS.OPEN && session) {
+    const full = await getExamWithQuestionsQuery(classId, examId, false)
+    if (full?.questions) {
+      payload.questions = full.questions
+      payload.exam = { ...examMeta, ...full, code: examMeta.code }
+    }
+  }
+
+  return { ok: true, ...payload }
+}
+
+export async function startExamService(classId, examId) {
+  const exam = await getExamForJoinQuery(classId, examId)
+  if (!exam) {
+    return { ok: false, status: 404, error: 'Exam not found.' }
+  }
+
+  const next = nextStatusAfterStart(exam.status)
+  if (!next) {
+    return { ok: false, status: 400, error: 'Only exams in the lobby (waiting) can be started.' }
+  }
+
+  const updated = await updateExamStatusByIdQuery(classId, examId, next)
+  if (!updated) {
+    return { ok: false, status: 500, error: 'Failed to start exam.' }
+  }
+
+  return { ok: true, status: next }
+}
+
+async function requireOpenSession(classId, examId, studentMemberId) {
+  const enrolled = await checkEnrollment(studentMemberId, classId)
+  if (!enrolled) {
+    return { ok: false, status: 403, error: 'NOT_ENROLLED' }
+  }
+
+  const exam = await getExamForJoinQuery(classId, examId)
+  if (!exam) {
+    return { ok: false, status: 404, error: 'Exam not found.' }
+  }
+
+  if ((exam.status || '').toLowerCase() !== EXAM_STATUS.OPEN) {
+    return { ok: false, status: 403, error: 'Exam is not live yet.' }
+  }
+
+  const session = await getSessionForStudentQuery(examId, studentMemberId)
+  if (!session) {
+    return { ok: false, status: 403, error: 'Join the exam with your exam code first.' }
+  }
+  if (session.status === 'submitted') {
+    return { ok: false, status: 400, error: 'You already submitted this exam.' }
+  }
+
+  return { ok: true, exam, session }
+}
+
+export async function logCheatingEventService(classId, examId, studentMemberId, eventType, details) {
+  if (!isValidCheatEvent(eventType)) {
+    return { ok: false, status: 400, error: 'Invalid event type.' }
+  }
+
+  const gate = await requireOpenSession(classId, examId, studentMemberId)
+  if (!gate.ok) return gate
+
+  await insertCheatingLogQuery(gate.session.session_id, eventType, details || null)
+  const warningCount = await incrementSessionWarningQuery(gate.session.session_id)
+
+  let autoSubmitted = false
+  let scores = { rawScore: 0, totalPoints: 0 }
+  if (warningCount >= 3) {
+    await markSessionSubmittedQuery(gate.session.session_id)
+    try {
+      scores = await gradeSessionAnswersQuery(gate.session.session_id)
+    } catch (err) {
+      console.error('[examSessionService.logCheating] auto-submit grade failed:', err)
+    }
+    autoSubmitted = true
+  }
+
+  return {
+    ok: true,
+    warningCount,
+    sessionId: gate.session.session_id,
+    autoSubmitted,
+    rawScore: scores.rawScore,
+    totalPoints: scores.totalPoints,
+    percentage:
+      scores.totalPoints > 0
+        ? Math.round((scores.rawScore / scores.totalPoints) * 10000) / 100
+        : 0,
+  }
+}
+
+export async function submitExamService(classId, examId, studentMemberId, answersPayload) {
+  const gate = await requireOpenSession(classId, examId, studentMemberId)
+  if (!gate.ok) return gate
+
+  const answers = Array.isArray(answersPayload) ? answersPayload : []
+  for (const row of answers) {
+    const questionId = Number(row?.questionId)
+    if (!Number.isFinite(questionId)) continue
+
+    let choiceId = row.choiceId != null ? Number(row.choiceId) : null
+    const answerText = row.answerText != null ? String(row.answerText) : null
+
+    if (!choiceId && answerText) {
+      choiceId = await findChoiceIdByTextQuery(questionId, answerText)
+    }
+
+    await upsertStudentAnswerQuery(gate.session.session_id, questionId, { choiceId, answerText })
+  }
+
+  await markSessionSubmittedQuery(gate.session.session_id)
+  let scores = { rawScore: 0, totalPoints: 0 }
+  try {
+    scores = await gradeSessionAnswersQuery(gate.session.session_id)
+  } catch (err) {
+    console.error('[examSessionService.submitExam] grading failed:', err)
+  }
+
+  return {
+    ok: true,
+    sessionId: gate.session.session_id,
+    rawScore: scores.rawScore,
+    totalPoints: scores.totalPoints,
+    percentage:
+      scores.totalPoints > 0
+        ? Math.round((scores.rawScore / scores.totalPoints) * 10000) / 100
+        : 0,
+  }
+}

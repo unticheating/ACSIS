@@ -1,36 +1,103 @@
+import { useCallback, useEffect, useState } from 'react'
 import { SummaryStatCard, SummaryStatGrid } from '@/components/dashboard/SummaryStatCard.jsx'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx'
+import { Badge } from '@/components/ui/badge.jsx'
+import { fetchStudentPerformance } from '@/lib/studentPerformanceApi.js'
 
-/** Placeholder analytics until grades API exists — matches ACSIS shell + green accent. */
+function formatDate(iso) {
+  if (!iso) return '—'
+  try {
+    return new Date(iso).toLocaleString()
+  } catch {
+    return '—'
+  }
+}
+
 export default function StudentPerformancePage() {
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const result = await fetchStudentPerformance()
+      setData(result)
+    } catch (err) {
+      setData(null)
+      setError(err instanceof Error ? err.message : 'Failed to load performance.')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  const submitted = (data?.attempts || []).filter((a) => a.status === 'submitted')
+
   return (
     <div className="acsis-view space-y-6">
       <div>
         <h1 className="text-xl font-bold tracking-tight text-foreground">Performance</h1>
         <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-          Track how you are doing across enrolled classes. Live charts will connect to your institution&apos;s gradebook.
+          Your exam scores and submissions from enrolled classes.
         </p>
       </div>
 
+      {error ? (
+        <p className="text-sm text-destructive" role="alert">
+          {error}
+        </p>
+      ) : null}
+
       <SummaryStatGrid>
-        <SummaryStatCard label="Average (demo)" value="—" hint="No graded attempts yet." tone="success" />
-        <SummaryStatCard label="Exams completed" value={0} tone="success" />
-        <SummaryStatCard label="Integrity strikes (demo)" value={0} tone="danger" />
+        <SummaryStatCard
+          label="Average score"
+          value={data?.averagePercentage != null ? `${data.averagePercentage}%` : '—'}
+          hint={submitted.length ? `From ${submitted.length} submitted exam(s)` : 'No graded attempts yet.'}
+          tone="success"
+        />
+        <SummaryStatCard label="Exams completed" value={data?.examsCompleted ?? 0} tone="success" />
+        <SummaryStatCard label="Integrity warnings" value={data?.totalWarnings ?? 0} tone="danger" />
       </SummaryStatGrid>
 
       <Card>
         <CardHeader>
-          <CardTitle>Readiness</CardTitle>
-          <CardDescription>Example progress bar using the same green system as the rest of ACSIS.</CardDescription>
+          <CardTitle>Exam history</CardTitle>
+          <CardDescription>Submitted and in-progress attempts.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-2">
-          <div className="flex justify-between text-xs text-muted-foreground">
-            <span>Course goals (placeholder)</span>
-            <span>42%</span>
-          </div>
-          <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-            <div className="h-full w-[42%] rounded-full bg-primary transition-all" />
-          </div>
+        <CardContent>
+          {loading ? (
+            <p className="text-sm text-muted-foreground">Loading…</p>
+          ) : !data?.attempts?.length ? (
+            <p className="text-sm text-muted-foreground">No exam attempts yet. Join a class exam and submit your answers.</p>
+          ) : (
+            <ul className="space-y-3">
+              {data.attempts.map((a) => (
+                <li
+                  key={a.sessionId}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3"
+                >
+                  <div>
+                    <p className="font-medium text-foreground">{a.examTitle}</p>
+                    <p className="text-xs text-muted-foreground">{a.className}</p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 text-sm">
+                    <Badge variant={a.status === 'submitted' ? 'default' : 'secondary'}>{a.status}</Badge>
+                    {a.status === 'submitted' && a.percentage != null ? (
+                      <span className="font-semibold text-primary">
+                        {a.percentage}% ({a.rawScore}/{a.totalPoints})
+                      </span>
+                    ) : null}
+                    <span className="text-muted-foreground text-xs">{formatDate(a.submittedAt)}</span>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </CardContent>
       </Card>
     </div>

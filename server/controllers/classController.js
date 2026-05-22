@@ -1,5 +1,10 @@
 import { getPool } from '../db.js';
-import { createClassService, getAdminClassesService, getTeacherClassesService, getTeacherDashboardStatsService } from '../services/classService.js';
+import { createClassService, getTeacherClassesService, getTeacherDashboardStatsService } from '../services/classService.js';
+import {
+  deleteAdminClassService,
+  getAdminClassesWithExamsService,
+  updateAdminClassService,
+} from '../services/adminService.js';
 
 export async function createAdminClass(req, res) {
   const { name, academicYear, semester, professorId } = req.body;
@@ -15,11 +20,35 @@ export async function createAdminClass(req, res) {
 }
 
 export async function getAdminClasses(req, res) {
-  const result = await getAdminClassesService(req.institutionId);
+  const result = await getAdminClassesWithExamsService(req.institutionId);
   if (!result.ok) {
     return res.status(500).json({ error: result.error });
   }
   return res.json(result.classes);
+}
+
+export async function updateAdminClass(req, res) {
+  const classId = Number(req.params.classId);
+  if (!Number.isFinite(classId)) {
+    return res.status(400).json({ error: 'Invalid class id.' });
+  }
+  const result = await updateAdminClassService(req.institutionId, classId, req.body);
+  if (!result.ok) {
+    return res.status(result.status || 500).json({ error: result.error });
+  }
+  return res.json(result.class);
+}
+
+export async function deleteAdminClass(req, res) {
+  const classId = Number(req.params.classId);
+  if (!Number.isFinite(classId)) {
+    return res.status(400).json({ error: 'Invalid class id.' });
+  }
+  const result = await deleteAdminClassService(req.institutionId, classId);
+  if (!result.ok) {
+    return res.status(result.status || 500).json({ error: result.error });
+  }
+  return res.json({ ok: true });
 }
 
 export async function getTeacherClasses(req, res) {

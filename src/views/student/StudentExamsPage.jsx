@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 const NEEDS_JOIN_CLASS_KEY = 'acsis.needsJoinClass'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button.jsx'
+<<<<<<< Updated upstream
 import {
   Dialog,
   DialogContent,
@@ -14,16 +15,19 @@ import {
 import { Input } from '@/components/ui/input.jsx'
 import { Label } from '@/components/ui/label.jsx'
 import { useSession } from '@/context/SessionContext.jsx'
+=======
+import { apiFetch } from '@/lib/apiFetch.js'
+>>>>>>> Stashed changes
 import '../../pages/student-ui/enrolled_classes.css'
 
 export default function StudentExamsPage() {
-  const { sessionMode, activeAccount } = useSession()
   const [joinCode, setJoinCode] = useState('')
   const [joinMsg, setJoinMsg] = useState(null)
   const [joining, setJoining] = useState(false)
   const [enrolled, setEnrolled] = useState([])
   const [loading, setLoading] = useState(true)
 
+<<<<<<< Updated upstream
   const [needsJoinClass, setNeedsJoinClass] = useState(
     () => sessionStorage.getItem(NEEDS_JOIN_CLASS_KEY) === '1',
   )
@@ -43,6 +47,11 @@ export default function StudentExamsPage() {
         headers: getHeaders(),
         credentials: 'include',
       })
+=======
+  const fetchClasses = useCallback(async () => {
+    try {
+      const res = await apiFetch('/api/student/classes')
+>>>>>>> Stashed changes
       if (!res.ok) throw new Error('Failed to fetch classes')
       const data = await res.json()
       setEnrolled(data)
@@ -51,7 +60,7 @@ export default function StudentExamsPage() {
     } finally {
       setLoading(false)
     }
-  }, [getHeaders])
+  }, [])
 
   useEffect(() => {
     fetchClasses()
@@ -65,11 +74,16 @@ export default function StudentExamsPage() {
 
     setJoining(true)
     try {
-      const res = await fetch('/api/student/enroll', {
+      const res = await apiFetch('/api/student/enroll', {
         method: 'POST',
+<<<<<<< Updated upstream
         headers: getHeaders(),
         credentials: 'include',
         body: JSON.stringify({ accessCode: code }),
+=======
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accessCode: joinCode }),
+>>>>>>> Stashed changes
       })
       const data = await res.json()
 

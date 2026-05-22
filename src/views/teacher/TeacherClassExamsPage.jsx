@@ -6,6 +6,7 @@ import {
   isExamOngoing,
   labelForPgExamStatus,
   PG_EXAM_STATUS,
+  normalizeExamStatus,
 } from '@/lib/examFlowUi.js'
 import { MoreVertical } from 'lucide-react'
 import {
@@ -90,7 +91,26 @@ export default function TeacherClassExamsPage() {
   async function publish(classId, examId) {
     try {
       const res = await apiFetch(`/api/teacher/classes/${classId}/exams/${examId}`, { method: 'PUT' })
-      if (!res.ok) throw new Error('Failed to publish')
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to publish')
+      }
+      if (data.code) {
+        window.alert(`Exam published.\n\nShare this code with students: ${data.code}`)
+      }
+      refresh()
+    } catch (err) {
+      alert(err.message)
+    }
+  }
+
+  async function startExam(classId, examId) {
+    try {
+      const res = await apiFetch(`/api/teacher/classes/${classId}/exams/${examId}/start`, { method: 'PUT' })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Failed to start exam')
+      }
       refresh()
     } catch (err) {
       alert(err.message)
@@ -204,7 +224,16 @@ export default function TeacherClassExamsPage() {
                                 publish(cls.id, exam.id)
                               }}
                             >
-                              Publish exam
+                              Publish exam (share code)
+                            </DropdownMenuItem>
+                          ) : null}
+                          {normalizeExamStatus(exam.status) === PG_EXAM_STATUS.WAITING ? (
+                            <DropdownMenuItem
+                              onSelect={() => {
+                                startExam(cls.id, exam.id)
+                              }}
+                            >
+                              Start exam (go live)
                             </DropdownMenuItem>
                           ) : null}
                           <DropdownMenuItem

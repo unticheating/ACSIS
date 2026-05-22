@@ -8,7 +8,9 @@ import {
 } from '../repositories/examRepository.js';
 import { getClassByIdQuery } from '../repositories/classRepository.js';
 import { checkEnrollment } from '../repositories/studentRepository.js';
-import { nextStatusAfterPublish } from '../lib/examStatus.js';
+import { nextStatusAfterClose, nextStatusAfterPublish } from '../lib/examStatus.js';
+import { getStudentSessionsForExamsQuery } from '../repositories/examSessionRepository.js';
+import { generateExamPassword } from '../lib/examCodes.js';
 
 export async function createExamService(memberId, classId, payload) {
   const pool = getPool();
@@ -17,18 +19,23 @@ export async function createExamService(memberId, classId, payload) {
   try {
     await client.query('BEGIN');
     
+    const examPassword =
+      payload.password && String(payload.password).trim()
+        ? String(payload.password).trim().toUpperCase()
+        : generateExamPassword();
+
     const examId = await insertExamTransaction(
       client,
       memberId,
       classId,
       payload.title,
-      payload.password || null,
+      examPassword,
       payload.duration || null,
       payload.questions
     );
 
     await client.query('COMMIT');
-    return { ok: true, examId };
+    return { ok: true, examId, code: examPassword };
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('[examService.createExam]', err);
@@ -36,6 +43,27 @@ export async function createExamService(memberId, classId, payload) {
   } finally {
     client.release();
   }
+}
+
+async function attachStudentSessionsToExams(exams, studentMemberId) {
+  if (!studentMemberId || !exams.length) return exams
+  const examIds = exams.map((e) => e.id)
+  const sessions = await getStudentSessionsForExamsQuery(examIds, studentMemberId)
+  const byExam = new Map(sessions.map((s) => [Number(s.exam_id), s]))
+  return exams.map((exam) => {
+    const sess = byExam.get(Number(exam.id))
+    if (!sess) return exam
+    return {
+      ...exam,
+      sessionId: sess.session_id,
+      sessionStatus: sess.status,
+      warningCount: Number(sess.warning_count || 0),
+      submittedAt: sess.submitted_at,
+      percentage: sess.percentage != null ? Number(sess.percentage) : null,
+      rawScore: sess.raw_score != null ? Number(sess.raw_score) : null,
+      totalPoints: sess.total_points != null ? Number(sess.total_points) : null,
+    }
+  })
 }
 
 export async function getClassExamsService(classId, requireActive = false, studentMemberId = null) {
@@ -52,9 +80,9 @@ export async function getClassExamsService(classId, requireActive = false, stude
       }
     }
     
-    const exams = await getExamsByClassIdQuery(classId, requireActive);
-    classData.exams = exams;
-    
+    const exams = await getExamsByClassIdQuery(classId, requireActive)
+    classData.exams = await attachStudentSessionsToExams(exams, studentMemberId)
+
     return { ok: true, classData };
   } catch (err) {
     console.error('[examService.getClassExams]', err);
@@ -74,14 +102,47 @@ export async function publishExamService(classId, examId) {
       return { ok: false, status: 400, error: 'Only draft exams can be published.' };
     }
 
+    if (!exam.code) {
+      const pool = getPool();
+      const code = generateExamPassword();
+      await pool.query(
+        `UPDATE exams SET password = $1 WHERE exam_id = $2 AND class_id = $3`,
+        [code, examId, classId],
+      );
+      exam.code = code;
+    }
+
     const success = await updateExamStatusQuery(classId, examId, nextStatus);
     if (!success) {
       return { ok: false, status: 404, error: 'Exam not found or you do not have permission.' };
     }
-    return { ok: true, status: nextStatus };
+    return { ok: true, status: nextStatus, code: exam.code };
   } catch (err) {
     console.error('[examService.publishExam]', err);
     return { ok: false, status: 500, error: 'Failed to publish exam.' };
+  }
+}
+
+export async function closeExamService(classId, examId) {
+  try {
+    const exam = await getExamWithQuestionsQuery(classId, examId, false)
+    if (!exam) {
+      return { ok: false, status: 404, error: 'Exam not found.' }
+    }
+
+    const nextStatus = nextStatusAfterClose(exam.status)
+    if (!nextStatus) {
+      return { ok: false, status: 400, error: 'Only live or lobby exams can be ended.' }
+    }
+
+    const success = await updateExamStatusQuery(classId, examId, nextStatus)
+    if (!success) {
+      return { ok: false, status: 404, error: 'Exam not found.' }
+    }
+    return { ok: true, status: nextStatus }
+  } catch (err) {
+    console.error('[examService.closeExam]', err)
+    return { ok: false, status: 500, error: 'Failed to end exam.' }
   }
 }
 

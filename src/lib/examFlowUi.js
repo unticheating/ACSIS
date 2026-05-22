@@ -31,10 +31,24 @@ export function isExamOngoing(status) {
   return s === PG_EXAM_STATUS.WAITING || s === PG_EXAM_STATUS.OPEN
 }
 
-/** Student can open lobby / session UI. */
-export function isExamEnterableByStudent(status) {
+/** Student can open lobby / session UI (exam must be live/lobby and not yet submitted). */
+export function isExamEnterableByStudent(status, sessionStatus) {
+  if ((sessionStatus || '').toLowerCase() === 'submitted') return false
   const s = normalizeExamStatus(status)
   return s === PG_EXAM_STATUS.WAITING || s === PG_EXAM_STATUS.OPEN
+}
+
+/** Badge label on student class stream — prefers personal session state. */
+export function labelForStudentExam(exam) {
+  if ((exam?.sessionStatus || '').toLowerCase() === 'submitted') {
+    return exam.percentage != null ? `Submitted · ${exam.percentage}%` : 'Submitted'
+  }
+  if ((exam?.sessionStatus || '').toLowerCase() === 'in_progress') {
+    const examSt = normalizeExamStatus(exam?.status)
+    if (examSt === PG_EXAM_STATUS.OPEN) return 'In progress'
+    if (examSt === PG_EXAM_STATUS.WAITING) return 'Joined · waiting'
+  }
+  return labelForPgExamStatus(exam?.status)
 }
 
 /** @param {string | null | undefined} status */

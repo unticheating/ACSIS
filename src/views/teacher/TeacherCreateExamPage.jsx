@@ -3,6 +3,7 @@ import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import { Clock, Plus, Shuffle, Trash2, ArrowLeft, GripVertical, CheckCircle2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card.jsx'
 import { Label } from '@/components/ui/label.jsx'
+import { apiFetch } from '@/lib/apiFetch.js'
 
 const HOURS = [0, 1, 2, 3, 4]
 const MINUTES = Array.from({ length: 12 }, (_, i) => i * 5)
@@ -20,8 +21,8 @@ export default function TeacherCreateExamPage() {
   const [selectedClass, setSelectedClass] = useState(searchParams.get('classId') || '')
 
   useEffect(() => {
-    fetch('/api/teacher/classes')
-      .then(res => res.json())
+    apiFetch('/api/teacher/classes')
+      .then((res) => res.json())
       .then(data => {
         setClasses(data)
         setLoadingClasses(false)
@@ -144,17 +145,20 @@ export default function TeacherCreateExamPage() {
 
     setIsSubmitting(true)
     try {
-      const res = await fetch(`/api/teacher/classes/${selectedClass}/exams`, {
+      const res = await apiFetch(`/api/teacher/classes/${selectedClass}/exams`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
+      const data = await res.json()
       if (!res.ok) {
-        const errData = await res.json()
-        throw new Error(errData.error || 'Failed to create exam.')
+        throw new Error(data.error || 'Failed to create exam.')
       }
-      window.alert(`Exam "${title}" created successfully with ${questions.length} questions.`)
-      navigate(`/teacher/classes/${selectedClass}`)
+      const code = data.code ? `\n\nExam code for students: ${data.code}` : ''
+      window.alert(
+        `Exam "${title}" saved with ${questions.length} questions.${code}\n\nPublish the exam from the class page so students can enter the code.`,
+      )
+      navigate(`/teacher/my-classes/${selectedClass}`)
     } catch (err) {
       window.alert(err.message)
     } finally {
@@ -238,7 +242,7 @@ export default function TeacherCreateExamPage() {
       {/* LEFT SIDEBAR - EXAM DETAILS */}
       <aside className="w-full md:w-[320px] lg:w-[380px] bg-white border-r border-gray-200 md:h-screen md:sticky top-0 flex flex-col shrink-0">
         <div className="p-6 border-b border-gray-100 flex items-center gap-3">
-          <Link to={selectedClass ? `/teacher/classes/${selectedClass}` : '/teacher/my-classes'} className="p-2 -ml-2 rounded-full hover:bg-gray-100 transition-colors text-gray-500">
+          <Link to={selectedClass ? `/teacher/my-classes/${selectedClass}` : '/teacher/my-classes'} className="p-2 -ml-2 rounded-full hover:bg-gray-100 transition-colors text-gray-500">
             <ArrowLeft size={20} />
           </Link>
           <h1 className="text-xl font-bold tracking-tight text-gray-900">Create Exam</h1>

@@ -1,46 +1,62 @@
-import React, { useEffect, useState, useMemo } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { Clock, AlertTriangle, ShieldAlert, MonitorPlay, X } from 'lucide-react'
 import { apiFetch } from '@/lib/apiFetch.js'
+import {
+  fetchTeacherExamResults,
+  fetchTeacherExamSessionDetail,
+} from '@/lib/teacherExamResultsApi.js'
 import '../../styles/teacher-detections-live.css'
 
-function generateMockStudents() {
-  const firstNames = ['John', 'Jane', 'Alex', 'Emma', 'Liam', 'Olivia', 'Noah', 'Ava', 'Ethan', 'Sophia', 'Mason', 'Isabella', 'William', 'Mia', 'James', 'Charlotte', 'Benjamin', 'Amelia', 'Lucas', 'Harper']
-  const lastNames = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis', 'Rodriguez', 'Martinez', 'Hernandez', 'Lopez', 'Gonzalez', 'Wilson', 'Anderson', 'Thomas', 'Taylor', 'Moore', 'Jackson', 'Martin']
+const SEAT_COUNT = 40
 
-  const students = []
-  for (let i = 0; i < 40; i++) {
-    const isPresent = Math.random() > 0.15
-    let status = 'empty'
-    let strikes = 0
-    let violations = []
+function splitName(fullName) {
+  const parts = String(fullName || 'Student').trim().split(/\s+/)
+  if (parts.length < 2) return { firstName: parts[0] || 'Student', lastName: '' }
+  return { firstName: parts[0], lastName: parts.slice(1).join(' ') }
+}
 
-    if (isPresent) {
-      const rand = Math.random()
-      if (rand > 0.9) {
-        status = 'void'
-        strikes = 3
-        violations = ['Tab switch (10:05)', 'Screenshot detected (10:15)', 'Lost focus (10:20) - Voided']
-      } else if (rand > 0.75) {
-        status = 'warning'
-        strikes = Math.floor(Math.random() * 2) + 1
-        violations = ['Tab switch (10:12)']
-        if (strikes === 2) violations.push('Right-click detected (10:18)')
-      } else {
-        status = 'good'
-      }
-    }
+function formatViolationEntry(v) {
+  const when = v.occurredAt ? new Date(v.occurredAt).toLocaleTimeString() : ''
+  const detail = v.details ? ` — ${v.details}` : ''
+  return `${v.eventType || 'event'}${detail}${when ? ` (${when})` : ''}`
+}
 
-    students.push({
-      id: `std-${i}`,
-      firstName: firstNames[Math.floor(Math.random() * firstNames.length)],
-      lastName: lastNames[Math.floor(Math.random() * lastNames.length)],
-      schoolId: `2024-${String(Math.floor(Math.random() * 9000) + 1000)}`,
-      status,
-      strikes,
-      violations,
-    })
+function violationsBySession(violations) {
+  const map = new Map()
+  for (const v of violations || []) {
+    const sid = v.sessionId
+    if (!map.has(sid)) map.set(sid, [])
+    map.get(sid).push(formatViolationEntry(v))
   }
-  return students
+  return map
+}
+
+function sessionToSeat(session, violationLabels = []) {
+  const { firstName, lastName } = splitName(session.studentName)
+  const strikes = Number(session.warningCount || 0)
+  let status = 'good'
+  if (session.status === 'submitted') status = 'good'
+  else if (strikes >= 3) status = 'void'
+  else if (strikes >= 1) status = 'warning'
+  return {
+    id: `session-${session.sessionId}`,
+    sessionId: session.sessionId,
+    sessionStatus: session.status,
+    firstName,
+    lastName,
+    schoolId: session.schoolId || '',
+    status,
+    strikes,
+    violations: violationLabels,
+  }
+}
+
+function buildSeatGrid(sessions, vMap) {
+  const seats = sessions.map((s) => sessionToSeat(s, vMap.get(s.sessionId) || []))
+  while (seats.length < SEAT_COUNT) {
+    seats.push({ id: `empty-${seats.length}`, status: 'empty', strikes: 0, violations: [] })
+  }
+  return seats.slice(0, SEAT_COUNT)
 }
 
 function seatModifier(status) {
@@ -53,9 +69,47 @@ function seatModifier(status) {
 export default function TeacherDetectionsPage() {
   const [seconds, setSeconds] = useState(0)
   const [activeExam, setActiveExam] = useState(null)
-
-  const students = useMemo(() => generateMockStudents(), [])
+  const [students, setStudents] = useState(() => buildSeatGrid([]))
   const [selectedStudent, setSelectedStudent] = useState(null)
+  const [violationTotal, setViolationTotal] = useState(0)
+
+  const refreshSessions = useCallback(async (exam) => {
+    if (!exam?.classId || !exam?.id) return
+    try {
+      const data = await fetchTeacherExamResults(exam.classId, exam.id)
+      const joined = (data.sessions || []).filter(
+        (s) => s.status === 'in_progress' || s.status === 'submitted',
+      )
+      const vMap = violationsBySession(data.violations)
+      setViolationTotal((data.violations || []).length)
+      setStudents(buildSeatGrid(joined, vMap))
+    } catch (err) {
+      console.error('[Detections] Failed to load sessions:', err)
+    }
+  }, [])
+
+  async function openStudentDetail(student) {
+    if (!student?.sessionId || !activeExam?.classId || !activeExam?.id) {
+      setSelectedStudent(student)
+      return
+    }
+    setSelectedStudent(student)
+    try {
+      const detail = await fetchTeacherExamSessionDetail(
+        activeExam.classId,
+        activeExam.id,
+        student.sessionId,
+      )
+      const labels = (detail.violations || []).map((v) => v.label || formatViolationEntry(v))
+      setSelectedStudent((prev) =>
+        prev && prev.sessionId === student.sessionId
+          ? { ...prev, violations: labels.length ? labels : prev.violations }
+          : prev,
+      )
+    } catch (err) {
+      console.error('[Detections] session detail:', err)
+    }
+  }
 
   useEffect(() => {
     async function findActiveExam() {
@@ -71,7 +125,9 @@ export default function TeacherDetectionsPage() {
             ['waiting', 'open'].includes((e.status || '').toLowerCase()),
           )
           if (found) {
-            setActiveExam({ ...found, className: clsData.name })
+            const exam = { ...found, classId: cls.id, className: clsData.name }
+            setActiveExam(exam)
+            await refreshSessions(exam)
             return
           }
         }
@@ -80,7 +136,13 @@ export default function TeacherDetectionsPage() {
       }
     }
     findActiveExam()
-  }, [])
+  }, [refreshSessions])
+
+  useEffect(() => {
+    if (!activeExam?.classId || !activeExam?.id) return undefined
+    const interval = window.setInterval(() => refreshSessions(activeExam), 5000)
+    return () => window.clearInterval(interval)
+  }, [activeExam, refreshSessions])
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -130,6 +192,10 @@ export default function TeacherDetectionsPage() {
               <h1 className="acsis-detections-header__title">Live Monitoring</h1>
             </div>
             <p className="acsis-detections-header__exam">{activeExam.title}</p>
+            <p className="text-xs text-gray-500 mt-1">
+              {students.filter((s) => s.status !== 'empty').length} student(s) joined · {violationTotal}{' '}
+              violation log(s). Events are recorded when students leave the tab during a live exam.
+            </p>
           </div>
 
           <div className="acsis-detections-header__stats">
@@ -173,11 +239,13 @@ export default function TeacherDetectionsPage() {
                   role={isEmpty ? undefined : 'button'}
                   tabIndex={isEmpty ? undefined : 0}
                   className={`acsis-detections-seat ${seatModifier(student.status)}`}
-                  onClick={() => !isEmpty && setSelectedStudent(student)}
+                  onClick={() => {
+                    if (!isEmpty) openStudentDetail(student)
+                  }}
                   onKeyDown={(e) => {
                     if (!isEmpty && (e.key === 'Enter' || e.key === ' ')) {
                       e.preventDefault()
-                      setSelectedStudent(student)
+                      openStudentDetail(student)
                     }
                   }}
                 >

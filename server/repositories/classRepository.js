@@ -36,17 +36,22 @@ export async function listTeacherClassesQuery(memberId) {
   const pool = getPool();
   const result = await pool.query(
     `SELECT 
-       class_id as id, 
-       class_name as name, 
-       school_year as "academicYear", 
-       semester, 
-       access_code as "accessCode"
-     FROM classes
-     WHERE member_id = $1 AND is_active = TRUE
-     ORDER BY created_at DESC`,
+       c.class_id as id, 
+       c.class_name as name, 
+       c.school_year as "academicYear", 
+       c.semester, 
+       c.access_code as "accessCode",
+       (SELECT COUNT(*)::int FROM exams e
+        WHERE e.class_id = c.class_id AND e.is_archived = FALSE) as "examCount"
+     FROM classes c
+     WHERE c.member_id = $1 AND c.is_active = TRUE
+     ORDER BY c.created_at DESC`,
     [memberId]
   );
-  return result.rows;
+  return result.rows.map((row) => ({
+    ...row,
+    exams: Array.from({ length: Number(row.examCount || 0) }),
+  }));
 }
 
 export async function getClassByIdQuery(classId) {

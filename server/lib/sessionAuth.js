@@ -48,6 +48,29 @@ export async function requireAuth(req, res, next) {
     const pool = getPool()
     if (pool) {
       try {
+        const roleForPortal =
+          session.portal === 'teacher'
+            ? 'faculty'
+            : session.portal === 'student'
+              ? 'student'
+              : session.portal === 'admin' || session.portal === 'super_admin'
+                ? 'admin'
+                : null
+
+        if (roleForPortal) {
+          const { rows: roleRows } = await pool.query(
+            `SELECT member_id FROM institution_members
+             WHERE uid = $1 AND role = $2::institution_user_role AND is_active = TRUE
+             ORDER BY joined_at ASC
+             LIMIT 1`,
+            [session.uid, roleForPortal],
+          )
+          if (roleRows[0]?.member_id) {
+            req.memberId = roleRows[0].member_id
+            return next()
+          }
+        }
+
         const { rows } = await pool.query(
           `SELECT member_id FROM institution_members
            WHERE uid = $1 AND is_active = TRUE
