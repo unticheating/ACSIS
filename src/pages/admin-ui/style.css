@@ -364,6 +364,23 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
     font-weight: 600;
 }
 
+.breadcrumb__link,
+.breadcrumb a.breadcrumb__link {
+    color: var(--brand-mark, #14532d);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.breadcrumb__link:hover,
+.breadcrumb a.breadcrumb__link:hover {
+    text-decoration: underline;
+}
+
+.breadcrumb__crumb {
+    color: #4b5563;
+    font-weight: 500;
+}
+
 /* For pages without breadcrumb, use old header style */
 .content-header-block {
     background: #ffffff;

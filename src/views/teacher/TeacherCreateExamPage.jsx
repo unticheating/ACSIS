@@ -4,6 +4,7 @@ import { Clock, Plus, Shuffle, Trash2, ArrowLeft, GripVertical, CheckCircle2 } f
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card.jsx'
 import { Label } from '@/components/ui/label.jsx'
 import { apiFetch } from '@/lib/apiFetch.js'
+import { COPY } from '@/lib/examFlowUi.js'
 
 const HOURS = [0, 1, 2, 3, 4]
 const MINUTES = Array.from({ length: 12 }, (_, i) => i * 5)
@@ -37,6 +38,7 @@ export default function TeacherCreateExamPage() {
   }, [])
 
   const [examTitle, setExamTitle] = useState('')
+  const [examPassword, setExamPassword] = useState('')
   const [duration, setDuration] = useState('')
 
   const [questionType, setQuestionType] = useState('multiple')
@@ -142,6 +144,8 @@ export default function TeacherCreateExamPage() {
       duration: dur,
       questions,
     }
+    const pw = examPassword.trim()
+    if (pw) payload.password = pw
 
     setIsSubmitting(true)
     try {
@@ -298,6 +302,24 @@ export default function TeacherCreateExamPage() {
                 />
                 <Clock className="absolute right-3 top-2.5 text-gray-400" size={18} />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="exam-password" className="text-sm font-semibold text-gray-700">
+                Exam password <span className="font-normal text-gray-500">(optional)</span>
+              </Label>
+              <input
+                id="exam-password"
+                type="text"
+                maxLength={20}
+                autoComplete="off"
+                placeholder="Leave blank for open lobby"
+                value={examPassword}
+                onChange={(e) => setExamPassword(e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+              />
+              <p className="text-xs text-gray-500 leading-relaxed">{COPY.examPassword}</p>
+              <p className="text-xs text-gray-500 leading-relaxed">{COPY.classAccessCode}</p>
             </div>
           </div>
         </div>

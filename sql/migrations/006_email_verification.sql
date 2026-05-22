@@ -1,4 +1,7 @@
 -- Email OTP after Google sign-in (and password continue flow)
+-- Safe to run multiple times.
+
+\echo '=== 006: email_verification_codes ==='
 
 CREATE TABLE IF NOT EXISTS email_verification_codes (
     verification_id SERIAL PRIMARY KEY,

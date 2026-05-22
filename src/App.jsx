@@ -33,6 +33,7 @@ const TeacherDetectionsPage = lazy(() => import('./views/teacher/TeacherDetectio
 const TeacherClassExamsPage = lazy(() => import('./views/teacher/TeacherClassExamsPage.jsx'))
 const TeacherExamDetailPage = lazy(() => import('./views/teacher/TeacherExamDetailPage.jsx'))
 const TeacherMyClassesPage = lazy(() => import('./views/teacher/TeacherMyClassesPage.jsx'))
+const TeacherTermClassesPage = lazy(() => import('./views/teacher/TeacherTermClassesPage.jsx'))
 const TeacherReportsPage = lazy(() => import('./views/teacher/TeacherReportsPage.jsx'))
 
 const SuperAdminDashboardPage = lazy(() => import('./views/super-admin/SuperAdminDashboardPage.jsx'))
@@ -61,6 +62,8 @@ export default function App() {
         <Route index element={<TeacherDashboardPage />} />
         <Route path="create-exam" element={<TeacherCreateExamPage />} />
         <Route path="my-classes" element={<TeacherMyClassesPage />} />
+        <Route path="my-classes/section/:sectionId" element={<TeacherTermClassesPage />} />
+        <Route path="my-classes/term/:termId" element={<TeacherTermClassesPage />} />
         <Route path="my-classes/:classId" element={<TeacherClassExamsPage />} />
         <Route path="my-classes/:classId/exams/:examId" element={<TeacherExamDetailPage />} />
         <Route path="my-exams" element={<Navigate to="/teacher/my-classes" replace />} />

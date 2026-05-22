@@ -1,8 +1,16 @@
 import { Router } from 'express';
-import { createTeacherClass, getTeacherClasses, getTeacherDashboard } from '../controllers/classController.js';
+import {
+  createTeacherClass,
+  getTeacherClasses,
+  getTeacherDashboard,
+  getTeacherClassEnrollments,
+  updateTeacherClass,
+  deleteTeacherClass,
+} from '../controllers/classController.js';
 import {
   createTeacherExam,
   getTeacherClassStream,
+  getTeacherExamsCatalog,
   publishTeacherExam,
   deleteTeacherExam,
   getTeacherExamSession,
@@ -29,8 +37,14 @@ router.use((req, res, next) => {
 router.get('/dashboard', getTeacherDashboard);
 router.get('/reports/exams', listTeacherReportExams);
 router.get('/monitoring/active', getTeacherActiveMonitoring);
+router.get('/exams', getTeacherExamsCatalog);
 router.get('/', getTeacherClasses);
 router.post('/', createTeacherClass);
+
+// Single class (before /:classId/exams)
+router.get('/:classId/enrollments', getTeacherClassEnrollments);
+router.patch('/:classId', updateTeacherClass);
+router.delete('/:classId', deleteTeacherClass);
 
 // Exam routes for a specific class
 router.get('/:classId/exams', getTeacherClassStream);

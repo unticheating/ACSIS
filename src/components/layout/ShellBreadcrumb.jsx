@@ -1,29 +1,75 @@
-import { useLocation } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { resolveShellPageTitle } from '@/config/shellConfig.js'
 import { useInstitutionTheme } from '@/context/InstitutionThemeContext.jsx'
 import { useDetectionsToolbar } from '@/context/DetectionsToolbarContext.jsx'
+import { useTeacherShellBreadcrumbSegments } from '@/context/TeacherShellBreadcrumbContext.jsx'
 import DetectionsSeatSettingsMenu from '@/components/teacher/DetectionsSeatSettingsMenu.jsx'
+
+/**
+ * @param {{ role: 'teacher' | 'student', segments: { label: string, to?: string, state?: object }[] }} props
+ */
+function BreadcrumbTrail({ segments }) {
+  const { acronym } = useInstitutionTheme()
+
+  return (
+    <div className="breadcrumb">
+      <span className="brand-plp">{acronym}</span>
+      <span className="brand-acsis"> ACSIS</span>
+      {segments.map((item, index) => {
+        const isLast = index === segments.length - 1
+        return (
+          <span key={`${item.label}-${index}`} className="breadcrumb__segment">
+            <span className="sep">/</span>
+            {item.to && !isLast ? (
+              <Link to={item.to} state={item.state} className="breadcrumb__link">
+                {item.label}
+              </Link>
+            ) : (
+              <span className={isLast ? 'page-name' : 'breadcrumb__crumb'}>{item.label}</span>
+            )}
+          </span>
+        )
+      })}
+    </div>
+  )
+}
+
+/**
+ * @param {{ role: 'teacher' | 'student' }} props
+ */
+function resolveTeacherSegments(pathname, extraSegments) {
+  const myClassesRoot = { label: 'My Classes', to: '/teacher/my-classes' }
+  if (extraSegments?.length) {
+    return [myClassesRoot, ...extraSegments]
+  }
+  if (pathname === '/teacher/my-classes') {
+    return [{ label: 'My Classes' }]
+  }
+  if (pathname.startsWith('/teacher/my-classes/')) {
+    return [myClassesRoot]
+  }
+  return [{ label: resolveShellPageTitle('teacher', pathname) }]
+}
 
 /**
  * Shared top bar for teacher & student (admin pages keep their own headers).
  * @param {{ role: 'teacher' | 'student' }} props
  */
 export default function ShellBreadcrumb({ role }) {
-  const { acronym } = useInstitutionTheme()
   const { pathname } = useLocation()
-  const pageName = resolveShellPageTitle(role, pathname)
+  const extraTeacherSegments = useTeacherShellBreadcrumbSegments()
   const ctx = useDetectionsToolbar()
   const toolbar = ctx?.toolbar
   const showDetectionsSettings = role === 'teacher' && pathname === '/teacher/detections' && toolbar
 
+  const segments =
+    role === 'teacher'
+      ? resolveTeacherSegments(pathname, extraTeacherSegments)
+      : [{ label: resolveShellPageTitle(role, pathname) }]
+
   return (
     <header className="content-header w-full">
-      <div className="breadcrumb">
-        <span className="brand-plp">{acronym}</span>
-        <span className="brand-acsis"> ACSIS</span>
-        <span className="sep">/</span>
-        <span className="page-name">{pageName}</span>
-      </div>
+      <BreadcrumbTrail segments={segments} />
       {showDetectionsSettings ? (
         <div className="content-header__actions">
           <DetectionsSeatSettingsMenu

@@ -3,9 +3,11 @@ import {
   closeExamService,
   createExamService,
   getClassExamsService,
+  listTeacherExamsWithClassMetaService,
   publishExamService,
   deleteExamService,
   getExamDetailsService,
+  verifyExamPasswordService,
 } from '../services/examService.js';
 import {
   getStudentExamSessionService,
@@ -44,9 +46,21 @@ const questionSchema = z.object({
 const createExamSchema = z.object({
   title: z.string().min(1, 'Exam title is required'),
   duration: z.number().int().min(1, 'Duration must be at least 1 minute'),
-  password: z.string().optional(),
+  password: z
+    .string()
+    .max(20, 'Exam password must be 20 characters or fewer')
+    .optional()
+    .transform((v) => (v == null || v.trim() === '' ? undefined : v.trim())),
   questions: z.array(questionSchema).min(1, 'At least one question is required')
 });
+
+export async function getTeacherExamsCatalog(req, res) {
+  const result = await listTeacherExamsWithClassMetaService(req.memberId);
+  if (!result.ok) {
+    return res.status(500).json({ error: result.error });
+  }
+  return res.json(result.exams);
+}
 
 export async function createTeacherExam(req, res) {
   try {
@@ -73,7 +87,7 @@ export async function createTeacherExam(req, res) {
 
 export async function getTeacherClassStream(req, res) {
   const { classId } = req.params;
-  const result = await getClassExamsService(classId, false); // Fetch all exams
+  const result = await getClassExamsService(classId, false, null, req.memberId);
   
   if (!result.ok) {
     return res.status(result.status || 500).json({ error: result.error });
@@ -222,6 +236,30 @@ export async function startTeacherExam(req, res) {
     console.error('[examController.startTeacherExam]', err);
     return res.status(500).json({ error: 'Failed to start exam.' });
   }
+}
+
+const verifyExamPasswordSchema = z.object({
+  password: z.string().min(1, 'Exam password is required').max(20),
+});
+
+export async function postStudentVerifyExamPassword(req, res) {
+  const { classId, examId } = req.params;
+  const parsed = verifyExamPasswordSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten().fieldErrors });
+  }
+
+  const result = await verifyExamPasswordService(
+    classId,
+    examId,
+    req.memberId,
+    parsed.data.password,
+  );
+
+  if (!result.ok) {
+    return res.status(result.status || 500).json({ error: result.error });
+  }
+  return res.json({ ok: true });
 }
 
 export async function getTeacherExamSession(req, res) {

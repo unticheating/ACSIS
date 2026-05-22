@@ -27,7 +27,17 @@ From the project root (`ACSIS/`):
 psql -U postgres -d acsis -f sql/acsis.sql
 ```
 
-This creates tables, enums, indexes, and triggers.
+This creates tables, enums, indexes, and triggers (including `email_verification_codes`).
+
+**Already have a database from an older dump?** Apply pending migrations without wiping data:
+
+```bash
+psql -U postgres -d acsis -f sql/migrations/004_teaching_terms_and_profile_cleanup.sql
+psql -U postgres -d acsis -f sql/migrations/005_exams_class_id_cleanup.sql
+psql -U postgres -d acsis -f sql/migrations/006_email_verification.sql
+```
+
+If you see `relation "email_verification_codes" does not exist` on login, run `006_email_verification.sql` only.
 
 ## 3. Import the data dump
 
@@ -81,6 +91,6 @@ Output is written to `sql/exports/acsis_dump_YYYY-MM-DD.sql`. Share that file wi
 ## Troubleshooting
 
 - **“database acsis does not exist”** — Run step 1.
-- **“relation does not exist”** — Run step 2 (`acsis.sql`) before the data dump.
+- **“relation does not exist”** — Run step 2 (`acsis.sql`) before the data dump, or run the matching file under `sql/migrations/` (e.g. `006_email_verification.sql` for OTP login).
 - **“invalid input value for enum exam_status”** — Use a dump exported after the exam status fix (`draft`, `waiting`, `open`, `closed` only).
 - **Login works but no classes** — Re-import the data dump or enroll with the class access code from the teacher.

@@ -162,12 +162,19 @@ CREATE TABLE IF NOT EXISTS institution_members (
     uid            INT NOT NULL REFERENCES users (uid) ON DELETE CASCADE,
     role           institution_user_role NOT NULL,
     school_id      VARCHAR(50) DEFAULT NULL,
-    year_level     VARCHAR(50) DEFAULT NULL,
-    section        VARCHAR(50) DEFAULT NULL,
     is_pending     BOOLEAN NOT NULL DEFAULT FALSE,
     is_active      BOOLEAN NOT NULL DEFAULT TRUE,
     joined_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (institution_id, uid) -- one membership per user per institution
+);
+
+-- Student-only profile (program e.g. BSIT, year level, section code e.g. 3D)
+CREATE TABLE IF NOT EXISTS students (
+    student_id    SERIAL PRIMARY KEY,
+    member_id     INT NOT NULL UNIQUE REFERENCES institution_members (member_id) ON DELETE CASCADE,
+    program_code  VARCHAR(20) DEFAULT NULL,
+    year_level    VARCHAR(50) DEFAULT NULL,
+    section_code  VARCHAR(20) DEFAULT NULL
 );
 
 -- ============================================================
@@ -189,18 +196,40 @@ CREATE INDEX IF NOT EXISTS idx_email_verification_uid_active
     WHERE used_at IS NULL;
 
 -- ============================================================
---  SECTION 5: CLASSES
---  Created by faculty. Students join via access_code.
---  Academic year and semester live here.
+--  SECTION 5: TEACHING SECTIONS & CLASSES (COURSES)
+--  Faculty browse: section (BSIT 3D + AY/sem) → course (IT 108) → exams
+--  Students join classes via access_code.
 -- ============================================================
+
+CREATE TABLE IF NOT EXISTS teaching_terms (
+    term_id        SERIAL PRIMARY KEY,
+    institution_id INT NOT NULL REFERENCES institutions (institution_id) ON DELETE CASCADE,
+    member_id      INT NOT NULL REFERENCES institution_members (member_id) ON DELETE CASCADE,
+    program_code   VARCHAR(20) NOT NULL,
+    section_code   VARCHAR(20) NOT NULL,
+    school_year    VARCHAR(10) NOT NULL,
+    semester       semester_type NOT NULL,
+    is_archived    BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (member_id, program_code, section_code, school_year, semester)
+);
+
+DROP TRIGGER IF EXISTS trg_teaching_terms_updated_at ON teaching_terms;
+CREATE TRIGGER trg_teaching_terms_updated_at
+    BEFORE UPDATE ON teaching_terms
+    FOR EACH ROW
+    EXECUTE FUNCTION fn_set_updated_at();
 
 CREATE TABLE IF NOT EXISTS classes (
     class_id       SERIAL PRIMARY KEY,
     institution_id INT NOT NULL REFERENCES institutions (institution_id) ON DELETE CASCADE,
     member_id      INT NOT NULL REFERENCES institution_members (member_id),
+    term_id        INT DEFAULT NULL REFERENCES teaching_terms (term_id) ON DELETE SET NULL,
+    course_code    VARCHAR(20) NOT NULL,
     class_name     VARCHAR(200) NOT NULL,
     description    TEXT DEFAULT NULL,
-    school_year    VARCHAR(10) NOT NULL, -- e.g. "2024-2025"
+    school_year    VARCHAR(10) NOT NULL, -- denormalized from term for reporting
     semester       semester_type NOT NULL,
     access_code    VARCHAR(20) NOT NULL UNIQUE, -- students enter this to enroll
     is_active      BOOLEAN NOT NULL DEFAULT TRUE,
@@ -419,16 +448,17 @@ $$;
 
 SELECT acsis_safe_index('idx_members_institution', 'institution_members', ARRAY['institution_id']);
 SELECT acsis_safe_index('idx_members_user', 'institution_members', ARRAY['uid']);
+SELECT acsis_safe_index('idx_students_member', 'students', ARRAY['member_id']);
+SELECT acsis_safe_index('idx_teaching_terms_member', 'teaching_terms', ARRAY['member_id']);
+SELECT acsis_safe_index('idx_classes_term', 'classes', ARRAY['term_id']);
 SELECT acsis_safe_index('idx_classes_institution', 'classes', ARRAY['institution_id']);
 SELECT acsis_safe_index('idx_classes_member', 'classes', ARRAY['member_id']);
 SELECT acsis_safe_index('idx_enrollments_class', 'class_enrollments', ARRAY['class_id']);
 SELECT acsis_safe_index('idx_enrollments_member', 'class_enrollments', ARRAY['member_id']);
 SELECT acsis_safe_index('idx_exams_class', 'exams', ARRAY['class_id']);
-SELECT acsis_safe_index('idx_exams_assignment', 'exams', ARRAY['assignment_id']);
 SELECT acsis_safe_index('idx_exams_status', 'exams', ARRAY['status', 'is_archived']);
 SELECT acsis_safe_index('idx_sessions_exam', 'exam_sessions', ARRAY['exam_id']);
 SELECT acsis_safe_index('idx_sessions_member', 'exam_sessions', ARRAY['member_id']);
-SELECT acsis_safe_index('idx_sessions_student', 'exam_sessions', ARRAY['student_id']);
 SELECT acsis_safe_index('idx_answers_session', 'student_answers', ARRAY['session_id']);
 SELECT acsis_safe_index('idx_answers_question', 'student_answers', ARRAY['question_id']);
 SELECT acsis_safe_index('idx_questions_exam', 'questions', ARRAY['exam_id']);

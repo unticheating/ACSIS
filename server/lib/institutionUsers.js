@@ -1,9 +1,13 @@
 import bcrypt from 'bcrypt'
 import { isAllowedInstitutionalEmail } from './emailDomain.js'
 import { config } from '../config.js'
+import {
+  getStudentProfile,
+  upsertStudentProfile,
+  validateStudentYearLevel,
+} from './studentProfile.js'
 
 const SCHOOL_ID_REGEX = /^\d{2}-\d{5}$/
-const YEAR_LEVELS = new Set(['1st Year', '2nd Year', '3rd Year', '4th Year'])
 
 function validateSchoolId(schoolId, role) {
   const id = String(schoolId || '').trim()
@@ -13,14 +17,6 @@ function validateSchoolId(schoolId, role) {
   if (!SCHOOL_ID_REGEX.test(id)) {
     return 'ID must follow format 00-00000 (example: 24-00123).'
   }
-  return null
-}
-
-function validateYearLevel(yearLevel, role) {
-  if (role !== 'student') return null
-  const v = String(yearLevel || '').trim()
-  if (!v) return 'Year level is required for students.'
-  if (!YEAR_LEVELS.has(v)) return 'Invalid year level.'
   return null
 }
 
@@ -45,8 +41,9 @@ function mapRow(row) {
     role: row.role,
     status,
     schoolId: row.school_id || '',
-    yearLevel: row.year_level,
-    section: row.section,
+    programCode: row.program_code || null,
+    yearLevel: row.year_level || null,
+    section: row.section_code || null,
     dateCreated: row.created_at,
     isSuperAdmin: row.is_super_admin,
   }
@@ -59,9 +56,11 @@ function mapRow(row) {
 export async function listInstitutionUsers(pool, institutionId) {
   const { rows } = await pool.query(
     `SELECT u.uid, u.first_name, u.middle_name, u.last_name, u.suffix, u.email, u.created_at, u.is_super_admin,
-            im.member_id, im.role, im.school_id, im.year_level, im.section, im.is_active, im.is_pending
+            im.member_id, im.role, im.school_id, im.is_active, im.is_pending,
+            s.program_code, s.year_level, s.section_code
      FROM institution_members im
      INNER JOIN users u ON u.uid = im.uid
+     LEFT JOIN students s ON s.member_id = im.member_id
      WHERE im.institution_id = $1
      ORDER BY im.role, u.last_name, u.first_name`,
     [institutionId],
@@ -100,8 +99,9 @@ export async function createInstitutionUser(pool, institutionId, body) {
   const email = String(body.email || '').trim().toLowerCase()
   const role = body.role
   const schoolId = String(body.schoolId || '').trim() || null
+  const programCode = body.programCode ? String(body.programCode).trim() : null
   const yearLevel = body.yearLevel ? String(body.yearLevel).trim() : null
-  const section = body.section ? String(body.section).trim() : null
+  const sectionCode = body.section ? String(body.section).trim() : null
   const password = typeof body.password === 'string' ? body.password : ''
 
   if (!firstName || !lastName || !email) {
@@ -117,7 +117,7 @@ export async function createInstitutionUser(pool, institutionId, body) {
   if (schoolIdError) {
     return { ok: false, status: 400, error: schoolIdError }
   }
-  const yearLevelError = validateYearLevel(yearLevel, role)
+  const yearLevelError = role === 'student' ? validateStudentYearLevel(yearLevel) : null
   if (yearLevelError) {
     return { ok: false, status: 400, error: yearLevelError }
   }
@@ -150,21 +150,22 @@ export async function createInstitutionUser(pool, institutionId, body) {
 
     const isPending = role === 'faculty' && Boolean(body.pendingFaculty)
 
-    await client.query(
+    const memberInsert = await client.query(
       `INSERT INTO institution_members (
-         institution_id, uid, role, school_id, year_level, section, is_active, is_pending
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [
-        institutionId,
-        uid,
-        role,
-        schoolId,
-        role === 'student' ? yearLevel : null,
-        role === 'student' ? section : null,
-        !isPending,
-        isPending,
-      ],
+         institution_id, uid, role, school_id, is_active, is_pending
+       ) VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING member_id`,
+      [institutionId, uid, role, schoolId, !isPending, isPending],
     )
+    const memberId = memberInsert.rows[0].member_id
+
+    if (role === 'student') {
+      await upsertStudentProfile(client, memberId, {
+        programCode,
+        yearLevel,
+        sectionCode,
+      })
+    }
 
     await client.query('COMMIT')
     const users = await listInstitutionUsers(pool, institutionId)
@@ -190,11 +191,19 @@ export async function updateInstitutionUser(pool, institutionId, uid, body) {
   const middleName = body.middleName !== undefined ? (body.middleName ? String(body.middleName).trim() : null) : undefined
   const email = body.email ? String(body.email).trim().toLowerCase() : undefined
   const schoolId = body.schoolId !== undefined ? String(body.schoolId || '').trim() || null : undefined
-  const yearLevel = body.yearLevel !== undefined ? (body.yearLevel ? String(body.yearLevel).trim() : null) : undefined
-  const section = body.section !== undefined ? (body.section ? String(body.section).trim() : null) : undefined
+  const programCode =
+    body.programCode !== undefined
+      ? body.programCode
+        ? String(body.programCode).trim()
+        : null
+      : undefined
+  const yearLevel =
+    body.yearLevel !== undefined ? (body.yearLevel ? String(body.yearLevel).trim() : null) : undefined
+  const sectionCode =
+    body.section !== undefined ? (body.section ? String(body.section).trim() : null) : undefined
 
   const member = await pool.query(
-    `SELECT im.role, im.school_id FROM institution_members im
+    `SELECT im.member_id, im.role, im.school_id FROM institution_members im
      WHERE im.institution_id = $1 AND im.uid = $2`,
     [institutionId, uid],
   )
@@ -212,12 +221,9 @@ export async function updateInstitutionUser(pool, institutionId, uid, body) {
   if (schoolIdError) {
     return { ok: false, status: 400, error: schoolIdError }
   }
-  if (yearLevel !== undefined || section !== undefined) {
-    const yearLevelError = validateYearLevel(
-      yearLevel !== undefined ? yearLevel : '',
-      role,
-    )
-    if (yearLevelError && yearLevel !== undefined) {
+  if (yearLevel !== undefined && role === 'student') {
+    const yearLevelError = validateStudentYearLevel(yearLevel)
+    if (yearLevelError) {
       return { ok: false, status: 400, error: yearLevelError }
     }
   }
@@ -252,14 +258,6 @@ export async function updateInstitutionUser(pool, institutionId, uid, body) {
     memberUpdates.push(`school_id = $${n++}`)
     params.push(schoolId)
   }
-  if (yearLevel !== undefined) {
-    memberUpdates.push(`year_level = $${n++}`)
-    params.push(yearLevel)
-  }
-  if (section !== undefined) {
-    memberUpdates.push(`section = $${n++}`)
-    params.push(section)
-  }
   if (body.approve === true) {
     memberUpdates.push('is_pending = FALSE', 'is_active = TRUE')
   }
@@ -276,6 +274,15 @@ export async function updateInstitutionUser(pool, institutionId, uid, body) {
        WHERE institution_id = $1 AND uid = $2`,
       params,
     )
+  }
+
+  if (role === 'student' && (programCode !== undefined || yearLevel !== undefined || sectionCode !== undefined)) {
+    const existing = await getStudentProfile(pool, member.rows[0].member_id)
+    await upsertStudentProfile(pool, member.rows[0].member_id, {
+      programCode: programCode !== undefined ? programCode : existing.programCode,
+      yearLevel: yearLevel !== undefined ? yearLevel : existing.yearLevel,
+      sectionCode: sectionCode !== undefined ? sectionCode : existing.sectionCode,
+    })
   }
 
   const users = await listInstitutionUsers(pool, institutionId)
