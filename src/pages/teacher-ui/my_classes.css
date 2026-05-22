@@ -9,6 +9,843 @@
   overflow-x: hidden;
 }
 
+/* Span full main column width (edge-to-edge inside shell) */
+.acsis-mc-view--full {
+  width: 100%;
+  max-width: 100%;
+  margin-inline: calc(-1 * var(--acsis-main-pad-x, 16px));
+  padding-inline: var(--acsis-main-pad-x, 16px);
+  box-sizing: border-box;
+  overflow: visible;
+}
+
+.acsis-mc-page-header {
+  margin-bottom: var(--size-4, 16px);
+}
+
+.acsis-mc-page-header__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: var(--size-4, 16px);
+}
+
+.acsis-mc-page-header__intro {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.acsis-mc-page-header__actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.acsis-mc-page-header__footer {
+  margin-top: 12px;
+}
+
+.acsis-mc-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.acsis-mc-filter {
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  color: #4b5563;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.acsis-mc-filter:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.acsis-mc-filter--on {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #166534;
+}
+
+.acsis-mc-content {
+  width: 100%;
+  min-width: 0;
+  overflow: visible;
+}
+
+.acsis-mc-loading {
+  padding: 2rem 0;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.acsis-mc-empty {
+  background: #fff;
+  border: 1px dashed #d1d5db;
+  border-radius: 14px;
+  padding: 2.25rem 1.5rem;
+  text-align: center;
+  max-width: 36rem;
+  margin: 0 auto;
+}
+
+.acsis-mc-empty__title {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #166534;
+}
+
+.acsis-mc-empty__text {
+  margin: 0 0 1.25rem;
+  font-size: 0.875rem;
+  color: #6b7280;
+  line-height: 1.5;
+}
+
+.acsis-mc-stream {
+  width: 100%;
+  min-width: 0;
+}
+
+/* Section cards + overlay course panel */
+.acsis-section-card-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  width: 100%;
+  max-width: 100%;
+  overflow: visible;
+  align-items: start;
+}
+
+@media (min-width: 1024px) {
+  .acsis-section-card-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+  }
+}
+
+.acsis-section-card {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  z-index: 1;
+  container-type: inline-size;
+  container-name: section-card;
+}
+
+.acsis-section-card--open {
+  z-index: 50;
+}
+
+.acsis-section-card--archived {
+  opacity: 0.9;
+}
+
+.acsis-section-card--dimmed {
+  opacity: 0.62;
+  filter: saturate(0.65);
+}
+
+.acsis-section-card--dimmed .acsis-section-card__surface {
+  cursor: pointer;
+}
+
+.acsis-section-card--dimmed.acsis-section-card--open {
+  opacity: 0.78;
+}
+
+.acsis-course-card--dimmed {
+  opacity: 0.72;
+  filter: saturate(0.7);
+}
+
+.acsis-course-card--dimmed:hover {
+  opacity: 0.85;
+}
+
+.acsis-archived-reveal {
+  margin-top: 20px;
+  padding-top: 4px;
+}
+
+.acsis-archived-reveal__field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  margin: 0 0 14px;
+}
+
+.acsis-archived-reveal__label {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.acsis-archived-reveal__select {
+  min-height: 40px;
+  min-width: min(100%, 280px);
+  padding: 8px 36px 8px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 12px center;
+  color: #374151;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  appearance: none;
+}
+
+.acsis-archived-reveal__list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  border: 1px dashed #d1d5db;
+  border-radius: 14px;
+  background: #f9fafb;
+}
+
+@media (min-width: 1024px) {
+  .acsis-archived-reveal__list {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+  }
+}
+
+.acsis-section-card__surface {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 16px 44px 16px 16px;
+  background: var(--bg-surface, #fff);
+  border: 1px solid var(--border-default, #e5e7eb);
+  border-radius: 14px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  transition:
+    border-color 0.28s ease,
+    border-radius 0.38s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.38s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.acsis-section-card--open .acsis-section-card__surface {
+  z-index: 2;
+  border-color: #bbf7d0;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  box-shadow: 0 4px 14px rgba(22, 163, 74, 0.1);
+  transition:
+    border-color 0.28s ease,
+    border-radius 0.38s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.38s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.acsis-section-card__surface:hover {
+  border-color: #d1d5db;
+}
+
+.acsis-section-card--open .acsis-section-card__surface:hover {
+  border-color: #bbf7d0;
+}
+
+.acsis-section-card__surface:focus-visible {
+  outline: 2px solid #16a34a;
+  outline-offset: 2px;
+}
+
+.acsis-section-card__menu {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+}
+
+.acsis-section-card__copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-right: 4px;
+}
+
+.acsis-section-card__trail {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  color: #6b7280;
+}
+
+.acsis-section-card__chev-wrap {
+  display: inline-flex;
+  color: #6b7280;
+  transition: transform 0.38s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.acsis-section-card__chev-wrap--open {
+  transform: rotate(180deg);
+}
+
+.acsis-section-card__eyebrow {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.acsis-section-card__title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: #111827;
+  line-height: 1.25;
+}
+
+@media (min-width: 768px) {
+  .acsis-section-card__title {
+    font-size: 1.375rem;
+  }
+}
+
+.acsis-section-card__stat {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.acsis-section-card__drop {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 3;
+  margin-top: -1px;
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transform: translateY(-8px) scaleY(0.98);
+  transform-origin: top center;
+  pointer-events: none;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid transparent;
+  border-top-color: transparent;
+  border-radius: 0 0 14px 14px;
+  box-shadow: none;
+  transition:
+    grid-template-rows 0.42s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.32s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.42s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.28s ease,
+    box-shadow 0.42s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.acsis-section-card__drop--open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transform: translateY(0) scaleY(1);
+  pointer-events: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  max-height: min(440px, 65vh);
+  border-color: #bbf7d0;
+  border-top-color: #e5e7eb;
+  box-shadow:
+    0 16px 32px rgba(15, 23, 42, 0.12),
+    0 6px 14px rgba(15, 23, 42, 0.08);
+}
+
+.acsis-section-card__drop-inner {
+  min-height: 0;
+  overflow: hidden;
+  padding: 0 14px;
+  transition: padding 0.42s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.acsis-section-card__drop--open .acsis-section-card__drop-inner {
+  padding: 14px;
+  overflow: visible;
+}
+
+.acsis-section-card__empty {
+  margin: 0;
+  padding: 8px 4px;
+  font-size: 0.8125rem;
+  color: #6b7280;
+  line-height: 1.45;
+}
+
+.acsis-section-card__empty-link {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: #166534;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.acsis-mc-course-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  width: 100%;
+}
+
+.acsis-mc-course-grid > li {
+  min-width: 0;
+  display: block;
+}
+
+.acsis-mc-course-grid--stack {
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.acsis-section-card__drop--open .acsis-mc-course-grid--stack > li {
+  animation: acsis-course-row-in 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.acsis-section-card__drop--open .acsis-mc-course-grid--stack > li:nth-child(1) {
+  animation-delay: 0.04s;
+}
+
+.acsis-section-card__drop--open .acsis-mc-course-grid--stack > li:nth-child(2) {
+  animation-delay: 0.08s;
+}
+
+.acsis-section-card__drop--open .acsis-mc-course-grid--stack > li:nth-child(3) {
+  animation-delay: 0.12s;
+}
+
+.acsis-section-card__drop--open .acsis-mc-course-grid--stack > li:nth-child(4) {
+  animation-delay: 0.16s;
+}
+
+.acsis-section-card__drop--open .acsis-mc-course-grid--stack > li:nth-child(n + 5) {
+  animation-delay: 0.2s;
+}
+
+@keyframes acsis-course-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Compact list row inside section dropdown */
+.acsis-section-card__drop .acsis-course-card {
+  flex-direction: row;
+  align-items: stretch;
+  min-height: 0;
+}
+
+.acsis-section-card__drop .acsis-course-card__accent {
+  width: 4px;
+  height: auto;
+  min-height: 100%;
+  flex-shrink: 0;
+}
+
+.acsis-section-card__drop .acsis-course-card__body {
+  flex: 1;
+  padding: 12px 14px;
+}
+
+.acsis-section-card__drop .acsis-course-card__footer {
+  flex-shrink: 0;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 2px;
+  padding: 10px 14px;
+  border-top: none;
+  border-left: 1px solid #f3f4f6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .acsis-section-card__drop,
+  .acsis-section-card__drop-inner,
+  .acsis-section-card__chev-wrap,
+  .acsis-section-card--open .acsis-section-card__surface {
+    transition: none;
+  }
+
+  .acsis-section-card__drop--open .acsis-mc-course-grid--stack > li {
+    animation: none;
+  }
+}
+
+.acsis-course-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 108px;
+  width: 100%;
+  padding: 0;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
+}
+
+.acsis-course-card:hover {
+  border-color: #bbf7d0;
+  box-shadow: 0 4px 14px rgba(22, 163, 74, 0.08);
+  transform: translateY(-1px);
+}
+
+.acsis-course-card:active {
+  transform: scale(0.99);
+}
+
+.acsis-course-card:focus-visible {
+  outline: 2px solid #16a34a;
+  outline-offset: 2px;
+}
+
+.acsis-course-card__accent {
+  height: 4px;
+  background: linear-gradient(90deg, #22c55e 0%, #16a34a 100%);
+}
+
+.acsis-course-card__body {
+  flex: 1;
+  padding: 12px 14px 10px;
+  min-width: 0;
+}
+
+.acsis-course-card__code {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #111827;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.acsis-course-card__name {
+  margin: 6px 0 0;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #6b7280;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.acsis-course-card__footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  border-top: 1px solid #f3f4f6;
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
+
+.acsis-course-card__stat {
+  font-weight: 600;
+  color: #4b5563;
+}
+
+.acsis-course-card__status {
+  font-weight: 600;
+  color: #16a34a;
+}
+
+.acsis-section-card__courses-title {
+  margin: 0 0 12px;
+  padding: 0 4px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+/* Class detail: course banner + toolbar */
+.acsis-course-banner {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto;
+  gap: 12px 16px;
+  align-items: end;
+  margin-bottom: var(--size-4, 16px);
+  padding: 20px 18px 18px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #14532d 0%, #166534 48%, #15803d 100%);
+  color: #fff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+}
+
+.acsis-course-banner__menu {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1;
+}
+
+.acsis-course-banner__menu .acsis-class-card__menu-btn {
+  color: rgba(255, 255, 255, 0.92);
+  border-color: rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.acsis-course-banner__menu .acsis-class-card__menu-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.acsis-course-banner__copy {
+  grid-column: 1 / -1;
+  padding-right: 2.5rem;
+  min-width: 0;
+}
+
+.acsis-course-banner__code {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.acsis-course-banner__name {
+  margin: 6px 0 0;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.88);
+  overflow-wrap: anywhere;
+}
+
+.acsis-course-banner__code-block {
+  grid-column: 2;
+  grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  text-align: right;
+}
+
+.acsis-course-banner__code-label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.acsis-course-banner__code-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.12);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.acsis-course-banner__code-btn:hover {
+  background: rgba(0, 0, 0, 0.22);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.acsis-course-banner__code-btn code {
+  font-family: ui-monospace, monospace;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.acsis-class-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: var(--size-4, 16px);
+}
+
+.acsis-class-toolbar__filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.acsis-class-toolbar__field {
+  margin: 0;
+}
+
+.acsis-class-toolbar__select {
+  min-height: 40px;
+  padding: 8px 36px 8px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 12px center;
+  color: #111827;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  appearance: none;
+}
+
+.acsis-class-toolbar__students-btn {
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  color: #374151;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.acsis-class-toolbar__students-btn:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.acsis-class-toolbar__students-btn--on {
+  background: #f0fdf4;
+  border-color: #86efac;
+  color: #166534;
+}
+
+.acsis-class-toolbar__back-exams {
+  min-height: 40px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: #16a34a;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.acsis-class-toolbar__create {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.acsis-enrolled-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.acsis-enrolled-list__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 14px 16px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+}
+
+.acsis-enrolled-list__main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.acsis-enrolled-list__name {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.acsis-enrolled-list__meta {
+  font-size: 0.8125rem;
+  color: #6b7280;
+}
+
+.acsis-enrolled-list__date {
+  font-size: 0.8125rem;
+  color: #9ca3af;
+  white-space: nowrap;
+}
+
+.acsis-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.acsis-btn-ghost--sm {
+  padding: 6px 12px;
+  font-size: 0.75rem;
+}
+
 .acsis-mc-head {
   display: flex;
   justify-content: space-between;
@@ -21,6 +858,9 @@
 .acsis-mc-head__intro {
   flex: 1 1 12rem;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
 }
 
 .acsis-mc-head__actions {
@@ -31,6 +871,37 @@
 
 .acsis-mc-head--compact {
   margin-bottom: 12px;
+}
+
+.acsis-mc-breadcrumb {
+  font-size: 0.875rem;
+  color: var(--text-muted, #64748b);
+  margin: 0 0 0.5rem;
+}
+
+.acsis-mc-breadcrumb a {
+  color: var(--primary, #16a34a);
+  text-decoration: none;
+}
+
+.acsis-mc-breadcrumb a:hover {
+  text-decoration: underline;
+}
+
+.acsis-class-card--archived {
+  opacity: 0.72;
+}
+
+.acsis-class-card__course-title {
+  font-weight: 500;
+  color: var(--text-muted, #64748b);
+  margin-top: 0.15rem;
+}
+
+.acsis-stream-banner__sub {
+  margin: 0.35rem 0 0;
+  font-size: 0.9rem;
+  opacity: 0.85;
 }
 
 .acsis-mc-title--section {
@@ -44,6 +915,17 @@
   font-weight: 700;
   letter-spacing: -0.02em;
   margin: 0 0 6px;
+}
+
+.acsis-mc-sub--term {
+  margin-top: 0.25rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.acsis-mc-sub--muted {
+  margin-top: 0.35rem;
+  font-style: italic;
 }
 
 .acsis-mc-sub {
@@ -579,6 +1461,36 @@
     text-align: center;
   }
 
+  .acsis-section-card__surface {
+    padding: 14px 40px 14px 14px;
+  }
+
+  .acsis-section-card__title {
+    font-size: 1.125rem;
+  }
+
+  .acsis-section-card-list {
+    grid-template-columns: 1fr;
+  }
+
+  .acsis-section-card__drop .acsis-mc-course-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .acsis-mc-page-header__row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .acsis-mc-page-header__actions {
+    justify-content: stretch;
+  }
+
+  .acsis-mc-page-header__actions .acsis-mc-create-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
   .acsis-mc-tabs {
     flex-wrap: nowrap;
     overflow-x: auto;
@@ -664,6 +1576,53 @@
     min-height: 44px;
     box-sizing: border-box;
   }
+
+  .acsis-course-banner {
+    grid-template-columns: 1fr;
+    padding: 18px 14px 14px;
+  }
+
+  .acsis-course-banner__code-block {
+    grid-column: 1;
+    grid-row: auto;
+    align-items: flex-start;
+    text-align: left;
+    margin-top: 4px;
+  }
+
+  .acsis-class-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .acsis-class-toolbar__create {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+  }
+}
+
+.acsis-mc-access-hint {
+  margin: 0 0 var(--size-3, 12px);
+  padding: var(--size-3, 12px) var(--size-4, 16px);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--acsis-muted, #6b7280);
+  background: var(--acsis-surface-2, #f3f4f6);
+  border: 1px solid var(--acsis-border, #e5e7eb);
+  border-radius: var(--radius-md, 8px);
+}
+
+.acsis-mc-access-hint__code {
+  font-family: ui-monospace, monospace;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--acsis-fg, #111827);
+  letter-spacing: 0.04em;
+}
+
+.acsis-mc-access-hint__note {
+  display: inline;
 }
 
 @media (prefers-reduced-motion: reduce) {

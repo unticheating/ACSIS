@@ -1,17 +1,33 @@
 import { getPool } from '../db.js';
 import { 
   insertExamTransaction, 
-  getExamsByClassIdQuery, 
+  getExamsByClassIdQuery,
+  listTeacherExamsWithClassMetaQuery,
   updateExamStatusQuery, 
   deleteExamQuery,
-  getExamWithQuestionsQuery
+  getExamWithQuestionsQuery,
+  verifyExamPasswordQuery,
 } from '../repositories/examRepository.js';
 import { closeOtherTeacherOngoingExamsQuery } from '../repositories/examResultsRepository.js';
-import { getClassByIdQuery } from '../repositories/classRepository.js';
+import { getClassByIdQuery, getTeacherClassByIdQuery } from '../repositories/classRepository.js';
 import { checkEnrollment } from '../repositories/studentRepository.js';
 import { nextStatusAfterClose, nextStatusAfterPublish } from '../lib/examStatus.js';
 import { getStudentSessionsForExamsQuery } from '../repositories/examSessionRepository.js';
 import { generateExamPassword } from '../lib/examCodes.js';
+
+function normalizeExamPassword(password) {
+  if (password == null) return null;
+  const trimmed = String(password).trim();
+  return trimmed === '' ? null : trimmed;
+}
+
+/** Hide lobby password from student API responses. */
+function sanitizeExamForStudent(exam) {
+  if (!exam) return exam;
+  const requiresPassword = Boolean(exam.code && String(exam.code).trim());
+  const { code, ...rest } = exam;
+  return { ...rest, requiresPassword };
+}
 
 export async function createExamService(memberId, classId, payload) {
   const pool = getPool();
@@ -67,9 +83,21 @@ async function attachStudentSessionsToExams(exams, studentMemberId) {
   })
 }
 
-export async function getClassExamsService(classId, requireActive = false, studentMemberId = null) {
+export async function listTeacherExamsWithClassMetaService(memberId) {
   try {
-    const classData = await getClassByIdQuery(classId);
+    const rows = await listTeacherExamsWithClassMetaQuery(memberId);
+    return { ok: true, exams: rows };
+  } catch (err) {
+    console.error('[examService.listTeacherExamsWithClassMeta]', err);
+    return { ok: false, error: 'Database error.' };
+  }
+}
+
+export async function getClassExamsService(classId, requireActive = false, studentMemberId = null, teacherMemberId = null) {
+  try {
+    const classData = teacherMemberId
+      ? await getTeacherClassByIdQuery(classId, teacherMemberId)
+      : await getClassByIdQuery(classId);
     if (!classData) {
       return { ok: false, status: 404, error: 'Class not found.' };
     }
@@ -82,8 +110,10 @@ export async function getClassExamsService(classId, requireActive = false, stude
     }
     
     const exams = await getExamsByClassIdQuery(classId, requireActive)
-    classData.exams = await attachStudentSessionsToExams(exams, studentMemberId)
-
+    const withSessions = await attachStudentSessionsToExams(exams, studentMemberId)
+    classData.exams = studentMemberId
+      ? withSessions.map(sanitizeExamForStudent)
+      : withSessions
     return { ok: true, classData };
   } catch (err) {
     console.error('[examService.getClassExams]', err);
@@ -164,6 +194,40 @@ export async function deleteExamService(classId, examId, teacherMemberId = null)
   }
 }
 
+export async function verifyExamPasswordService(classId, examId, studentMemberId, password) {
+  try {
+    const isEnrolled = await checkEnrollment(studentMemberId, classId);
+    if (!isEnrolled) {
+      return { ok: false, status: 403, error: 'NOT_ENROLLED' };
+    }
+
+    const exam = await getExamWithQuestionsQuery(classId, examId, true);
+    if (!exam) {
+      return { ok: false, status: 404, error: 'Exam not found or not available.' };
+    }
+
+    const stored = exam.code ? String(exam.code).trim() : '';
+    if (!stored) {
+      return { ok: true };
+    }
+
+    const attempt = normalizeExamPassword(password);
+    if (!attempt) {
+      return { ok: false, status: 400, error: 'Exam password is required.' };
+    }
+
+    const valid = await verifyExamPasswordQuery(classId, examId, attempt, true);
+    if (!valid) {
+      return { ok: false, status: 401, error: 'Incorrect exam password.' };
+    }
+
+    return { ok: true };
+  } catch (err) {
+    console.error('[examService.verifyExamPassword]', err);
+    return { ok: false, status: 500, error: 'Failed to verify exam password.' };
+  }
+}
+
 export async function getExamDetailsService(classId, examId, requireActive = false, studentMemberId = null) {
   try {
     if (studentMemberId) {
@@ -178,7 +242,10 @@ export async function getExamDetailsService(classId, examId, requireActive = fal
       return { ok: false, status: 404, error: 'Exam not found or not active.' };
     }
 
-    return { ok: true, exam };
+    return {
+      ok: true,
+      exam: studentMemberId ? sanitizeExamForStudent(exam) : exam,
+    };
   } catch (err) {
     console.error('[examService.getExamDetails]', err);
     return { ok: false, status: 500, error: 'Failed to fetch exam details.' };

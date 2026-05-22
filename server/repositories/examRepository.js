@@ -53,6 +53,35 @@ export async function insertExamTransaction(pool, memberId, classId, title, pass
   return examId;
 }
 
+export async function listTeacherExamsWithClassMetaQuery(memberId) {
+  const pool = getPool();
+  const result = await pool.query(
+    `SELECT
+      e.exam_id AS id,
+      e.title,
+      e.password AS code,
+      e.time_limit AS duration,
+      e.status,
+      e.class_id AS "classId",
+      c.course_code AS "courseCode",
+      c.class_name AS name,
+      c.school_year AS "academicYear",
+      c.semester,
+      c.access_code AS "accessCode",
+      c.term_id AS "termId",
+      t.program_code AS "programCode",
+      t.section_code AS "sectionCode",
+      (SELECT COUNT(*)::int FROM questions q WHERE q.exam_id = e.exam_id) AS "questionCount"
+    FROM exams e
+    INNER JOIN classes c ON c.class_id = e.class_id
+    LEFT JOIN teaching_terms t ON t.term_id = c.term_id
+    WHERE c.member_id = $1 AND c.is_active = TRUE
+    ORDER BY e.created_at DESC`,
+    [memberId],
+  );
+  return result.rows;
+}
+
 export async function getExamsByClassIdQuery(classId, requireActive = false) {
   const pool = getPool();
   let query = `
@@ -84,6 +113,20 @@ export async function updateExamStatusQuery(classId, examId, status) {
     `UPDATE exams SET status = $1 WHERE exam_id = $2 AND class_id = $3 RETURNING exam_id`,
     [status, examId, classId]
   );
+  return result.rowCount > 0;
+}
+
+export async function verifyExamPasswordQuery(classId, examId, password, requireActive = true) {
+  const pool = getPool();
+  let sql = `
+    SELECT exam_id
+    FROM exams
+    WHERE exam_id = $1 AND class_id = $2 AND TRIM(password) = TRIM($3)
+  `;
+  if (requireActive) {
+    sql += ` AND status IN ${STUDENT_VISIBLE_STATUS_SQL}`;
+  }
+  const result = await pool.query(sql, [examId, classId, password]);
   return result.rowCount > 0;
 }
 

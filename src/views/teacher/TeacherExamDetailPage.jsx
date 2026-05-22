@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useTeacherShellBreadcrumbTrail } from '@/context/TeacherShellBreadcrumbContext.jsx'
+import TeacherPageHeader from '@/components/teacher/TeacherPageHeader.jsx'
 import { apiFetch } from '@/lib/apiFetch.js'
 import { fetchTeacherExamResults } from '@/lib/teacherExamResultsApi.js'
 import {
@@ -9,6 +11,7 @@ import {
   PG_EXAM_STATUS,
   normalizeExamStatus,
 } from '@/lib/examFlowUi.js'
+import { formatCourseBreadcrumbLabel } from '@/lib/sectionLabel.js'
 import '../../pages/teacher-ui/my_classes.css'
 
 async function copyExamCode(code) {
@@ -25,6 +28,7 @@ export default function TeacherExamDetailPage() {
   const navigate = useNavigate()
   
   const [hit, setHit] = useState(null)
+  const [clsMeta, setClsMeta] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [refreshTick, setRefreshTick] = useState(0)
@@ -36,21 +40,44 @@ export default function TeacherExamDetailPage() {
       if (!classId || !examId) return
       setLoading(true)
       try {
-        const res = await apiFetch(`/api/teacher/classes/${classId}/exams/${examId}`)
-        if (!res.ok) {
+        const [examRes, classRes] = await Promise.all([
+          apiFetch(`/api/teacher/classes/${classId}/exams/${examId}`),
+          apiFetch(`/api/teacher/classes/${classId}/exams`),
+        ])
+        if (!examRes.ok) {
           throw new Error('Exam not found or you do not have permission.')
         }
-        const data = await res.json()
-        // data will have { id, class_group_id, title, status, ... }
-        setHit(data)
+        setHit(await examRes.json())
+        if (classRes.ok) {
+          const classPayload = await classRes.json()
+          setClsMeta(classPayload)
+        } else {
+          setClsMeta(null)
+        }
       } catch (err) {
         setError(err.message)
+        setClsMeta(null)
       } finally {
         setLoading(false)
       }
     }
     fetchExam()
   }, [classId, examId, refreshTick])
+
+  const breadcrumbTrail = useMemo(() => {
+    if (!hit) return null
+    const trail = []
+    if (clsMeta) {
+      trail.push({
+        label: formatCourseBreadcrumbLabel(clsMeta),
+        to: `/teacher/my-classes/${encodeURIComponent(classId)}`,
+      })
+    }
+    trail.push({ label: hit.title || 'Exam' })
+    return trail
+  }, [hit, clsMeta, classId])
+
+  useTeacherShellBreadcrumbTrail(breadcrumbTrail)
 
   useEffect(() => {
     if (!classId || !examId) return undefined
@@ -77,7 +104,7 @@ export default function TeacherExamDetailPage() {
   if (loading) {
     return (
       <div className="acsis-mc-view acsis-view acsis-exam-detail">
-        <p className="acsis-mc-sub">Loading exam details...</p>
+        <div className="acsis-mc-loading">Loading exam details…</div>
       </div>
     )
   }
@@ -169,25 +196,26 @@ export default function TeacherExamDetailPage() {
   const qs = new URLSearchParams({ classId })
   const createHref = `/teacher/create-exam?${qs.toString()}`
 
+  const classHint =
+    exam.class_name && (exam.academic_year || exam.semester)
+      ? `${exam.class_name} · ${[exam.academic_year, exam.semester].filter(Boolean).join(' · ')}`
+      : exam.class_name || undefined
+
+  const headerMeta = [classHint, labelForPgExamStatus(exam.status)].filter(Boolean).join(' · ')
+
   return (
     <div className="acsis-mc-view acsis-view acsis-exam-detail">
-      <Link to={streamHref} className="acsis-stream-back">
-        ← Back to class stream
-      </Link>
+      <TeacherPageHeader
+        title={exam.title || 'Untitled exam'}
+        meta={headerMeta || undefined}
+        actions={
+          <Link to={streamHref} className="acsis-stream-back">
+            Back to exams
+          </Link>
+        }
+      />
 
       <div className="acsis-exam-detail__card">
-        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-          <span className={`acsis-pill ${active ? 'acsis-pill--live' : 'acsis-pill--draft'}`}>
-            {labelForPgExamStatus(exam.status)}
-          </span>
-        </div>
-        <h1>{exam.title || 'Untitled exam'}</h1>
-        
-        {exam.class_name && (
-          <p className="acsis-mc-sub" style={{ marginBottom: 0 }}>
-            In {exam.class_name} · {exam.academic_year} · {exam.semester}
-          </p>
-        )}
 
         <dl className="acsis-exam-detail__meta-grid">
           <div>

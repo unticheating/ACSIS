@@ -7,6 +7,7 @@ import {
   logStudentCheating,
   submitStudentExam,
   getStudentPerformance,
+  postStudentVerifyExamPassword,
 } from '../controllers/examController.js';
 import { requireAuth, requireStudentMember } from '../lib/sessionAuth.js';
 
@@ -21,6 +22,7 @@ router.get('/classes', getClasses);
 router.get('/classes/:classId/exams', getStudentClassStream);
 router.post('/classes/:classId/exams/:examId/join', joinStudentExam);
 router.get('/classes/:classId/exams/:examId/session', getStudentExamSession);
+router.post('/classes/:classId/exams/:examId/verify-password', postStudentVerifyExamPassword);
 router.post('/classes/:classId/exams/:examId/cheating', logStudentCheating);
 router.post('/classes/:classId/exams/:examId/submit', submitStudentExam);
 

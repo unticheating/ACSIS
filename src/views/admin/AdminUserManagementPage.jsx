@@ -38,6 +38,7 @@ const emptyForm = {
   email: '',
   role: 'student',
   schoolId: '',
+  programCode: '',
   yearLevel: '',
   section: '',
   password: '',
@@ -104,6 +105,7 @@ export default function AdminUserManagementPage() {
       email: user.email || '',
       role: user.role,
       schoolId: user.schoolId || '',
+      programCode: user.programCode || '',
       yearLevel: user.yearLevel || '',
       section: user.section || '',
       password: '',
@@ -146,6 +148,7 @@ export default function AdminUserManagementPage() {
         email: form.email,
         role: form.role,
         schoolId: form.schoolId,
+        programCode: form.programCode,
         yearLevel: form.yearLevel,
         section: form.section,
         password: form.role === 'admin' ? form.password : undefined,
@@ -171,15 +174,19 @@ export default function AdminUserManagementPage() {
     setSubmitting(true)
     setBanner(null)
     try {
-      await updateAdminUser(editingUid, {
+      const payload = {
         firstName: form.firstName,
         lastName: form.lastName,
         middleName: form.middleName || null,
         email: form.email,
         schoolId: form.schoolId,
-        yearLevel: form.yearLevel,
-        section: form.section,
-      })
+      }
+      if (form.role === 'student') {
+        payload.programCode = form.programCode
+        payload.yearLevel = form.yearLevel
+        payload.section = form.section
+      }
+      await updateAdminUser(editingUid, payload)
       setEditOpen(false)
       setEditingUid(null)
       await loadUsers()
@@ -280,6 +287,15 @@ export default function AdminUserManagementPage() {
       {form.role === 'student' ? (
         <>
           <label>
+            Program
+            <input
+              type="text"
+              placeholder="BSIT"
+              value={form.programCode}
+              onChange={(e) => patchForm('programCode', e.target.value)}
+            />
+          </label>
+          <label>
             Year level
             <select
               required
@@ -297,7 +313,7 @@ export default function AdminUserManagementPage() {
             Section
             <input
               type="text"
-              placeholder="BSCS 3A"
+              placeholder="3D"
               value={form.section}
               onChange={(e) => patchForm('section', e.target.value)}
             />

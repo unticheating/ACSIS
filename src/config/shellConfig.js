@@ -68,10 +68,13 @@ export function resolveShellPageTitle(role, pathname) {
       const hit = getExamInClass(examDetail[1], examDetail[2])
       if (hit?.exam?.title) return hit.exam.title
     }
-    const classStream = pathname.match(/^\/teacher\/my-classes\/([^/]+)$/)
+    const sectionCourses = pathname.match(/^\/teacher\/my-classes\/(?:section|term)\/([^/]+)$/)
+    if (sectionCourses) {
+      return 'Courses'
+    }
+    const classStream = pathname.match(/^\/teacher\/my-classes\/(?!section\/|term\/)([^/]+)$/)
     if (classStream) {
-      const cls = getClassById(classStream[1])
-      if (cls?.name) return cls.name
+      return 'Exams'
     }
   }
 
