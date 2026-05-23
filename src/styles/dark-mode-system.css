@@ -30,6 +30,10 @@ html.dark .table-wrapper,
 html.dark .acsis-empty-panel,
 html.dark .acsis-view .panel,
 html.dark .student-detail-card,
+html.dark .exam-card,
+html.dark .subject-card,
+html.dark .subject-toolbar,
+html.dark .admin-dialog-content,
 html.dark .monitor-stat-card,
 html.dark .acsis-summary-stat,
 html.dark .acsis-class-card,
@@ -562,6 +566,143 @@ html.dark .admin-exam-row__trigger:hover {
 
 html.dark .admin-exam-row__title {
   color: var(--fg-default, #f5f5f5) !important;
+}
+
+html.dark .exam-card-title,
+html.dark .exam-card-meta,
+html.dark .exam-done-label,
+html.dark .subject-title,
+html.dark .subject-code,
+html.dark .subject-instance-faculty,
+html.dark .subject-filter__label,
+html.dark .subject-filter--checkbox {
+  color: var(--fg-default, #f5f5f5) !important;
+}
+
+html.dark .exam-card-meta,
+html.dark .subject-code,
+html.dark .subject-instance-faculty,
+html.dark .admin-dialog-desc {
+  color: var(--fg-muted, #a3a3a3) !important;
+}
+
+html.dark .exam-card--archived {
+  background: var(--bg-elevated, #212121) !important;
+  border-color: var(--border-default, #2a2a2a) !important;
+}
+
+html.dark .subject-card--archived {
+  background: var(--bg-elevated, #212121) !important;
+  border-color: var(--border-default, #2a2a2a) !important;
+}
+
+html.dark .subject-filter__select {
+  background: var(--bg-elevated, #212121) !important;
+  border-color: var(--border-default, #2a2a2a) !important;
+  color: var(--fg-default, #f5f5f5) !important;
+}
+
+html.dark .admin-dialog-content .admin-dialog-footer {
+  background: var(--bg-elevated, #212121) !important;
+  border-top-color: var(--border-default, #2a2a2a) !important;
+}
+
+html.dark .admin-dialog-content .admin-dialog-header {
+  border-bottom-color: var(--border-default, #2a2a2a) !important;
+}
+
+html.dark .exam-status-badge.status-open,
+html.dark .exam-status-badge.status-ongoing,
+html.dark .exam-status-badge.status-active {
+  background: var(--acsis-status-active, #16a34a) !important;
+  color: #fff !important;
+  border-color: var(--acsis-status-active-border, #15803d) !important;
+  box-shadow: 0 1px 6px rgba(22, 163, 74, 0.45) !important;
+}
+
+html.dark .exam-status-badge.status-closed {
+  background: #dc2626 !important;
+  color: #fff !important;
+  border-color: #b91c1c !important;
+}
+
+html.dark .exam-status-badge.status-waiting {
+  background: #d97706 !important;
+  color: #fff !important;
+}
+
+html.dark .exam-status-badge.status-draft,
+html.dark .exam-status-badge.status-scheduled,
+html.dark .exam-status-badge.status-completed {
+  background: var(--bg-elevated, #2a2a2a) !important;
+  color: var(--fg-muted, #d1d5db) !important;
+  border-color: var(--border-default, #3a3a3a) !important;
+}
+
+html.dark .exam-archive-btn--primary {
+  background: var(--acsis-brand-600, var(--acsis-brand)) !important;
+  color: #fff !important;
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--acsis-brand) 40%, transparent) !important;
+}
+
+html.dark .exam-archive-btn--ghost {
+  border-color: var(--border-default, #3a3a3a) !important;
+  color: var(--fg-muted, #d1d5db) !important;
+}
+
+html.dark .exam-archive-btn--ghost:hover {
+  background: var(--acsis-brand-subtle) !important;
+  color: var(--acsis-brand-muted-text, #f5f5f5) !important;
+}
+
+html.dark .monitor-stat-icon.green {
+  background: color-mix(in srgb, var(--acsis-brand, #16a34a) 16%, #1a1a1a) !important;
+}
+
+html.dark .monitor-stat-icon.green .monitor-stat-icon__svg {
+  color: var(--acsis-brand-muted-text, #86efac) !important;
+}
+
+html.dark .monitor-stat-icon.red {
+  background: color-mix(in srgb, #dc2626 14%, #1a1a1a) !important;
+}
+
+html.dark .monitor-stat-icon.red .monitor-stat-icon__svg {
+  color: #f87171 !important;
+}
+
+html.dark .monitor-stat-label {
+  color: var(--fg-muted, #a3a3a3) !important;
+}
+
+html.dark .monitor-stat-value {
+  color: var(--fg-default, #f5f5f5) !important;
+}
+
+html.dark .tag.green {
+  background: color-mix(in srgb, var(--acsis-brand) 18%, #1a1a1a) !important;
+  color: var(--acsis-brand-muted-text, #86efac) !important;
+}
+
+html.dark .tag.blue {
+  background: color-mix(in srgb, #3b82f6 14%, #1a1a1a) !important;
+  color: #93c5fd !important;
+}
+
+html.dark .admin-modal-field label {
+  color: var(--fg-muted, #a3a3a3) !important;
+}
+
+html.dark .admin-modal-field input,
+html.dark .admin-modal-field textarea,
+html.dark .admin-modal-field select {
+  background: var(--bg-elevated, #212121) !important;
+  border-color: var(--border-default, #2a2a2a) !important;
+  color: var(--fg-default, #f5f5f5) !important;
+}
+
+html.dark .exam-progress-bar {
+  background: var(--bg-elevated, #2a2a2a) !important;
 }
 
 /* Teacher tabs (my classes) */

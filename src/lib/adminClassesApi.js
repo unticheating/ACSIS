@@ -39,8 +39,18 @@ export async function deleteAdminClass(classId) {
 
 export function examStatusLabel(status) {
   const s = String(status || 'draft').toLowerCase()
-  if (s === 'open') return 'Active'
+  if (s === 'open' || s === 'active') return 'Active'
   if (s === 'waiting') return 'Waiting'
   if (s === 'closed') return 'Closed'
   return 'Draft'
+}
+
+/** CSS modifier for `.exam-status-badge.status-{name}` */
+export function examStatusBadgeClass(status) {
+  const s = String(status || 'draft').toLowerCase()
+  if (s === 'open' || s === 'active') return 'open'
+  if (s === 'closed') return 'closed'
+  if (s === 'waiting') return 'waiting'
+  if (s === 'archived') return 'archived'
+  return 'draft'
 }

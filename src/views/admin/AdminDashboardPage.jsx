@@ -107,7 +107,7 @@ export default function AdminDashboardPage({ basePath = '/admin' }) {
         <FadeIn className="panel" delay={0.4}>
           <div className="panel-header">
             <span className="panel-title">On-Going Examinations</span>
-            <Link to={`${basePath}/classes`} className="panel-view-all">
+            <Link to={`${basePath}/classes?view=active`} className="panel-view-all">
               {hasMoreOngoing && stats.ongoingExams > ongoingExams.length
                 ? `View All (${stats.ongoingExams})`
                 : 'View All'}

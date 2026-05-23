@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Activity, AlertTriangle, Eye } from 'lucide-react'
 import { fetchAdminMonitoring, formatRelativeTime } from '@/lib/adminMonitoringApi.js'
 import FadeIn from '@/components/ui/fade-in.jsx'
 import { acsisToastError } from '@/lib/acsisToast.js'
@@ -53,8 +54,8 @@ export default function AdminMonitoringPage() {
 
         <div className="monitor-stat-cards">
           <FadeIn delay={0.05} className="monitor-stat-card">
-            <div className="monitor-stat-icon green">
-              <i className="fas fa-wave-square" aria-hidden />
+            <div className="monitor-stat-icon green" aria-hidden>
+              <Activity className="monitor-stat-icon__svg" strokeWidth={2.25} />
             </div>
             <div className="monitor-stat-info">
               <div className="monitor-stat-label">Active sessions</div>
@@ -62,8 +63,8 @@ export default function AdminMonitoringPage() {
             </div>
           </FadeIn>
           <FadeIn delay={0.1} className="monitor-stat-card">
-            <div className="monitor-stat-icon green">
-              <i className="fas fa-eye" aria-hidden />
+            <div className="monitor-stat-icon green" aria-hidden>
+              <Eye className="monitor-stat-icon__svg" strokeWidth={2.25} />
             </div>
             <div className="monitor-stat-info">
               <div className="monitor-stat-label">Being monitored</div>
@@ -71,8 +72,8 @@ export default function AdminMonitoringPage() {
             </div>
           </FadeIn>
           <FadeIn delay={0.15} className="monitor-stat-card">
-            <div className="monitor-stat-icon red">
-              <i className="fas fa-exclamation-triangle" aria-hidden />
+            <div className="monitor-stat-icon red" aria-hidden>
+              <AlertTriangle className="monitor-stat-icon__svg" strokeWidth={2.25} />
             </div>
             <div className="monitor-stat-info">
               <div className="monitor-stat-label">Alerts (last 5m)</div>
@@ -95,7 +96,7 @@ export default function AdminMonitoringPage() {
           ) : (
             <div className="activity-feed">
               {activities.map((act, index) => (
-                <FadeIn key={`${act.status}-${act.id}`} delay={0.25 + (index * 0.05)} className="activity-item">
+                <FadeIn key={`${act.status}-${act.id}`} delay={0.25 + index * 0.05} className="activity-item">
                   <div className="activity-left">
                     <span className={`activity-dot dot-${act.status}`} />
                     <div className="activity-info">

@@ -1,10 +1,12 @@
 import {
   AlertCircle,
   BarChart3,
+  BookOpen,
   ClipboardList,
   FileText,
   LayoutDashboard,
   LayoutGrid,
+  Radio,
   ScrollText,
   Settings,
   Shield,
@@ -32,7 +34,10 @@ export const shellConfig = {
     nav: [
       { to: '/admin', label: 'Dashboard', end: true, icon: LayoutDashboard },
       { to: '/admin/classes', label: 'Classes', icon: FileText },
+      { to: '/admin/subjects', label: 'Subjects', icon: BookOpen },
+      { to: '/admin/monitoring', label: 'Monitoring', icon: Radio },
       { to: '/admin/violations', label: 'Violation Records', mobileLabel: 'Violations', icon: Shield },
+      { to: '/admin/reports', label: 'Reports', icon: BarChart3 },
       { to: '/admin/users', label: 'User Management', mobileLabel: 'Users', icon: UsersRound },
       { to: '/admin/settings', label: 'Institution settings', mobileLabel: 'Settings', icon: Settings },
     ],

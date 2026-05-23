@@ -21,6 +21,7 @@ const AdminSettingsPage = lazy(() => import('./views/admin/AdminSettingsPage.jsx
 const AdminViolationsPage = lazy(() => import('./views/admin/AdminViolationsPage.jsx'))
 const AdminMonitoringPage = lazy(() => import('./views/admin/AdminMonitoringPage.jsx'))
 const AdminReportsPage = lazy(() => import('./views/admin/AdminReportsPage.jsx'))
+const AdminSubjectsPage = lazy(() => import('./views/admin/AdminSubjectsPage.jsx'))
 const DevPortalsPage = lazy(() => import('./views/DevPortalsPage.jsx'))
 
 const StudentClassStreamPage = lazy(() => import('./views/student/StudentClassStreamPage.jsx'))
@@ -137,7 +138,7 @@ export default function App() {
       >
         <Route index element={<AdminDashboardPage />} />
         <Route path="students" element={<AdminPlaceholderPage title="Students" />} />
-        <Route path="subjects" element={<AdminPlaceholderPage title="Subjects" />} />
+        <Route path="subjects" element={<AdminSubjectsPage />} />
         <Route path="classes" element={<AdminExaminationsPage />} />
         <Route path="examinations" element={<Navigate to="/admin/classes" replace />} />
         <Route path="monitoring" element={<AdminMonitoringPage />} />
