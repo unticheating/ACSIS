@@ -234,6 +234,43 @@
   font-size: 0.9375rem;
 }
 
+.acsis-immersive__password-field {
+  position: relative;
+}
+
+.acsis-immersive__password-field .acsis-immersive__input {
+  padding-right: 48px;
+}
+
+.acsis-immersive__password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 9999px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  transform: translateY(-50%);
+  transition: color 0.15s, background-color 0.15s;
+}
+
+.acsis-immersive__password-toggle:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.acsis-immersive__password-toggle:focus-visible {
+  outline: 2px solid var(--acsis-immersive-accent);
+  outline-offset: 2px;
+}
+
 .acsis-immersive__input::placeholder {
   color: rgba(255, 255, 255, 0.35);
 }

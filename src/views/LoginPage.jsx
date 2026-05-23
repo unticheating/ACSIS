@@ -13,6 +13,7 @@ export default function LoginPage() {
   const { refreshAuth, authUser, authLoading, isAuthenticated, activeAccount } = useSession()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
 
   useEffect(() => {
     const errorCode = searchParams.get('error')
@@ -152,16 +153,45 @@ export default function LoginPage() {
           </div>
           <div className="acsis-immersive__field">
             <label htmlFor="acsis-password">Password</label>
+            <div className="acsis-immersive__password-field">
             <input
               id="acsis-password"
               className="acsis-immersive__input"
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               autoComplete="current-password"
               value={password}
               onChange={(ev) => setPassword(ev.target.value)}
               placeholder="Enter your password"
               aria-required="true"
             />
+              <button
+                type="button"
+                className="acsis-immersive__password-toggle"
+                onClick={() => setShowPassword((current) => !current)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                aria-pressed={showPassword}
+              >
+                {showPassword ? (
+                  <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden>
+                    <path
+                      fill="currentColor"
+                      d="M12 5c5.5 0 9.9 4 11 7-1.1 3-5.5 7-11 7S2.1 15 1 12c1.1-3 5.5-7 11-7zm0 2C7.8 7 4.2 9.8 3.1 12 4.2 14.2 7.8 17 12 17s7.8-2.8 8.9-5C19.8 9.8 16.2 7 12 7zm0 2.25A2.75 2.75 0 1 1 12 14.75 2.75 2.75 0 0 1 12 9.25z"
+                    />
+                    <path
+                      fill="currentColor"
+                      d="M4.22 4.22 19.78 19.78l-1.06 1.06L3.16 5.28z"
+                    />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden>
+                    <path
+                      fill="currentColor"
+                      d="M12 5c5.5 0 9.9 4 11 7-1.1 3-5.5 7-11 7S2.1 15 1 12c1.1-3 5.5-7 11-7zm0 2C7.8 7 4.2 9.8 3.1 12 4.2 14.2 7.8 17 12 17s7.8-2.8 8.9-5C19.8 9.8 16.2 7 12 7zm0 1.75A3.25 3.25 0 1 1 12 15.25 3.25 3.25 0 0 1 12 8.75z"
+                    />
+                  </svg>
+                )}
+              </button>
+            </div>
           </div>
           <button type="submit" className="acsis-immersive__btn-primary">
             Continue
