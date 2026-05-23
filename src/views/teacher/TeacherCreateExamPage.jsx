@@ -33,7 +33,10 @@ export default function TeacherCreateExamPage() {
   
   const [classes, setClasses] = useState([])
   const [loadingClasses, setLoadingClasses] = useState(true)
-  const [selectedClass, setSelectedClass] = useState(searchParams.get('classId') || '')
+  const classesQuery = searchParams.get('classes') || ''
+  const [selectedClass, setSelectedClass] = useState(searchParams.get('classId') || (classesQuery ? classesQuery.split(',')[0] : ''))
+  const [createForClasses, setCreateForClasses] = useState(classesQuery ? classesQuery.split(',') : [])
+  const preselectedCourse = searchParams.get('course') || ''
 
   useEffect(() => {
     apiFetch('/api/teacher/classes')
@@ -260,6 +263,7 @@ export default function TeacherCreateExamPage() {
 
     setIsSubmitting(true)
     try {
+      // Create for primary selectedClass
       const res = await apiFetch(`/api/teacher/classes/${selectedClass}/exams`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -269,9 +273,27 @@ export default function TeacherCreateExamPage() {
       if (!res.ok) {
         throw new Error(data.error || 'Failed to create exam.')
       }
+      const createdIds = [data.examId]
+
+      // If createForClasses includes additional class ids, duplicate exam for them
+      const other = createForClasses.filter((id) => String(id) !== String(selectedClass))
+      for (const clsId of other) {
+        try {
+          const r = await apiFetch(`/api/teacher/classes/${clsId}/exams`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          })
+          const d = await r.json()
+          if (r.ok) createdIds.push(d.examId)
+        } catch (e) {
+          console.error('Failed to duplicate exam for class', clsId, e)
+        }
+      }
+
       const codeMsg = data.code ? ` Exam code: ${data.code}.` : ''
       acsisToastSuccess(
-        `Exam "${title}" saved (${totalQuestions} questions, ${sections.length} set(s)).${codeMsg} Publish from the class page when ready.`,
+        `Exam "${title}" saved for ${createdIds.length} class(es) (${totalQuestions} questions, ${sections.length} set(s)).${codeMsg} Publish from the class page when ready.`,
       )
       navigate(`/teacher/my-classes/${selectedClass}`)
     } catch (err) {

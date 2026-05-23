@@ -342,7 +342,9 @@ export default function TeacherReportsPage() {
                         <div className="sdc-score">
                           {student.status === 'submitted' && student.percentage != null ? (
                             <>
-                              <div className="score-val text-green">{student.percentage}%</div>
+                              <div className={`score-val ${Number(student.percentage) < 50 ? 'text-red' : 'text-green'}`}>
+                                {student.percentage}%
+                              </div>
                               <div className="score-lbl">
                                 {student.rawScore}/{student.totalPoints} pts
                               </div>
@@ -363,7 +365,7 @@ export default function TeacherReportsPage() {
                       <div className="sdc-stats">
                         <div className="sdc-stat">
                           <div className="stat-val">{student.answerCount}</div>
-                          <div className="stat-lbl">Answers saved</div>
+                          <div className="stat-lbl">Questions answered</div>
                         </div>
                         <div className="sdc-stat">
                           <div className="stat-val text-red">{student.warningCount}</div>
