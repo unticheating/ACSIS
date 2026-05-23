@@ -10,12 +10,12 @@ import {
 } from '@/lib/studentExamApi.js'
 import { PG_EXAM_STATUS, normalizeExamStatus } from '@/lib/examFlowUi.js'
 import { MAX_EXAM_WARNINGS, labelForCheatEvent } from '@/lib/examAntiCheat.js'
+import { computeExamTimeDisplay } from '@/lib/examCountdown.js'
 
 import { useSession } from '@/context/SessionContext.jsx'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle.js'
 // Removed legacy CSS import
 
-const LOBBY_MS = 4000
 const COUNTDOWN_SEC = 3
 const DETECTION_RETURN_SEC = 5
 const OVERLAY_FADE_MS = 340
@@ -158,7 +158,13 @@ export default function StudentExamSessionPage() {
   useEffect(() => {
     if (!hit?.exam) return
     const st = normalizeExamStatus(hit.exam.status)
-    if (st === PG_EXAM_STATUS.OPEN && questions.length > 0 && scene === 'lobby') {
+    if (st !== PG_EXAM_STATUS.OPEN) {
+      if (scene === 'countdown' || scene === 'question') {
+        setScene('lobby')
+      }
+      return
+    }
+    if (questions.length > 0 && scene === 'lobby') {
       setScene('countdown')
     }
   }, [hit?.exam?.status, questions.length, scene])
@@ -169,24 +175,27 @@ export default function StudentExamSessionPage() {
   const postCooldownUntilRef = useRef(0)
   const visibilityTimerRef = useRef(null)
   const returnSceneRef = useRef('question')
+  const autoSubmittingRef = useRef(false)
 
   useEffect(() => {
-    setSecondsLeft(durationMin * 60)
-  }, [durationMin])
-
-  useEffect(() => {
-    if (!isExamScene(scene)) return undefined
-    const id = window.setInterval(() => {
-      setSecondsLeft((t) => {
-        if (t <= 1) {
-          submitToServer()
-          return 0
-        }
-        return t - 1
+    if (scene !== 'question' || !hit?.exam) return undefined
+    const tick = () => {
+      const { seconds } = computeExamTimeDisplay({
+        status: hit.exam.status,
+        duration: hit.exam.duration ?? durationMin,
+        openedAt: hit.exam.openedAt,
       })
-    }, 1000)
+      const left = seconds ?? 0
+      setSecondsLeft(left)
+      if (left <= 0 && !autoSubmittingRef.current) {
+        autoSubmittingRef.current = true
+        submitToServer()
+      }
+    }
+    tick()
+    const id = window.setInterval(tick, 1000)
     return () => window.clearInterval(id)
-  }, [scene, submitToServer])
+  }, [scene, hit?.exam, durationMin, submitToServer])
 
   const showViolationOverlay = useCallback((returnTo) => {
     detectionRunningRef.current = true
@@ -293,6 +302,16 @@ export default function StudentExamSessionPage() {
       if (document.hidden) scheduleTabLeave()
       else cancelTabLeave()
     }
+    function onWindowBlur() {
+      if (!isExamScene(sceneRef.current) || detectionRunningRef.current) return
+      scheduleTabLeave()
+    }
+    function onFullscreenChange() {
+      if (!isExamScene(sceneRef.current) || detectionRunningRef.current) return
+      if (!document.fullscreenElement) {
+        recordViolation('window_blur', 'Exited fullscreen')
+      }
+    }
     function onKey(ev) {
       if (detectionRunningRef.current) return
       if (!isExamScene(sceneRef.current)) return
@@ -329,13 +348,17 @@ export default function StudentExamSessionPage() {
       ev.preventDefault()
       recordViolation('paste_attempt', 'Paste')
     }
+    window.addEventListener('blur', onWindowBlur)
     document.addEventListener('visibilitychange', onVis)
+    document.addEventListener('fullscreenchange', onFullscreenChange)
     document.addEventListener('keydown', onKey, true)
     document.addEventListener('copy', onCopy, true)
     document.addEventListener('cut', onCut, true)
     document.addEventListener('paste', onPaste, true)
     return () => {
+      window.removeEventListener('blur', onWindowBlur)
       document.removeEventListener('visibilitychange', onVis)
+      document.removeEventListener('fullscreenchange', onFullscreenChange)
       document.removeEventListener('keydown', onKey, true)
       document.removeEventListener('copy', onCopy, true)
       document.removeEventListener('cut', onCut, true)
@@ -358,16 +381,11 @@ export default function StudentExamSessionPage() {
   }, [scene])
 
   useEffect(() => {
-    if (scene !== 'lobby') return undefined
-    const t = window.setTimeout(() => {
-      setScene('countdown')
-      setCountdownNum(COUNTDOWN_SEC)
-    }, LOBBY_MS)
-    return () => window.clearTimeout(t)
-  }, [scene])
-
-  useEffect(() => {
     if (scene !== 'countdown') return undefined
+    if (normalizeExamStatus(hit?.exam?.status) !== PG_EXAM_STATUS.OPEN) {
+      setScene('lobby')
+      return undefined
+    }
     setCountdownNum(COUNTDOWN_SEC)
     let n = COUNTDOWN_SEC
     const step = () => {

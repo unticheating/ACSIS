@@ -18,7 +18,7 @@ export function computeExamTimeDisplay(exam, nowMs = Date.now()) {
   if (status === PG_EXAM_STATUS.WAITING) {
     return {
       seconds: limitSec,
-      label: 'Duration',
+      label: 'Not started',
       display: limitSec != null ? formatMmSs(limitSec) : '--:--',
       isLow: false,
     }

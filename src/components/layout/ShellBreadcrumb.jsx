@@ -60,7 +60,7 @@ export default function ShellBreadcrumb({ role }) {
   const extraTeacherSegments = useTeacherShellBreadcrumbSegments()
   const ctx = useDetectionsToolbar()
   const toolbar = ctx?.toolbar
-  const showDetectionsSettings = role === 'teacher' && pathname === '/teacher/detections' && toolbar
+  const isDetectionsPage = role === 'teacher' && pathname === '/teacher/detections'
 
   const segments =
     role === 'teacher'
@@ -68,14 +68,21 @@ export default function ShellBreadcrumb({ role }) {
       : [{ label: resolveShellPageTitle(role, pathname) }]
 
   return (
-    <header className="content-header w-full">
+    <header className={`content-header w-full${isDetectionsPage ? ' content-header--detections' : ''}`}>
       <BreadcrumbTrail segments={segments} />
-      {showDetectionsSettings ? (
+      {isDetectionsPage ? (
         <div className="content-header__actions">
-          <DetectionsSeatSettingsMenu
-            seatSettings={toolbar.seatSettings}
-            onFillModeChange={toolbar.onFillModeChange}
-          />
+          {toolbar ? (
+            <DetectionsSeatSettingsMenu
+              seatSettings={toolbar.seatSettings}
+              onFillModeChange={toolbar.onFillModeChange}
+            />
+          ) : (
+            <span
+              className="acsis-detections-settings-btn acsis-detections-settings-btn--placeholder"
+              aria-hidden
+            />
+          )}
         </div>
       ) : null}
     </header>

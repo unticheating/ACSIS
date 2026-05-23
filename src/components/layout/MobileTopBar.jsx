@@ -16,7 +16,7 @@ export default function MobileTopBar({ settingsPath = null, role }) {
   const extraTeacherSegments = useTeacherShellBreadcrumbSegments()
   const ctx = useDetectionsToolbar()
   const toolbar = ctx?.toolbar
-  const showDetectionsSettings = role === 'teacher' && pathname === '/teacher/detections' && toolbar
+  const isDetectionsPage = role === 'teacher' && pathname === '/teacher/detections'
 
   const myClassesRoot = { label: 'My Classes', to: '/teacher/my-classes' }
   let items
@@ -35,7 +35,9 @@ export default function MobileTopBar({ settingsPath = null, role }) {
   }
 
   return (
-    <header className="acsis-mobile-top-bar">
+    <header
+      className={`acsis-mobile-top-bar${isDetectionsPage ? ' acsis-mobile-top-bar--detections' : ''}`}
+    >
       <div className="acsis-mobile-top-bar__brand">
         <div className="acsis-mobile-top-bar__logo">
           <InstitutionLogo logo={logo} alt="" responsive />
@@ -61,12 +63,19 @@ export default function MobileTopBar({ settingsPath = null, role }) {
         </div>
       </div>
       <div className="acsis-mobile-top-bar__actions">
-        {showDetectionsSettings ? (
-          <DetectionsSeatSettingsMenu
-            seatSettings={toolbar.seatSettings}
-            onFillModeChange={toolbar.onFillModeChange}
-            triggerClassName="acsis-detections-settings-btn acsis-detections-settings-btn--mobile"
-          />
+        {isDetectionsPage ? (
+          toolbar ? (
+            <DetectionsSeatSettingsMenu
+              seatSettings={toolbar.seatSettings}
+              onFillModeChange={toolbar.onFillModeChange}
+              triggerClassName="acsis-detections-settings-btn acsis-detections-settings-btn--mobile"
+            />
+          ) : (
+            <span
+              className="acsis-detections-settings-btn acsis-detections-settings-btn--mobile acsis-detections-settings-btn--placeholder"
+              aria-hidden
+            />
+          )
         ) : null}
         <AccountMenu
           settingsPath={settingsPath}

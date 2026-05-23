@@ -20,12 +20,14 @@ import { closeOtherTeacherOngoingExamsQuery } from '../repositories/examResultsR
 import { checkEnrollment } from '../repositories/studentRepository.js'
 
 function mapExamMeta(row) {
+  const status = (row.status || '').toLowerCase()
   return {
     id: row.exam_id,
     title: row.title,
     duration: row.time_limit,
     status: row.status,
     code: row.password,
+    openedAt: status === EXAM_STATUS.OPEN && row.updated_at ? row.updated_at : null,
   }
 }
 
