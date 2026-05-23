@@ -20,7 +20,11 @@ import {
   setSessionCookie,
   verifySession,
 } from '../lib/session.js'
-import { authenticateAdministrator } from '../lib/passwordAuth.js'
+import {
+  authenticateAdministrator,
+  sendTemporaryPasswordReset,
+  setUserPassword,
+} from '../lib/passwordAuth.js'
 import { getBrandingForUser } from '../lib/institutionTheme.js'
 import {
   buildSessionFromUid,
@@ -304,6 +308,68 @@ router.post('/login', async (req, res) => {
   } catch (err) {
     console.error('[auth/login]', err)
     return res.status(500).json({ error: 'Login failed. Please try again.' })
+  }
+})
+
+router.post('/forgot-password', async (req, res) => {
+  const email = typeof req.body?.email === 'string' ? req.body.email : ''
+
+  try {
+    const result = await sendTemporaryPasswordReset(getPool(), email)
+    if (!result.ok) {
+      return res.status(result.status).json({ error: result.error })
+    }
+
+    const payload = {
+      ok: true,
+      email: result.email,
+    }
+
+    if (result.devHint) {
+      payload.devHint = result.devHint
+    }
+
+    return res.json(payload)
+  } catch (err) {
+    console.error('[auth/forgot-password]', err)
+    return res.status(500).json({ error: 'Could not send a temporary password.' })
+  }
+})
+
+router.post('/change-password', async (req, res) => {
+  const session = readSession(req)
+  if (!session) {
+    return res.status(401).json({ error: 'Sign in again to change your password.' })
+  }
+  if (!session.mustChangePassword) {
+    return res.status(400).json({ error: 'Password change is not required for this account.' })
+  }
+
+  const newPassword = typeof req.body?.newPassword === 'string' ? req.body.newPassword : ''
+  const confirmPassword = typeof req.body?.confirmPassword === 'string' ? req.body.confirmPassword : ''
+
+  if (newPassword.length < 8) {
+    return res.status(400).json({ error: 'New password must be at least 8 characters long.' })
+  }
+  if (newPassword !== confirmPassword) {
+    return res.status(400).json({ error: 'Passwords do not match.' })
+  }
+
+  const pool = getPool()
+  if (!pool) {
+    return res.status(503).json({ error: 'Database unavailable.' })
+  }
+
+  try {
+    await setUserPassword(pool, session.uid, newPassword, false)
+    const nextSession = await buildSessionFromUid(pool, session.uid, {
+      googleSub: session.googleSub,
+    })
+    setSessionCookie(res, nextSession)
+    return res.json({ ok: true, user: nextSession })
+  } catch (err) {
+    console.error('[auth/change-password]', err)
+    return res.status(500).json({ error: 'Could not update your password.' })
   }
 })
 

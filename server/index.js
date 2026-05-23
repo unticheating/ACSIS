@@ -15,6 +15,7 @@ import teacherClassesRouter from './routes/teacherClasses.js'
 import teacherTermsRouter from './routes/teacherTerms.js'
 import studentRouter from './routes/student.js'
 import { logSmtpStatus } from './lib/sendEmail.js'
+import { ensurePasswordResetSchema } from './lib/ensurePasswordResetSchema.js'
 
 try {
   if (config.google.clientId && config.google.clientSecret) {
@@ -53,6 +54,13 @@ app.use('/api/teacher/classes', teacherClassesRouter)
 app.use('/api/student', studentRouter)
 
 app.listen(config.port, async () => {
+  if (config.databaseUrl) {
+    try {
+      await ensurePasswordResetSchema()
+    } catch (err) {
+      console.warn('  Password reset schema check failed:', err.message)
+    }
+  }
   console.log(`ACSIS auth API listening on http://localhost:${config.port}`)
   console.log(`  Frontend: ${config.frontendUrl}`)
   console.log(`  Google callback: ${config.google.callbackUrl}`)

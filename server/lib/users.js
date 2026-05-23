@@ -165,7 +165,8 @@ export async function resolveUserPortal(pool, uid, isSuperAdmin) {
  */
 export async function buildSessionFromUid(pool, uid, opts = {}) {
   const { rows } = await pool.query(
-    `SELECT uid, first_name, last_name, email, is_super_admin, google_sub, avatar_url
+    `SELECT uid, first_name, last_name, email, is_super_admin, google_sub, avatar_url,
+            COALESCE(password_reset_required, FALSE) AS password_reset_required
      FROM users WHERE uid = $1`,
     [uid],
   )
@@ -219,6 +220,7 @@ export async function buildSessionFromUid(pool, uid, opts = {}) {
     roleLabel: portalInfo.roleLabel,
     entryPath: portalInfo.entryPath,
     membershipStatus: portalInfo.membershipStatus,
+    mustChangePassword: Boolean(user.password_reset_required),
     needsInitialJoin,
     needsStudentNumber,
     needsJoinClass,
@@ -240,5 +242,6 @@ export function buildSessionWithoutDatabase(profile) {
     roleLabel: 'Student (dev — no database)',
     entryPath: '/student/my-classes',
     membershipStatus: /** @type {'active'} */ ('active'),
+    mustChangePassword: false,
   }
 }

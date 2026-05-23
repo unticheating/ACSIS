@@ -89,6 +89,7 @@ CREATE TABLE IF NOT EXISTS users (
     suffix         VARCHAR(10)  DEFAULT NULL,
     email          VARCHAR(100) NOT NULL UNIQUE,
     password       VARCHAR(255) DEFAULT NULL, -- bcrypt hash; NULL for Google-only accounts
+    password_reset_required BOOLEAN NOT NULL DEFAULT FALSE,
     google_sub     VARCHAR(255) UNIQUE, -- Google account subject (stable id)
     avatar_url     TEXT         DEFAULT NULL,
     is_super_admin BOOLEAN      NOT NULL DEFAULT FALSE,

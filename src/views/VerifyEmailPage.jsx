@@ -125,7 +125,7 @@ export default function VerifyEmailPage() {
     try {
       const data = await verifyEmailCode(code)
       await refreshAuth()
-      setEntryPath(data.user?.entryPath || '/student/my-classes')
+      setEntryPath(data.user?.mustChangePassword ? '/change-password' : (data.user?.entryPath || '/student/my-classes'))
       setNeedsJoinClass(Boolean(data.needsJoinClass))
       setShowSuccess(true)
     } catch (err) {

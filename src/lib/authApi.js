@@ -45,6 +45,26 @@ export async function loginWithPassword(email, password) {
   return parseJson(res)
 }
 
+export async function requestPasswordReset(email) {
+  const res = await fetch(`${API_BASE}/api/auth/forgot-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ email }),
+  })
+  return parseJson(res)
+}
+
+export async function changePassword(newPassword, confirmPassword) {
+  const res = await fetch(`${API_BASE}/api/auth/change-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ newPassword, confirmPassword }),
+  })
+  return parseJson(res)
+}
+
 export async function fetchAuthConfig() {
   const res = await fetch(`${API_BASE}/api/auth/config`, { credentials: 'include' })
   return parseJson(res)

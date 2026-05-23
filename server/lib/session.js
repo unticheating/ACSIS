@@ -16,6 +16,7 @@ export const SESSION_COOKIE = 'acsis_session'
  * @property {string | null} roleLabel
  * @property {string | null} entryPath
  * @property {'pending' | 'active'} membershipStatus
+ * @property {boolean} [mustChangePassword]
  */
 
 /** @param {SessionPayload} payload */

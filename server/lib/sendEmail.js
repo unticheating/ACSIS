@@ -84,6 +84,42 @@ export async function sendVerificationEmail(to, code) {
 }
 
 /**
+ * @param {string} to
+ * @param {string} temporaryPassword
+ */
+export async function sendTemporaryPasswordEmail(to, temporaryPassword) {
+  const subject = 'Your ACSIS temporary password'
+  const text = `Your ACSIS temporary password is: ${temporaryPassword}\n\nUse this temporary password to sign in to ACSIS.`
+  const html = `
+    <p>Your ACSIS temporary password is:</p>
+    <p style="font-size:28px;font-weight:bold;letter-spacing:0.12em">${temporaryPassword}</p>
+    <p>Use this temporary password to sign in to ACSIS.</p>
+  `
+
+  const transport = getTransporter()
+  if (!transport) {
+    console.log(`[ACSIS] Temporary password for ${to}: ${temporaryPassword}`)
+    return { sent: false, devLogged: true }
+  }
+
+  try {
+    await transport.sendMail({
+      from: config.smtp.from,
+      to,
+      subject,
+      text,
+      html,
+    })
+    console.log(`[ACSIS] Temporary password email sent to ${to}`)
+    return { sent: true, devLogged: false }
+  } catch (err) {
+    console.error(`[ACSIS] Failed to send temporary password email to ${to}:`, err.message)
+    console.log(`[ACSIS] Temporary password for ${to}: ${temporaryPassword}`)
+    return { sent: false, devLogged: true, error: err.message }
+  }
+}
+
+/**
  * @param {{
  *   to: string,
  *   studentName: string,

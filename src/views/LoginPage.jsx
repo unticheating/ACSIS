@@ -2,8 +2,14 @@ import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import AuthImmersiveShell from '@/components/auth/AuthImmersiveShell.jsx'
 import { useSession } from '@/context/SessionContext.jsx'
-import { AUTH_ERROR_MESSAGES, startGoogleSignIn, loginWithPassword, startEmailVerification } from '@/lib/authApi.js'
-import { acsisToastError } from '@/lib/acsisToast.js'
+import {
+  AUTH_ERROR_MESSAGES,
+  startGoogleSignIn,
+  loginWithPassword,
+  requestPasswordReset,
+  startEmailVerification,
+} from '@/lib/authApi.js'
+import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle.js'
 import '../styles/acsis-immersive.css'
 
@@ -16,6 +22,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [forgotPasswordSubmitting, setForgotPasswordSubmitting] = useState(false)
 
   useEffect(() => {
     const errorCode = searchParams.get('error')
@@ -29,10 +36,16 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (authLoading) return
-    if (isAuthenticated && activeAccount.entryPath && location.pathname === '/') {
-      navigate(activeAccount.entryPath, { replace: true })
+    if (isAuthenticated && location.pathname === '/') {
+      if (authUser?.mustChangePassword) {
+        navigate('/change-password', { replace: true })
+        return
+      }
+      if (activeAccount.entryPath) {
+        navigate(activeAccount.entryPath, { replace: true })
+      }
     }
-  }, [authLoading, isAuthenticated, activeAccount.entryPath, location.pathname, navigate])
+  }, [authLoading, isAuthenticated, authUser?.mustChangePassword, activeAccount.entryPath, location.pathname, navigate])
 
   useEffect(() => {
     if (searchParams.get('auth') === 'success') {
@@ -55,6 +68,28 @@ export default function LoginPage() {
 
   function onGoogle() {
     startGoogleSignIn()
+  }
+
+  async function onForgotPassword() {
+    const trimmed = email.trim()
+    if (!trimmed) {
+      acsisToastError('Enter your registered email first, then tap Forgot password.')
+      return
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      acsisToastError('Enter a valid email address.')
+      return
+    }
+
+    setForgotPasswordSubmitting(true)
+    try {
+      await requestPasswordReset(trimmed)
+      acsisToastSuccess('A temporary password was sent to your email.')
+    } catch (err) {
+      acsisToastError(err instanceof Error ? err.message : 'Could not send temporary password.')
+    } finally {
+      setForgotPasswordSubmitting(false)
+    }
   }
 
   async function onEmailContinue(e) {
@@ -83,7 +118,9 @@ export default function LoginPage() {
       try {
         await loginWithPassword(trimmed, password)
         const user = await refreshAuth()
-        if (user?.entryPath) {
+        if (user?.mustChangePassword) {
+          navigate('/change-password', { replace: true })
+        } else if (user?.entryPath) {
           navigate(user.entryPath, { replace: true })
         } else {
           acsisToastError(AUTH_ERROR_MESSAGES.no_membership)
@@ -98,6 +135,10 @@ export default function LoginPage() {
       const data = await startEmailVerification(trimmed, password)
       if (data.verificationRequired === false && data.user?.entryPath) {
         const user = await refreshAuth()
+        if (user?.mustChangePassword) {
+          navigate('/change-password', { replace: true })
+          return
+        }
         navigate(user?.entryPath || data.user.entryPath, { replace: true })
         return
       }
@@ -195,6 +236,14 @@ export default function LoginPage() {
               </button>
             </div>
           </div>
+          <button
+            type="button"
+            className="acsis-immersive__link-btn"
+            onClick={onForgotPassword}
+            disabled={forgotPasswordSubmitting}
+          >
+            {forgotPasswordSubmitting ? 'Sending temporary password…' : 'Forgot password?'}
+          </button>
           <button type="submit" className="acsis-immersive__btn-primary">
             Continue
           </button>

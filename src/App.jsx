@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import ProtectedRoute from './components/auth/ProtectedRoute.jsx'
 import LazyPage from './components/layout/LazyPage.jsx'
 import LoginPage from './views/LoginPage.jsx'
+import ChangePasswordPage from './views/ChangePasswordPage.jsx'
 import VerifyEmailPage from './views/VerifyEmailPage.jsx'
 import PostOnboardingModal from './components/auth/PostOnboardingModal.jsx'
 import { useSession } from './context/SessionContext.jsx'
@@ -47,6 +48,7 @@ export default function App() {
   const showOnboarding =
     sessionMode === 'auth' &&
     authUser &&
+    !authUser.mustChangePassword &&
     (authUser.needsInitialJoin || authUser.needsStudentNumber || authUser.needsJoinClass)
 
   return (
@@ -61,6 +63,7 @@ export default function App() {
     )}
     <Routes>
       <Route path="/" element={<LoginPage />} />
+      <Route path="/change-password" element={<ChangePasswordPage />} />
       <Route path="/verify" element={<VerifyEmailPage />} />
       <Route
         path="/dev/portals"

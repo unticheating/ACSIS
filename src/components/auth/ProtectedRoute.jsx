@@ -7,7 +7,7 @@ import { useSession } from '@/context/SessionContext.jsx'
  * @param {{ children: import('react').ReactNode, portal?: 'admin' | 'teacher' | 'student' | 'super_admin' }} props
  */
 export default function ProtectedRoute({ children, portal }) {
-  const { authLoading, isAuthenticated, activeAccount } = useSession()
+  const { authLoading, isAuthenticated, activeAccount, authUser } = useSession()
 
   if (authLoading) {
     return <AuthLoadingSkeleton />
@@ -15,6 +15,10 @@ export default function ProtectedRoute({ children, portal }) {
 
   if (!isAuthenticated) {
     return <Navigate to="/" replace />
+  }
+
+  if (authUser?.mustChangePassword) {
+    return <Navigate to="/change-password" replace />
   }
 
   if (portal && activeAccount.portal !== portal) {
