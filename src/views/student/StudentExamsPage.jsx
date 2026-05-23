@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { Button } from '@/components/ui/button.jsx'
+import TeacherPageHeader from '@/components/teacher/TeacherPageHeader.jsx'
+import StudentCourseCard from '@/components/student/StudentCourseCard.jsx'
 import {
   Dialog,
   DialogContent,
@@ -11,7 +11,10 @@ import {
 } from '@/components/ui/dialog.jsx'
 import { Input } from '@/components/ui/input.jsx'
 import { Label } from '@/components/ui/label.jsx'
+import { Button } from '@/components/ui/button.jsx'
 import { apiFetch } from '@/lib/apiFetch.js'
+import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
+import '../../pages/teacher-ui/my_classes.css'
 import '../../pages/student-ui/enrolled_classes.css'
 
 const NEEDS_JOIN_CLASS_KEY = 'acsis.needsJoinClass'
@@ -22,8 +25,6 @@ export default function StudentExamsPage() {
   const [joining, setJoining] = useState(false)
   const [enrolled, setEnrolled] = useState([])
   const [loading, setLoading] = useState(true)
-  
-  // State to track manual activation of the enrollment dialog
   const [isManualOpen, setIsManualOpen] = useState(false)
 
   const [needsJoinClass, setNeedsJoinClass] = useState(
@@ -52,7 +53,10 @@ export default function StudentExamsPage() {
     e?.preventDefault?.()
     setJoinMsg(null)
     const code = joinCode.trim()
-    if (!code) return
+    if (!code) {
+      acsisToastError('Enter your class access code.')
+      return
+    }
 
     setJoining(true)
     try {
@@ -64,95 +68,78 @@ export default function StudentExamsPage() {
       const data = await res.json()
 
       if (!res.ok) {
-        setJoinMsg({ type: 'err', text: data.error || 'Failed to enroll' })
+        const msg = data.error || 'Failed to enroll.'
+        setJoinMsg({ type: 'err', text: msg })
+        acsisToastError(msg)
         return
       }
 
-      setJoinMsg({
-        type: 'ok',
-        text: data.already ? `You are already in ${data.className}.` : `Added to ${data.className}.`,
-      })
+      const okText = data.already ? `You are already in ${data.className}.` : `Added to ${data.className}.`
+      setJoinMsg({ type: 'ok', text: okText })
+      acsisToastSuccess(okText)
       setJoinCode('')
       sessionStorage.removeItem(NEEDS_JOIN_CLASS_KEY)
       setNeedsJoinClass(false)
-      
-      // Auto-close manual dialog after 1.5 seconds so the user can read the success message
+
       if (isManualOpen) {
         setTimeout(() => {
           setIsManualOpen(false)
           setJoinMsg(null)
         }, 1500)
       }
-      
+
       await fetchClasses()
     } catch {
-      setJoinMsg({ type: 'err', text: 'Network error. Try again.' })
+      const msg = 'Network error. Try again.'
+      setJoinMsg({ type: 'err', text: msg })
+      acsisToastError(msg)
     } finally {
       setJoining(false)
     }
   }
 
+  const headerMeta = loading
+    ? undefined
+    : `${enrolled.length} ${enrolled.length === 1 ? 'class' : 'classes'}`
+
   return (
-    <div className={`acsis-view stu-my-classes${showJoinModal ? ' stu-my-classes--first-visit' : ''}`}>
+    <div className={`acsis-mc-view acsis-view stu-my-classes${showJoinModal ? ' stu-my-classes--first-visit' : ''}`}>
       <div className="stu-my-classes__content" aria-hidden={showJoinModal || isManualOpen}>
-        
-        {/* Header Layout: Title and Description on the left, Enroll button on the far right */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-border">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">
-              Enrolled classes
-            </h1>
-            <p className="mt-1 max-w-[75ch] text-sm text-muted-foreground">
-              Open a class to see exams newest first — like Classroom.
-            </p>
-          </div>
+        <TeacherPageHeader
+          title="Enrolled classes"
+          meta={headerMeta}
+          actions={
+            <button type="button" className="acsis-mc-create-btn" onClick={() => setIsManualOpen(true)}>
+              Enroll in a class
+            </button>
+          }
+        />
 
-          <Button
-            onClick={() => setIsManualOpen(true)}
-            className="font-semibold rounded-xl px-5 py-2.5 shadow-sm transition self-start sm:self-auto shrink-0 hover:-translate-y-px"
-          >
-            Enroll in a Class
-          </Button>
+        <div className="acsis-mc-content">
+          {loading ? (
+            <div className="acsis-mc-loading">Loading enrolled classes…</div>
+          ) : enrolled.length === 0 ? (
+            <div className="acsis-mc-empty">
+              <h2 className="acsis-mc-empty__title">No classes yet</h2>
+              <p className="acsis-mc-empty__text">
+                Enter the class code from your instructor to join and see exams here.
+              </p>
+              <button type="button" className="acsis-mc-create-btn" onClick={() => setIsManualOpen(true)}>
+                Enroll in a class
+              </button>
+            </div>
+          ) : (
+            <ul className="acsis-mc-course-grid acsis-mc-course-grid--top">
+              {enrolled.map((c, index) => (
+                <StudentCourseCard key={c.id} course={c} delay={index * 0.05} />
+              ))}
+            </ul>
+          )}
         </div>
-
-        {loading ? (
-          <div className="stu-empty mt-8">Loading enrolled classes…</div>
-        ) : enrolled.length === 0 ? (
-          <div className="stu-empty mt-8">
-            You are not enrolled in any class yet. Click the Enroll button to enter a class code.
-          </div>
-        ) : (
-          /* Enhanced Larger Card Layout Grid */
-          <div className="stu-class-grid grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
-            {enrolled.map((c) => (
-              <Link 
-                key={c.id} 
-                to={`/student/my-classes/${encodeURIComponent(c.id)}`} 
-                className="stu-class-card group block p-6 min-h-[150px] rounded-2xl border border-border transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5"
-              >
-                <h3 className="text-xl font-bold text-foreground tracking-tight">
-                  {c.name}
-                </h3>
-                <p className="text-sm text-muted-foreground mt-2">
-                  Academic Year: {c.academicYear} · {c.semester}
-                </p>
-                <div className="mt-5 pt-3 border-t border-border flex items-center justify-between">
-                  <span className="text-xs font-semibold tracking-wider uppercase text-primary">
-                    {(c.exams || []).length} exam{(c.exams || []).length === 1 ? '' : 's'} posted
-                  </span>
-                  <span className="text-xs text-muted-foreground group-hover:text-primary transition">
-                    View Stream →
-                  </span>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
       </div>
 
-      {/* Unified Dialog Handler */}
-      <Dialog 
-        open={showJoinModal || isManualOpen} 
+      <Dialog
+        open={showJoinModal || isManualOpen}
         onOpenChange={(open) => {
           if (!open && !showJoinModal) {
             setIsManualOpen(false)
@@ -163,13 +150,17 @@ export default function StudentExamsPage() {
       >
         <DialogContent
           className="stu-join-dialog w-[90vw] max-w-md rounded-2xl sm:rounded-2xl"
-          onInteractOutside={(e) => { if (showJoinModal) e.preventDefault() }}
-          onEscapeKeyDown={(e) => { if (showJoinModal) e.preventDefault() }}
+          onInteractOutside={(e) => {
+            if (showJoinModal) e.preventDefault()
+          }}
+          onEscapeKeyDown={(e) => {
+            if (showJoinModal) e.preventDefault()
+          }}
         >
           <DialogHeader>
             <DialogTitle className="text-black dark:text-white">Join a class</DialogTitle>
             <DialogDescription>
-              Enter the class code from your instructor. It is linked to the class they created under your school (PLP).
+              Enter the class code from your instructor. It is linked to the class they created under your school.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={submitJoin} className="flex flex-col gap-4">
@@ -191,10 +182,10 @@ export default function StudentExamsPage() {
               </p>
             ) : null}
             <DialogFooter className="flex gap-2 sm:justify-end">
-              {!showJoinModal && (
-                <Button 
-                  type="button" 
-                  variant="ghost" 
+              {!showJoinModal ? (
+                <Button
+                  type="button"
+                  variant="ghost"
                   onClick={() => {
                     setIsManualOpen(false)
                     setJoinMsg(null)
@@ -203,7 +194,7 @@ export default function StudentExamsPage() {
                 >
                   Cancel
                 </Button>
-              )}
+              ) : null}
               <Button type="submit" disabled={!joinCode.trim() || joining} className="w-full sm:w-auto">
                 {joining ? 'Joining…' : 'Join class'}
               </Button>

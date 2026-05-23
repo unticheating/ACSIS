@@ -3,9 +3,13 @@ import { Link } from 'react-router-dom'
 import { SummaryStatCard, SummaryStatGrid } from '@/components/dashboard/SummaryStatCard.jsx'
 import { fetchAdminDashboard, formatRelativeTime } from '@/lib/adminDashboardApi.js'
 import { issueViolationTicket } from '@/lib/adminViolationsApi.js'
+import FadeIn from '@/components/ui/fade-in.jsx'
+import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
+import { useAcsisConfirm } from '@/hooks/useAcsisConfirm.jsx'
 import '../../pages/admin-ui/style.css'
 
 export default function AdminDashboardPage({ basePath = '/admin' }) {
+  const { confirm, ConfirmDialog } = useAcsisConfirm()
   const [stats, setStats] = useState({ ongoingExams: 0, totalExams: 0, detectedStudents: 0 })
   const [ongoingExams, setOngoingExams] = useState([])
   const [detectedStudents, setDetectedStudents] = useState([])
@@ -28,7 +32,9 @@ export default function AdminDashboardPage({ basePath = '/admin' }) {
       setHasMoreOngoing(Boolean(data.hasMoreOngoingExams))
       setHasMoreDetected(Boolean(data.hasMoreDetectedStudents))
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load dashboard.')
+      const msg = err instanceof Error ? err.message : 'Failed to load dashboard.'
+      setError(msg)
+      acsisToastError(msg)
     } finally {
       setLoading(false)
     }
@@ -40,14 +46,20 @@ export default function AdminDashboardPage({ basePath = '/admin' }) {
 
   async function ticketViolation(sessionId, alreadyTicketed) {
     if (alreadyTicketed) return
-    if (!window.confirm('Issue an official violation ticket for this student session?')) return
+    const ok = await confirm({
+      title: 'Issue violation ticket?',
+      description: 'This will create an official violation ticket for this student session.',
+      confirmLabel: 'Issue ticket',
+    })
+    if (!ok) return
 
     setTicketingId(sessionId)
     try {
       await issueViolationTicket(sessionId)
+      acsisToastSuccess('Violation ticket issued.')
       await load()
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : 'Failed to issue ticket.')
+      acsisToastError(err instanceof Error ? err.message : 'Failed to issue ticket.')
     } finally {
       setTicketingId(null)
     }
@@ -76,20 +88,23 @@ export default function AdminDashboardPage({ basePath = '/admin' }) {
             label="On-Going Examinations"
             value={loading ? '…' : stats.ongoingExams}
             tone="success"
+            delay={0.1}
           />
           <SummaryStatCard
             label="Total Examinations"
             value={loading ? '…' : stats.totalExams}
             tone="success"
+            delay={0.2}
           />
           <SummaryStatCard
             label="Detected Students"
             value={loading ? '…' : stats.detectedStudents}
             tone="danger"
+            delay={0.3}
           />
         </SummaryStatGrid>
 
-        <div className="panel">
+        <FadeIn className="panel" delay={0.4}>
           <div className="panel-header">
             <span className="panel-title">On-Going Examinations</span>
             <Link to={`${basePath}/classes`} className="panel-view-all">
@@ -125,9 +140,9 @@ export default function AdminDashboardPage({ basePath = '/admin' }) {
               ))
             )}
           </div>
-        </div>
+        </FadeIn>
 
-        <div className="panel">
+        <FadeIn className="panel" delay={0.5}>
           <div className="panel-header">
             <span className="panel-title">Detected Students</span>
             <Link to={`${basePath}/violations`} className="panel-view-all">
@@ -170,8 +185,9 @@ export default function AdminDashboardPage({ basePath = '/admin' }) {
               ))
             )}
           </div>
-        </div>
+        </FadeIn>
       </div>
+      {ConfirmDialog}
     </div>
   )
 }

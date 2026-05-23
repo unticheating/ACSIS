@@ -4,6 +4,8 @@ import ProtectedRoute from './components/auth/ProtectedRoute.jsx'
 import LazyPage from './components/layout/LazyPage.jsx'
 import LoginPage from './views/LoginPage.jsx'
 import VerifyEmailPage from './views/VerifyEmailPage.jsx'
+import PostOnboardingModal from './components/auth/PostOnboardingModal.jsx'
+import { useSession } from './context/SessionContext.jsx'
 
 const AdminLayout = lazy(() => import('./layouts/AdminLayout.jsx'))
 const StudentLayout = lazy(() => import('./layouts/StudentLayout.jsx'))
@@ -37,9 +39,26 @@ const TeacherTermClassesPage = lazy(() => import('./views/teacher/TeacherTermCla
 const TeacherReportsPage = lazy(() => import('./views/teacher/TeacherReportsPage.jsx'))
 
 const SuperAdminDashboardPage = lazy(() => import('./views/super-admin/SuperAdminDashboardPage.jsx'))
+const SuperAdminInstitutionsPage = lazy(() => import('./views/super-admin/SuperAdminInstitutionsPage.jsx'))
 
 export default function App() {
+  const { authUser, sessionMode, refreshAuth } = useSession()
+
+  const showOnboarding =
+    sessionMode === 'auth' &&
+    authUser &&
+    (authUser.needsInitialJoin || authUser.needsStudentNumber || authUser.needsJoinClass)
+
   return (
+    <>
+    {showOnboarding && (
+      <PostOnboardingModal
+        authUser={authUser}
+        onComplete={async () => {
+          window.location.reload()
+        }}
+      />
+    )}
     <Routes>
       <Route path="/" element={<LoginPage />} />
       <Route path="/verify" element={<VerifyEmailPage />} />
@@ -135,7 +154,7 @@ export default function App() {
         <Route index element={<SuperAdminDashboardPage />} />
         <Route path="students" element={<AdminPlaceholderPage title="Students" />} />
         <Route path="subjects" element={<AdminPlaceholderPage title="Subjects" />} />
-        <Route path="institutions" element={<AdminExaminationsPage pageTitle="Institutions" />} />
+        <Route path="institutions" element={<SuperAdminInstitutionsPage />} />
         <Route path="classes" element={<Navigate to="/super-admin/institutions" replace />} />
         <Route path="examinations" element={<Navigate to="/super-admin/institutions" replace />} />
         <Route path="monitoring" element={<AdminPlaceholderPage title="Monitoring" />} />
@@ -147,5 +166,6 @@ export default function App() {
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </>
   )
 }

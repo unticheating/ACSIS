@@ -23,6 +23,18 @@ export function formatTermPeriod(term) {
  * Breadcrumb label for a course: "BSIT 3D - IT 103"
  * @param {{ programCode?: string, sectionCode?: string, program?: string, section?: string, courseCode?: string, name?: string, termId?: string|number }} course
  */
+/**
+ * Primary/secondary labels for course cards and banners.
+ * @param {{ courseCode?: string, name?: string }} course
+ */
+export function formatCourseDisplayLabels(course) {
+  const courseCode = String(course?.courseCode || '').trim()
+  const courseName = String(course?.name || '').trim()
+  const primary = courseCode || courseName || 'Course'
+  const secondary = courseCode && courseName && courseName !== courseCode ? courseName : null
+  return { primary, secondary, courseCode, courseName }
+}
+
 export function formatCourseBreadcrumbLabel(course) {
   const code = String(course?.courseCode || '').trim()
   const sectionTitle = formatSectionTitle(course)

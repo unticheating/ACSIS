@@ -5,7 +5,7 @@ export function normalizeHex(hex) {
     return `#${h[0]}${h[0]}${h[1]}${h[1]}${h[2]}${h[2]}`.toUpperCase()
   }
   if (h.length === 6) return `#${h}`.toUpperCase()
-  return '#16A34A'
+  return '#334155'
 }
 
 /** @param {string} hex @param {number} amount 0–1 mix toward white */

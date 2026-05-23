@@ -1,0 +1,212 @@
+/* ============================================================
+   Shadcn-style Dialog for PostOnboardingModal
+   ============================================================ */
+
+.shadcn-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(4px);
+  animation: shadcn-fade-in 150ms cubic-bezier(0.16, 1, 0.3, 1);
+  padding: 1rem;
+}
+
+@keyframes shadcn-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.shadcn-dialog-content {
+  position: relative;
+  width: 100%;
+  max-width: 425px;
+  background-color: var(--bg-surface, #ffffff);
+  border: 1px solid var(--border-default, #e2e8f0);
+  border-radius: 0.5rem; /* rounded-lg */
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  animation: shadcn-content-show 150ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+html.dark .shadcn-dialog-content {
+  background-color: var(--bg-elevated, #020817); /* Radix dark slate */
+  border-color: var(--border-default, #1e293b);
+}
+
+@keyframes shadcn-content-show {
+  from { opacity: 0; transform: scale(0.95) translateY(-5%); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.shadcn-dialog-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  padding: 1.5rem;
+  text-align: left;
+}
+
+.shadcn-dialog-title {
+  margin: 0;
+  font-size: 1.125rem; /* text-lg */
+  font-weight: 600;
+  line-height: 1;
+  color: var(--fg-default, #0f172a);
+}
+
+html.dark .shadcn-dialog-title {
+  color: #f8fafc;
+}
+
+.shadcn-dialog-description {
+  margin: 0;
+  font-size: 0.875rem; /* text-sm */
+  color: var(--fg-muted, #64748b);
+  line-height: 1.5;
+}
+
+html.dark .shadcn-dialog-description {
+  color: #94a3b8;
+}
+
+.shadcn-dialog-body {
+  padding: 0 1.5rem 1.5rem;
+}
+
+.shadcn-dialog-step-indicator {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--fg-muted, #64748b);
+  margin-bottom: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.shadcn-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.shadcn-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--fg-default, #0f172a);
+}
+
+html.dark .shadcn-label {
+  color: #f8fafc;
+}
+
+.shadcn-input {
+  display: flex;
+  height: 2.5rem; /* h-10 */
+  width: 100%;
+  border-radius: 0.375rem; /* rounded-md */
+  border: 1px solid var(--border-default, #e2e8f0);
+  background-color: transparent;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  color: var(--fg-default, #0f172a);
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+html.dark .shadcn-input {
+  border-color: #1e293b;
+  color: #f8fafc;
+}
+
+.shadcn-input::placeholder {
+  color: var(--fg-subtle, #94a3b8);
+}
+
+.shadcn-input:focus-visible {
+  border-color: var(--focus-ring, #0f172a);
+  box-shadow: 0 0 0 1px var(--focus-ring, #0f172a);
+}
+
+html.dark .shadcn-input:focus-visible {
+  border-color: #cbd5e1;
+  box-shadow: 0 0 0 1px #cbd5e1;
+}
+
+.shadcn-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.shadcn-error-msg {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--acsis-danger, #ef4444);
+}
+
+.shadcn-dialog-footer {
+  display: flex;
+  flex-direction: row-reverse;
+  justify-content: flex-start;
+  padding: 1.5rem;
+  border-top: 1px solid var(--border-default, #f1f5f9);
+}
+
+html.dark .shadcn-dialog-footer {
+  border-top-color: #1e293b;
+}
+
+.shadcn-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  border-radius: 0.375rem; /* rounded-md */
+  font-size: 0.875rem; /* text-sm */
+  font-weight: 500;
+  transition: background-color 0.2s, opacity 0.2s;
+  outline: none;
+  height: 2.5rem; /* h-10 */
+  padding: 0 1rem;
+  cursor: pointer;
+  border: none;
+}
+
+.shadcn-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.shadcn-btn-primary {
+  background-color: var(--accent-primary, #0f172a);
+  color: #ffffff;
+}
+
+html.dark .shadcn-btn-primary {
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+.shadcn-btn-primary:hover {
+  opacity: 0.9;
+}
+
+/* Spinner */
+.shadcn-spinner {
+  margin-right: 0.5rem;
+  height: 1rem;
+  width: 1rem;
+  animation: shadcn-spin 1s linear infinite;
+}
+
+@keyframes shadcn-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.opacity-25 { opacity: 0.25; }
+.opacity-75 { opacity: 0.75; }

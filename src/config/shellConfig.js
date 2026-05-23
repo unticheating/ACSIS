@@ -28,7 +28,6 @@ export const shellConfig = {
     nav: [
       { to: '/student/my-classes', label: 'Enrolled classes', mobileLabel: 'Classes', icon: ClipboardList },
       { to: '/student/performance', label: 'Performance', mobileLabel: 'Performance', icon: TrendingUp },
-      { to: '/student/reports', label: 'Reports', mobileLabel: 'Reports', icon: ScrollText },
     ],
   },
   admin: {

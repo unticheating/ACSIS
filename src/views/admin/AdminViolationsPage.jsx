@@ -6,6 +6,8 @@ import {
   formatViolationDateTime,
   violationStatusClass,
 } from '@/lib/adminViolationsApi.js'
+import { acsisToastError } from '@/lib/acsisToast.js'
+import FadeIn from '@/components/ui/fade-in.jsx'
 import '../../pages/admin-ui/style.css'
 
 export default function AdminViolationsPage() {
@@ -30,7 +32,9 @@ export default function AdminViolationsPage() {
       setMaxWarnings(data.maxWarnings ?? 3)
     } catch (err) {
       setViolations([])
-      setError(err instanceof Error ? err.message : 'Failed to load violations.')
+      const msg = err instanceof Error ? err.message : 'Failed to load violations.'
+      setError(msg)
+      acsisToastError(msg)
     } finally {
       setLoading(false)
     }
@@ -50,7 +54,9 @@ export default function AdminViolationsPage() {
       setDetail(data.detail)
       if (data.maxWarnings != null) setMaxWarnings(data.maxWarnings)
     } catch (err) {
-      setDetailError(err instanceof Error ? err.message : 'Failed to load session detail.')
+      const msg = err instanceof Error ? err.message : 'Failed to load session detail.'
+      setDetailError(msg)
+      acsisToastError(msg)
     } finally {
       setDetailLoading(false)
     }
@@ -80,7 +86,7 @@ export default function AdminViolationsPage() {
           </p>
         ) : null}
 
-        <div className="panel">
+        <FadeIn delay={0.1} className="panel">
           <div className="panel-header">
             <span className="panel-title">
               All violations
@@ -94,8 +100,8 @@ export default function AdminViolationsPage() {
             <p className="admin-placeholder-lead">No proctoring violations recorded yet.</p>
           ) : (
             <div className="violation-list">
-              {violations.map((v) => (
-                <div key={v.id} className="violation-item">
+              {violations.map((v, index) => (
+                <FadeIn key={v.id} delay={0.15 + (index * 0.05)} className="violation-item">
                   <div className="violation-left">
                     <div className="strikes-badge">
                       <span className="strikes-count">{v.strikes}</span>
@@ -116,11 +122,11 @@ export default function AdminViolationsPage() {
                       View
                     </button>
                   </div>
-                </div>
+                </FadeIn>
               ))}
             </div>
           )}
-        </div>
+        </FadeIn>
       </div>
 
       {detailOpen ? (

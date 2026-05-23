@@ -9,14 +9,14 @@ import {
   PG_EXAM_STATUS,
   normalizeExamStatus,
 } from '@/lib/examFlowUi.js'
-import { Copy, MoreVertical } from 'lucide-react'
+import { Copy, MoreVertical, Pencil, Play, Send, Trash2 } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu.jsx'
+import { DropdownMenuActionItem } from '@/components/ui/dropdown-menu-action-item.jsx'
 import {
   Dialog,
   DialogContent,
@@ -27,7 +27,11 @@ import {
 } from '@/components/ui/dialog.jsx'
 import { Input } from '@/components/ui/input.jsx'
 import { Label } from '@/components/ui/label.jsx'
-import { formatCourseBreadcrumbLabel } from '@/lib/sectionLabel.js'
+import FadeIn from '@/components/ui/fade-in.jsx'
+import { formatCourseBreadcrumbLabel, formatCourseDisplayLabels } from '@/lib/sectionLabel.js'
+import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
+import { copyToClipboard } from '@/lib/copyToClipboard.js'
+import { useAcsisConfirm } from '@/hooks/useAcsisConfirm.jsx'
 import '../../pages/teacher-ui/my_classes.css'
 
 const EXAM_FILTER_OPTIONS = [
@@ -37,22 +41,10 @@ const EXAM_FILTER_OPTIONS = [
   { id: 'completed', label: 'Completed exams' },
 ]
 
-async function copyText(value) {
-  const text = value || ''
-  try {
-    await navigator.clipboard.writeText(text)
-  } catch {
-    window.prompt('Copy:', text)
-  }
-}
-
-async function copyExamCode(code) {
-  await copyText(code)
-}
-
 export default function TeacherClassExamsPage() {
   const { classId } = useParams()
   const navigate = useNavigate()
+  const { confirm, ConfirmDialog } = useAcsisConfirm()
   const [tick, setTick] = useState(0)
   const [filter, setFilter] = useState('all')
   const [pageView, setPageView] = useState('exams')
@@ -147,10 +139,7 @@ export default function TeacherClassExamsPage() {
   }
 
   const createHref = `/teacher/create-exam?classId=${encodeURIComponent(cls.id)}`
-  const courseCode = (cls.courseCode || '').trim()
-  const courseName = (cls.name || '').trim()
-  const coursePrimary = courseCode || courseName || 'Course'
-  const courseSecondary = courseCode && courseName && courseName !== courseCode ? courseName : null
+  const { primary: coursePrimary, secondary: courseSecondary } = formatCourseDisplayLabels(cls)
 
   async function publish(classId, examId) {
     try {
@@ -160,11 +149,13 @@ export default function TeacherClassExamsPage() {
         throw new Error(data.error || 'Failed to publish')
       }
       if (data.code) {
-        window.alert(`Exam published.\n\nShare this code with students: ${data.code}`)
+        acsisToastSuccess(`Exam published. Share this code with students: ${data.code}`)
+      } else {
+        acsisToastSuccess('Exam published.')
       }
       refresh()
     } catch (err) {
-      alert(err.message)
+      acsisToastError(err.message)
     }
   }
 
@@ -175,23 +166,31 @@ export default function TeacherClassExamsPage() {
         const data = await res.json()
         throw new Error(data.error || 'Failed to start exam')
       }
+      acsisToastSuccess('Exam is now live.')
       refresh()
     } catch (err) {
-      alert(err.message)
+      acsisToastError(err.message)
     }
   }
 
   async function removeExam(classId, examId, title) {
-    if (!window.confirm(`Delete “${title || 'this exam'}”? This cannot be undone.`)) return
+    const ok = await confirm({
+      title: `Delete “${title || 'this exam'}”?`,
+      description: 'This cannot be undone.',
+      confirmLabel: 'Delete exam',
+      destructive: true,
+    })
+    if (!ok) return
     try {
       const res = await apiFetch(`/api/teacher/classes/${classId}/exams/${examId}`, { method: 'DELETE' })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
         throw new Error(typeof data.error === 'string' ? data.error : 'Failed to delete exam.')
       }
+      acsisToastSuccess('Exam deleted.')
       refresh()
     } catch (err) {
-      alert(err.message)
+      acsisToastError(err.message)
     }
   }
 
@@ -205,7 +204,7 @@ export default function TeacherClassExamsPage() {
     const code = editCode.trim()
     const name = editName.trim()
     if (!code && !name) {
-      window.alert('Enter a subject code or course name.')
+      acsisToastError('Enter a subject code or course name.')
       return
     }
     setSavingCourse(true)
@@ -220,25 +219,33 @@ export default function TeacherClassExamsPage() {
         throw new Error(data.error || 'Failed to update course.')
       }
       setEditOpen(false)
+      acsisToastSuccess('Course updated.')
       refresh()
     } catch (err) {
-      window.alert(err.message)
+      acsisToastError(err.message)
     } finally {
       setSavingCourse(false)
     }
   }
 
   async function deleteCourse() {
-    if (!window.confirm(`Delete “${coursePrimary}”? Students will lose access. This cannot be undone.`)) return
+    const ok = await confirm({
+      title: `Delete “${coursePrimary}”?`,
+      description: 'Students will lose access. This cannot be undone.',
+      confirmLabel: 'Delete course',
+      destructive: true,
+    })
+    if (!ok) return
     try {
       const res = await apiFetch(`/api/teacher/classes/${cls.id}`, { method: 'DELETE' })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
         throw new Error(data.error || 'Failed to delete course.')
       }
+      acsisToastSuccess('Course deleted.')
       navigate('/teacher/my-classes')
     } catch (err) {
-      window.alert(err.message)
+      acsisToastError(err.message)
     }
   }
 
@@ -253,38 +260,39 @@ export default function TeacherClassExamsPage() {
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-[11rem]">
-              <DropdownMenuItem onSelect={openEditCourse}>Edit course</DropdownMenuItem>
+              <DropdownMenuActionItem icon={Pencil} onSelect={openEditCourse}>
+                Edit course
+              </DropdownMenuActionItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="text-destructive focus:text-destructive"
-                onSelect={deleteCourse}
-              >
+              <DropdownMenuActionItem icon={Trash2} variant="destructive" onSelect={deleteCourse}>
                 Delete course
-              </DropdownMenuItem>
+              </DropdownMenuActionItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
 
-        <div className="acsis-course-banner__copy">
-          <h1 className="acsis-course-banner__code">{coursePrimary}</h1>
-          {courseSecondary ? <p className="acsis-course-banner__name">{courseSecondary}</p> : null}
-        </div>
-
-        {cls.accessCode ? (
-          <div className="acsis-course-banner__code-block">
-            <span className="acsis-course-banner__code-label">Class code</span>
-            <button
-              type="button"
-              className="acsis-course-banner__code-btn"
-              onClick={() => copyText(cls.accessCode)}
-              title="Copy class code for students to enroll"
-            >
-              <code>{cls.accessCode}</code>
-              <Copy size={16} strokeWidth={2} aria-hidden />
-              <span className="acsis-sr-only">Copy class code</span>
-            </button>
+        <div className="acsis-course-banner__bottom-row">
+          <div className="acsis-course-banner__copy">
+            <h1 className="acsis-course-banner__code">{coursePrimary}</h1>
+            {courseSecondary ? <p className="acsis-course-banner__name">{courseSecondary}</p> : null}
           </div>
-        ) : null}
+
+          {cls.accessCode ? (
+            <div className="acsis-course-banner__code-block">
+              <span className="acsis-course-banner__code-label">Class code</span>
+              <button
+                type="button"
+                className="acsis-course-banner__code-btn"
+                onClick={() => void copyToClipboard(cls.accessCode, { successMessage: 'Access code copied.' })}
+                title="Copy class code for students to enroll"
+              >
+                <code>{cls.accessCode}</code>
+                <Copy size={16} strokeWidth={2} aria-hidden />
+                <span className="acsis-sr-only">Copy class code</span>
+              </button>
+            </div>
+          ) : null}
+        </div>
       </section>
 
       <div className="acsis-class-toolbar">
@@ -348,8 +356,8 @@ export default function TeacherClassExamsPage() {
             </div>
           ) : (
             <ul className="acsis-enrolled-list">
-              {enrolled.map((s) => (
-                <li key={s.memberId} className="acsis-enrolled-list__item">
+              {enrolled.map((s, index) => (
+                <FadeIn as="li" key={s.memberId} delay={index * 0.05} className="acsis-enrolled-list__item">
                   <div className="acsis-enrolled-list__main">
                     <span className="acsis-enrolled-list__name">{s.studentName}</span>
                     {s.schoolId ? (
@@ -361,7 +369,7 @@ export default function TeacherClassExamsPage() {
                       Joined {new Date(s.enrolledAt).toLocaleDateString()}
                     </time>
                   ) : null}
-                </li>
+                </FadeIn>
               ))}
             </ul>
           )
@@ -378,7 +386,7 @@ export default function TeacherClassExamsPage() {
         ) : (
           <div className="acsis-mc-stream">
             <ul className="acsis-stream-list">
-              {filtered.map((exam) => {
+              {filtered.map((exam, index) => {
                 const active = isExamOngoing(exam.status)
                 const draft = isExamDraft(exam.status)
                 const detailPath = `/teacher/my-classes/${encodeURIComponent(cls.id)}/exams/${encodeURIComponent(exam.id)}`
@@ -391,7 +399,7 @@ export default function TeacherClassExamsPage() {
                   .join(' · ')
 
                 return (
-                  <li key={exam.id} className="acsis-stream-item">
+                  <FadeIn as="li" key={exam.id} delay={index * 0.05} className="acsis-stream-item acsis-card-surface">
                     <div className="acsis-stream-item__accent" aria-hidden />
                     <div className="acsis-stream-item__main">
                       <button
@@ -400,6 +408,9 @@ export default function TeacherClassExamsPage() {
                         onClick={() => navigate(detailPath)}
                       >
                         <h3 className="acsis-stream-item__title">{exam.title || 'Untitled exam'}</h3>
+                        {exam.description && (
+                          <p className="acsis-stream-item__desc">{exam.description}</p>
+                        )}
                         <p className="acsis-stream-item__meta">{meta}</p>
                       </button>
                       <div className="acsis-stream-item__right">
@@ -418,41 +429,51 @@ export default function TeacherClassExamsPage() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="min-w-[11rem]">
                             {draft ? (
-                              <DropdownMenuItem
+                              <DropdownMenuActionItem
+                                icon={Send}
+                                variant="success"
                                 onSelect={() => {
                                   publish(cls.id, exam.id)
                                 }}
                               >
                                 Publish exam (share code)
-                              </DropdownMenuItem>
+                              </DropdownMenuActionItem>
                             ) : null}
                             {normalizeExamStatus(exam.status) === PG_EXAM_STATUS.WAITING ? (
-                              <DropdownMenuItem
+                              <DropdownMenuActionItem
+                                icon={Play}
+                                variant="success"
                                 onSelect={() => {
                                   startExam(cls.id, exam.id)
                                 }}
                               >
                                 Start exam (go live)
-                              </DropdownMenuItem>
+                              </DropdownMenuActionItem>
                             ) : null}
-                            <DropdownMenuItem onSelect={() => copyExamCode(exam.code)}>
+                            <DropdownMenuActionItem
+                              icon={Copy}
+                              onSelect={() =>
+                                void copyToClipboard(exam.code, { successMessage: 'Exam code copied.' })
+                              }
+                            >
                               Copy exam code
-                            </DropdownMenuItem>
+                            </DropdownMenuActionItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              className="text-destructive focus:text-destructive"
+                            <DropdownMenuActionItem
+                              icon={Trash2}
+                              variant="destructive"
                               onSelect={(e) => {
                                 e.preventDefault()
                                 removeExam(cls.id, exam.id, exam.title)
                               }}
                             >
                               Delete exam
-                            </DropdownMenuItem>
+                            </DropdownMenuActionItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
                     </div>
-                  </li>
+                  </FadeIn>
                 )
               })}
             </ul>
@@ -495,6 +516,7 @@ export default function TeacherClassExamsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {ConfirmDialog}
     </div>
   )
 }

@@ -18,26 +18,26 @@
   --size-9: 128px;
 
   /* —— Semantic surfaces (named by role, not hue) —— */
-  --bg-canvas: var(--acsis-canvas, #ddeeec);
+  --bg-canvas: var(--acsis-canvas, #f1f5f9);
   --bg-surface: var(--acsis-dark-surface, #ffffff);
-  --bg-surface-muted: hsl(138 30% 97%);
+  --bg-surface-muted: #f8fafc;
   --bg-elevated: #ffffff;
-  --fg-default: hsl(142 20% 12%);
-  --fg-muted: hsl(142 10% 40%);
-  --fg-subtle: hsl(142 8% 52%);
-  --border-default: hsl(140 15% 90%);
-  --border-muted: rgba(22, 101, 52, 0.12);
+  --fg-default: #0f172a;
+  --fg-muted: #64748b;
+  --fg-subtle: #94a3b8;
+  --border-default: #e2e8f0;
+  --border-muted: color-mix(in srgb, var(--acsis-brand, #334155) 12%, transparent);
   --accent-primary: var(--acsis-brand, #334155);
   --accent-primary-hover: var(--acsis-brand-hover, #1e293b);
   --brand-mark: var(--acsis-brand, #334155);
   --brand-plp: var(--brand-mark);
   --brand-acsis: var(--brand-mark);
-  --brand-page: #1a2e22;
+  --brand-page: #0f172a;
   --acsis-danger: #dc2626;
   --acsis-danger-muted: #f87171;
   --acsis-danger-bg: rgba(220, 38, 38, 0.12);
   --accent-danger: var(--acsis-danger, #dc2626);
-  --focus-ring: hsl(142 71% 36%);
+  --focus-ring: var(--acsis-brand, #334155);
 
   /* —— Elevation (z-index tiers) —— */
   --z-sticky: 120;
@@ -99,6 +99,7 @@ html[data-theme='ocean'] {
   }
 
   .acsis-summary-stat:hover,
+  .acsis-card-surface:hover,
   .acsis-class-card:hover {
     transform: none !important;
   }

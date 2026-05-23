@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Clock, AlertTriangle, ShieldAlert, MonitorPlay, X } from 'lucide-react'
+import { Clock, AlertTriangle, ShieldAlert, X } from 'lucide-react'
 import { useDetectionsToolbar } from '@/context/DetectionsToolbarContext.jsx'
 import {
   fetchTeacherActiveMonitoring,
@@ -17,6 +17,8 @@ import {
   saveSeatLayout,
   saveSeatSettings,
 } from '@/lib/detectionsSeatLayout.js'
+import FadeIn from '@/components/ui/fade-in.jsx'
+import '../../pages/teacher-ui/reports.css'
 import '../../styles/teacher-detections-live.css'
 
 function splitName(fullName) {
@@ -41,12 +43,17 @@ function violationsBySession(violations) {
   return map
 }
 
-/** Seat color: absent | submitted | ongoing | warn1 | warn2 | warn3 */
+/**
+ * Seat color: absent | ongoing | warn1 | warn2 | warn3 | submitted | done-warn3
+ * Auto-submit at 3 warnings → done-warn3 (red, still counts as Done).
+ */
 function resolveSeatTone(entry) {
   if (!entry.joined) return 'absent'
   const strikes = Number(entry.warningCount || 0)
+  if (strikes >= MAX_EXAM_WARNINGS) {
+    return entry.status === 'submitted' ? 'done-warn3' : 'warn3'
+  }
   if (entry.status === 'submitted') return 'submitted'
-  if (strikes >= MAX_EXAM_WARNINGS) return 'warn3'
   if (strikes === 2) return 'warn2'
   if (strikes === 1) return 'warn1'
   return 'ongoing'
@@ -58,10 +65,15 @@ function statusLabelForTone(tone) {
     ongoing: 'Active — no warnings',
     warn1: '1 warning',
     warn2: '2 warnings',
-    warn3: 'Max warnings (3+)',
+    warn3: '3 warnings — auto-submit pending',
+    'done-warn3': 'Auto-submitted (3 warnings)',
     submitted: 'Exam submitted',
   }
   return map[tone] || tone
+}
+
+function isDoneTone(tone) {
+  return tone === 'submitted' || tone === 'done-warn3'
 }
 
 function rosterEntryToSeat(entry, violationLabels = []) {
@@ -159,17 +171,23 @@ export default function TeacherDetectionsPage() {
   )
 
   const { setToolbar } = useDetectionsToolbar() || {}
+  const [monitoringReady, setMonitoringReady] = useState(false)
 
   useEffect(() => {
-    if (!setToolbar || !activeExam) {
-      setToolbar?.(null)
-      return undefined
+    if (!setToolbar) return undefined
+    return () => setToolbar(null)
+  }, [setToolbar])
+
+  useEffect(() => {
+    if (!setToolbar) return
+    if (!activeExam) {
+      setToolbar(null)
+      return
     }
     setToolbar({
       seatSettings,
       onFillModeChange: handleFillModeChange,
     })
-    return () => setToolbar(null)
   }, [activeExam, seatSettings, handleFillModeChange, setToolbar])
 
   const handleSeatDrop = useCallback(
@@ -226,17 +244,30 @@ export default function TeacherDetectionsPage() {
   }
 
   useEffect(() => {
+    let cancelled = false
     async function loadActiveExam() {
       try {
         const data = await fetchTeacherActiveMonitoring()
-        if (!data.activeExam) return
-        setActiveExam(data.activeExam)
-        applyMonitoringData(data, data.activeExam)
+        if (cancelled) return
+        if (data.activeExam) {
+          setActiveExam(data.activeExam)
+          applyMonitoringData(data, data.activeExam)
+        } else {
+          setActiveExam(null)
+        }
       } catch (err) {
-        console.error('[Detections] Failed to fetch active exam:', err)
+        if (!cancelled) {
+          console.error('[Detections] Failed to fetch active exam:', err)
+          setActiveExam(null)
+        }
+      } finally {
+        if (!cancelled) setMonitoringReady(true)
       }
     }
     loadActiveExam()
+    return () => {
+      cancelled = true
+    }
   }, [applyMonitoringData])
 
   useEffect(() => {
@@ -252,87 +283,91 @@ export default function TeacherDetectionsPage() {
   }, [activeExam])
 
   const examTime = useMemo(
-    () => computeExamTimeDisplay(activeExam),
+    () => (activeExam ? computeExamTimeDisplay(activeExam) : null),
     [activeExam, clockTick],
   )
 
-  if (!activeExam) {
-    return (
-      <div className="acsis-detections-live acsis-detections-live--empty acsis-view">
-        <div className="flex items-center gap-3 mb-6">
-          <MonitorPlay className="w-8 h-8 text-muted-foreground shrink-0" aria-hidden />
-          <h1 className="text-xl sm:text-3xl font-bold text-foreground tracking-tight">Live Monitoring</h1>
-        </div>
-        <div className="acsis-detections-empty-card text-center max-w-2xl mx-auto">
-          <ShieldAlert className="w-14 h-14 sm:w-16 sm:h-16 text-muted-foreground/50 mx-auto mb-4 sm:mb-6" aria-hidden />
-          <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-3 sm:mb-4">No Active Exams</h2>
-          <p className="text-muted-foreground text-base sm:text-lg px-2">
-            Activate an exam from the &apos;My Classes&apos; page to begin live monitoring your students.
-          </p>
-        </div>
-      </div>
-    )
-  }
-
+  const isLive = Boolean(monitoringReady && activeExam)
   const presentStudents = students.filter((s) => s.tone !== 'empty')
-  const countByTone = (tone) => presentStudents.filter((s) => s.tone === tone).length
+  const countByTone = (tone) => (isLive ? presentStudents.filter((s) => s.tone === tone).length : null)
+  const countDone = () =>
+    isLive ? presentStudents.filter((s) => isDoneTone(s.tone)).length : null
+
+  const examSubtitle = !monitoringReady
+    ? 'Loading…'
+    : activeExam
+      ? `${activeExam.title}${activeExam.className ? ` · ${activeExam.className}` : ''}`
+      : 'No active exam — activate one from My Classes'
+
+  const statValue = (n) => (n == null ? '—' : String(n))
 
   return (
-    <div className="acsis-detections-live acsis-view">
-      <header className="acsis-detections-header">
-        <div className="acsis-detections-header__inner">
-          <div className="acsis-detections-header__intro">
-            <div className="acsis-detections-header__title-row">
-              <span className="relative flex h-3 w-3 shrink-0" aria-hidden>
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500" />
-              </span>
-              <h1 className="acsis-detections-header__title">Live Monitoring</h1>
+    <div className="acsis-detections-live acsis-view" aria-busy={!monitoringReady}>
+      <div className="container" style={{ padding: 0 }}>
+        <div className="panel acsis-detections-panel">
+          <div className="acsis-detections-panel__row">
+            <div className="acsis-detections-panel__intro">
+              <div className="acsis-detections-header__title-row">
+                <span
+                  className={`acsis-detections-live-dot${isLive ? ' acsis-detections-live-dot--live' : ' acsis-detections-live-dot--idle'}`}
+                  aria-hidden
+                />
+                <h1 className="acsis-detections-header__title">Live Monitoring</h1>
+              </div>
+              <p className="acsis-detections-header__exam">{examSubtitle}</p>
             </div>
-            <p className="acsis-detections-header__exam">
-              {activeExam.title}
-              {activeExam.className ? ` · ${activeExam.className}` : ''}
-            </p>
-          </div>
 
-          <div className="acsis-detections-header__stats">
-            <div className="acsis-detections-stat acsis-detections-stat--absent">
-              <span className="acsis-detections-stat__value">{countByTone('absent')}</span>
-              <span className="acsis-detections-stat__label">Not joined</span>
-            </div>
-            <div className="acsis-detections-stat acsis-detections-stat--ongoing">
-              <span className="acsis-detections-stat__value">{countByTone('ongoing')}</span>
-              <span className="acsis-detections-stat__label">Active</span>
-            </div>
-            <div className="acsis-detections-stat acsis-detections-stat--warn1">
-              <span className="acsis-detections-stat__value">{countByTone('warn1')}</span>
-              <span className="acsis-detections-stat__label">1 warn</span>
-            </div>
-            <div className="acsis-detections-stat acsis-detections-stat--warn2">
-              <span className="acsis-detections-stat__value">{countByTone('warn2')}</span>
-              <span className="acsis-detections-stat__label">2 warns</span>
-            </div>
-            <div className="acsis-detections-stat acsis-detections-stat--warn3">
-              <span className="acsis-detections-stat__value">{countByTone('warn3')}</span>
-              <span className="acsis-detections-stat__label">3 warns</span>
-            </div>
-            <div className="acsis-detections-stat acsis-detections-stat--submitted">
-              <span className="acsis-detections-stat__value">{countByTone('submitted')}</span>
-              <span className="acsis-detections-stat__label">Done</span>
-            </div>
-            <div
-              className={`acsis-detections-stat acsis-detections-stat--timer${examTime.isLow ? ' acsis-detections-stat--timer-low' : ''}`}
-            >
-              <span className="acsis-detections-stat__value acsis-detections-stat__timer">
-                <Clock className="acsis-detections-stat__clock" aria-hidden />
-                {examTime.display}
-              </span>
-              <span className="acsis-detections-stat__label">{examTime.label}</span>
+            <div className="acsis-detections-header__stats">
+              <FadeIn delay={0.05} className="acsis-detections-stat acsis-detections-stat--absent">
+                <span className="acsis-detections-stat__value">{statValue(countByTone('absent'))}</span>
+                <span className="acsis-detections-stat__label">Not joined</span>
+              </FadeIn>
+              <FadeIn delay={0.1} className="acsis-detections-stat acsis-detections-stat--ongoing">
+                <span className="acsis-detections-stat__value">{statValue(countByTone('ongoing'))}</span>
+                <span className="acsis-detections-stat__label">Active</span>
+              </FadeIn>
+              <FadeIn delay={0.15} className="acsis-detections-stat acsis-detections-stat--warn1">
+                <span className="acsis-detections-stat__value">{statValue(countByTone('warn1'))}</span>
+                <span className="acsis-detections-stat__label">1 warn</span>
+              </FadeIn>
+              <FadeIn delay={0.2} className="acsis-detections-stat acsis-detections-stat--warn2">
+                <span className="acsis-detections-stat__value">{statValue(countByTone('warn2'))}</span>
+                <span className="acsis-detections-stat__label">2 warns</span>
+              </FadeIn>
+              <FadeIn delay={0.25} className="acsis-detections-stat acsis-detections-stat--warn3">
+                <span className="acsis-detections-stat__value">{statValue(countByTone('warn3'))}</span>
+                <span className="acsis-detections-stat__label">3 warns</span>
+              </FadeIn>
+              <FadeIn delay={0.3} className="acsis-detections-stat acsis-detections-stat--submitted">
+                <span className="acsis-detections-stat__value">{statValue(countDone())}</span>
+                <span className="acsis-detections-stat__label">Done</span>
+              </FadeIn>
+              <FadeIn
+                delay={0.35}
+                className={`acsis-detections-stat acsis-detections-stat--timer${examTime?.isLow ? ' acsis-detections-stat--timer-low' : ''}`}
+              >
+                <span className="acsis-detections-stat__value acsis-detections-stat__timer">
+                  <Clock className="acsis-detections-stat__clock" aria-hidden />
+                  {examTime?.display ?? '--:--'}
+                </span>
+                <span className="acsis-detections-stat__label">{examTime?.label ?? 'Time'}</span>
+              </FadeIn>
             </div>
           </div>
         </div>
-      </header>
 
+        {monitoringReady && !activeExam ? (
+          <div className="panel acsis-detections-empty-panel text-center">
+            <ShieldAlert className="w-14 h-14 sm:w-16 sm:h-16 text-muted-foreground/50 mx-auto mb-4 sm:mb-6" aria-hidden />
+            <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-3 sm:mb-4">No Active Exams</h2>
+            <p className="text-muted-foreground text-base sm:text-lg px-2 m-0">
+              Activate an exam from the &apos;My Classes&apos; page to begin live monitoring your students.
+            </p>
+          </div>
+        ) : null}
+      </div>
+
+      {isLive ? (
       <div className="acsis-detections-body">
         <div className="acsis-detections-board w-full flex items-center justify-center relative box-border">
           <div className="absolute top-full w-full h-4 flex justify-around px-8 opacity-20 pointer-events-none" aria-hidden>
@@ -358,7 +393,8 @@ export default function TeacherDetectionsPage() {
             return (
               <React.Fragment key={`seat-${idx}-${student.id}`}>
                 {isWalkwayCol ? <div className="acsis-detections-walkway" aria-hidden /> : null}
-                <div
+                <FadeIn
+                  delay={0.1 + idx * 0.02}
                   role={isEmpty ? undefined : 'button'}
                   tabIndex={isEmpty ? undefined : 0}
                   draggable={!isEmpty}
@@ -411,21 +447,35 @@ export default function TeacherDetectionsPage() {
                         <div className={`acsis-detections-seat__avatar acsis-detections-seat__avatar--${tone}`}>
                           {initials}
                         </div>
+                        {student.strikes > 0 ? (
+                          <span
+                            className="acsis-detections-seat__strikes"
+                            title={`${student.strikes} / ${MAX_EXAM_WARNINGS} warnings`}
+                          >
+                            {student.strikes}/{MAX_EXAM_WARNINGS}
+                          </span>
+                        ) : null}
                       </div>
                       <div className="min-w-0">
                         <div className="acsis-detections-seat__name">{student.firstName}</div>
                         <div className="acsis-detections-seat__last">{student.lastName}</div>
                       </div>
+                      {tone === 'done-warn3' ? (
+                        <span className="acsis-detections-seat__badge acsis-detections-seat__badge--auto">
+                          Auto-submitted
+                        </span>
+                      ) : null}
                     </>
                   ) : (
                     <span className="acsis-detections-seat__empty-label">Empty</span>
                   )}
-                </div>
+                </FadeIn>
               </React.Fragment>
             )
           })}
         </div>
       </div>
+      ) : null}
 
       {selectedStudent ? (
         <div

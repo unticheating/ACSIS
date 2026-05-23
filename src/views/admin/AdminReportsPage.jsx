@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { fetchAdminReports, reportTypeLabel } from '@/lib/adminReportsApi.js'
 import { formatDateCreated } from '@/lib/adminUsersApi.js'
+import { acsisToastError } from '@/lib/acsisToast.js'
+import FadeIn from '@/components/ui/fade-in.jsx'
 import '../../pages/admin-ui/style.css'
 
 export default function AdminReportsPage() {
@@ -16,7 +18,9 @@ export default function AdminReportsPage() {
       setReports(data.reports || [])
     } catch (err) {
       setReports([])
-      setError(err instanceof Error ? err.message : 'Failed to load reports.')
+      const msg = err instanceof Error ? err.message : 'Failed to load reports.'
+      setError(msg)
+      acsisToastError(msg)
     } finally {
       setLoading(false)
     }
@@ -44,7 +48,7 @@ export default function AdminReportsPage() {
           </p>
         ) : null}
 
-        <div className="panel">
+        <FadeIn className="panel">
           <div className="panel-header">
             <span className="panel-title">Generated reports</span>
           </div>
@@ -81,7 +85,7 @@ export default function AdminReportsPage() {
               </table>
             )}
           </div>
-        </div>
+        </FadeIn>
       </div>
     </div>
   )

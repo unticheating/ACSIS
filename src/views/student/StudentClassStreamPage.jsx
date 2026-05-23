@@ -1,8 +1,19 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { MoreVertical, UserMinus } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu.jsx'
+import { DropdownMenuActionItem } from '@/components/ui/dropdown-menu-action-item.jsx'
 import { apiFetch } from '@/lib/apiFetch.js'
+import { acsisToastError } from '@/lib/acsisToast.js'
+import { formatCourseDisplayLabels, formatTermPeriod } from '@/lib/sectionLabel.js'
 import { isExamEnterableByStudent, labelForStudentExam } from '@/lib/examFlowUi.js'
 import { joinStudentExam } from '@/lib/studentExamApi.js'
+import FadeIn from '@/components/ui/fade-in.jsx'
+import '../../pages/teacher-ui/my_classes.css'
 import '../../pages/student-ui/enrolled_classes.css'
 
 export default function StudentClassStreamPage() {
@@ -20,6 +31,7 @@ export default function StudentClassStreamPage() {
   useEffect(() => {
     async function loadData() {
       setLoading(true)
+      setError(null)
       try {
         const res = await apiFetch(`/api/student/classes/${classId}/exams`)
         if (!res.ok) {
@@ -29,7 +41,7 @@ export default function StudentClassStreamPage() {
         const data = await res.json()
         setCls(data)
       } catch (err) {
-        setError(err.message)
+        setError(err instanceof Error ? err.message : 'Failed to fetch class.')
       } finally {
         setLoading(false)
       }
@@ -54,40 +66,62 @@ export default function StudentClassStreamPage() {
         `/student/exam/session?classId=${encodeURIComponent(classId)}&examId=${encodeURIComponent(joinExamId)}`,
       )
     } catch (err) {
-      setJoinError(err instanceof Error ? err.message : 'Could not join exam.')
+      const msg = err instanceof Error ? err.message : 'Could not join exam.'
+      setJoinError(msg)
+      acsisToastError(msg)
     } finally {
       setJoining(false)
     }
   }
 
+  async function unenrollFromClass() {
+    const { primary } = formatCourseDisplayLabels(cls || {})
+    if (
+      !window.confirm(
+        `Leave “${primary}”? You will need a new class code from your instructor to re-enroll.`,
+      )
+    ) {
+      return
+    }
+    try {
+      const res = await apiFetch(`/api/student/classes/${encodeURIComponent(classId)}/enroll`, {
+        method: 'DELETE',
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to leave class.')
+      }
+      navigate('/student/my-classes')
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Failed to leave class.')
+    }
+  }
+
   if (loading) {
     return (
-      <div className="acsis-view">
-        <Link to="/student/my-classes" className="stu-stream-back">
+      <div className="acsis-mc-view acsis-view">
+        <Link to="/student/my-classes" className="acsis-stream-back">
           ← Enrolled classes
         </Link>
-        <p className="text-sm text-muted-foreground">Loading...</p>
+        <div className="acsis-mc-loading">Loading class…</div>
       </div>
     )
   }
 
   if (error === 'NOT_ENROLLED') {
     return (
-      <div className="acsis-view">
-        <Link to="/student/my-classes" className="stu-stream-back">
+      <div className="acsis-mc-view acsis-view">
+        <Link to="/student/my-classes" className="acsis-stream-back">
           ← Enrolled classes
         </Link>
-        <div className="stu-gmail-banner" role="status">
-          <div className="stu-gmail-banner__icon" aria-hidden>
-            !
-          </div>
-          <div className="stu-gmail-banner__body">
-            <strong>Not enrolled in this class</strong>
-            <p>
-              Go back to Enrolled classes and enter the class access code your instructor gave you. After you enroll,
-              this stream will show posted exams.
-            </p>
-          </div>
+        <div className="acsis-mc-empty">
+          <h2 className="acsis-mc-empty__title">Not enrolled in this class</h2>
+          <p className="acsis-mc-empty__text">
+            Go back to Enrolled classes and enter the class access code your instructor gave you.
+          </p>
+          <Link to="/student/my-classes" className="acsis-mc-create-btn">
+            Enrolled classes
+          </Link>
         </div>
       </div>
     )
@@ -99,59 +133,79 @@ export default function StudentClassStreamPage() {
         ? 'This class was not found.'
         : error || 'This class could not be loaded.'
     return (
-      <div className="acsis-view">
-        <Link to="/student/my-classes" className="stu-stream-back">
+      <div className="acsis-mc-view acsis-view">
+        <Link to="/student/my-classes" className="acsis-stream-back">
           ← Enrolled classes
         </Link>
-        <p className="text-sm text-muted-foreground">{message}</p>
+        <p className="acsis-mc-sub">{message}</p>
       </div>
     )
   }
 
+  const { primary, secondary } = formatCourseDisplayLabels(cls)
+  const period = formatTermPeriod(cls)
+
   return (
-    <div className="acsis-view">
-      <Link to="/student/my-classes" className="stu-stream-back">
+    <div className="acsis-mc-view acsis-view">
+      <Link to="/student/my-classes" className="acsis-stream-back">
         ← Enrolled classes
       </Link>
 
-      <div className="stu-gmail-banner" role="region" aria-label="Class notice">
-        <div className="stu-gmail-banner__icon" aria-hidden>
-          i
+      <FadeIn as="section" delay={0.05} className="acsis-course-banner cyber-banner" aria-label="Course details">
+        <div className="acsis-course-banner__menu">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button type="button" className="acsis-class-card__menu-btn" aria-label="Class options">
+                <MoreVertical size={18} strokeWidth={2} />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-[11rem]">
+              <DropdownMenuActionItem icon={UserMinus} variant="destructive" onSelect={unenrollFromClass}>
+                Unenroll from class
+              </DropdownMenuActionItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
-        <div className="stu-gmail-banner__body">
-          <strong>{cls.name}</strong>
-          <p>
-            You are enrolled in this class ({cls.academicYear}, {cls.semester}). Below is the stream of exams, newest
-            first. Your instructor controls when each exam moves to lobby and live — watch for announcements in class.
-          </p>
+
+        <div className="acsis-course-banner__bottom-row">
+          <div className="acsis-course-banner__copy">
+            <h1 className="acsis-course-banner__code">{primary}</h1>
+            {secondary ? <p className="acsis-course-banner__name">{secondary}</p> : null}
+            {period ? <p className="acsis-course-banner__period">{period}</p> : null}
+          </div>
         </div>
-      </div>
+      </FadeIn>
 
       {examsSorted.length === 0 ? (
-        <div className="stu-empty">No exams posted in this class yet.</div>
+        <div className="acsis-mc-empty">
+          <h2 className="acsis-mc-empty__title">No exams yet</h2>
+          <p className="acsis-mc-empty__text">Your instructor has not posted any exams in this class.</p>
+        </div>
       ) : (
-        <>
-          <p className="stu-stream-title">Stream</p>
-          <div className="stu-stream-list">
-            {examsSorted.map((exam) => (
-              <div key={exam.id} className="stu-stream-item">
-                <div className="stu-stream-item__accent" aria-hidden />
-                <div className="stu-stream-item__main">
-                  <div>
-                    <h3 className="stu-stream-item__title">{exam.title || 'Untitled exam'}</h3>
-                    <p className="stu-stream-item__meta">
+        <div className="acsis-mc-stream">
+          <ul className="acsis-stream-list">
+            {examsSorted.map((exam, index) => (
+              <FadeIn as="li" delay={0.1 + (index * 0.05)} key={exam.id} className="acsis-stream-item acsis-card-surface">
+                <div className="acsis-stream-item__accent" aria-hidden />
+                <div className="acsis-stream-item__main">
+                  <div className="acsis-stream-item__link" style={{ cursor: 'default' }}>
+                    <h3 className="acsis-stream-item__title">{exam.title || 'Untitled exam'}</h3>
+                    {exam.description && (
+                      <p className="acsis-stream-item__desc">{exam.description}</p>
+                    )}
+                    <p className="acsis-stream-item__meta">
                       {Number(exam.questionCount || 0)} questions · {Number(exam.duration || 0)} min
-                      {exam.code ? ` · Code ${exam.code}` : ''}
+                      {exam.requiresPassword ? ` · Password required to enter` : ''}
                     </p>
                   </div>
-                  <div className="flex flex-wrap items-center justify-end gap-2">
+                  <div className="acsis-stream-item__right">
                     <span
-                      className={`stu-pill ${
+                      className={`acsis-pill ${
                         exam.sessionStatus === 'submitted'
-                          ? 'stu-pill--done'
+                          ? 'acsis-pill--draft'
                           : isExamEnterableByStudent(exam.status, exam.sessionStatus)
-                            ? 'stu-pill--live'
-                            : 'stu-pill--muted'
+                            ? 'acsis-pill--live'
+                            : 'acsis-pill--draft'
                       }`}
                     >
                       {labelForStudentExam(exam)}
@@ -159,7 +213,8 @@ export default function StudentClassStreamPage() {
                     {isExamEnterableByStudent(exam.status, exam.sessionStatus) ? (
                       <button
                         type="button"
-                        className="stu-stream-enter"
+                        className="acsis-mc-create-btn"
+                        style={{ padding: '6px 12px', fontSize: '0.8125rem' }}
                         onClick={() => {
                           setJoinExamId(exam.id)
                           setJoinCode('')
@@ -171,10 +226,10 @@ export default function StudentClassStreamPage() {
                     ) : null}
                   </div>
                 </div>
-              </div>
+              </FadeIn>
             ))}
-          </div>
-        </>
+          </ul>
+        </div>
       )}
 
       {joinExamId ? (

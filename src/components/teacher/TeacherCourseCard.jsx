@@ -1,9 +1,10 @@
 import { useNavigate } from 'react-router-dom'
+import FadeIn from '@/components/ui/fade-in.jsx'
 
 /**
- * @param {{ course: { id: string|number, courseCode?: string, name?: string, enrollmentCount?: number }, dimmed?: boolean }} props
+ * @param {{ course: { id: string|number, courseCode?: string, name?: string, enrollmentCount?: number }, dimmed?: boolean, delay?: number }} props
  */
-export default function TeacherCourseCard({ course, dimmed = false }) {
+export default function TeacherCourseCard({ course, dimmed = false, delay = 0 }) {
   const navigate = useNavigate()
   const code = (course.courseCode || '').trim()
   const name = (course.name || '').trim()
@@ -16,9 +17,9 @@ export default function TeacherCourseCard({ course, dimmed = false }) {
   }
 
   return (
-    <li>
+    <FadeIn as="li" delay={delay}>
       <article
-        className={`acsis-course-card${dimmed ? ' acsis-course-card--dimmed' : ''}`}
+        className={`acsis-course-card acsis-card-surface${dimmed ? ' acsis-course-card--dimmed' : ''}`}
         role="button"
         tabIndex={0}
         onClick={open}
@@ -42,6 +43,6 @@ export default function TeacherCourseCard({ course, dimmed = false }) {
           <span className="acsis-course-card__status">View exams</span>
         </div>
       </article>
-    </li>
+    </FadeIn>
   )
 }

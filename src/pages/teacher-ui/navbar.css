@@ -3,8 +3,8 @@
    =========================== */
 
 :root {
-  --green-primary: #22c55e;
-  --green-dark: #16a34a;
+  --green-primary: var(--acsis-brand, #334155);
+  --green-dark: var(--acsis-brand-hover, #1e293b);
   --green-light: #bbf7d0;
   --green-bg: #f0fdf4;
   --white: #ffffff;

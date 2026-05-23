@@ -168,13 +168,13 @@ CREATE TABLE IF NOT EXISTS institution_members (
     UNIQUE (institution_id, uid) -- one membership per user per institution
 );
 
--- Student-only profile (program e.g. BSIT, year level, section code e.g. 3D)
+-- Student subtype: institution-issued student number (00-00000).
+-- Cohort (program, section, school year) lives on teaching_terms / classes.
 CREATE TABLE IF NOT EXISTS students (
-    student_id    SERIAL PRIMARY KEY,
-    member_id     INT NOT NULL UNIQUE REFERENCES institution_members (member_id) ON DELETE CASCADE,
-    program_code  VARCHAR(20) DEFAULT NULL,
-    year_level    VARCHAR(50) DEFAULT NULL,
-    section_code  VARCHAR(20) DEFAULT NULL
+    student_id       SERIAL PRIMARY KEY,
+    member_id        INT NOT NULL UNIQUE REFERENCES institution_members (member_id) ON DELETE CASCADE,
+    institution_id   INT NOT NULL REFERENCES institutions (institution_id) ON DELETE CASCADE,
+    student_number   VARCHAR(50) DEFAULT NULL
 );
 
 -- ============================================================
@@ -323,6 +323,8 @@ CREATE TABLE IF NOT EXISTS exam_sessions (
     warning_count  SMALLINT NOT NULL DEFAULT 0,
     auto_submitted BOOLEAN NOT NULL DEFAULT FALSE,
     status         session_status NOT NULL DEFAULT 'in_progress',
+    question_order JSONB DEFAULT NULL,
+    choice_orders  JSONB DEFAULT NULL,
     UNIQUE (exam_id, member_id)
 );
 
@@ -449,6 +451,19 @@ $$;
 SELECT acsis_safe_index('idx_members_institution', 'institution_members', ARRAY['institution_id']);
 SELECT acsis_safe_index('idx_members_user', 'institution_members', ARRAY['uid']);
 SELECT acsis_safe_index('idx_students_member', 'students', ARRAY['member_id']);
+SELECT acsis_safe_index('idx_students_institution', 'students', ARRAY['institution_id']);
+-- Partial unique: student number per institution (see migration 009)
+DO $acsis$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes WHERE indexname = 'idx_students_institution_student_number'
+    ) THEN
+        CREATE UNIQUE INDEX idx_students_institution_student_number
+            ON students (institution_id, student_number)
+            WHERE student_number IS NOT NULL AND student_number <> '';
+    END IF;
+END
+$acsis$;
 SELECT acsis_safe_index('idx_teaching_terms_member', 'teaching_terms', ARRAY['member_id']);
 SELECT acsis_safe_index('idx_classes_term', 'classes', ARRAY['term_id']);
 SELECT acsis_safe_index('idx_classes_institution', 'classes', ARRAY['institution_id']);

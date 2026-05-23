@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { ChevronDown, MoreVertical } from 'lucide-react'
+import { Archive, ArchiveRestore, ChevronDown, MoreVertical, Plus, Trash2 } from 'lucide-react'
 import AnimatedHoverIcon from '@/components/icons/AnimatedHoverIcon.jsx'
 import { UserPlusIcon } from '@/components/icons/hoverIcons.js'
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu.jsx'
+import { DropdownMenuActionItem } from '@/components/ui/dropdown-menu-action-item.jsx'
 import { apiFetch } from '@/lib/apiFetch.js'
+import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
+import { useAcsisConfirm } from '@/hooks/useAcsisConfirm.jsx'
 import TeacherPageHeader from '@/components/teacher/TeacherPageHeader.jsx'
 import TeacherCourseCard from '@/components/teacher/TeacherCourseCard.jsx'
 import TeacherAddCourseDialog from '@/components/teacher/TeacherAddCourseDialog.jsx'
@@ -25,6 +27,7 @@ import {
 } from '@/components/ui/dialog.jsx'
 import { Input } from '@/components/ui/input.jsx'
 import { Label } from '@/components/ui/label.jsx'
+import FadeIn from '@/components/ui/fade-in.jsx'
 import '../../pages/teacher-ui/my_classes.css'
 
 /**
@@ -39,7 +42,7 @@ import '../../pages/teacher-ui/my_classes.css'
  *   dimmed?: boolean,
  * }} props
  */
-function SectionCardItem({ group, isOpen, onToggle, onAddCourse, onArchive, onRestore, onDelete, dimmed = false }) {
+function SectionCardItem({ group, isOpen, onToggle, onAddCourse, onArchive, onRestore, onDelete, dimmed = false, delay = 0 }) {
   const { term, courses, isOrphan } = group
   const title = isOrphan ? 'Other courses' : formatSectionTitle(term)
   const period = isOrphan ? 'Not linked to a section' : formatTermPeriod(term)
@@ -48,7 +51,7 @@ function SectionCardItem({ group, isOpen, onToggle, onAddCourse, onArchive, onRe
   const canManage = !isOrphan
 
   return (
-    <article
+    <FadeIn as="article" delay={delay}
       className={`acsis-section-card${isOpen ? ' acsis-section-card--open' : ''}${term.isArchived || dimmed ? ' acsis-section-card--archived' : ''}${dimmed ? ' acsis-section-card--dimmed' : ''}`}
     >
       <div
@@ -82,21 +85,32 @@ function SectionCardItem({ group, isOpen, onToggle, onAddCourse, onArchive, onRe
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="min-w-[11rem]" onClick={(e) => e.stopPropagation()}>
                 {!term.isArchived ? (
-                  <DropdownMenuItem onSelect={() => onAddCourse(term)}>Add course</DropdownMenuItem>
+                  <DropdownMenuActionItem icon={Plus} onSelect={() => onAddCourse(term)}>
+                    Add course
+                  </DropdownMenuActionItem>
                 ) : null}
                 {!term.isArchived ? <DropdownMenuSeparator /> : null}
                 {term.isArchived ? (
-                  <DropdownMenuItem onSelect={() => onRestore?.(term.id)}>Restore section</DropdownMenuItem>
+                  <DropdownMenuActionItem
+                    icon={ArchiveRestore}
+                    variant="success"
+                    onSelect={() => onRestore?.(term.id)}
+                  >
+                    Restore section
+                  </DropdownMenuActionItem>
                 ) : (
-                  <DropdownMenuItem onSelect={() => onArchive?.(term.id)}>Archive section</DropdownMenuItem>
+                  <DropdownMenuActionItem icon={Archive} variant="warning" onSelect={() => onArchive?.(term.id)}>
+                    Archive section
+                  </DropdownMenuActionItem>
                 )}
                 <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  className="text-destructive focus:text-destructive"
+                <DropdownMenuActionItem
+                  icon={Trash2}
+                  variant="destructive"
                   onSelect={() => onDelete?.(term)}
                 >
                   Delete section
-                </DropdownMenuItem>
+                </DropdownMenuActionItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -140,15 +154,15 @@ function SectionCardItem({ group, isOpen, onToggle, onAddCourse, onArchive, onRe
             <>
               <h3 className="acsis-section-card__courses-title">Courses</h3>
               <ul className="acsis-mc-course-grid acsis-mc-course-grid--stack">
-                {courses.map((c) => (
-                  <TeacherCourseCard key={c.id} course={c} dimmed={dimmed} />
+                {courses.map((c, index) => (
+                  <TeacherCourseCard key={c.id} course={c} dimmed={dimmed} delay={index * 0.05} />
                 ))}
               </ul>
             </>
           )}
         </div>
       </div>
-    </article>
+    </FadeIn>
   )
 }
 
@@ -177,6 +191,7 @@ function AddSectionButton({ onClick, className = 'acsis-mc-create-btn' }) {
 
 export default function TeacherMyClassesPage() {
   const location = useLocation()
+  const { confirm, ConfirmDialog } = useAcsisConfirm()
   const listRef = useRef(null)
   const [sections, setSections] = useState([])
   const [courses, setCourses] = useState([])
@@ -335,7 +350,7 @@ export default function TeacherMyClassesPage() {
     })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) {
-      window.alert(data.error || 'Could not update section.')
+      acsisToastError(data.error || 'Could not update section.')
       return false
     }
     await fetchAll()
@@ -343,13 +358,20 @@ export default function TeacherMyClassesPage() {
   }
 
   async function handleArchiveSection(id) {
-    if (!window.confirm('Archive this section? You can restore it from Archived.')) return
-    await patchSection(id, { isArchived: true })
+    const ok = await confirm({
+      title: 'Archive this section?',
+      description: 'You can restore it from Archived.',
+      confirmLabel: 'Archive',
+    })
+    if (!ok) return
+    const success = await patchSection(id, { isArchived: true })
+    if (success) acsisToastSuccess('Section archived.')
     if (String(id) === openSectionId) setOpenSectionId(null)
   }
 
   async function handleRestoreSection(id) {
-    await patchSection(id, { isArchived: false })
+    const success = await patchSection(id, { isArchived: false })
+    if (success) acsisToastSuccess('Section restored.')
   }
 
   async function handleDeleteSection(section) {
@@ -359,18 +381,25 @@ export default function TeacherMyClassesPage() {
       count > 0
         ? `This will permanently delete ${title} and all ${count} course(s) with their exams.`
         : `This will permanently delete ${title}.`
-    if (!window.confirm(`${detail} This cannot be undone. Continue?`)) return
+    const ok = await confirm({
+      title: 'Delete this section?',
+      description: `${detail} This cannot be undone.`,
+      confirmLabel: 'Delete',
+      destructive: true,
+    })
+    if (!ok) return
     try {
       const res = await apiFetch(`/api/teacher/terms/${encodeURIComponent(section.id)}`, { method: 'DELETE' })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        window.alert(data.error || 'Could not delete section.')
+        acsisToastError(data.error || 'Could not delete section.')
         return
       }
       if (String(section.id) === openSectionId) setOpenSectionId(null)
+      acsisToastSuccess('Section deleted.')
       await fetchAll()
     } catch {
-      window.alert('Network error.')
+      acsisToastError('Network error. Please try again.')
     }
   }
 
@@ -390,18 +419,18 @@ export default function TeacherMyClassesPage() {
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        window.alert(data.error || 'Failed to add section.')
+        acsisToastError(data.error || 'Failed to add section.')
         return
       }
-      const codeMsg = data.accessCode ? `\n\nClass access code for students: ${data.accessCode}` : ''
-      window.alert(`Class created.${codeMsg}`)
+      const codeMsg = data.accessCode ? ` Access code: ${data.accessCode}.` : ''
+      acsisToastSuccess(`Section created.${codeMsg}`)
       setCreateOpen(false)
       if (data.id != null) {
         setOpenSectionId(String(data.id))
       }
       await fetchAll()
     } catch {
-      window.alert('Network error. Please try again.')
+      acsisToastError('Network error. Please try again.')
     } finally {
       setCreating(false)
     }
@@ -429,7 +458,7 @@ export default function TeacherMyClassesPage() {
         ) : (
           <>
             <div ref={listRef} className="acsis-section-card-list">
-              {activeSectionGroups.map((group) => (
+              {activeSectionGroups.map((group, index) => (
                 <SectionCardItem
                   key={group.term.id}
                   group={group}
@@ -439,6 +468,7 @@ export default function TeacherMyClassesPage() {
                   onArchive={handleArchiveSection}
                   onRestore={handleRestoreSection}
                   onDelete={handleDeleteSection}
+                  delay={index * 0.05}
                 />
               ))}
             </div>
@@ -466,7 +496,7 @@ export default function TeacherMyClassesPage() {
 
                 {archivedOpen ? (
                   <div className="acsis-archived-reveal__list">
-                    {archivedSectionGroups.map((group) => (
+                    {archivedSectionGroups.map((group, index) => (
                       <SectionCardItem
                         key={group.term.id}
                         group={group}
@@ -477,6 +507,7 @@ export default function TeacherMyClassesPage() {
                         onArchive={handleArchiveSection}
                         onRestore={handleRestoreSection}
                         onDelete={handleDeleteSection}
+                        delay={index * 0.05}
                       />
                     ))}
                   </div>
@@ -560,6 +591,7 @@ export default function TeacherMyClassesPage() {
           </form>
         </DialogContent>
       </Dialog>
+      {ConfirmDialog}
     </div>
   )
 }

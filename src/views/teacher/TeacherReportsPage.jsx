@@ -1,5 +1,8 @@
 import { useEffect, useState, useMemo } from 'react'
 import { fetchTeacherExamResults, fetchTeacherReportExams } from '@/lib/teacherExamResultsApi.js'
+import { exportExamReport } from '@/lib/teacherExamGradingApi.js'
+import { acsisToastError } from '@/lib/acsisToast.js'
+import FadeIn from '@/components/ui/fade-in.jsx'
 import '../../pages/teacher-ui/reports.css'
 
 function formatDate(iso) {
@@ -9,6 +12,15 @@ function formatDate(iso) {
   } catch {
     return '—'
   }
+}
+
+function sortSessionsByRank(sessions) {
+  return [...sessions].sort((a, b) => {
+    const ra = a.rank != null ? Number(a.rank) : 9999
+    const rb = b.rank != null ? Number(b.rank) : 9999
+    if (ra !== rb) return ra - rb
+    return String(a.studentName || '').localeCompare(String(b.studentName || ''))
+  })
 }
 
 export default function TeacherReportsPage() {
@@ -21,6 +33,8 @@ export default function TeacherReportsPage() {
   const [stats, setStats] = useState(null)
   const [sessions, setSessions] = useState([])
   const [violations, setViolations] = useState([])
+  const [topStudent, setTopStudent] = useState(null)
+  const [exporting, setExporting] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -64,6 +78,7 @@ export default function TeacherReportsPage() {
         setStats(data.stats || null)
         setSessions(data.sessions || [])
         setViolations(data.violations || [])
+        setTopStudent(data.topStudent || null)
       } catch (err) {
         if (!cancelled) {
           setReportError(err instanceof Error ? err.message : 'Failed to load report.')
@@ -84,8 +99,23 @@ export default function TeacherReportsPage() {
     }
   }, [currentExam?.classId, currentExam?.id])
 
-  const handleExport = (format) => {
-    window.alert(`Preparing ${format} download. The file will be saved shortly.`)
+  const sessionsByRank = useMemo(() => sortSessionsByRank(sessions), [sessions])
+
+  const handleExport = async (format) => {
+    if (!currentExam?.classId || !currentExam?.id) return
+    setExporting(true)
+    try {
+      const reportType =
+        activeTab === 'violations' ? 'violations' : activeTab === 'summary' ? 'summary' : 'detailed'
+      await exportExamReport(currentExam.classId, currentExam.id, {
+        format: format === 'CSV' ? 'csv' : 'pdf',
+        reportType,
+      })
+    } catch (err) {
+      acsisToastError(err instanceof Error ? err.message : 'Export failed.')
+    } finally {
+      setExporting(false)
+    }
   }
 
   const handleChangeExam = () => {
@@ -94,11 +124,11 @@ export default function TeacherReportsPage() {
   }
 
   const submittedSessions = sessions.filter((s) => s.status === 'submitted')
+  const scoredSessions = submittedSessions.filter((s) => s.percentage != null)
   const avgScore =
-    submittedSessions.filter((s) => s.percentage != null).length > 0
+    scoredSessions.length > 0
       ? Math.round(
-          submittedSessions.reduce((sum, s) => sum + Number(s.percentage || 0), 0) /
-            submittedSessions.filter((s) => s.percentage != null).length,
+          scoredSessions.reduce((sum, s) => sum + Number(s.percentage || 0), 0) / scoredSessions.length,
         )
       : null
 
@@ -139,7 +169,7 @@ export default function TeacherReportsPage() {
 
         {currentExam && (
           <>
-            <div className="panel">
+            <FadeIn delay={0.1} className="panel">
               <div className="exam-title-row">
                 <div>
                   <h2>{currentExam.title}</h2>
@@ -173,20 +203,30 @@ export default function TeacherReportsPage() {
                     className={`tab-btn ${activeTab === 'detailed' ? 'active' : ''}`}
                     onClick={() => setActiveTab('detailed')}
                   >
-                    Detailed
+                    Results
                   </button>
                 </div>
 
                 <div className="action-group">
-                  <button type="button" className="btn-action btn-blue" onClick={() => handleExport('CSV')}>
+                  <button
+                    type="button"
+                    className="btn-action btn-blue"
+                    disabled={exporting}
+                    onClick={() => handleExport('CSV')}
+                  >
                     Download CSV
                   </button>
-                  <button type="button" className="btn-action btn-green" onClick={() => handleExport('PDF')}>
-                    Print PDF
+                  <button
+                    type="button"
+                    className="btn-action btn-green"
+                    disabled={exporting}
+                    onClick={() => handleExport('PDF')}
+                  >
+                    {exporting ? 'Exporting…' : 'Download PDF'}
                   </button>
                 </div>
               </div>
-            </div>
+            </FadeIn>
 
             {reportError ? (
               <p className="text-sm text-red-600 px-1" role="alert">
@@ -198,38 +238,51 @@ export default function TeacherReportsPage() {
             ) : null}
 
             {activeTab === 'summary' && (
-              <div className="tab-panel active panel">
+              <FadeIn delay={0.1} className="tab-panel active panel">
                 <div className="report-header">
                   <h3>Summary Report</h3>
                   <p>{currentExam.title}</p>
                 </div>
+                {topStudent ? (
+                  <div className="violation-alert-box" style={{ background: '#f0fdf4', borderColor: '#bbf7d0' }}>
+                    <div className="alert-title" style={{ color: '#166534' }}>
+                      Top 1 — Class rank
+                    </div>
+                    <div className="alert-count" style={{ color: '#15803d' }}>
+                      {topStudent.studentName}
+                    </div>
+                    <div className="alert-sub">
+                      {topStudent.schoolId || '—'} · {topStudent.percentage}% ({topStudent.rawScore} pts)
+                    </div>
+                  </div>
+                ) : null}
                 {stats ? (
                   <div className="sdc-stats" style={{ maxWidth: 520 }}>
-                    <div className="sdc-stat">
+                    <FadeIn delay={0.15} className="sdc-stat">
                       <div className="stat-val">{stats.enrolled}</div>
                       <div className="stat-lbl">Enrolled</div>
-                    </div>
-                    <div className="sdc-stat">
+                    </FadeIn>
+                    <FadeIn delay={0.2} className="sdc-stat">
                       <div className="stat-val">{stats.joined}</div>
                       <div className="stat-lbl">Joined</div>
-                    </div>
-                    <div className="sdc-stat">
+                    </FadeIn>
+                    <FadeIn delay={0.25} className="sdc-stat">
                       <div className="stat-val text-green">{stats.submitted}</div>
                       <div className="stat-lbl">Submitted</div>
-                    </div>
-                    <div className="sdc-stat">
+                    </FadeIn>
+                    <FadeIn delay={0.3} className="sdc-stat">
                       <div className="stat-val">{avgScore != null ? `${avgScore}%` : '—'}</div>
                       <div className="stat-lbl">Class average</div>
-                    </div>
+                    </FadeIn>
                   </div>
                 ) : (
                   <p className="text-gray">No summary data yet.</p>
                 )}
-              </div>
+              </FadeIn>
             )}
 
             {activeTab === 'violations' && (
-              <div className="tab-panel active panel">
+              <FadeIn delay={0.1} className="tab-panel active panel">
                 <div className="report-header">
                   <h3>Violations Report</h3>
                   <p>{currentExam.title}</p>
@@ -245,8 +298,10 @@ export default function TeacherReportsPage() {
                   <p className="text-sm text-gray-500">No violations logged for this exam.</p>
                 ) : (
                   <ul className="space-y-2">
-                    {violations.map((v) => (
-                      <li
+                    {violations.map((v, index) => (
+                      <FadeIn
+                        as="li"
+                        delay={0.15 + (index * 0.05)}
                         key={v.id}
                         className="text-sm border border-gray-100 rounded-lg p-3 bg-gray-50 flex flex-wrap justify-between gap-2"
                       >
@@ -255,28 +310,33 @@ export default function TeacherReportsPage() {
                           {v.details ? `: ${v.details}` : ''}
                         </span>
                         <span className="text-gray-500">{formatDate(v.occurredAt)}</span>
-                      </li>
+                      </FadeIn>
                     ))}
                   </ul>
                 )}
-              </div>
+              </FadeIn>
             )}
 
             {activeTab === 'detailed' && (
-              <div className="tab-panel active panel">
+              <FadeIn delay={0.1} className="tab-panel active panel">
                 <div className="report-header">
-                  <h3>Detailed Performance Report</h3>
-                  <p>{currentExam.title}</p>
+                  <h3>Student results</h3>
+                  <p>Sorted by rank — Rank #1 appears first.</p>
                 </div>
 
-                {sessions.length === 0 ? (
+                {sessionsByRank.length === 0 ? (
                   <p className="text-sm text-gray-500">No student sessions yet. Students must join and submit the exam.</p>
                 ) : (
-                  sessions.map((student) => (
-                    <div key={student.sessionId} className="student-detail-card">
+                  sessionsByRank.map((student, index) => (
+                    <FadeIn delay={0.15 + (index * 0.05)} key={student.sessionId} className="student-detail-card">
                       <div className="sdc-header">
                         <div className="sdc-info">
-                          <h4>{student.studentName}</h4>
+                          <h4>
+                            {student.rank != null ? (
+                              <span className="text-green font-bold mr-2">#{student.rank}</span>
+                            ) : null}
+                            {student.studentName}
+                          </h4>
                           <span>{student.schoolId || '—'} · {student.status}</span>
                         </div>
                         <div className="sdc-score">
@@ -286,6 +346,11 @@ export default function TeacherReportsPage() {
                               <div className="score-lbl">
                                 {student.rawScore}/{student.totalPoints} pts
                               </div>
+                            </>
+                          ) : student.status === 'submitted' ? (
+                            <>
+                              <div className="score-val text-gray">—</div>
+                              <div className="score-lbl">Grading pending</div>
                             </>
                           ) : (
                             <>
@@ -309,14 +374,15 @@ export default function TeacherReportsPage() {
                           <div className="stat-lbl">Submitted</div>
                         </div>
                       </div>
-                    </div>
+                    </FadeIn>
                   ))
                 )}
-              </div>
+              </FadeIn>
             )}
           </>
         )}
       </div>
+
     </div>
   )
 }

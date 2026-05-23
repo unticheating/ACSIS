@@ -1,52 +1,95 @@
 import { getPool } from '../db.js';
 import { STUDENT_VISIBLE_STATUS_SQL } from '../lib/examStatus.js';
+import { ensureExamSectionsSchema } from '../lib/ensureExamSectionsSchema.js';
 
-export async function insertExamTransaction(pool, memberId, classId, title, password, timeLimit, questionsData) {
-  // We use the provided pool client (which is already in a transaction)
-  
-  // 1. Insert Exam
-  const examResult = await pool.query(
-    `INSERT INTO exams (class_id, title, password, time_limit, status, created_by)
-     VALUES ($1, $2, $3, $4, 'draft', $5)
+function mapQuestionTypeToDb(type) {
+  if (type === 'multiple-choice' || type === 'multiple') return 'mcq';
+  if (type === 'truefalse') return 'true_false';
+  return 'identification';
+}
+
+async function insertQuestionWithChoices(client, examId, sectionId, q, orderNum) {
+  const dbType = mapQuestionTypeToDb(q.type);
+  const qResult = await client.query(
+    `INSERT INTO questions (exam_id, section_id, question_text, question_type, points, order_num)
+     VALUES ($1, $2, $3, $4, 1.00, $5)
+     RETURNING question_id`,
+    [examId, sectionId, q.question, dbType, orderNum],
+  );
+  const questionId = qResult.rows[0].question_id;
+
+  if (dbType === 'mcq') {
+    for (let j = 0; j < q.options.length; j++) {
+      const choiceText = q.options[j];
+      const isCorrect = choiceText === q.correctAnswer;
+      await client.query(
+        `INSERT INTO choices (question_id, choice_text, is_correct, order_num)
+         VALUES ($1, $2, $3, $4)`,
+        [questionId, choiceText, isCorrect, j + 1],
+      );
+    }
+  } else {
+    await client.query(
+      `INSERT INTO choices (question_id, choice_text, is_correct, order_num)
+       VALUES ($1, $2, TRUE, 1)`,
+      [questionId, q.correctAnswer],
+    );
+  }
+}
+
+export async function insertExamTransaction(
+  pool,
+  memberId,
+  classId,
+  title,
+  password,
+  timeLimit,
+  payload,
+  { shuffleQuestions = false, shuffleChoices = false } = {},
+) {
+  await ensureExamSectionsSchema();
+  const client = pool;
+
+  const examResult = await client.query(
+    `INSERT INTO exams (class_id, title, password, time_limit, status, shuffle_questions, shuffle_choices, created_by)
+     VALUES ($1, $2, $3, $4, 'draft', $5, $6, $7)
      RETURNING exam_id`,
-    [classId, title, password || null, timeLimit, memberId]
+    [classId, title, password || null, timeLimit, Boolean(shuffleQuestions), Boolean(shuffleChoices), memberId],
   );
   const examId = examResult.rows[0].exam_id;
 
-  // 2. Insert Questions and Choices
-  for (let i = 0; i < questionsData.length; i++) {
-    const q = questionsData[i];
-    
-    const dbType = q.type === 'multiple-choice' || q.type === 'multiple' ? 'mcq' 
-                 : q.type === 'truefalse' ? 'true_false' 
-                 : 'identification';
+  const sections = Array.isArray(payload?.sections) ? payload.sections : null;
+  const flatQuestions = Array.isArray(payload?.questions) ? payload.questions : null;
 
-    const qResult = await pool.query(
-      `INSERT INTO questions (exam_id, question_text, question_type, points, order_num)
-       VALUES ($1, $2, $3, 1.00, $4)
-       RETURNING question_id`,
-      [examId, q.question, dbType, i + 1]
-    );
-    const questionId = qResult.rows[0].question_id;
+  let orderNum = 0;
 
-    if (dbType === 'mcq') {
-      // Multiple choice has options and a specific correct answer
-      for (let j = 0; j < q.options.length; j++) {
-        const choiceText = q.options[j];
-        const isCorrect = choiceText === q.correctAnswer;
-        await pool.query(
-          `INSERT INTO choices (question_id, choice_text, is_correct, order_num)
-           VALUES ($1, $2, $3, $4)`,
-          [questionId, choiceText, isCorrect, j + 1]
-        );
-      }
-    } else {
-      // True/False and Identification just have one correct answer
-      await pool.query(
-        `INSERT INTO choices (question_id, choice_text, is_correct, order_num)
-         VALUES ($1, $2, TRUE, 1)`,
-        [questionId, q.correctAnswer]
+  if (sections?.length) {
+    for (let sIdx = 0; sIdx < sections.length; sIdx++) {
+      const sec = sections[sIdx];
+      const secResult = await client.query(
+        `INSERT INTO exam_sections (exam_id, title, description, order_num)
+         VALUES ($1, $2, $3, $4)
+         RETURNING section_id`,
+        [examId, String(sec.title || '').trim() || `Set ${sIdx + 1}`, sec.description?.trim() || null, sIdx + 1],
       );
+      const sectionId = secResult.rows[0].section_id;
+      const secQuestions = sec.questions || [];
+      for (const q of secQuestions) {
+        orderNum += 1;
+        await insertQuestionWithChoices(client, examId, sectionId, q, orderNum);
+      }
+    }
+  } else if (flatQuestions?.length) {
+    const secResult = await client.query(
+      `INSERT INTO exam_sections (exam_id, title, description, order_num)
+       VALUES ($1, $2, NULL, 1)
+       RETURNING section_id`,
+      [examId, 'Set 1'],
+    );
+    const sectionId = secResult.rows[0].section_id;
+    for (const q of flatQuestions) {
+      orderNum += 1;
+      await insertQuestionWithChoices(client, examId, sectionId, q, orderNum);
     }
   }
 
@@ -174,6 +217,7 @@ export async function deleteExamQuery(classId, examId, teacherMemberId = null) {
       [examId],
     );
     await client.query(`DELETE FROM questions WHERE exam_id = $1`, [examId]);
+    await client.query(`DELETE FROM exam_sections WHERE exam_id = $1`, [examId]);
 
     const result = await client.query(
       `DELETE FROM exams WHERE exam_id = $1 AND class_id = $2 RETURNING exam_id`,
@@ -190,9 +234,46 @@ export async function deleteExamQuery(classId, examId, teacherMemberId = null) {
   }
 }
 
+async function attachChoicesToQuestion(pool, row) {
+  const qType = row.type === 'mcq' ? 'multiple-choice' : row.type === 'true_false' ? 'truefalse' : 'identification';
+
+  const qObj = {
+    id: row.id,
+    type: qType,
+    question: row.question,
+    points: row.points,
+    sectionId: row.sectionId ?? null,
+    sectionTitle: row.sectionTitle ?? null,
+    sectionDescription: row.sectionDescription ?? null,
+  };
+
+  if (qType === 'multiple-choice' || qType === 'truefalse') {
+    const cResult = await pool.query(
+      `SELECT choice_id, choice_text, is_correct FROM choices WHERE question_id = $1 ORDER BY order_num ASC`,
+      [row.id],
+    );
+    qObj.options = cResult.rows.map((c) => c.choice_text);
+    qObj._choicesMeta = cResult.rows.map((c) => ({
+      choiceId: c.choice_id,
+      choiceText: c.choice_text,
+      isCorrect: c.is_correct,
+    }));
+    qObj.correctAnswer = cResult.rows.find((c) => c.is_correct)?.choice_text || '';
+  } else {
+    const cResult = await pool.query(
+      `SELECT choice_text FROM choices WHERE question_id = $1 AND is_correct = TRUE LIMIT 1`,
+      [row.id],
+    );
+    qObj.correctAnswer = cResult.rows[0]?.choice_text || '';
+  }
+
+  return qObj;
+}
+
 export async function getExamWithQuestionsQuery(classId, examId, requireActive = false) {
   const pool = getPool();
-  
+  await ensureExamSectionsSchema();
+
   // 1. Fetch exam details
   let examQuery = `
     SELECT 
@@ -217,46 +298,43 @@ export async function getExamWithQuestionsQuery(classId, examId, requireActive =
   
   const exam = examResult.rows[0];
   
-  // 2. Fetch questions
-  const qResult = await pool.query(
-    `SELECT question_id as id, question_text as question, question_type as type, points, order_num 
-     FROM questions 
-     WHERE exam_id = $1 
+  const secResult = await pool.query(
+    `SELECT section_id AS id, title, description, order_num AS "orderNum"
+     FROM exam_sections
+     WHERE exam_id = $1
      ORDER BY order_num ASC`,
-    [examId]
+    [examId],
   );
-  
+
+  const qResult = await pool.query(
+    `SELECT
+       q.question_id AS id,
+       q.question_text AS question,
+       q.question_type AS type,
+       q.points,
+       q.order_num AS "orderNum",
+       q.section_id AS "sectionId",
+       s.title AS "sectionTitle",
+       s.description AS "sectionDescription",
+       s.order_num AS "sectionOrder"
+     FROM questions q
+     LEFT JOIN exam_sections s ON s.section_id = q.section_id
+     WHERE q.exam_id = $1
+     ORDER BY COALESCE(s.order_num, 9999), q.order_num ASC`,
+    [examId],
+  );
+
   const questions = [];
-  
   for (const row of qResult.rows) {
-    const qType = row.type === 'mcq' ? 'multiple-choice' : row.type === 'true_false' ? 'truefalse' : 'identification';
-    
-    const qObj = {
-      id: row.id,
-      type: qType,
-      question: row.question,
-      points: row.points
-    };
-    
-    // Fetch choices
-    if (qType === 'multiple-choice') {
-      const cResult = await pool.query(
-        `SELECT choice_text, is_correct FROM choices WHERE question_id = $1 ORDER BY order_num ASC`,
-        [row.id]
-      );
-      qObj.options = cResult.rows.map(c => c.choice_text);
-      qObj.correctAnswer = cResult.rows.find(c => c.is_correct)?.choice_text || '';
-    } else {
-      const cResult = await pool.query(
-        `SELECT choice_text FROM choices WHERE question_id = $1 AND is_correct = TRUE LIMIT 1`,
-        [row.id]
-      );
-      qObj.correctAnswer = cResult.rows[0]?.choice_text || '';
-    }
-    
-    questions.push(qObj);
+    questions.push(await attachChoicesToQuestion(pool, row));
   }
-  
+
+  exam.sections = secResult.rows.map((s) => ({
+    id: s.id,
+    title: s.title,
+    description: s.description,
+    orderNum: s.orderNum,
+  }));
   exam.questions = questions;
   return exam;
 }

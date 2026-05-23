@@ -57,8 +57,6 @@
   border: 1px solid #e5e7eb;
   background: #fff;
   color: #4b5563;
-  font-size: 0.8125rem;
-  font-weight: 600;
   padding: 8px 14px;
   border-radius: 9999px;
   cursor: pointer;
@@ -71,9 +69,9 @@
 }
 
 .acsis-mc-filter--on {
-  background: #f0fdf4;
-  border-color: #bbf7d0;
-  color: #166534;
+  background: var(--acsis-brand-muted-bg, #f0fdf4);
+  border-color: var(--acsis-brand-ring, #bbf7d0);
+  color: var(--acsis-brand-700, #166534);
 }
 
 .acsis-mc-content {
@@ -84,9 +82,6 @@
 
 .acsis-mc-loading {
   padding: 2rem 0;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: #6b7280;
 }
 
 .acsis-mc-empty {
@@ -101,16 +96,10 @@
 
 .acsis-mc-empty__title {
   margin: 0 0 8px;
-  font-size: 1.05rem;
-  font-weight: 700;
-  color: #166534;
 }
 
 .acsis-mc-empty__text {
   margin: 0 0 1.25rem;
-  font-size: 0.875rem;
-  color: #6b7280;
-  line-height: 1.5;
 }
 
 .acsis-mc-stream {
@@ -189,10 +178,6 @@
 }
 
 .acsis-archived-reveal__label {
-  font-size: 0.8125rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   color: #6b7280;
 }
 
@@ -204,8 +189,6 @@
   border-radius: 10px;
   background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 12px center;
   color: #374151;
-  font-size: 0.875rem;
-  font-weight: 600;
   cursor: pointer;
   appearance: none;
 }
@@ -251,10 +234,10 @@
 
 .acsis-section-card--open .acsis-section-card__surface {
   z-index: 2;
-  border-color: #bbf7d0;
+  border-color: var(--acsis-brand-ring, #bbf7d0);
   border-bottom-left-radius: 0;
   border-bottom-right-radius: 0;
-  box-shadow: 0 4px 14px rgba(22, 163, 74, 0.1);
+  box-shadow: 0 4px 14px var(--acsis-brand-subtle, rgba(22, 163, 74, 0.1));
   transition:
     border-color 0.28s ease,
     border-radius 0.38s cubic-bezier(0.16, 1, 0.3, 1),
@@ -266,11 +249,11 @@
 }
 
 .acsis-section-card--open .acsis-section-card__surface:hover {
-  border-color: #bbf7d0;
+  border-color: var(--acsis-brand-ring, #bbf7d0);
 }
 
 .acsis-section-card__surface:focus-visible {
-  outline: 2px solid #16a34a;
+  outline: 2px solid var(--acsis-brand, #16a34a);
   outline-offset: 2px;
 }
 
@@ -309,33 +292,15 @@
 
 .acsis-section-card__eyebrow {
   margin: 0;
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #6b7280;
 }
 
 .acsis-section-card__title {
   margin: 0;
-  font-size: 1.25rem;
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  color: #111827;
   line-height: 1.25;
-}
-
-@media (min-width: 768px) {
-  .acsis-section-card__title {
-    font-size: 1.375rem;
-  }
 }
 
 .acsis-section-card__stat {
   margin: 0;
-  font-size: 0.8125rem;
-  font-weight: 500;
-  color: #6b7280;
 }
 
 .acsis-section-card__drop {
@@ -373,7 +338,7 @@
   overflow-x: hidden;
   overflow-y: auto;
   max-height: min(440px, 65vh);
-  border-color: #bbf7d0;
+  border-color: var(--acsis-brand-ring, #bbf7d0);
   border-top-color: #e5e7eb;
   box-shadow:
     0 16px 32px rgba(15, 23, 42, 0.12),
@@ -406,7 +371,7 @@
   padding: 0;
   font: inherit;
   font-weight: 600;
-  color: #166534;
+  color: var(--acsis-brand-700, #166534);
   cursor: pointer;
   text-decoration: underline;
   text-underline-offset: 2px;
@@ -415,7 +380,7 @@
 .acsis-mc-course-grid {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: var(--size-2, 8px);
   display: grid;
   grid-template-columns: 1fr;
   gap: 10px;
@@ -429,7 +394,13 @@
 
 .acsis-mc-course-grid--stack {
   grid-template-columns: 1fr;
-  gap: 8px;
+  gap: var(--size-4, 16px);
+}
+
+.acsis-mc-course-grid--top {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+  gap: var(--size-4, 16px);
+  padding: 0;
 }
 
 .acsis-section-card__drop--open .acsis-mc-course-grid--stack > li {
@@ -475,13 +446,6 @@
   min-height: 0;
 }
 
-.acsis-section-card__drop .acsis-course-card__accent {
-  width: 4px;
-  height: auto;
-  min-height: 100%;
-  flex-shrink: 0;
-}
-
 .acsis-section-card__drop .acsis-course-card__body {
   flex: 1;
   padding: 12px 14px;
@@ -521,18 +485,12 @@
   background: #fff;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
-  overflow: hidden;
   cursor: pointer;
   text-align: left;
-  transition:
-    border-color 0.16s ease,
-    box-shadow 0.16s ease,
-    transform 0.16s ease;
 }
 
-.acsis-course-card:hover {
-  border-color: #bbf7d0;
-  box-shadow: 0 4px 14px rgba(22, 163, 74, 0.08);
+.acsis-course-card.acsis-card-surface:hover,
+.acsis-course-card.acsis-card-surface:focus-within {
   transform: translateY(-1px);
 }
 
@@ -541,13 +499,8 @@
 }
 
 .acsis-course-card:focus-visible {
-  outline: 2px solid #16a34a;
+  outline: 2px solid var(--acsis-brand, #334155);
   outline-offset: 2px;
-}
-
-.acsis-course-card__accent {
-  height: 4px;
-  background: linear-gradient(90deg, #22c55e 0%, #16a34a 100%);
 }
 
 .acsis-course-card__body {
@@ -558,22 +511,18 @@
 
 .acsis-course-card__code {
   margin: 0;
-  font-size: 0.875rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #111827;
-  line-height: 1.35;
   overflow-wrap: anywhere;
 }
 
 .acsis-course-card__name {
   margin: 6px 0 0;
-  font-size: 0.8125rem;
-  font-weight: 500;
-  color: #6b7280;
-  line-height: 1.4;
   overflow-wrap: anywhere;
+}
+
+.acsis-course-card__period {
+  margin: 6px 0 0;
+  font-size: var(--text-sm, 0.875rem);
+  color: var(--fg-muted, #6b7280);
 }
 
 .acsis-course-card__footer {
@@ -582,44 +531,53 @@
   align-items: center;
   padding: 10px 14px;
   border-top: 1px solid #f3f4f6;
-  font-size: 0.75rem;
-  color: #9ca3af;
-}
-
-.acsis-course-card__stat {
-  font-weight: 600;
-  color: #4b5563;
 }
 
 .acsis-course-card__status {
-  font-weight: 600;
-  color: #16a34a;
+  color: var(--acsis-brand-muted-text, var(--acsis-brand, #334155));
 }
 
 .acsis-section-card__courses-title {
   margin: 0 0 12px;
   padding: 0 4px;
-  font-size: 0.8125rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: #6b7280;
 }
 
 /* Class detail: course banner + toolbar */
 .acsis-course-banner {
   position: relative;
-  display: grid;
-  grid-template-columns: 1fr auto;
-  grid-template-rows: auto auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: 220px;
   gap: 12px 16px;
-  align-items: end;
+  align-items: flex-start;
   margin-bottom: var(--size-4, 16px);
   padding: 20px 18px 18px;
   border-radius: 14px;
-  background: linear-gradient(135deg, #14532d 0%, #166534 48%, #15803d 100%);
+  background-color: var(--acsis-brand, #14532d);
   color: #fff;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.12);
+  overflow: hidden;
+}
+
+.acsis-course-banner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: 
+    radial-gradient(circle at center, transparent 30%, rgba(0, 0, 0, 0.4) 90%),
+    linear-gradient(rgba(255, 255, 255, 0.15) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.15) 1px, transparent 1px),
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size:
+    100% 100%,
+    60px 60px,
+    60px 60px,
+    20px 20px,
+    20px 20px;
+  z-index: 0;
 }
 
 .acsis-course-banner__menu {
@@ -639,33 +597,39 @@
   background: rgba(255, 255, 255, 0.16);
 }
 
+.acsis-course-banner__bottom-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  width: 100%;
+  gap: 16px;
+  margin-top: auto;
+  position: relative;
+  z-index: 1;
+}
+
 .acsis-course-banner__copy {
-  grid-column: 1 / -1;
-  padding-right: 2.5rem;
   min-width: 0;
 }
 
 .acsis-course-banner__code {
   margin: 0;
-  font-size: 1.35rem;
-  font-weight: 800;
-  letter-spacing: 0.02em;
-  line-height: 1.2;
   overflow-wrap: anywhere;
 }
 
 .acsis-course-banner__name {
   margin: 6px 0 0;
-  font-size: 0.9375rem;
-  font-weight: 500;
-  line-height: 1.4;
   color: rgba(255, 255, 255, 0.88);
   overflow-wrap: anywhere;
 }
 
+.acsis-course-banner__period {
+  margin: 4px 0 0;
+  color: rgba(255, 255, 255, 0.85);
+}
+
 .acsis-course-banner__code-block {
-  grid-column: 2;
-  grid-row: 2;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -674,10 +638,6 @@
 }
 
 .acsis-course-banner__code-label {
-  font-size: 0.6875rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
   color: rgba(255, 255, 255, 0.72);
 }
 
@@ -701,8 +661,6 @@
 
 .acsis-course-banner__code-btn code {
   font-family: ui-monospace, monospace;
-  font-size: 0.9375rem;
-  font-weight: 700;
   letter-spacing: 0.06em;
 }
 
@@ -734,8 +692,6 @@
   border-radius: 10px;
   background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 12px center;
   color: #111827;
-  font-size: 0.875rem;
-  font-weight: 600;
   cursor: pointer;
   appearance: none;
 }
@@ -747,8 +703,6 @@
   border-radius: 10px;
   background: #fff;
   color: #374151;
-  font-size: 0.875rem;
-  font-weight: 600;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
@@ -759,9 +713,9 @@
 }
 
 .acsis-class-toolbar__students-btn--on {
-  background: #f0fdf4;
-  border-color: #86efac;
-  color: #166534;
+  background: var(--acsis-brand-muted-bg, #f0fdf4);
+  border-color: var(--acsis-brand-ring, #86efac);
+  color: var(--acsis-brand-700, #166534);
 }
 
 .acsis-class-toolbar__back-exams {
@@ -770,9 +724,7 @@
   border: none;
   border-radius: 10px;
   background: transparent;
-  color: #16a34a;
-  font-size: 0.875rem;
-  font-weight: 600;
+  color: var(--acsis-brand, #16a34a);
   cursor: pointer;
   text-decoration: underline;
   text-underline-offset: 2px;
@@ -813,18 +765,14 @@
 }
 
 .acsis-enrolled-list__name {
-  font-size: 0.9375rem;
-  font-weight: 700;
   color: #111827;
 }
 
 .acsis-enrolled-list__meta {
-  font-size: 0.8125rem;
   color: #6b7280;
 }
 
 .acsis-enrolled-list__date {
-  font-size: 0.8125rem;
   color: #9ca3af;
   white-space: nowrap;
 }
@@ -880,7 +828,7 @@
 }
 
 .acsis-mc-breadcrumb a {
-  color: var(--primary, #16a34a);
+  color: var(--primary, var(--acsis-brand, #16a34a));
   text-decoration: none;
 }
 
@@ -905,34 +853,23 @@
 }
 
 .acsis-mc-title--section {
-  font-size: 1.15rem;
   margin-bottom: 0;
 }
 
 .acsis-mc-title {
-  color: var(--fg-default, #111827);
-  font-size: 1.5rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
   margin: 0 0 6px;
 }
 
 .acsis-mc-sub--term {
   margin-top: 0.25rem;
-  font-weight: 600;
-  color: #374151;
 }
 
 .acsis-mc-sub--muted {
   margin-top: 0.35rem;
-  font-style: italic;
 }
 
 .acsis-mc-sub {
   margin: 0;
-  font-size: 0.875rem;
-  color: var(--fg-muted, #6b7280);
-  font-weight: 500;
 }
 
 .acsis-mc-tabs {
@@ -946,8 +883,6 @@
   border: none;
   background: transparent;
   color: #4b5563;
-  font-size: 0.875rem;
-  font-weight: 600;
   padding: 8px 16px;
   border-radius: 9999px;
   cursor: pointer;
@@ -955,17 +890,17 @@
 }
 
 .acsis-mc-tab:hover {
-  background: var(--acsis-brand-subtle, color-mix(in srgb, var(--acsis-brand, #16a34a) 10%, transparent));
-  color: var(--acsis-brand-muted-text, var(--acsis-brand, #16a34a));
+  background: var(--acsis-brand-subtle, color-mix(in srgb, var(--acsis-brand, var(--acsis-brand, #16a34a)) 10%, transparent));
+  color: var(--acsis-brand-muted-text, var(--acsis-brand, var(--acsis-brand, #16a34a)));
 }
 
 .acsis-mc-tab--active {
-  background: var(--acsis-brand-600, var(--acsis-brand, #16a34a));
+  background: var(--acsis-brand-600, var(--acsis-brand, var(--acsis-brand, #16a34a)));
   color: #fff;
 }
 
 .acsis-mc-tab--active:hover {
-  background: var(--acsis-brand-500, var(--acsis-brand, #16a34a));
+  background: var(--acsis-brand-500, var(--acsis-brand, var(--acsis-brand, #16a34a)));
   color: #fff;
 }
 
@@ -1037,7 +972,7 @@
 
 .acsis-class-card__code-value {
   letter-spacing: 0.05em;
-  color: var(--acsis-brand-muted-text, var(--acsis-brand, #16a34a));
+  color: var(--acsis-brand-muted-text, var(--acsis-brand, var(--acsis-brand, #16a34a)));
   font-weight: 700;
 }
 
@@ -1067,7 +1002,7 @@
 }
 
 .acsis-class-card__status--open {
-  color: var(--acsis-brand-muted-text, var(--acsis-brand, #16a34a));
+  color: var(--acsis-brand-muted-text, var(--acsis-brand, var(--acsis-brand, #16a34a)));
 }
 
 .acsis-class-card__menu-btn {
@@ -1096,9 +1031,7 @@
   align-items: center;
   gap: 6px;
   margin-bottom: 14px;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--acsis-brand-muted-text, var(--acsis-brand, #16a34a));
+  color: var(--acsis-brand-muted-text, var(--acsis-brand, var(--acsis-brand, #16a34a)));
   text-decoration: none;
 }
 
@@ -1119,24 +1052,13 @@
 
 .acsis-stream-banner h1 {
   margin: 0 0 6px;
-  font-size: 1.35rem;
-  font-weight: 700;
-  color: var(--fg-default, #111827);
 }
 
 .acsis-stream-banner p {
   margin: 0;
-  font-size: 0.875rem;
-  color: var(--fg-muted, #6b7280);
-  font-weight: 500;
 }
 
 .acsis-stream-section-title {
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #6b7280;
   margin: 0 0 10px 4px;
 }
 
@@ -1152,29 +1074,12 @@
   background: var(--bg-surface, #fff);
   border: 1px solid var(--border-default, #e8eaed);
   border-radius: 12px;
-  overflow: hidden;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
-  transition: box-shadow 0.2s, border-color 0.2s;
-}
-
-.acsis-stream-item:hover {
-  box-shadow: 0 2px 8px rgba(60, 64, 67, 0.18);
-}
-
-.acsis-stream-item__accent {
-  width: 5px;
-  flex-shrink: 0;
-  background: linear-gradient(
-    180deg,
-    var(--acsis-brand-500, var(--acsis-brand, #16a34a)) 0%,
-    var(--acsis-brand-700, var(--acsis-brand, #16a34a)) 100%
-  );
 }
 
 .acsis-stream-item__main {
   flex: 1;
   min-width: 0;
-  padding: 14px 16px;
+  padding: 20px 20px;
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -1204,22 +1109,26 @@
 }
 
 .acsis-stream-item__title {
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--fg-default, #202124);
   margin: 0 0 4px;
-  line-height: 1.35;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
 
 .acsis-stream-item__meta {
   margin: 0;
-  font-size: 0.8125rem;
-  color: #5f6368;
-  font-weight: 500;
-  line-height: 1.45;
   overflow-wrap: anywhere;
+}
+
+.acsis-stream-item__desc {
+  margin: 4px 0 2px;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--fg-muted, #6b7280);
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .acsis-stream-item__right {
@@ -1239,8 +1148,6 @@
 }
 
 .acsis-pill {
-  font-size: 0.7rem;
-  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   padding: 5px 10px;
@@ -1253,9 +1160,9 @@
 }
 
 .acsis-pill--live {
-  background: var(--acsis-brand-muted-bg, color-mix(in srgb, var(--acsis-brand, #16a34a) 18%, transparent));
-  color: var(--acsis-brand-muted-text, var(--acsis-brand, #16a34a));
-  border: 1px solid var(--acsis-brand-ring, color-mix(in srgb, var(--acsis-brand, #16a34a) 35%, transparent));
+  background: var(--acsis-brand-muted-bg, color-mix(in srgb, var(--acsis-brand, var(--acsis-brand, #16a34a)) 18%, transparent));
+  color: var(--acsis-brand-muted-text, var(--acsis-brand, var(--acsis-brand, #16a34a)));
+  border: 1px solid var(--acsis-brand-ring, color-mix(in srgb, var(--acsis-brand, var(--acsis-brand, #16a34a)) 35%, transparent));
 }
 
 .acsis-stream-item__menu {
@@ -1291,7 +1198,7 @@
   font-size: 1.1rem;
   font-weight: 700;
   margin: 0 0 8px;
-  color: var(--acsis-brand-muted-text, var(--acsis-brand, #16a34a));
+  color: var(--acsis-brand-muted-text, var(--acsis-brand, var(--acsis-brand, #16a34a)));
 }
 
 .acsis-exam-detail__meta-grid {
@@ -1334,7 +1241,7 @@
 }
 
 .acsis-btn-primary {
-  background: var(--acsis-brand-600, var(--acsis-brand, #16a34a));
+  background: var(--acsis-brand-600, var(--acsis-brand, var(--acsis-brand, #16a34a)));
   color: #fff;
   border: none;
   padding: 10px 18px;
@@ -1343,13 +1250,13 @@
   font-weight: 700;
   cursor: pointer;
   transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--acsis-brand, #16a34a) 30%, transparent);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--acsis-brand, var(--acsis-brand, #16a34a)) 30%, transparent);
 }
 
 .acsis-btn-primary:hover {
-  background: var(--acsis-brand-500, var(--acsis-brand, #16a34a));
+  background: var(--acsis-brand-500, var(--acsis-brand, var(--acsis-brand, #16a34a)));
   transform: translateY(-1px);
-  box-shadow: 0 4px 14px color-mix(in srgb, var(--acsis-brand, #16a34a) 40%, transparent);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--acsis-brand, var(--acsis-brand, #16a34a)) 40%, transparent);
 }
 
 .acsis-btn-primary:disabled {
@@ -1371,7 +1278,7 @@
 }
 
 .acsis-btn-ghost:hover {
-  background: var(--acsis-brand-subtle, color-mix(in srgb, var(--acsis-brand, #16a34a) 10%, var(--bg-elevated)));
+  background: var(--acsis-brand-subtle, color-mix(in srgb, var(--acsis-brand, var(--acsis-brand, #16a34a)) 10%, var(--bg-elevated)));
   border-color: var(--acsis-brand-ring, var(--border-default));
   color: var(--acsis-brand-muted-text, var(--fg-default));
 }
@@ -1398,21 +1305,21 @@
 
 .acsis-link-create {
   display: inline-block;
-  background: var(--acsis-brand-600, var(--acsis-brand, #16a34a));
+  background: var(--acsis-brand-600, var(--acsis-brand, var(--acsis-brand, #16a34a)));
   color: #fff !important;
   text-decoration: none;
   padding: 10px 20px;
   border-radius: 9999px;
   font-size: 0.8125rem;
   font-weight: 700;
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--acsis-brand, #16a34a) 30%, transparent);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--acsis-brand, var(--acsis-brand, #16a34a)) 30%, transparent);
   transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .acsis-link-create:hover {
-  background: var(--acsis-brand-500, var(--acsis-brand, #16a34a));
+  background: var(--acsis-brand-500, var(--acsis-brand, var(--acsis-brand, #16a34a)));
   transform: translateY(-1px);
-  box-shadow: 0 4px 14px color-mix(in srgb, var(--acsis-brand, #16a34a) 40%, transparent);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--acsis-brand, var(--acsis-brand, #16a34a)) 40%, transparent);
 }
 
 .acsis-mc-create-btn {
@@ -1422,26 +1329,26 @@
   gap: 0.5rem;
   min-height: 44px;
   padding: 0 1.125rem;
-  border: 1px solid color-mix(in srgb, var(--acsis-brand, #16a34a) 35%, transparent);
+  border: 1px solid color-mix(in srgb, var(--acsis-brand, var(--acsis-brand, #16a34a)) 35%, transparent);
   border-radius: 9999px;
-  background: var(--acsis-brand-600, var(--acsis-brand, #16a34a));
+  background: var(--acsis-brand-600, var(--acsis-brand, var(--acsis-brand, #16a34a)));
   color: #fff;
   font-size: 0.8125rem;
   font-weight: 700;
   cursor: pointer;
   transition: background 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, transform 0.15s ease;
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--acsis-brand, #16a34a) 30%, transparent);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--acsis-brand, var(--acsis-brand, #16a34a)) 30%, transparent);
 }
 
 .acsis-mc-create-btn:hover {
-  background: var(--acsis-brand-500, var(--acsis-brand, #16a34a));
-  border-color: color-mix(in srgb, var(--acsis-brand, #16a34a) 50%, transparent);
-  box-shadow: 0 4px 14px color-mix(in srgb, var(--acsis-brand, #16a34a) 40%, transparent);
+  background: var(--acsis-brand-500, var(--acsis-brand, var(--acsis-brand, #16a34a)));
+  border-color: color-mix(in srgb, var(--acsis-brand, var(--acsis-brand, #16a34a)) 50%, transparent);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--acsis-brand, var(--acsis-brand, #16a34a)) 40%, transparent);
   transform: translateY(-1px);
 }
 
 .acsis-mc-create-btn:focus-visible {
-  outline: 2px solid var(--acsis-brand, #16a34a);
+  outline: 2px solid var(--acsis-brand, var(--acsis-brand, #16a34a));
   outline-offset: 2px;
 }
 

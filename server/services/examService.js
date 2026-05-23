@@ -9,6 +9,7 @@ import {
   verifyExamPasswordQuery,
 } from '../repositories/examRepository.js';
 import { closeOtherTeacherOngoingExamsQuery } from '../repositories/examResultsRepository.js';
+import { finalizeExamResultsService } from './examReleaseService.js';
 import { getClassByIdQuery, getTeacherClassByIdQuery } from '../repositories/classRepository.js';
 import { checkEnrollment } from '../repositories/studentRepository.js';
 import { nextStatusAfterClose, nextStatusAfterPublish } from '../lib/examStatus.js';
@@ -48,7 +49,14 @@ export async function createExamService(memberId, classId, payload) {
       payload.title,
       examPassword,
       payload.duration || null,
-      payload.questions
+      {
+        sections: payload.sections,
+        questions: payload.questions,
+      },
+      {
+        shuffleQuestions: Boolean(payload.shuffleQuestions),
+        shuffleChoices: Boolean(payload.shuffleChoices),
+      },
     );
 
     await client.query('COMMIT');
@@ -114,6 +122,9 @@ export async function getClassExamsService(classId, requireActive = false, stude
     classData.exams = studentMemberId
       ? withSessions.map(sanitizeExamForStudent)
       : withSessions
+    if (studentMemberId && classData) {
+      delete classData.accessCode
+    }
     return { ok: true, classData };
   } catch (err) {
     console.error('[examService.getClassExams]', err);
@@ -174,7 +185,9 @@ export async function closeExamService(classId, examId) {
     if (!success) {
       return { ok: false, status: 404, error: 'Exam not found.' }
     }
-    return { ok: true, status: nextStatus }
+
+    const { top } = await finalizeExamResultsService(examId)
+    return { ok: true, status: nextStatus, topStudent: top }
   } catch (err) {
     console.error('[examService.closeExam]', err)
     return { ok: false, status: 500, error: 'Failed to end exam.' }

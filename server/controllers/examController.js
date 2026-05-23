@@ -24,6 +24,9 @@ import {
   getTeacherMonitoringSnapshotService,
   listTeacherReportExamsService,
 } from '../services/examResultsService.js';
+import { manualGradeAnswerService } from '../services/examGradingService.js';
+import { exportExamReportService } from '../services/examReportService.js';
+import { releaseExamScoresService } from '../services/examReleaseService.js';
 
 // Input validation schemas
 const choiceSchema = z.string().min(1, 'Option text cannot be empty');
@@ -43,15 +46,50 @@ const questionSchema = z.object({
   }
 });
 
-const createExamSchema = z.object({
-  title: z.string().min(1, 'Exam title is required'),
-  duration: z.number().int().min(1, 'Duration must be at least 1 minute'),
-  password: z
-    .string()
-    .max(20, 'Exam password must be 20 characters or fewer')
-    .optional()
-    .transform((v) => (v == null || v.trim() === '' ? undefined : v.trim())),
-  questions: z.array(questionSchema).min(1, 'At least one question is required')
+const sectionSchema = z.object({
+  title: z.string().optional().default(''),
+  description: z.string().optional().default(''),
+  questions: z.array(questionSchema).default([]),
+});
+
+const createExamSchema = z
+  .object({
+    title: z.string().min(1, 'Exam title is required'),
+    duration: z.number().int().min(1, 'Duration must be at least 1 minute'),
+    password: z
+      .string()
+      .max(20, 'Exam password must be 20 characters or fewer')
+      .optional()
+      .transform((v) => (v == null || v.trim() === '' ? undefined : v.trim())),
+    shuffleQuestions: z.boolean().optional().default(false),
+    shuffleChoices: z.boolean().optional().default(false),
+    sections: z.array(sectionSchema).optional(),
+    questions: z.array(questionSchema).optional(),
+  })
+  .superRefine((data, ctx) => {
+    const fromSections = (data.sections || []).reduce((n, s) => n + (s.questions?.length || 0), 0);
+    const fromFlat = (data.questions || []).length;
+    if (fromSections + fromFlat < 1) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'At least one question is required',
+        path: ['questions'],
+      });
+    }
+  });
+
+const manualGradeSchema = z.object({
+  isCorrect: z.boolean(),
+});
+
+const releaseScoresSchema = z.object({
+  sendEmail: z.boolean().optional().default(true),
+  includeAnswerKey: z.boolean().optional().default(false),
+});
+
+const exportReportSchema = z.object({
+  format: z.enum(['pdf', 'csv']).optional().default('pdf'),
+  reportType: z.enum(['summary', 'detailed', 'violations', 'class_results']).optional().default('class_results'),
 });
 
 export async function getTeacherExamsCatalog(req, res) {
@@ -178,6 +216,8 @@ export async function logStudentCheating(req, res) {
       warningCount: result.warningCount,
       sessionId: result.sessionId,
       autoSubmitted: Boolean(result.autoSubmitted),
+      scoreReleased: Boolean(result.scoreReleased),
+      scorePending: Boolean(result.scorePending),
       rawScore: result.rawScore,
       totalPoints: result.totalPoints,
       percentage: result.percentage,
@@ -200,6 +240,8 @@ export async function submitStudentExam(req, res) {
     return res.json({
       ok: true,
       sessionId: result.sessionId,
+      scoreReleased: Boolean(result.scoreReleased),
+      scorePending: Boolean(result.scorePending),
       rawScore: result.rawScore,
       totalPoints: result.totalPoints,
       percentage: result.percentage,
@@ -217,7 +259,7 @@ export async function closeTeacherExam(req, res) {
     if (!result.ok) {
       return res.status(result.status || 500).json({ error: result.error });
     }
-    return res.json({ ok: true, status: result.status });
+    return res.json({ ok: true, status: result.status, topStudent: result.topStudent ?? null });
   } catch (err) {
     console.error('[examController.closeTeacherExam]', err);
     return res.status(500).json({ error: 'Failed to end exam.' });
@@ -322,4 +364,71 @@ export async function getStudentPerformance(req, res) {
     return res.status(result.status || 500).json({ error: result.error });
   }
   return res.json(result);
+}
+
+export async function patchManualGrade(req, res) {
+  const { classId, examId, sessionId, answerId } = req.params;
+  try {
+    const body = manualGradeSchema.parse(req.body);
+    const result = await manualGradeAnswerService(
+      classId,
+      examId,
+      sessionId,
+      answerId,
+      req.memberId,
+      body.isCorrect,
+    );
+    if (!result.ok) {
+      return res.status(result.status || 500).json({ error: result.error });
+    }
+    return res.json(result);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: err.errors[0].message });
+    }
+    console.error('[examController.patchManualGrade]', err);
+    return res.status(500).json({ error: 'Failed to save grade.' });
+  }
+}
+
+export async function postReleaseExamScores(req, res) {
+  const { classId, examId } = req.params;
+  try {
+    const body = releaseScoresSchema.parse(req.body ?? {});
+    const result = await releaseExamScoresService(classId, examId, req.memberId, body);
+    if (!result.ok) {
+      return res.status(result.status || 500).json({ error: result.error });
+    }
+    return res.json(result);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: err.errors[0].message });
+    }
+    console.error('[examController.postReleaseExamScores]', err);
+    return res.status(500).json({ error: 'Failed to release scores.' });
+  }
+}
+
+export async function postExportExamReport(req, res) {
+  const { classId, examId } = req.params;
+  try {
+    const body = exportReportSchema.parse(req.body ?? {});
+
+    const result = await exportExamReportService(classId, examId, req.memberId, {
+      format: body.format,
+      reportType: body.reportType,
+    });
+    if (!result.ok) {
+      return res.status(result.status || 500).json({ error: result.error });
+    }
+    res.setHeader('Content-Type', result.contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+    return res.send(result.body);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: err.errors[0].message });
+    }
+    console.error('[examController.postExportExamReport]', err);
+    return res.status(500).json({ error: 'Failed to export report.' });
+  }
 }

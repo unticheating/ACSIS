@@ -4,9 +4,11 @@ import AuthImmersiveShell from '@/components/auth/AuthImmersiveShell.jsx'
 import { useSession } from '@/context/SessionContext.jsx'
 import { AUTH_ERROR_MESSAGES, startGoogleSignIn, loginWithPassword, startEmailVerification } from '@/lib/authApi.js'
 import { acsisToastError } from '@/lib/acsisToast.js'
+import { useDocumentTitle } from '@/hooks/useDocumentTitle.js'
 import '../styles/acsis-immersive.css'
 
 export default function LoginPage() {
+  useDocumentTitle('Sign in')
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()

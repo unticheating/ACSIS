@@ -16,12 +16,10 @@ import {
   statusLabel,
   updateAdminUser,
 } from '@/lib/adminUsersApi.js'
-import {
-  formatSchoolIdInput,
-  validateSchoolIdClient,
-  validateYearLevelClient,
-  YEAR_LEVEL_OPTIONS,
-} from '@/lib/userFormConstants.js'
+import { formatSchoolIdInput, validateSchoolIdClient } from '@/lib/userFormConstants.js'
+import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
+import { useAcsisConfirm } from '@/hooks/useAcsisConfirm.jsx'
+import FadeIn from '@/components/ui/fade-in.jsx'
 import '../../pages/admin-ui/style.css'
 
 const TABS = [
@@ -38,14 +36,12 @@ const emptyForm = {
   email: '',
   role: 'student',
   schoolId: '',
-  programCode: '',
-  yearLevel: '',
-  section: '',
   password: '',
   pendingFaculty: false,
 }
 
 export default function AdminUserManagementPage() {
+  const { confirm, ConfirmDialog } = useAcsisConfirm()
   const [activeTab, setActiveTab] = useState('all')
   const [search, setSearch] = useState('')
   const [users, setUsers] = useState([])
@@ -68,7 +64,9 @@ export default function AdminUserManagementPage() {
       setPendingFaculty(data.pendingFaculty ?? 0)
     } catch (err) {
       setUsers([])
-      setBanner(err instanceof Error ? err.message : 'Failed to load users.')
+      const msg = err instanceof Error ? err.message : 'Failed to load users.'
+      setBanner(msg)
+      acsisToastError(msg)
     } finally {
       setLoading(false)
     }
@@ -105,9 +103,6 @@ export default function AdminUserManagementPage() {
       email: user.email || '',
       role: user.role,
       schoolId: user.schoolId || '',
-      programCode: user.programCode || '',
-      yearLevel: user.yearLevel || '',
-      section: user.section || '',
       password: '',
       pendingFaculty: false,
     })
@@ -121,12 +116,8 @@ export default function AdminUserManagementPage() {
   function validateForm() {
     const id = String(form.schoolId || '').trim()
     if (form.role === 'student' || id) {
-      const idErr = validateSchoolIdClient(form.schoolId, form.role === 'student')
+      const idErr = validateSchoolIdClient(form.schoolId, form.role === 'student', form.role)
       if (idErr) return idErr
-    }
-    if (form.role === 'student') {
-      const yearErr = validateYearLevelClient(form.yearLevel, true)
-      if (yearErr) return yearErr
     }
     return null
   }
@@ -136,6 +127,7 @@ export default function AdminUserManagementPage() {
     const validationError = validateForm()
     if (validationError) {
       setBanner(validationError)
+      acsisToastError(validationError)
       return
     }
     setSubmitting(true)
@@ -148,16 +140,16 @@ export default function AdminUserManagementPage() {
         email: form.email,
         role: form.role,
         schoolId: form.schoolId,
-        programCode: form.programCode,
-        yearLevel: form.yearLevel,
-        section: form.section,
         password: form.role === 'admin' ? form.password : undefined,
         pendingFaculty: form.role === 'faculty' && form.pendingFaculty,
       })
       setAddOpen(false)
+      acsisToastSuccess('User created.')
       await loadUsers()
     } catch (err) {
-      setBanner(err instanceof Error ? err.message : 'Failed to create user.')
+      const msg = err instanceof Error ? err.message : 'Failed to create user.'
+      setBanner(msg)
+      acsisToastError(msg)
     } finally {
       setSubmitting(false)
     }
@@ -169,6 +161,7 @@ export default function AdminUserManagementPage() {
     const validationError = validateForm()
     if (validationError) {
       setBanner(validationError)
+      acsisToastError(validationError)
       return
     }
     setSubmitting(true)
@@ -181,43 +174,56 @@ export default function AdminUserManagementPage() {
         email: form.email,
         schoolId: form.schoolId,
       }
-      if (form.role === 'student') {
-        payload.programCode = form.programCode
-        payload.yearLevel = form.yearLevel
-        payload.section = form.section
-      }
       await updateAdminUser(editingUid, payload)
       setEditOpen(false)
       setEditingUid(null)
+      acsisToastSuccess('User updated.')
       await loadUsers()
     } catch (err) {
-      setBanner(err instanceof Error ? err.message : 'Failed to update user.')
+      const msg = err instanceof Error ? err.message : 'Failed to update user.'
+      setBanner(msg)
+      acsisToastError(msg)
     } finally {
       setSubmitting(false)
     }
   }
 
   async function onDeactivate(user) {
-    if (!window.confirm(`Deactivate ${user.name}? They will not be able to sign in.`)) return
+    const ok = await confirm({
+      title: `Deactivate ${user.name}?`,
+      description: 'They will not be able to sign in.',
+      confirmLabel: 'Deactivate',
+      destructive: true,
+    })
+    if (!ok) return
     setBanner(null)
     try {
       await updateAdminUser(user.uid, { deactivate: true })
+      acsisToastSuccess(`${user.name} deactivated.`)
       await loadUsers()
     } catch (err) {
-      setBanner(err instanceof Error ? err.message : 'Failed to deactivate user.')
+      const msg = err instanceof Error ? err.message : 'Failed to deactivate user.'
+      setBanner(msg)
+      acsisToastError(msg)
     }
   }
 
   async function onApprove(user) {
-    if (!window.confirm(`Approve ${user.name}?`)) {
-      return
-    }
+    const ok = await confirm({
+      title: `Approve ${user.name}?`,
+      description: 'They will be able to sign in as faculty.',
+      confirmLabel: 'Approve',
+    })
+    if (!ok) return
     setBanner(null)
     try {
       await updateAdminUser(user.uid, { approve: true })
+      acsisToastSuccess(`${user.name} approved.`)
       await loadUsers()
     } catch (err) {
-      setBanner(err instanceof Error ? err.message : 'Failed to approve user.')
+      const msg = err instanceof Error ? err.message : 'Failed to approve user.'
+      setBanner(msg)
+      acsisToastError(msg)
     }
   }
 
@@ -270,11 +276,11 @@ export default function AdminUserManagementPage() {
         </label>
       ) : null}
       <label>
-        Student / employee ID
+        {form.role === 'student' ? 'Student number' : 'Employee ID'}
         <input
           type="text"
           inputMode="numeric"
-          required={form.role === 'student' && !editOpen}
+          required={form.role === 'student'}
           placeholder="00-00000"
           pattern="\d{2}-\d{5}"
           maxLength={8}
@@ -284,42 +290,6 @@ export default function AdminUserManagementPage() {
         />
         <span className="um-field-hint">Format: 00-00000 (example: 24-00123)</span>
       </label>
-      {form.role === 'student' ? (
-        <>
-          <label>
-            Program
-            <input
-              type="text"
-              placeholder="BSIT"
-              value={form.programCode}
-              onChange={(e) => patchForm('programCode', e.target.value)}
-            />
-          </label>
-          <label>
-            Year level
-            <select
-              required
-              value={form.yearLevel}
-              onChange={(e) => patchForm('yearLevel', e.target.value)}
-            >
-              {YEAR_LEVEL_OPTIONS.map((opt) => (
-                <option key={opt.value || 'empty'} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Section
-            <input
-              type="text"
-              placeholder="3D"
-              value={form.section}
-              onChange={(e) => patchForm('section', e.target.value)}
-            />
-          </label>
-        </>
-      ) : null}
       {!editOpen && form.role === 'admin' ? (
         <label className="um-form-full">
           Password <span className="um-optional">(for email login)</span>
@@ -362,7 +332,7 @@ export default function AdminUserManagementPage() {
           </p>
         ) : null}
 
-        <div className="um-topbar">
+        <FadeIn delay={0.05} className="um-topbar">
           <div className="um-tabs" role="tablist" aria-label="Filter users by role">
             {TABS.map((tab) => (
               <button
@@ -391,9 +361,9 @@ export default function AdminUserManagementPage() {
               />
             </label>
           </div>
-        </div>
+        </FadeIn>
 
-        <div className="panel">
+        <FadeIn delay={0.1} className="panel">
           <div className="panel-header">
             <span className="panel-title">
               Users
@@ -414,7 +384,6 @@ export default function AdminUserManagementPage() {
                     <th>Name</th>
                     <th>Email</th>
                     <th>Student / ID no.</th>
-                    <th>Year &amp; section</th>
                     <th>Status</th>
                     <th>Role</th>
                     <th>Date created</th>
@@ -424,29 +393,16 @@ export default function AdminUserManagementPage() {
                 <tbody>
                   {filteredUsers.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="um-empty">
+                      <td colSpan={7} className="um-empty">
                         No users found. Add a user or adjust your filters.
                       </td>
                     </tr>
                   ) : (
-                    filteredUsers.map((u) => (
-                      <tr key={u.uid}>
+                    filteredUsers.map((u, index) => (
+                      <FadeIn as="tr" key={u.uid} delay={0.15 + (index * 0.05)}>
                         <td className="um-name">{u.name}</td>
                         <td className="um-email">{u.email}</td>
                         <td>{u.schoolId || '—'}</td>
-                        <td>
-                          {u.yearLevel || u.section ? (
-                            <>
-                              {u.yearLevel || '—'}
-                              {u.yearLevel && u.section ? (
-                                <span className="um-meta-sep"> · </span>
-                              ) : null}
-                              {u.section || ''}
-                            </>
-                          ) : (
-                            <span className="um-muted">—</span>
-                          )}
-                        </td>
                         <td>
                           <span
                             className={`um-status-badge${u.status !== 'active' ? ` um-status-badge--${u.status}` : ''}`}
@@ -485,14 +441,14 @@ export default function AdminUserManagementPage() {
                             ) : null}
                           </div>
                         </td>
-                      </tr>
+                      </FadeIn>
                     ))
                   )}
                 </tbody>
               </table>
             )}
           </div>
-        </div>
+        </FadeIn>
       </div>
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
@@ -536,6 +492,7 @@ export default function AdminUserManagementPage() {
           </form>
         </DialogContent>
       </Dialog>
+      {ConfirmDialog}
     </div>
   )
 }

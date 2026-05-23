@@ -4,6 +4,9 @@ import { useTeacherShellBreadcrumbTrail } from '@/context/TeacherShellBreadcrumb
 import TeacherPageHeader from '@/components/teacher/TeacherPageHeader.jsx'
 import { apiFetch } from '@/lib/apiFetch.js'
 import { fetchTeacherExamResults } from '@/lib/teacherExamResultsApi.js'
+import { releaseExamScores } from '@/lib/teacherExamGradingApi.js'
+import ExamAnswerReviewModal from '@/components/teacher/ExamAnswerReviewModal.jsx'
+import ReleaseScoresDialog from '@/components/teacher/ReleaseScoresDialog.jsx'
 import {
   isExamDraft,
   isExamOngoing,
@@ -11,17 +14,12 @@ import {
   PG_EXAM_STATUS,
   normalizeExamStatus,
 } from '@/lib/examFlowUi.js'
-import { formatCourseBreadcrumbLabel } from '@/lib/sectionLabel.js'
+import { formatCourseBreadcrumbLabel, formatSectionTitle, formatTermPeriod } from '@/lib/sectionLabel.js'
+import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
+import { copyToClipboard } from '@/lib/copyToClipboard.js'
+import { useAcsisConfirm } from '@/hooks/useAcsisConfirm.jsx'
+import FadeIn from '@/components/ui/fade-in.jsx'
 import '../../pages/teacher-ui/my_classes.css'
-
-async function copyExamCode(code) {
-  const value = code || ''
-  try {
-    await navigator.clipboard.writeText(value)
-  } catch {
-    window.prompt('Copy this exam code:', value)
-  }
-}
 
 export default function TeacherExamDetailPage() {
   const { classId, examId } = useParams()
@@ -34,6 +32,11 @@ export default function TeacherExamDetailPage() {
   const [refreshTick, setRefreshTick] = useState(0)
   const [results, setResults] = useState(null)
   const [resultsLoading, setResultsLoading] = useState(false)
+  const [reviewOpen, setReviewOpen] = useState(false)
+  const [reviewInitialSessionId, setReviewInitialSessionId] = useState(null)
+  const [releasing, setReleasing] = useState(false)
+  const [releaseDialogOpen, setReleaseDialogOpen] = useState(false)
+  const { confirm, ConfirmDialog } = useAcsisConfirm()
 
   useEffect(() => {
     async function fetchExam() {
@@ -123,9 +126,18 @@ export default function TeacherExamDetailPage() {
   const exam = hit
   const active = isExamOngoing(exam.status)
   const draft = isExamDraft(exam.status)
-  // exam.class_name, exam.academic_year, exam.semester should come from the backend if we did a join,
-  // but since our getExamDetailsService might only return exam properties, we'll gracefully fallback if they are missing.
-  
+  const closed = normalizeExamStatus(exam.status) === PG_EXAM_STATUS.CLOSED
+  const hasSubmissions = (results?.sessions || []).some((s) => s.status === 'submitted')
+
+  const subjectLabel = (clsMeta?.courseCode || clsMeta?.name || '').trim() || null
+  const sectionLabel = clsMeta ? formatSectionTitle(clsMeta) : ''
+  const classGroupParts = [
+    sectionLabel && sectionLabel !== 'Section' ? sectionLabel : null,
+    clsMeta ? formatTermPeriod(clsMeta) : null,
+  ].filter(Boolean)
+  const classGroupLabel =
+    classGroupParts.length > 0 ? classGroupParts.join(' · ') : (clsMeta?.name || '').trim() || null
+
   const streamHref = `/teacher/my-classes/${encodeURIComponent(classId)}`
 
   async function publish() {
@@ -138,27 +150,58 @@ export default function TeacherExamDetailPage() {
         throw new Error(data.error || 'Failed to publish exam.')
       }
       if (data.code) {
-        window.alert(`Exam published.\n\nShare this code with students: ${data.code}`)
+        acsisToastSuccess(`Exam published. Share this code with students: ${data.code}`)
+      } else {
+        acsisToastSuccess('Exam published.')
       }
       setRefreshTick(t => t + 1)
     } catch (err) {
-      alert(err.message)
+      acsisToastError(err.message)
     }
   }
 
   async function endExam() {
-    if (!window.confirm('End this exam? Students will no longer be able to enter or submit.')) return
+    const ok = await confirm({
+      title: 'End this exam?',
+      description: 'Students will no longer be able to enter or submit.',
+      confirmLabel: 'End exam',
+      destructive: true,
+    })
+    if (!ok) return
     try {
       const res = await apiFetch(`/api/teacher/classes/${classId}/exams/${examId}/close`, {
         method: 'PUT',
       })
+      const data = await res.json()
       if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error || 'Failed to end exam.')
+        throw new Error(data.error || 'Failed to end exam.')
+      }
+      if (data.topStudent) {
+        acsisToastSuccess(
+          `Exam ended. Top 1: ${data.topStudent.studentName} (${data.topStudent.percentage}%).`,
+        )
+      } else {
+        acsisToastSuccess('Exam ended. Ranks computed.')
       }
       setRefreshTick((t) => t + 1)
     } catch (err) {
-      alert(err.message)
+      acsisToastError(err.message)
+    }
+  }
+
+  async function handleReleaseScores({ sendEmail, includeAnswerKey }) {
+    setReleasing(true)
+    try {
+      const data = await releaseExamScores(classId, examId, { sendEmail, includeAnswerKey })
+      const topMsg = data.topStudent ? ` Top 1: ${data.topStudent.studentName}.` : ''
+      acsisToastSuccess(`Scores released. Emails sent: ${data.emailsSent ?? 0}.${topMsg}`)
+      setReleaseDialogOpen(false)
+      const refreshed = await fetchTeacherExamResults(classId, examId)
+      setResults(refreshed)
+    } catch (err) {
+      acsisToastError(err instanceof Error ? err.message : 'Failed to release scores.')
+    } finally {
+      setReleasing(false)
     }
   }
 
@@ -171,14 +214,21 @@ export default function TeacherExamDetailPage() {
         const err = await res.json()
         throw new Error(err.error || 'Failed to start exam.')
       }
+      acsisToastSuccess('Exam is now live.')
       setRefreshTick((t) => t + 1)
     } catch (err) {
-      alert(err.message)
+      acsisToastError(err.message)
     }
   }
 
   async function remove() {
-    if (!window.confirm(`Delete “${exam.title || 'this exam'}”? This cannot be undone.`)) return
+    const ok = await confirm({
+      title: `Delete “${exam.title || 'this exam'}”?`,
+      description: 'This cannot be undone.',
+      confirmLabel: 'Delete exam',
+      destructive: true,
+    })
+    if (!ok) return
     try {
       const res = await apiFetch(`/api/teacher/classes/${classId}/exams/${examId}`, {
         method: 'DELETE'
@@ -187,19 +237,19 @@ export default function TeacherExamDetailPage() {
         const err = await res.json()
         throw new Error(err.error || 'Failed to delete exam.')
       }
+      acsisToastSuccess('Exam deleted.')
       navigate(streamHref)
     } catch (err) {
-      alert(err.message)
+      acsisToastError(err.message)
     }
   }
 
   const qs = new URLSearchParams({ classId })
   const createHref = `/teacher/create-exam?${qs.toString()}`
 
-  const classHint =
-    exam.class_name && (exam.academic_year || exam.semester)
-      ? `${exam.class_name} · ${[exam.academic_year, exam.semester].filter(Boolean).join(' · ')}`
-      : exam.class_name || undefined
+  const classHint = clsMeta
+    ? [clsMeta.name || clsMeta.courseCode, formatTermPeriod(clsMeta)].filter(Boolean).join(' · ')
+    : undefined
 
   const headerMeta = [classHint, labelForPgExamStatus(exam.status)].filter(Boolean).join(' · ')
 
@@ -217,34 +267,39 @@ export default function TeacherExamDetailPage() {
 
       <div className="acsis-exam-detail__card">
 
-        <dl className="acsis-exam-detail__meta-grid">
-          <div>
-            <dt>Exam code</dt>
-            <dd className="acsis-exam-detail__code">{exam.code || '—'}</dd>
-          </div>
-          <div>
-            <dt>Questions</dt>
-            {/* questions array length or questionCount based on how it's structured in the db */}
-            <dd>{exam.questions ? exam.questions.length : (exam.questionCount || 0)}</dd>
-          </div>
-          <div>
-            <dt>Time limit</dt>
-            <dd>{Number(exam.duration || 0)} minutes</dd>
-          </div>
-          <div>
-            <dt>Subject</dt>
-            <dd>{exam.subject || '—'}</dd>
-          </div>
-          <div>
-            <dt>Class group</dt>
-            <dd>
-              {exam.yearLevel || '—'} · {exam.section || '—'}
-            </dd>
-          </div>
-        </dl>
+        <FadeIn delay={0.05}>
+          <dl className="acsis-exam-detail__meta-grid">
+            <div>
+              <dt>Exam code</dt>
+              <dd className="acsis-exam-detail__code">{exam.code || '—'}</dd>
+            </div>
+            <div>
+              <dt>Questions</dt>
+              {/* questions array length or questionCount based on how it's structured in the db */}
+              <dd>{exam.questions ? exam.questions.length : (exam.questionCount || 0)}</dd>
+            </div>
+            <div>
+              <dt>Time limit</dt>
+              <dd>{Number(exam.duration || 0)} minutes</dd>
+            </div>
+            <div>
+              <dt>Subject</dt>
+              <dd>{subjectLabel || '—'}</dd>
+            </div>
+            <div>
+              <dt>Class group</dt>
+              <dd>{classGroupLabel || '—'}</dd>
+            </div>
+          </dl>
+        </FadeIn>
 
-        <div className="acsis-exam-detail__actions">
-          <button type="button" className="acsis-btn-primary" onClick={() => copyExamCode(exam.code)}>
+        <FadeIn delay={0.1}>
+          <div className="acsis-exam-detail__actions">
+          <button
+            type="button"
+            className="acsis-btn-primary"
+            onClick={() => void copyToClipboard(exam.code, { successMessage: 'Exam code copied.' })}
+          >
             Copy exam code
           </button>
           {draft ? (
@@ -258,30 +313,57 @@ export default function TeacherExamDetailPage() {
             </button>
           ) : null}
           {active ? (
-            <button type="button" className="acsis-btn-ghost" onClick={endExam}>
+            <button type="button" className="acsis-btn-ghost" onClick={() => void endExam()}>
               End exam (close for students)
+            </button>
+          ) : null}
+          {(closed || hasSubmissions) && !draft ? (
+            <button
+              type="button"
+              className="acsis-btn-primary"
+              disabled={releasing}
+              onClick={() => setReleaseDialogOpen(true)}
+            >
+              {releasing ? 'Releasing…' : 'Release scores to students'}
             </button>
           ) : null}
           <Link to={createHref} className="acsis-btn-ghost" style={{ textDecoration: 'none', display: 'inline-block' }}>
             New exam in this class
           </Link>
-          <button type="button" className="acsis-btn-ghost" style={{ color: '#b91c1c', borderColor: '#fecaca' }} onClick={remove}>
+          <button
+            type="button"
+            className="acsis-btn-ghost"
+            style={{ color: '#b91c1c', borderColor: '#fecaca' }}
+            onClick={() => void remove()}
+          >
             Delete exam
           </button>
-        </div>
+          </div>
+        </FadeIn>
 
-        <p className="acsis-mc-sub" style={{ marginTop: 22, fontSize: '0.8125rem', lineHeight: 1.5 }}>
-          When this exam is on-going, students join with the code above. Submissions below update automatically.
-        </p>
+        <FadeIn delay={0.15}>
+          <p className="acsis-mc-sub" style={{ marginTop: 22, fontSize: '0.8125rem', lineHeight: 1.5 }}>
+            When this exam is on-going, students join with the code above. Submissions below update automatically.
+          </p>
+        </FadeIn>
 
-        <section
+        <FadeIn
+          as="section"
+          delay={0.2}
           className="acsis-exam-detail__submissions"
           style={{ marginTop: 28, borderTop: '1px solid var(--border-default, #e5e7eb)', paddingTop: 20 }}
         >
           <h2 className="acsis-exam-detail__section-title">Student submissions</h2>
+          {results?.topStudent ? (
+            <p className="acsis-mc-sub" style={{ marginBottom: 8, color: '#15803d', fontWeight: 600 }}>
+              Top 1: {results.topStudent.studentName}
+              {results.topStudent.percentage != null ? ` — ${results.topStudent.percentage}%` : ''}
+            </p>
+          ) : null}
           {results?.stats ? (
             <p className="acsis-mc-sub" style={{ marginBottom: 12 }}>
               {results.stats.submitted} submitted · {results.stats.joined} joined · {results.stats.enrolled} enrolled
+              {closed ? ' · Exam closed — release scores when ready' : ''}
             </p>
           ) : null}
           {resultsLoading && !results ? (
@@ -296,13 +378,17 @@ export default function TeacherExamDetailPage() {
                   <tr style={{ borderBottom: '1px solid #e5e7eb', textAlign: 'left' }}>
                     <th style={{ padding: '8px 6px' }}>Student</th>
                     <th style={{ padding: '8px 6px' }}>Status</th>
+                    <th style={{ padding: '8px 6px' }}>Review</th>
                     <th style={{ padding: '8px 6px' }}>Score</th>
+                    <th style={{ padding: '8px 6px' }}>Rank</th>
+                    <th style={{ padding: '8px 6px' }}>Released</th>
                     <th style={{ padding: '8px 6px' }}>Warnings</th>
+                    <th style={{ padding: '8px 6px' }} />
                   </tr>
                 </thead>
                 <tbody>
-                  {(results?.sessions || []).map((s) => (
-                    <tr key={s.sessionId} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                  {(results?.sessions || []).map((s, index) => (
+                    <FadeIn as="tr" delay={0.25 + (index * 0.05)} key={s.sessionId} style={{ borderBottom: '1px solid #f3f4f6' }}>
                       <td style={{ padding: '8px 6px' }}>
                         {s.studentName}
                         {s.schoolId ? (
@@ -311,19 +397,72 @@ export default function TeacherExamDetailPage() {
                       </td>
                       <td style={{ padding: '8px 6px' }}>{s.status}</td>
                       <td style={{ padding: '8px 6px' }}>
+                        {s.status === 'submitted'
+                          ? s.reviewComplete
+                            ? 'Reviewed'
+                            : (s.uncheckedCount ?? 0) > 0
+                              ? `Optional (${s.uncheckedCount})`
+                              : 'Auto-graded'
+                          : '—'}
+                      </td>
+                      <td style={{ padding: '8px 6px' }}>
                         {s.status === 'submitted' && s.percentage != null
                           ? `${s.percentage}% (${s.rawScore}/${s.totalPoints})`
                           : '—'}
                       </td>
+                      <td style={{ padding: '8px 6px' }}>{s.rank != null ? `#${s.rank}` : '—'}</td>
+                      <td style={{ padding: '8px 6px' }}>
+                        {s.status === 'submitted' ? (s.scoreReleased ? 'Yes' : 'Pending') : '—'}
+                      </td>
                       <td style={{ padding: '8px 6px' }}>{s.warningCount}</td>
-                    </tr>
+                      <td style={{ padding: '8px 6px' }}>
+                        {s.status === 'submitted' && s.sessionId ? (
+                          <button
+                            type="button"
+                            className="text-xs font-semibold text-blue-700 hover:underline"
+                            onClick={() => {
+                              setReviewInitialSessionId(s.sessionId)
+                              setReviewOpen(true)
+                            }}
+                          >
+                            Review
+                          </button>
+                        ) : null}
+                      </td>
+                    </FadeIn>
                   ))}
                 </tbody>
               </table>
             </div>
           )}
-        </section>
+        </FadeIn>
       </div>
+
+      {reviewOpen && results?.sessions ? (
+        <ExamAnswerReviewModal
+          classId={classId}
+          examId={examId}
+          examTitle={hit?.title || 'Exam'}
+          submittedSessions={results.sessions.filter((s) => s.status === 'submitted')}
+          initialSessionId={reviewInitialSessionId}
+          onClose={() => {
+            setReviewOpen(false)
+            setReviewInitialSessionId(null)
+          }}
+          onUpdated={async () => {
+            const data = await fetchTeacherExamResults(classId, examId)
+            setResults(data)
+          }}
+        />
+      ) : null}
+
+      <ReleaseScoresDialog
+        open={releaseDialogOpen}
+        onOpenChange={setReleaseDialogOpen}
+        releasing={releasing}
+        onRelease={(opts) => void handleReleaseScores(opts)}
+      />
+      {ConfirmDialog}
     </div>
   )
 }

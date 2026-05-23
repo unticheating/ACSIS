@@ -129,7 +129,7 @@ export const demoUsers = [
   },
   {
     id: 11,
-    name: 'PLP Administrator',
+    name: 'ACSIS Administrator',
     email: 'admin@plpasig.edu.ph',
     role: 'admin',
     status: 'active',

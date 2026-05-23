@@ -1,4 +1,5 @@
 import { getPool } from '../db.js';
+import { SQL_JOIN_STUDENTS, SQL_MEMBER_SCHOOL_ID } from '../lib/memberSql.js';
 
 export async function createClassQuery(
   institutionId,
@@ -141,16 +142,17 @@ export async function listClassEnrolledStudentsQuery(classId, memberId) {
   const pool = getPool();
   const { rows } = await pool.query(
     `SELECT
-       sm.member_id AS "memberId",
-       sm.school_id AS "schoolId",
+       im.member_id AS "memberId",
+       ${SQL_MEMBER_SCHOOL_ID} AS "schoolId",
        u.first_name,
        u.middle_name,
        u.last_name,
        ce.enrolled_at AS "enrolledAt"
      FROM class_enrollments ce
      JOIN classes c ON c.class_id = ce.class_id
-     JOIN institution_members sm ON ce.member_id = sm.member_id
-     JOIN users u ON sm.uid = u.uid
+     JOIN institution_members im ON ce.member_id = im.member_id
+     ${SQL_JOIN_STUDENTS}
+     JOIN users u ON im.uid = u.uid
      WHERE ce.class_id = $1 AND c.member_id = $2 AND c.is_active = TRUE
      ORDER BY u.last_name, u.first_name`,
     [classId, memberId],

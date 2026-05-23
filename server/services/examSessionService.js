@@ -11,21 +11,47 @@ import {
   incrementSessionWarningQuery,
   insertCheatingLogQuery,
   isValidCheatEvent,
+  isSessionScoreReleasedQuery,
   markSessionSubmittedQuery,
   updateExamStatusByIdQuery,
   upsertStudentAnswerQuery,
 } from '../repositories/examSessionRepository.js'
+
+function percentageFromScores(scores) {
+  return scores.totalPoints > 0
+    ? Math.round((scores.rawScore / scores.totalPoints) * 10000) / 100
+    : 0
+}
+
+/** Students only receive numeric scores after faculty releases them. */
+async function buildStudentSubmitPayload(sessionId, scores) {
+  const scoreReleased = await isSessionScoreReleasedQuery(sessionId)
+  const base = { sessionId, scoreReleased }
+  if (!scoreReleased) {
+    return { ...base, scorePending: true }
+  }
+  return {
+    ...base,
+    rawScore: scores.rawScore,
+    totalPoints: scores.totalPoints,
+    percentage: percentageFromScores(scores),
+  }
+}
 import { getExamWithQuestionsQuery } from '../repositories/examRepository.js'
+import { applyLayoutToExamQuestions } from '../lib/examShuffle.js'
+import { getSessionShuffleLayoutQuery } from '../repositories/examSessionRepository.js'
 import { closeOtherTeacherOngoingExamsQuery } from '../repositories/examResultsRepository.js'
 import { checkEnrollment } from '../repositories/studentRepository.js'
 
 function mapExamMeta(row) {
+  const status = (row.status || '').toLowerCase()
   return {
     id: row.exam_id,
     title: row.title,
     duration: row.time_limit,
     status: row.status,
     code: row.password,
+    openedAt: status === EXAM_STATUS.OPEN && row.updated_at ? row.updated_at : null,
   }
 }
 
@@ -104,16 +130,19 @@ export async function getStudentExamSessionService(classId, examId, studentMembe
   if (session?.status === 'submitted') {
     const pool = getPool()
     const { rows } = await pool.query(
-      `SELECT raw_score, total_points, percentage
+      `SELECT raw_score, total_points, percentage, score_released
        FROM exam_results WHERE session_id = $1`,
       [session.session_id],
     )
-    if (rows[0]) {
+    if (rows[0]?.score_released) {
       payload.result = {
+        scoreReleased: true,
         rawScore: Number(rows[0].raw_score),
         totalPoints: Number(rows[0].total_points),
         percentage: Number(rows[0].percentage),
       }
+    } else if (rows[0]) {
+      payload.scorePending = true
     }
     return { ok: true, ...payload }
   }
@@ -121,8 +150,10 @@ export async function getStudentExamSessionService(classId, examId, studentMembe
   if (status === EXAM_STATUS.OPEN && session) {
     const full = await getExamWithQuestionsQuery(classId, examId, false)
     if (full?.questions) {
-      payload.questions = full.questions
-      payload.exam = { ...examMeta, ...full, code: examMeta.code }
+      const layout = await getSessionShuffleLayoutQuery(session.session_id)
+      payload.questions = applyLayoutToExamQuestions(full.questions, layout, { forStudent: true })
+      const { questions, correctAnswer, _choicesMeta, ...examPublic } = full
+      payload.exam = { ...examMeta, ...examPublic, code: examMeta.code }
     }
   }
 
@@ -201,18 +232,13 @@ export async function logCheatingEventService(classId, examId, studentMemberId, 
     autoSubmitted = true
   }
 
-  return {
+  const payload = {
     ok: true,
     warningCount,
-    sessionId: gate.session.session_id,
     autoSubmitted,
-    rawScore: scores.rawScore,
-    totalPoints: scores.totalPoints,
-    percentage:
-      scores.totalPoints > 0
-        ? Math.round((scores.rawScore / scores.totalPoints) * 10000) / 100
-        : 0,
+    ...(await buildStudentSubmitPayload(gate.session.session_id, scores)),
   }
+  return payload
 }
 
 export async function submitExamService(classId, examId, studentMemberId, answersPayload) {
@@ -244,12 +270,6 @@ export async function submitExamService(classId, examId, studentMemberId, answer
 
   return {
     ok: true,
-    sessionId: gate.session.session_id,
-    rawScore: scores.rawScore,
-    totalPoints: scores.totalPoints,
-    percentage:
-      scores.totalPoints > 0
-        ? Math.round((scores.rawScore / scores.totalPoints) * 10000) / 100
-        : 0,
+    ...(await buildStudentSubmitPayload(gate.session.session_id, scores)),
   }
 }

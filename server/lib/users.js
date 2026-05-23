@@ -1,4 +1,4 @@
-import { upsertStudentProfile } from './studentProfile.js'
+import { ensureStudentRow } from './studentProfile.js'
 
 /** @typedef {'admin' | 'teacher' | 'student' | 'super_admin'} Portal */
 
@@ -87,41 +87,7 @@ export async function findOrCreateGoogleUser(pool, profile) {
   }
 }
 
-/**
- * First-time Google sign-in: enroll user at the active institution as a student
- * when they have no membership yet (admin-added faculty/admin rows are left as-is).
- * @param {import('pg').Pool} pool
- * @param {number} uid
- * @param {boolean} isSuperAdmin
- */
-export async function ensureGoogleStudentMembership(pool, uid, isSuperAdmin) {
-  if (isSuperAdmin) return
-
-  const { rows: instRows } = await pool.query(
-    `SELECT institution_id FROM institutions WHERE is_active = TRUE ORDER BY institution_id ASC LIMIT 1`,
-  )
-  if (!instRows[0]) return
-
-  const institutionId = instRows[0].institution_id
-  const { rows: existing } = await pool.query(
-    `SELECT member_id FROM institution_members WHERE institution_id = $1 AND uid = $2`,
-    [institutionId, uid],
-  )
-  if (existing[0]) return
-
-  const inserted = await pool.query(
-    `INSERT INTO institution_members (
-       institution_id, uid, role, school_id, is_active, is_pending
-     ) VALUES ($1, $2, 'student', NULL, TRUE, FALSE)
-     RETURNING member_id`,
-    [institutionId, uid],
-  )
-
-  const memberId = inserted.rows[0]?.member_id
-  if (memberId) {
-    await upsertStudentProfile(pool, memberId, {})
-  }
-}
+// ensureGoogleStudentMembership removed for dynamic onboarding
 
 /**
  * @param {import('pg').Pool} pool
@@ -139,7 +105,7 @@ export async function resolveUserPortal(pool, uid, isSuperAdmin) {
   }
 
   const { rows } = await pool.query(
-    `SELECT im.role
+    `SELECT im.role, im.member_id
      FROM institution_members im
      JOIN institutions i ON i.institution_id = im.institution_id
      WHERE im.uid = $1 AND im.is_active = TRUE AND im.is_pending = FALSE AND i.is_active = TRUE
@@ -156,16 +122,19 @@ export async function resolveUserPortal(pool, uid, isSuperAdmin) {
       roleLabel: null,
       entryPath: null,
       membershipStatus: 'pending',
+      memberId: null,
     }
   }
 
   const role = rows[0].role
+  const memberId = rows[0].member_id
   if (role === 'admin') {
     return {
       portal: 'admin',
       roleLabel: 'Administrator',
       entryPath: '/admin',
       membershipStatus: 'active',
+      memberId,
     }
   }
   if (role === 'faculty') {
@@ -174,6 +143,7 @@ export async function resolveUserPortal(pool, uid, isSuperAdmin) {
       roleLabel: 'Faculty',
       entryPath: '/teacher',
       membershipStatus: 'active',
+      memberId,
     }
   }
   return {
@@ -181,6 +151,7 @@ export async function resolveUserPortal(pool, uid, isSuperAdmin) {
     roleLabel: 'Student',
     entryPath: '/student/my-classes',
     membershipStatus: 'active',
+    memberId,
   }
 }
 
@@ -206,6 +177,36 @@ export async function buildSessionFromUid(pool, uid, opts = {}) {
   const portalInfo = await resolveUserPortal(pool, uid, user.is_super_admin)
   const displayName = `${user.first_name} ${user.last_name}`.trim() || user.email
 
+  let needsStudentNumber = false
+  let needsJoinClass = false
+  let needsInitialJoin = false
+
+  if (portalInfo.portal === null && !user.is_super_admin) {
+    needsInitialJoin = true
+    portalInfo.portal = 'student'
+    portalInfo.roleLabel = 'Student'
+    portalInfo.entryPath = '/student/my-classes'
+    portalInfo.membershipStatus = 'active'
+  }
+
+  if (portalInfo.portal === 'student' && portalInfo.memberId) {
+    const { rows: stRows } = await pool.query(
+      `SELECT student_number FROM students WHERE member_id = $1`,
+      [portalInfo.memberId]
+    )
+    if (!stRows[0] || !stRows[0].student_number) {
+      needsStudentNumber = true
+    }
+
+    const { rows: enRows } = await pool.query(
+      `SELECT 1 FROM class_enrollments WHERE member_id = $1 LIMIT 1`,
+      [portalInfo.memberId]
+    )
+    if (enRows.length === 0) {
+      needsJoinClass = true
+    }
+  }
+
   return {
     uid: user.uid,
     email: user.email,
@@ -218,6 +219,9 @@ export async function buildSessionFromUid(pool, uid, opts = {}) {
     roleLabel: portalInfo.roleLabel,
     entryPath: portalInfo.entryPath,
     membershipStatus: portalInfo.membershipStatus,
+    needsInitialJoin,
+    needsStudentNumber,
+    needsJoinClass,
   }
 }
 

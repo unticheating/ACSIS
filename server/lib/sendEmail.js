@@ -82,3 +82,68 @@ export async function sendVerificationEmail(to, code) {
     return { sent: false, devLogged: true, error: err.message }
   }
 }
+
+/**
+ * @param {{
+ *   to: string,
+ *   studentName: string,
+ *   examTitle: string,
+ *   rawScore: number,
+ *   totalPoints: number,
+ *   percentage: number,
+ *   answerKey?: Array<{ question: string, correctAnswer?: string, type?: string }> | null,
+ * }} params
+ */
+export async function sendExamResultEmail({
+  to,
+  studentName,
+  examTitle,
+  rawScore,
+  totalPoints,
+  percentage,
+  answerKey = null,
+}) {
+  const subject = `ACSIS exam result: ${examTitle}`
+  const scoreLine = `Score: ${rawScore} / ${totalPoints} (${percentage}%)`
+  let text = `Hello ${studentName},\n\nYour exam "${examTitle}" has been graded.\n${scoreLine}\n`
+  let html = `
+    <p>Hello ${studentName},</p>
+    <p>Your exam <strong>${examTitle}</strong> has been graded.</p>
+    <p><strong>${scoreLine}</strong></p>
+  `
+
+  if (answerKey?.length) {
+    text += '\nAnswer key:\n'
+    html += '<h3 style="font-size:14px;margin-top:16px">Answer key</h3><ol>'
+    for (const q of answerKey) {
+      const ans = q.correctAnswer || '—'
+      text += `\n- ${q.question}: ${ans}`
+      html += `<li><strong>${q.question}</strong><br/>${ans}</li>`
+    }
+    html += '</ol>'
+  }
+
+  text += '\n— ACSIS'
+
+  const transport = getTransporter()
+  if (!transport) {
+    console.log(`[ACSIS] Exam result for ${to}: ${scoreLine}`)
+    return { sent: false, devLogged: true }
+  }
+
+  try {
+    await transport.sendMail({
+      from: config.smtp.from,
+      to,
+      subject,
+      text,
+      html,
+    })
+    console.log(`[ACSIS] Exam result email sent to ${to}`)
+    return { sent: true, devLogged: false }
+  } catch (err) {
+    console.error(`[ACSIS] Failed to send exam result to ${to}:`, err.message)
+    console.log(`[ACSIS] Exam result for ${to}: ${scoreLine}`)
+    return { sent: false, devLogged: true, error: err.message }
+  }
+}

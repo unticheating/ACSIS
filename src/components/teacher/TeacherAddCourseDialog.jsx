@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { apiFetch } from '@/lib/apiFetch.js'
+import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
 import { formatSectionTitle } from '@/lib/sectionLabel.js'
 import {
   Dialog,
@@ -46,13 +47,14 @@ export default function TeacherAddCourseDialog({ open, onOpenChange, term, onCre
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        window.alert(data.error || 'Failed to create course.')
+        acsisToastError(data.error || 'Failed to create course.')
         return
       }
+      acsisToastSuccess('Course added.')
       onOpenChange(false)
       onCreated?.()
     } catch {
-      window.alert('Network error.')
+      acsisToastError('Network error. Please try again.')
     } finally {
       setCreating(false)
     }

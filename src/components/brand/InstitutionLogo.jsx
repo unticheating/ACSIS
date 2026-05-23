@@ -1,4 +1,4 @@
-import PlpLogo from './PlpLogo.jsx'
+import { Landmark } from 'lucide-react'
 
 /**
  * Institution logo from settings, or default PLP mark.
@@ -24,5 +24,12 @@ export default function InstitutionLogo({
       />
     )
   }
-  return <PlpLogo className={className} width={width} height={height} alt={alt} responsive={responsive} />
+  return (
+    <div 
+      className={`flex items-center justify-center bg-gray-100 rounded-md text-gray-400 ${className}`} 
+      style={{ width, height, minWidth: width, minHeight: height }}
+    >
+      <Landmark size={width * 0.55} />
+    </div>
+  )
 }

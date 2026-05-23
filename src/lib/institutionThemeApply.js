@@ -16,8 +16,8 @@ const STORAGE_DEMO_THEME = 'acsis.demoThemeId'
 const STORAGE_DEMO_INSTITUTION = 'acsis.demoInstitution'
 
 const DEFAULT_DEMO_INSTITUTION = {
-  institutionName: 'Pamantasan ng Lungsod ng Pasig',
-  acronym: 'PLP',
+  institutionName: 'ACSIS',
+  acronym: '',
   logo: null,
   maxWarnings: 3,
 }
@@ -95,6 +95,10 @@ const THEME_CSS_KEYS = [
   '--border',
   '--input',
   '--ring',
+  '--acsis-card-neu-highlight',
+  '--acsis-card-neu-shadow',
+  '--neu-surface-hi',
+  '--neu-surface-lo',
 ]
 
 /** @returns {boolean} */
@@ -268,6 +272,27 @@ function applyShadcnTokens(root, primary, isDark) {
 }
 
 /**
+ * Neumorphic card shadows tinted by institution primary.
+ * @param {HTMLElement} root
+ * @param {string} primary
+ * @param {boolean} isDark
+ */
+function applyCardNeumorphism(root, primary, isDark) {
+  if (isDark) {
+    root.style.setProperty('--neu-surface-hi', '#1c1c1c')
+    root.style.setProperty('--neu-surface-lo', '#000000')
+    root.style.setProperty('--acsis-card-neu-highlight', hexToRgba(tint(primary, 0.1), 0.2))
+    root.style.setProperty('--acsis-card-neu-shadow', hexToRgba('#000000', 0.45))
+    return
+  }
+
+  root.style.setProperty('--neu-surface-hi', '#ffffff')
+  root.style.setProperty('--neu-surface-lo', '#0f172a')
+  root.style.setProperty('--acsis-card-neu-highlight', hexToRgba(tint(primary, 0.9), 0.98))
+  root.style.setProperty('--acsis-card-neu-shadow', hexToRgba(shade(primary, 0.48), 0.38))
+}
+
+/**
  * @param {ThemeColors | null | undefined} theme
  * @param {boolean} [isDark] defaults to document class
  */
@@ -289,6 +314,7 @@ export function applyInstitutionTheme(theme, isDark = isDocumentDark()) {
     applyLightSurfaces(root, primary, secondary, baseColor)
   }
 
+  applyCardNeumorphism(root, primary, isDark)
   root.dataset.institutionTheme = theme.themeName?.toLowerCase?.() || ''
 }
 
@@ -299,12 +325,14 @@ export function clearInstitutionTheme() {
   delete root.dataset.institutionTheme
 }
 
+const DEFAULT_DEMO_THEME_ID = 6
+
 export function readDemoThemeId() {
   try {
     const v = Number(localStorage.getItem(STORAGE_DEMO_THEME))
-    return Number.isInteger(v) && v >= 1 ? v : 1
+    return Number.isInteger(v) && v >= 1 ? v : DEFAULT_DEMO_THEME_ID
   } catch {
-    return 1
+    return DEFAULT_DEMO_THEME_ID
   }
 }
 

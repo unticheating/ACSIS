@@ -6,6 +6,7 @@ import {
   findClassByAccessCode,
   getEnrolledClasses as getClassesRepo,
   getStudentMember,
+  unenrollStudent,
 } from '../repositories/studentRepository.js'
 
 export async function enrollByAccessCode(memberId, code) {
@@ -59,4 +60,13 @@ export async function getEnrolledClasses(memberId) {
     }),
   )
   return withExams
+}
+
+export async function unenrollFromClass(memberId, classId) {
+  const enrolled = await checkEnrollment(memberId, classId)
+  if (!enrolled) {
+    return { ok: false, status: 404, error: 'You are not enrolled in this class.' }
+  }
+  await unenrollStudent(memberId, classId)
+  return { ok: true }
 }

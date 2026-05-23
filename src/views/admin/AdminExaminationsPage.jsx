@@ -3,14 +3,16 @@ import { ChevronDown } from 'lucide-react'
 import { Badge } from '@/components/ui/badge.jsx'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx'
 import { examStatusLabel, fetchAdminClasses } from '@/lib/adminClassesApi.js'
+import FadeIn from '@/components/ui/fade-in.jsx'
+import { acsisToastError } from '@/lib/acsisToast.js'
 import '../../pages/admin-ui/style.css'
 
-function ExamRow({ exam }) {
+function ExamRow({ exam, delay = 0 }) {
   const [open, setOpen] = useState(false)
   const title = exam.title || 'Untitled exam'
 
   return (
-    <div className={`admin-exam-row${open ? ' admin-exam-row--open' : ''}`}>
+    <FadeIn delay={delay} className={`admin-exam-row${open ? ' admin-exam-row--open' : ''}`}>
       <button
         type="button"
         className="admin-exam-row__trigger"
@@ -50,17 +52,17 @@ function ExamRow({ exam }) {
           </div>
         </dl>
       ) : null}
-    </div>
+    </FadeIn>
   )
 }
 
-function ClassRow({ classItem }) {
+function ClassRow({ classItem, delay = 0 }) {
   const [open, setOpen] = useState(false)
   const exams = classItem.exams || []
   const examCount = exams.length
 
   return (
-    <div className={`admin-class-row${open ? ' admin-class-row--open' : ''}`}>
+    <FadeIn delay={delay} className={`admin-class-row${open ? ' admin-class-row--open' : ''}`}>
       <button
         type="button"
         className="admin-class-row__trigger"
@@ -91,14 +93,14 @@ function ClassRow({ classItem }) {
             <p className="text-sm text-muted-foreground">No exams in this class yet.</p>
           ) : (
             <div className="admin-exam-list">
-              {exams.map((ex) => (
-                <ExamRow key={ex.id} exam={ex} />
+              {exams.map((ex, index) => (
+                <ExamRow key={ex.id} exam={ex} delay={index * 0.05} />
               ))}
             </div>
           )}
         </div>
       ) : null}
-    </div>
+    </FadeIn>
   )
 }
 
@@ -115,7 +117,9 @@ export default function AdminExaminationsPage({ pageTitle = 'Classes' }) {
       setClasses(data)
     } catch (err) {
       setClasses([])
-      setError(err instanceof Error ? err.message : 'Failed to load classes.')
+      const msg = err instanceof Error ? err.message : 'Failed to load classes.'
+      setError(msg)
+      acsisToastError(msg)
     } finally {
       setLoading(false)
     }
@@ -159,8 +163,8 @@ export default function AdminExaminationsPage({ pageTitle = 'Classes' }) {
               <p className="text-sm text-muted-foreground">No classes yet. Faculty can create classes from My Classes.</p>
             ) : (
               <div className="admin-class-list">
-                {classes.map((c) => (
-                  <ClassRow key={c.id} classItem={c} />
+                {classes.map((c, index) => (
+                  <ClassRow key={c.id} classItem={c} delay={index * 0.05} />
                 ))}
               </div>
             )}

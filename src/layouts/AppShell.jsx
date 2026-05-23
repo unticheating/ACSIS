@@ -1,5 +1,7 @@
 import { Suspense } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
+import { resolveShellPageTitle } from '../config/shellConfig.js'
+import { useDocumentTitle } from '../hooks/useDocumentTitle.js'
 import AppSidebar from '../components/layout/AppSidebar.jsx'
 import RouteFallback from '../components/layout/RouteFallback.jsx'
 import MobileBottomNav from '../components/layout/MobileBottomNav.jsx'
@@ -22,6 +24,10 @@ import '../styles/route-fallback.css'
  * @param {{ role: 'teacher' | 'student' | 'admin' | 'super_admin' }} props
  */
 export default function AppShell({ role }) {
+  const { pathname } = useLocation()
+  const pageTitle = resolveShellPageTitle(role, pathname)
+  useDocumentTitle(pageTitle)
+
   const { nav } = shellConfig[role]
   const settingsPath =
     role === 'admin' ? '/admin/settings' : role === 'super_admin' ? '/super-admin/settings' : null

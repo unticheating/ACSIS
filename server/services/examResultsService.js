@@ -1,8 +1,10 @@
 import { getClassByIdQuery } from '../repositories/classRepository.js'
 import {
   closeOtherTeacherOngoingExamsQuery,
+  computeExamRanksQuery,
   getExamSubmissionStatsQuery,
   getTeacherActiveMonitoringExamQuery,
+  getTopRankedSessionQuery,
   listCheatingLogsForExamQuery,
   listCheatingLogsForSessionQuery,
   listClassEnrolledStudentsQuery,
@@ -114,6 +116,8 @@ export async function getTeacherMonitoringSnapshotService(classId, examId, _teac
       return { ok: false, status: 404, error: 'Exam not found.' }
     }
 
+    await computeExamRanksQuery(examId)
+
     const [sessions, stats, violations, enrolled] = await Promise.all([
       listExamSessionsForExamQuery(classId, examId),
       getExamSubmissionStatsQuery(examId),
@@ -161,10 +165,13 @@ export async function getTeacherExamResultsService(classId, examId, teacherMembe
       return { ok: false, status: 404, error: 'Exam not found.' }
     }
 
-    const [sessions, stats, violations] = await Promise.all([
+    await computeExamRanksQuery(examId)
+
+    const [sessions, stats, violations, topStudent] = await Promise.all([
       listExamSessionsForExamQuery(classId, examId),
       getExamSubmissionStatsQuery(examId),
       listCheatingLogsForExamQuery(examId),
+      getTopRankedSessionQuery(examId),
     ])
 
     return {
@@ -175,6 +182,15 @@ export async function getTeacherExamResultsService(classId, examId, teacherMembe
         joined: Number(stats.joined || 0),
         submitted: Number(stats.submitted || 0),
       },
+      topStudent: topStudent
+        ? {
+            sessionId: topStudent.sessionId,
+            studentName: topStudent.studentName,
+            schoolId: topStudent.schoolId,
+            percentage: topStudent.percentage != null ? Number(topStudent.percentage) : null,
+            rawScore: topStudent.rawScore != null ? Number(topStudent.rawScore) : null,
+          }
+        : null,
       sessions,
       violations: violations.map((v) => ({
         id: v.id,

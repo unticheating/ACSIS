@@ -1,5 +1,8 @@
 import { getPool } from '../db.js'
 import { getExamSessionUserColumn } from '../lib/schemaCompat.js'
+import { ensureExamSessionShuffleColumns } from '../lib/ensureExamSessionShuffleSchema.js'
+import { buildShuffleLayout } from '../lib/examShuffle.js'
+import { computeExamRanksQuery } from './examResultsRepository.js'
 
 export async function getExamForJoinQuery(classId, examId) {
   const pool = getPool()
@@ -25,16 +28,90 @@ export async function findExamSessionQuery(examId, studentMemberId) {
   return rows[0] || null
 }
 
+export async function getExamShuffleFlagsQuery(examId) {
+  const pool = getPool()
+  const { rows } = await pool.query(
+    `SELECT shuffle_questions AS "shuffleQuestions", shuffle_choices AS "shuffleChoices"
+     FROM exams WHERE exam_id = $1`,
+    [examId],
+  )
+  return rows[0] || { shuffleQuestions: false, shuffleChoices: false }
+}
+
+export async function fetchExamQuestionChoiceRowsQuery(examId) {
+  const pool = getPool()
+  const { rows: questions } = await pool.query(
+    `SELECT q.question_id, q.section_id
+     FROM questions q
+     LEFT JOIN exam_sections s ON s.section_id = q.section_id
+     WHERE q.exam_id = $1
+     ORDER BY COALESCE(s.order_num, 9999), q.order_num ASC`,
+    [examId],
+  )
+  const { rows: choices } = await pool.query(
+    `SELECT c.choice_id, c.question_id
+     FROM choices c
+     JOIN questions q ON q.question_id = c.question_id
+     WHERE q.exam_id = $1
+     ORDER BY c.question_id, c.order_num ASC`,
+    [examId],
+  )
+  const choicesByQuestion = new Map()
+  for (const c of choices) {
+    const qid = Number(c.question_id)
+    if (!choicesByQuestion.has(qid)) choicesByQuestion.set(qid, [])
+    choicesByQuestion.get(qid).push(c)
+  }
+  return { questions, choicesByQuestion }
+}
+
 export async function createExamSessionQuery(examId, studentMemberId) {
+  await ensureExamSessionShuffleColumns()
   const pool = getPool()
   const col = await getExamSessionUserColumn(pool)
+
+  const flags = await getExamShuffleFlagsQuery(examId)
+  const needsLayout = flags.shuffleQuestions || flags.shuffleChoices
+  let questionOrder = null
+  let choiceOrders = null
+
+  if (needsLayout) {
+    const { questions, choicesByQuestion } = await fetchExamQuestionChoiceRowsQuery(examId)
+    const layout = buildShuffleLayout(questions, choicesByQuestion, {
+      shuffleQuestions: flags.shuffleQuestions,
+      shuffleChoices: flags.shuffleChoices,
+    })
+    questionOrder = layout.questionOrder
+    choiceOrders = layout.choiceOrders
+  }
+
   const { rows } = await pool.query(
-    `INSERT INTO exam_sessions (exam_id, ${col}, status)
-     VALUES ($1, $2, 'in_progress')
-     RETURNING session_id, status, warning_count, started_at`,
-    [examId, studentMemberId],
+    `INSERT INTO exam_sessions (exam_id, ${col}, status, question_order, choice_orders)
+     VALUES ($1, $2, 'in_progress', $3::jsonb, $4::jsonb)
+     RETURNING session_id, status, warning_count, started_at, question_order, choice_orders`,
+    [
+      examId,
+      studentMemberId,
+      questionOrder ? JSON.stringify(questionOrder) : null,
+      choiceOrders && Object.keys(choiceOrders).length ? JSON.stringify(choiceOrders) : null,
+    ],
   )
   return rows[0]
+}
+
+export async function getSessionShuffleLayoutQuery(sessionId) {
+  await ensureExamSessionShuffleColumns()
+  const pool = getPool()
+  const { rows } = await pool.query(
+    `SELECT question_order AS "questionOrder", choice_orders AS "choiceOrders"
+     FROM exam_sessions WHERE session_id = $1`,
+    [sessionId],
+  )
+  if (!rows[0]) return null
+  return {
+    questionOrder: rows[0].questionOrder || null,
+    choiceOrders: rows[0].choiceOrders || null,
+  }
 }
 
 export async function getStudentSessionsForExamsQuery(examIds, studentMemberId) {
@@ -106,6 +183,15 @@ export async function incrementSessionWarningQuery(sessionId) {
   return Number(rows[0]?.warning_count ?? 0)
 }
 
+export async function isSessionScoreReleasedQuery(sessionId) {
+  const pool = getPool()
+  const { rows } = await pool.query(
+    `SELECT score_released FROM exam_results WHERE session_id = $1`,
+    [sessionId],
+  )
+  return Boolean(rows[0]?.score_released)
+}
+
 export async function markSessionSubmittedQuery(sessionId) {
   const pool = getPool()
   await pool.query(
@@ -133,6 +219,7 @@ export async function gradeSessionAnswersQuery(sessionId) {
   await pool.query(
     `UPDATE student_answers sa
      SET is_correct = CASE
+       WHEN sa.manually_checked = TRUE THEN sa.is_correct
        WHEN q.question_type IN ('mcq', 'true_false') THEN (
          SELECT c.is_correct FROM choices c WHERE c.choice_id = sa.choice_id
        )
@@ -170,6 +257,15 @@ export async function gradeSessionAnswersQuery(sessionId) {
      DO UPDATE SET raw_score = EXCLUDED.raw_score, total_points = EXCLUDED.total_points, computed_at = NOW()`,
     [sessionId, raw, total],
   )
+
+  const { rows: examRows } = await pool.query(
+    `SELECT exam_id FROM exam_sessions WHERE session_id = $1`,
+    [sessionId],
+  )
+  const examId = examRows[0]?.exam_id
+  if (examId) {
+    await computeExamRanksQuery(examId)
+  }
 
   return { rawScore: raw, totalPoints: total }
 }
