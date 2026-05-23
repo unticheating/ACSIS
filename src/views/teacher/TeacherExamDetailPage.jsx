@@ -18,6 +18,7 @@ import { formatCourseBreadcrumbLabel, formatSectionTitle, formatTermPeriod } fro
 import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
 import { copyToClipboard } from '@/lib/copyToClipboard.js'
 import { useAcsisConfirm } from '@/hooks/useAcsisConfirm.jsx'
+import FadeIn from '@/components/ui/fade-in.jsx'
 import '../../pages/teacher-ui/my_classes.css'
 
 export default function TeacherExamDetailPage() {
@@ -266,31 +267,34 @@ export default function TeacherExamDetailPage() {
 
       <div className="acsis-exam-detail__card">
 
-        <dl className="acsis-exam-detail__meta-grid">
-          <div>
-            <dt>Exam code</dt>
-            <dd className="acsis-exam-detail__code">{exam.code || '—'}</dd>
-          </div>
-          <div>
-            <dt>Questions</dt>
-            {/* questions array length or questionCount based on how it's structured in the db */}
-            <dd>{exam.questions ? exam.questions.length : (exam.questionCount || 0)}</dd>
-          </div>
-          <div>
-            <dt>Time limit</dt>
-            <dd>{Number(exam.duration || 0)} minutes</dd>
-          </div>
-          <div>
-            <dt>Subject</dt>
-            <dd>{subjectLabel || '—'}</dd>
-          </div>
-          <div>
-            <dt>Class group</dt>
-            <dd>{classGroupLabel || '—'}</dd>
-          </div>
-        </dl>
+        <FadeIn delay={0.05}>
+          <dl className="acsis-exam-detail__meta-grid">
+            <div>
+              <dt>Exam code</dt>
+              <dd className="acsis-exam-detail__code">{exam.code || '—'}</dd>
+            </div>
+            <div>
+              <dt>Questions</dt>
+              {/* questions array length or questionCount based on how it's structured in the db */}
+              <dd>{exam.questions ? exam.questions.length : (exam.questionCount || 0)}</dd>
+            </div>
+            <div>
+              <dt>Time limit</dt>
+              <dd>{Number(exam.duration || 0)} minutes</dd>
+            </div>
+            <div>
+              <dt>Subject</dt>
+              <dd>{subjectLabel || '—'}</dd>
+            </div>
+            <div>
+              <dt>Class group</dt>
+              <dd>{classGroupLabel || '—'}</dd>
+            </div>
+          </dl>
+        </FadeIn>
 
-        <div className="acsis-exam-detail__actions">
+        <FadeIn delay={0.1}>
+          <div className="acsis-exam-detail__actions">
           <button
             type="button"
             className="acsis-btn-primary"
@@ -334,13 +338,18 @@ export default function TeacherExamDetailPage() {
           >
             Delete exam
           </button>
-        </div>
+          </div>
+        </FadeIn>
 
-        <p className="acsis-mc-sub" style={{ marginTop: 22, fontSize: '0.8125rem', lineHeight: 1.5 }}>
-          When this exam is on-going, students join with the code above. Submissions below update automatically.
-        </p>
+        <FadeIn delay={0.15}>
+          <p className="acsis-mc-sub" style={{ marginTop: 22, fontSize: '0.8125rem', lineHeight: 1.5 }}>
+            When this exam is on-going, students join with the code above. Submissions below update automatically.
+          </p>
+        </FadeIn>
 
-        <section
+        <FadeIn
+          as="section"
+          delay={0.2}
           className="acsis-exam-detail__submissions"
           style={{ marginTop: 28, borderTop: '1px solid var(--border-default, #e5e7eb)', paddingTop: 20 }}
         >
@@ -378,8 +387,8 @@ export default function TeacherExamDetailPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {(results?.sessions || []).map((s) => (
-                    <tr key={s.sessionId} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                  {(results?.sessions || []).map((s, index) => (
+                    <FadeIn as="tr" delay={0.25 + (index * 0.05)} key={s.sessionId} style={{ borderBottom: '1px solid #f3f4f6' }}>
                       <td style={{ padding: '8px 6px' }}>
                         {s.studentName}
                         {s.schoolId ? (
@@ -420,13 +429,13 @@ export default function TeacherExamDetailPage() {
                           </button>
                         ) : null}
                       </td>
-                    </tr>
+                    </FadeIn>
                   ))}
                 </tbody>
               </table>
             </div>
           )}
-        </section>
+        </FadeIn>
       </div>
 
       {reviewOpen && results?.sessions ? (

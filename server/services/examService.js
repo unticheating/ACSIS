@@ -122,6 +122,9 @@ export async function getClassExamsService(classId, requireActive = false, stude
     classData.exams = studentMemberId
       ? withSessions.map(sanitizeExamForStudent)
       : withSessions
+    if (studentMemberId && classData) {
+      delete classData.accessCode
+    }
     return { ok: true, classData };
   } catch (err) {
     console.error('[examService.getClassExams]', err);

@@ -24,6 +24,7 @@ import {
 } from '@/lib/userFormConstants.js'
 import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
 import { useAcsisConfirm } from '@/hooks/useAcsisConfirm.jsx'
+import FadeIn from '@/components/ui/fade-in.jsx'
 import '../../pages/admin-ui/style.css'
 
 const TABS = [
@@ -390,7 +391,7 @@ export default function AdminUserManagementPage() {
           </p>
         ) : null}
 
-        <div className="um-topbar">
+        <FadeIn delay={0.05} className="um-topbar">
           <div className="um-tabs" role="tablist" aria-label="Filter users by role">
             {TABS.map((tab) => (
               <button
@@ -419,9 +420,9 @@ export default function AdminUserManagementPage() {
               />
             </label>
           </div>
-        </div>
+        </FadeIn>
 
-        <div className="panel">
+        <FadeIn delay={0.1} className="panel">
           <div className="panel-header">
             <span className="panel-title">
               Users
@@ -457,8 +458,8 @@ export default function AdminUserManagementPage() {
                       </td>
                     </tr>
                   ) : (
-                    filteredUsers.map((u) => (
-                      <tr key={u.uid}>
+                    filteredUsers.map((u, index) => (
+                      <FadeIn as="tr" key={u.uid} delay={0.15 + (index * 0.05)}>
                         <td className="um-name">{u.name}</td>
                         <td className="um-email">{u.email}</td>
                         <td>{u.schoolId || '—'}</td>
@@ -513,14 +514,14 @@ export default function AdminUserManagementPage() {
                             ) : null}
                           </div>
                         </td>
-                      </tr>
+                      </FadeIn>
                     ))
                   )}
                 </tbody>
               </table>
             )}
           </div>
-        </div>
+        </FadeIn>
       </div>
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>

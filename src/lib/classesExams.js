@@ -30,7 +30,7 @@ function defaultClass(/** @type {Exam[]} */ exams = []) {
     name: 'Default class',
     academicYear: 'A.Y. 2025-2026',
     semester: '1st Semester',
-    accessCode: 'PLP-DEFAULT',
+    accessCode: 'ACSIS-DEFAULT',
     exams,
   }
 }
@@ -52,7 +52,7 @@ export function ensureClassAccessCodes() {
     const existing = (c.accessCode && String(c.accessCode).trim()) || ''
     if (existing) return { ...c, accessCode: existing.toUpperCase(), exams: Array.isArray(c.exams) ? c.exams : [] }
     changed = true
-    const code = String(c.id) === 'class_default' ? 'PLP-DEFAULT' : generateClassAccessCode()
+    const code = String(c.id) === 'class_default' ? 'ACSIS-DEFAULT' : generateClassAccessCode()
     return { ...c, accessCode: code, exams: Array.isArray(c.exams) ? c.exams : [] }
   })
   if (changed) {
@@ -74,7 +74,18 @@ export function getClasses() {
     const raw = localStorage.getItem(CLASSES_STORAGE_KEY)
     if (!raw) return []
     const p = JSON.parse(raw)
-    return Array.isArray(p) ? p.map((c) => ({ ...c, exams: Array.isArray(c.exams) ? c.exams : [] })) : []
+    return Array.isArray(p) ? p.map((c) => ({
+      ...c,
+      exams: Array.isArray(c.exams) ? c.exams.map(e => {
+        if (e.id === 'exam_def_1' && !e.description) {
+          return { ...e, description: 'This quiz covers the OSI model, basic networking concepts, and typical protocol analysis using Wireshark.' }
+        }
+        if (e.id === 'exam_def_2' && !e.description) {
+          return { ...e, description: 'Comprehensive midterm exam covering chapters 1 through 5. Password is required to enter.' }
+        }
+        return e
+      }) : []
+    })) : []
   } catch {
     return []
   }
@@ -101,7 +112,21 @@ export function ensureClassesMigrated() {
     const raw = localStorage.getItem(EXAMS_STORAGE_KEY)
     if (raw) {
       const p = JSON.parse(raw)
-      legacy = Array.isArray(p) ? p : []
+      legacy = Array.isArray(p)
+        ? p.map((e) => {
+            if (e.id === 'exam_def_1')
+              return {
+                ...e,
+                description: 'This quiz covers the OSI model, basic networking concepts, and typical protocol analysis using Wireshark.',
+              }
+            if (e.id === 'exam_def_2')
+              return {
+                ...e,
+                description: 'Comprehensive midterm exam covering chapters 1 through 5. Password is required to enter.',
+              }
+            return e
+          })
+        : []
     }
   } catch {
     legacy = []

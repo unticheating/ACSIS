@@ -52,6 +52,7 @@ export default function TeacherCreateExamPage() {
   }, [])
 
   const [examTitle, setExamTitle] = useState('')
+  const [examDescription, setExamDescription] = useState('')
   const [examPassword, setExamPassword] = useState('')
   const [duration, setDuration] = useState('')
 
@@ -239,6 +240,7 @@ export default function TeacherCreateExamPage() {
 
     const payload = {
       title,
+      description: examDescription.trim(),
       duration: dur,
       sections: sections.map((sec) => ({
         title: sec.title.trim() || 'Set',
@@ -438,6 +440,16 @@ export default function TeacherCreateExamPage() {
                 value={examTitle} 
                 onChange={(e) => setExamTitle(e.target.value)} 
                 className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold text-gray-700">Exam Description (Optional)</Label>
+              <textarea 
+                placeholder="Brief instructions or summary"
+                value={examDescription} 
+                onChange={(e) => setExamDescription(e.target.value)} 
+                className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 min-h-[60px]"
               />
             </div>
 

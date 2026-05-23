@@ -13,7 +13,15 @@ export const THEME_PALETTES = [
   { themeId: 6, themeName: 'Slate', primaryColor: '#334155', secondaryColor: '#F1F5F9', baseColor: '#FFFFFF' },
 ]
 
+/** Default when user has no institution or branding is unavailable. */
+export const DEFAULT_THEME_ID = 6
+
+/** @returns {ThemePalette} */
+export function defaultPalette() {
+  return paletteById(DEFAULT_THEME_ID)
+}
+
 /** @param {number} themeId */
 export function paletteById(themeId) {
-  return THEME_PALETTES.find((p) => p.themeId === themeId) ?? THEME_PALETTES[0]
+  return THEME_PALETTES.find((p) => p.themeId === themeId) ?? defaultPalette()
 }

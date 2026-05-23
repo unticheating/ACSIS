@@ -17,6 +17,7 @@ import {
   saveSeatLayout,
   saveSeatSettings,
 } from '@/lib/detectionsSeatLayout.js'
+import FadeIn from '@/components/ui/fade-in.jsx'
 import '../../pages/teacher-ui/reports.css'
 import '../../styles/teacher-detections-live.css'
 
@@ -317,31 +318,32 @@ export default function TeacherDetectionsPage() {
             </div>
 
             <div className="acsis-detections-header__stats">
-              <div className="acsis-detections-stat acsis-detections-stat--absent">
+              <FadeIn delay={0.05} className="acsis-detections-stat acsis-detections-stat--absent">
                 <span className="acsis-detections-stat__value">{statValue(countByTone('absent'))}</span>
                 <span className="acsis-detections-stat__label">Not joined</span>
-              </div>
-              <div className="acsis-detections-stat acsis-detections-stat--ongoing">
+              </FadeIn>
+              <FadeIn delay={0.1} className="acsis-detections-stat acsis-detections-stat--ongoing">
                 <span className="acsis-detections-stat__value">{statValue(countByTone('ongoing'))}</span>
                 <span className="acsis-detections-stat__label">Active</span>
-              </div>
-              <div className="acsis-detections-stat acsis-detections-stat--warn1">
+              </FadeIn>
+              <FadeIn delay={0.15} className="acsis-detections-stat acsis-detections-stat--warn1">
                 <span className="acsis-detections-stat__value">{statValue(countByTone('warn1'))}</span>
                 <span className="acsis-detections-stat__label">1 warn</span>
-              </div>
-              <div className="acsis-detections-stat acsis-detections-stat--warn2">
+              </FadeIn>
+              <FadeIn delay={0.2} className="acsis-detections-stat acsis-detections-stat--warn2">
                 <span className="acsis-detections-stat__value">{statValue(countByTone('warn2'))}</span>
                 <span className="acsis-detections-stat__label">2 warns</span>
-              </div>
-              <div className="acsis-detections-stat acsis-detections-stat--warn3">
+              </FadeIn>
+              <FadeIn delay={0.25} className="acsis-detections-stat acsis-detections-stat--warn3">
                 <span className="acsis-detections-stat__value">{statValue(countByTone('warn3'))}</span>
                 <span className="acsis-detections-stat__label">3 warns</span>
-              </div>
-              <div className="acsis-detections-stat acsis-detections-stat--submitted">
+              </FadeIn>
+              <FadeIn delay={0.3} className="acsis-detections-stat acsis-detections-stat--submitted">
                 <span className="acsis-detections-stat__value">{statValue(countDone())}</span>
                 <span className="acsis-detections-stat__label">Done</span>
-              </div>
-              <div
+              </FadeIn>
+              <FadeIn
+                delay={0.35}
                 className={`acsis-detections-stat acsis-detections-stat--timer${examTime?.isLow ? ' acsis-detections-stat--timer-low' : ''}`}
               >
                 <span className="acsis-detections-stat__value acsis-detections-stat__timer">
@@ -349,7 +351,7 @@ export default function TeacherDetectionsPage() {
                   {examTime?.display ?? '--:--'}
                 </span>
                 <span className="acsis-detections-stat__label">{examTime?.label ?? 'Time'}</span>
-              </div>
+              </FadeIn>
             </div>
           </div>
         </div>
@@ -391,7 +393,8 @@ export default function TeacherDetectionsPage() {
             return (
               <React.Fragment key={`seat-${idx}-${student.id}`}>
                 {isWalkwayCol ? <div className="acsis-detections-walkway" aria-hidden /> : null}
-                <div
+                <FadeIn
+                  delay={0.1 + idx * 0.02}
                   role={isEmpty ? undefined : 'button'}
                   tabIndex={isEmpty ? undefined : 0}
                   draggable={!isEmpty}
@@ -466,7 +469,7 @@ export default function TeacherDetectionsPage() {
                   ) : (
                     <span className="acsis-detections-seat__empty-label">Empty</span>
                   )}
-                </div>
+                </FadeIn>
               </React.Fragment>
             )
           })}

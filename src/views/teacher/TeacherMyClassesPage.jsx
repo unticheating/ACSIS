@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { ChevronDown, MoreVertical } from 'lucide-react'
+import { Archive, ArchiveRestore, ChevronDown, MoreVertical, Plus, Trash2 } from 'lucide-react'
 import AnimatedHoverIcon from '@/components/icons/AnimatedHoverIcon.jsx'
 import { UserPlusIcon } from '@/components/icons/hoverIcons.js'
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu.jsx'
+import { DropdownMenuActionItem } from '@/components/ui/dropdown-menu-action-item.jsx'
 import { apiFetch } from '@/lib/apiFetch.js'
 import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
 import { useAcsisConfirm } from '@/hooks/useAcsisConfirm.jsx'
@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/dialog.jsx'
 import { Input } from '@/components/ui/input.jsx'
 import { Label } from '@/components/ui/label.jsx'
+import FadeIn from '@/components/ui/fade-in.jsx'
 import '../../pages/teacher-ui/my_classes.css'
 
 /**
@@ -41,7 +42,7 @@ import '../../pages/teacher-ui/my_classes.css'
  *   dimmed?: boolean,
  * }} props
  */
-function SectionCardItem({ group, isOpen, onToggle, onAddCourse, onArchive, onRestore, onDelete, dimmed = false }) {
+function SectionCardItem({ group, isOpen, onToggle, onAddCourse, onArchive, onRestore, onDelete, dimmed = false, delay = 0 }) {
   const { term, courses, isOrphan } = group
   const title = isOrphan ? 'Other courses' : formatSectionTitle(term)
   const period = isOrphan ? 'Not linked to a section' : formatTermPeriod(term)
@@ -50,7 +51,7 @@ function SectionCardItem({ group, isOpen, onToggle, onAddCourse, onArchive, onRe
   const canManage = !isOrphan
 
   return (
-    <article
+    <FadeIn as="article" delay={delay}
       className={`acsis-section-card${isOpen ? ' acsis-section-card--open' : ''}${term.isArchived || dimmed ? ' acsis-section-card--archived' : ''}${dimmed ? ' acsis-section-card--dimmed' : ''}`}
     >
       <div
@@ -84,21 +85,32 @@ function SectionCardItem({ group, isOpen, onToggle, onAddCourse, onArchive, onRe
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="min-w-[11rem]" onClick={(e) => e.stopPropagation()}>
                 {!term.isArchived ? (
-                  <DropdownMenuItem onSelect={() => onAddCourse(term)}>Add course</DropdownMenuItem>
+                  <DropdownMenuActionItem icon={Plus} onSelect={() => onAddCourse(term)}>
+                    Add course
+                  </DropdownMenuActionItem>
                 ) : null}
                 {!term.isArchived ? <DropdownMenuSeparator /> : null}
                 {term.isArchived ? (
-                  <DropdownMenuItem onSelect={() => onRestore?.(term.id)}>Restore section</DropdownMenuItem>
+                  <DropdownMenuActionItem
+                    icon={ArchiveRestore}
+                    variant="success"
+                    onSelect={() => onRestore?.(term.id)}
+                  >
+                    Restore section
+                  </DropdownMenuActionItem>
                 ) : (
-                  <DropdownMenuItem onSelect={() => onArchive?.(term.id)}>Archive section</DropdownMenuItem>
+                  <DropdownMenuActionItem icon={Archive} variant="warning" onSelect={() => onArchive?.(term.id)}>
+                    Archive section
+                  </DropdownMenuActionItem>
                 )}
                 <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  className="text-destructive focus:text-destructive"
+                <DropdownMenuActionItem
+                  icon={Trash2}
+                  variant="destructive"
                   onSelect={() => onDelete?.(term)}
                 >
                   Delete section
-                </DropdownMenuItem>
+                </DropdownMenuActionItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -142,15 +154,15 @@ function SectionCardItem({ group, isOpen, onToggle, onAddCourse, onArchive, onRe
             <>
               <h3 className="acsis-section-card__courses-title">Courses</h3>
               <ul className="acsis-mc-course-grid acsis-mc-course-grid--stack">
-                {courses.map((c) => (
-                  <TeacherCourseCard key={c.id} course={c} dimmed={dimmed} />
+                {courses.map((c, index) => (
+                  <TeacherCourseCard key={c.id} course={c} dimmed={dimmed} delay={index * 0.05} />
                 ))}
               </ul>
             </>
           )}
         </div>
       </div>
-    </article>
+    </FadeIn>
   )
 }
 
@@ -446,7 +458,7 @@ export default function TeacherMyClassesPage() {
         ) : (
           <>
             <div ref={listRef} className="acsis-section-card-list">
-              {activeSectionGroups.map((group) => (
+              {activeSectionGroups.map((group, index) => (
                 <SectionCardItem
                   key={group.term.id}
                   group={group}
@@ -456,6 +468,7 @@ export default function TeacherMyClassesPage() {
                   onArchive={handleArchiveSection}
                   onRestore={handleRestoreSection}
                   onDelete={handleDeleteSection}
+                  delay={index * 0.05}
                 />
               ))}
             </div>
@@ -483,7 +496,7 @@ export default function TeacherMyClassesPage() {
 
                 {archivedOpen ? (
                   <div className="acsis-archived-reveal__list">
-                    {archivedSectionGroups.map((group) => (
+                    {archivedSectionGroups.map((group, index) => (
                       <SectionCardItem
                         key={group.term.id}
                         group={group}
@@ -494,6 +507,7 @@ export default function TeacherMyClassesPage() {
                         onArchive={handleArchiveSection}
                         onRestore={handleRestoreSection}
                         onDelete={handleDeleteSection}
+                        delay={index * 0.05}
                       />
                     ))}
                   </div>

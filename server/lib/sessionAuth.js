@@ -235,6 +235,23 @@ export async function requireInstitutionAdminOnly(req, res, next) {
   }
 }
 
+/**
+ * Platform super administrator only.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ */
+export function requireSuperAdmin(req, res, next) {
+  const session = req.authSession
+  if (!session) {
+    return res.status(401).json({ error: 'Not authenticated.' })
+  }
+  if (!session.isSuperAdmin && session.portal !== 'super_admin') {
+    return res.status(403).json({ error: 'Super administrator access required.' })
+  }
+  return next()
+}
+
 export async function requireInstitutionAdmin(req, res, next) {
   const session = req.authSession
   if (!session) {

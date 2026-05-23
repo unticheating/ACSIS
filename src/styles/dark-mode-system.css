@@ -53,13 +53,17 @@ html.dark .detected-item {
 
 html.dark .panel:hover,
 html.dark .acsis-class-card:hover,
-html.dark .acsis-summary-stat:hover,
 html.dark .detected-item:hover,
 html.dark .super-admin-link:hover {
   border-color: var(--acsis-brand-ring, color-mix(in srgb, var(--acsis-brand) 38%, #2a2a2a)) !important;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.05),
     0 6px 20px rgba(0, 0, 0, 0.45) !important;
+}
+
+/* Summary stats use acsis-card-surface neumorphic hover */
+html.dark .acsis-summary-stat.acsis-card-surface:not(:hover) {
+  box-shadow: none !important;
 }
 
 html.dark .panel-title,

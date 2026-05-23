@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils'
+import FadeIn from '@/components/ui/fade-in.jsx'
 
 /**
  * @param {{
@@ -8,6 +9,7 @@ import { cn } from '@/lib/utils'
  *   tone?: 'default' | 'success' | 'danger',
  *   hint?: string,
  *   className?: string,
+ *   delay?: number,
  * }} props
  */
 export function SummaryStatCard({
@@ -17,11 +19,13 @@ export function SummaryStatCard({
   tone = 'default',
   hint,
   className,
+  delay = 0,
 }) {
   return (
-    <div
+    <FadeIn
+      delay={delay}
       className={cn(
-        'acsis-summary-stat',
+        'acsis-summary-stat acsis-card-surface',
         tone !== 'default' && `acsis-summary-stat--${tone}`,
         className,
       )}
@@ -32,7 +36,7 @@ export function SummaryStatCard({
         {hint ? <span className="acsis-summary-stat__hint">{hint}</span> : null}
       </div>
       {icon ? <div className="acsis-summary-stat__icon">{icon}</div> : null}
-    </div>
+    </FadeIn>
   )
 }
 

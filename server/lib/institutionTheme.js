@@ -58,17 +58,7 @@ export async function getInstitutionSettings(pool, institutionId) {
  */
 export async function getBrandingForUser(pool, uid, isSuperAdmin) {
   if (isSuperAdmin) {
-    const { rows } = await pool.query(
-      `SELECT i.institution_id, i.institution_name, i.acronym, i.logo, i.max_warnings,
-              t.theme_id, t.theme_name, t.primary_color, t.secondary_color, t.base_color
-       FROM institutions i
-       JOIN themes t ON t.theme_id = i.theme_id
-       WHERE i.is_active = TRUE
-       ORDER BY i.institution_id ASC
-       LIMIT 1`,
-    )
-    if (!rows[0]) return null
-    return mapBrandingRow(rows[0])
+    return null
   }
 
   const { rows } = await pool.query(

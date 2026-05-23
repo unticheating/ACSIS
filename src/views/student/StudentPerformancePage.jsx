@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge.jsx'
 import { fetchStudentPerformance } from '@/lib/studentPerformanceApi.js'
 import { acsisToastError } from '@/lib/acsisToast.js'
+import FadeIn from '@/components/ui/fade-in.jsx'
 
 function formatDate(iso) {
   if (!iso) return '—'
@@ -43,12 +44,12 @@ export default function StudentPerformancePage() {
 
   return (
     <div className="acsis-view space-y-6">
-      <div>
+      <FadeIn delay={0.05}>
         <h1 className="text-xl font-bold tracking-tight text-foreground">Performance</h1>
         <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
           Your exam scores and submissions from enrolled classes.
         </p>
-      </div>
+      </FadeIn>
 
       {error ? (
         <p className="text-sm text-destructive" role="alert">
@@ -56,19 +57,22 @@ export default function StudentPerformancePage() {
         </p>
       ) : null}
 
-      <SummaryStatGrid>
-        <SummaryStatCard
-          label="Average score"
-          value={data?.averagePercentage != null ? `${data.averagePercentage}%` : '—'}
-          hint={submitted.length ? `From ${submitted.length} submitted exam(s)` : 'No graded attempts yet.'}
-          tone="success"
-        />
-        <SummaryStatCard label="Exams completed" value={data?.examsCompleted ?? 0} tone="success" />
-        <SummaryStatCard label="Integrity warnings" value={data?.totalWarnings ?? 0} tone="danger" />
-      </SummaryStatGrid>
+      <FadeIn delay={0.1}>
+        <SummaryStatGrid>
+          <SummaryStatCard
+            label="Average score"
+            value={data?.averagePercentage != null ? `${data.averagePercentage}%` : '—'}
+            hint={submitted.length ? `From ${submitted.length} submitted exam(s)` : 'No graded attempts yet.'}
+            tone="success"
+          />
+          <SummaryStatCard label="Exams completed" value={data?.examsCompleted ?? 0} tone="success" />
+          <SummaryStatCard label="Integrity warnings" value={data?.totalWarnings ?? 0} tone="danger" />
+        </SummaryStatGrid>
+      </FadeIn>
 
-      <Card>
-        <CardHeader>
+      <FadeIn delay={0.15}>
+        <Card>
+          <CardHeader>
           <CardTitle>Exam history</CardTitle>
           <CardDescription>Submitted and in-progress attempts.</CardDescription>
         </CardHeader>
@@ -79,8 +83,10 @@ export default function StudentPerformancePage() {
             <p className="text-sm text-muted-foreground">No exam attempts yet. Join a class exam and submit your answers.</p>
           ) : (
             <ul className="space-y-3">
-              {data.attempts.map((a) => (
-                <li
+              {data.attempts.map((a, index) => (
+                <FadeIn
+                  as="li"
+                  delay={0.2 + (index * 0.05)}
                   key={a.sessionId}
                   className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3"
                 >
@@ -97,12 +103,13 @@ export default function StudentPerformancePage() {
                     ) : null}
                     <span className="text-muted-foreground text-xs">{formatDate(a.submittedAt)}</span>
                   </div>
-                </li>
+                </FadeIn>
               ))}
             </ul>
           )}
         </CardContent>
-      </Card>
+        </Card>
+      </FadeIn>
     </div>
   )
 }

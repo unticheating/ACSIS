@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { fetchAdminMonitoring, formatRelativeTime } from '@/lib/adminMonitoringApi.js'
+import FadeIn from '@/components/ui/fade-in.jsx'
 import { acsisToastError } from '@/lib/acsisToast.js'
 import '../../pages/admin-ui/style.css'
 
@@ -51,7 +52,7 @@ export default function AdminMonitoringPage() {
         ) : null}
 
         <div className="monitor-stat-cards">
-          <div className="monitor-stat-card">
+          <FadeIn delay={0.05} className="monitor-stat-card">
             <div className="monitor-stat-icon green">
               <i className="fas fa-wave-square" aria-hidden />
             </div>
@@ -59,8 +60,8 @@ export default function AdminMonitoringPage() {
               <div className="monitor-stat-label">Active sessions</div>
               <div className="monitor-stat-value">{loading ? '…' : stats.activeSessions}</div>
             </div>
-          </div>
-          <div className="monitor-stat-card">
+          </FadeIn>
+          <FadeIn delay={0.1} className="monitor-stat-card">
             <div className="monitor-stat-icon green">
               <i className="fas fa-eye" aria-hidden />
             </div>
@@ -68,8 +69,8 @@ export default function AdminMonitoringPage() {
               <div className="monitor-stat-label">Being monitored</div>
               <div className="monitor-stat-value">{loading ? '…' : stats.beingMonitored}</div>
             </div>
-          </div>
-          <div className="monitor-stat-card">
+          </FadeIn>
+          <FadeIn delay={0.15} className="monitor-stat-card">
             <div className="monitor-stat-icon red">
               <i className="fas fa-exclamation-triangle" aria-hidden />
             </div>
@@ -77,10 +78,10 @@ export default function AdminMonitoringPage() {
               <div className="monitor-stat-label">Alerts (last 5m)</div>
               <div className="monitor-stat-value">{loading ? '…' : stats.recentAlerts}</div>
             </div>
-          </div>
+          </FadeIn>
         </div>
 
-        <div className="panel">
+        <FadeIn delay={0.2} className="panel">
           <div className="panel-header">
             <span className="panel-title">Live activity feed</span>
             <button type="button" className="panel-view-all" onClick={load} disabled={loading}>
@@ -93,8 +94,8 @@ export default function AdminMonitoringPage() {
             <p className="admin-placeholder-lead">No recent exam activity.</p>
           ) : (
             <div className="activity-feed">
-              {activities.map((act) => (
-                <div key={`${act.status}-${act.id}`} className="activity-item">
+              {activities.map((act, index) => (
+                <FadeIn key={`${act.status}-${act.id}`} delay={0.25 + (index * 0.05)} className="activity-item">
                   <div className="activity-left">
                     <span className={`activity-dot dot-${act.status}`} />
                     <div className="activity-info">
@@ -108,11 +109,11 @@ export default function AdminMonitoringPage() {
                   <div className="activity-right">
                     <span className="activity-time">{formatRelativeTime(act.time) || 'now'}</span>
                   </div>
-                </div>
+                </FadeIn>
               ))}
             </div>
           )}
-        </div>
+        </FadeIn>
       </div>
     </div>
   )

@@ -39,10 +39,19 @@ export async function enrollStudent(memberId, classId) {
   return result.rows[0];
 }
 
+export async function unenrollStudent(memberId, classId) {
+  const pool = getPool();
+  const result = await pool.query(
+    'DELETE FROM class_enrollments WHERE member_id = $1 AND class_id = $2 RETURNING enrollment_id',
+    [memberId, classId],
+  );
+  return result.rowCount > 0;
+}
+
 export async function getEnrolledClasses(memberId) {
   const pool = getPool();
   const result = await pool.query(
-    `SELECT c.class_id as id, c.class_name as name, c.school_year as "academicYear", c.semester
+    `SELECT c.class_id as id, c.course_code as "courseCode", c.class_name as name, c.school_year as "academicYear", c.semester
      FROM classes c
      JOIN class_enrollments ce ON ce.class_id = c.class_id
      WHERE ce.member_id = $1 AND c.is_active = TRUE

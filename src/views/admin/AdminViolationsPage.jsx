@@ -7,6 +7,7 @@ import {
   violationStatusClass,
 } from '@/lib/adminViolationsApi.js'
 import { acsisToastError } from '@/lib/acsisToast.js'
+import FadeIn from '@/components/ui/fade-in.jsx'
 import '../../pages/admin-ui/style.css'
 
 export default function AdminViolationsPage() {
@@ -85,7 +86,7 @@ export default function AdminViolationsPage() {
           </p>
         ) : null}
 
-        <div className="panel">
+        <FadeIn delay={0.1} className="panel">
           <div className="panel-header">
             <span className="panel-title">
               All violations
@@ -99,8 +100,8 @@ export default function AdminViolationsPage() {
             <p className="admin-placeholder-lead">No proctoring violations recorded yet.</p>
           ) : (
             <div className="violation-list">
-              {violations.map((v) => (
-                <div key={v.id} className="violation-item">
+              {violations.map((v, index) => (
+                <FadeIn key={v.id} delay={0.15 + (index * 0.05)} className="violation-item">
                   <div className="violation-left">
                     <div className="strikes-badge">
                       <span className="strikes-count">{v.strikes}</span>
@@ -121,11 +122,11 @@ export default function AdminViolationsPage() {
                       View
                     </button>
                   </div>
-                </div>
+                </FadeIn>
               ))}
             </div>
           )}
-        </div>
+        </FadeIn>
       </div>
 
       {detailOpen ? (

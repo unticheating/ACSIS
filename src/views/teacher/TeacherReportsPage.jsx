@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { fetchTeacherExamResults, fetchTeacherReportExams } from '@/lib/teacherExamResultsApi.js'
 import { exportExamReport } from '@/lib/teacherExamGradingApi.js'
 import { acsisToastError } from '@/lib/acsisToast.js'
+import FadeIn from '@/components/ui/fade-in.jsx'
 import '../../pages/teacher-ui/reports.css'
 
 function formatDate(iso) {
@@ -168,7 +169,7 @@ export default function TeacherReportsPage() {
 
         {currentExam && (
           <>
-            <div className="panel">
+            <FadeIn delay={0.1} className="panel">
               <div className="exam-title-row">
                 <div>
                   <h2>{currentExam.title}</h2>
@@ -225,7 +226,7 @@ export default function TeacherReportsPage() {
                   </button>
                 </div>
               </div>
-            </div>
+            </FadeIn>
 
             {reportError ? (
               <p className="text-sm text-red-600 px-1" role="alert">
@@ -237,7 +238,7 @@ export default function TeacherReportsPage() {
             ) : null}
 
             {activeTab === 'summary' && (
-              <div className="tab-panel active panel">
+              <FadeIn delay={0.1} className="tab-panel active panel">
                 <div className="report-header">
                   <h3>Summary Report</h3>
                   <p>{currentExam.title}</p>
@@ -257,31 +258,31 @@ export default function TeacherReportsPage() {
                 ) : null}
                 {stats ? (
                   <div className="sdc-stats" style={{ maxWidth: 520 }}>
-                    <div className="sdc-stat">
+                    <FadeIn delay={0.15} className="sdc-stat">
                       <div className="stat-val">{stats.enrolled}</div>
                       <div className="stat-lbl">Enrolled</div>
-                    </div>
-                    <div className="sdc-stat">
+                    </FadeIn>
+                    <FadeIn delay={0.2} className="sdc-stat">
                       <div className="stat-val">{stats.joined}</div>
                       <div className="stat-lbl">Joined</div>
-                    </div>
-                    <div className="sdc-stat">
+                    </FadeIn>
+                    <FadeIn delay={0.25} className="sdc-stat">
                       <div className="stat-val text-green">{stats.submitted}</div>
                       <div className="stat-lbl">Submitted</div>
-                    </div>
-                    <div className="sdc-stat">
+                    </FadeIn>
+                    <FadeIn delay={0.3} className="sdc-stat">
                       <div className="stat-val">{avgScore != null ? `${avgScore}%` : '—'}</div>
                       <div className="stat-lbl">Class average</div>
-                    </div>
+                    </FadeIn>
                   </div>
                 ) : (
                   <p className="text-gray">No summary data yet.</p>
                 )}
-              </div>
+              </FadeIn>
             )}
 
             {activeTab === 'violations' && (
-              <div className="tab-panel active panel">
+              <FadeIn delay={0.1} className="tab-panel active panel">
                 <div className="report-header">
                   <h3>Violations Report</h3>
                   <p>{currentExam.title}</p>
@@ -297,8 +298,10 @@ export default function TeacherReportsPage() {
                   <p className="text-sm text-gray-500">No violations logged for this exam.</p>
                 ) : (
                   <ul className="space-y-2">
-                    {violations.map((v) => (
-                      <li
+                    {violations.map((v, index) => (
+                      <FadeIn
+                        as="li"
+                        delay={0.15 + (index * 0.05)}
                         key={v.id}
                         className="text-sm border border-gray-100 rounded-lg p-3 bg-gray-50 flex flex-wrap justify-between gap-2"
                       >
@@ -307,15 +310,15 @@ export default function TeacherReportsPage() {
                           {v.details ? `: ${v.details}` : ''}
                         </span>
                         <span className="text-gray-500">{formatDate(v.occurredAt)}</span>
-                      </li>
+                      </FadeIn>
                     ))}
                   </ul>
                 )}
-              </div>
+              </FadeIn>
             )}
 
             {activeTab === 'detailed' && (
-              <div className="tab-panel active panel">
+              <FadeIn delay={0.1} className="tab-panel active panel">
                 <div className="report-header">
                   <h3>Student results</h3>
                   <p>Sorted by rank — Rank #1 appears first.</p>
@@ -324,8 +327,8 @@ export default function TeacherReportsPage() {
                 {sessionsByRank.length === 0 ? (
                   <p className="text-sm text-gray-500">No student sessions yet. Students must join and submit the exam.</p>
                 ) : (
-                  sessionsByRank.map((student) => (
-                    <div key={student.sessionId} className="student-detail-card">
+                  sessionsByRank.map((student, index) => (
+                    <FadeIn delay={0.15 + (index * 0.05)} key={student.sessionId} className="student-detail-card">
                       <div className="sdc-header">
                         <div className="sdc-info">
                           <h4>
@@ -371,10 +374,10 @@ export default function TeacherReportsPage() {
                           <div className="stat-lbl">Submitted</div>
                         </div>
                       </div>
-                    </div>
+                    </FadeIn>
                   ))
                 )}
-              </div>
+              </FadeIn>
             )}
           </>
         )}

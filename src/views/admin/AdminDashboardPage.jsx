@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { SummaryStatCard, SummaryStatGrid } from '@/components/dashboard/SummaryStatCard.jsx'
 import { fetchAdminDashboard, formatRelativeTime } from '@/lib/adminDashboardApi.js'
 import { issueViolationTicket } from '@/lib/adminViolationsApi.js'
+import FadeIn from '@/components/ui/fade-in.jsx'
 import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
 import { useAcsisConfirm } from '@/hooks/useAcsisConfirm.jsx'
 import '../../pages/admin-ui/style.css'
@@ -87,20 +88,23 @@ export default function AdminDashboardPage({ basePath = '/admin' }) {
             label="On-Going Examinations"
             value={loading ? '…' : stats.ongoingExams}
             tone="success"
+            delay={0.1}
           />
           <SummaryStatCard
             label="Total Examinations"
             value={loading ? '…' : stats.totalExams}
             tone="success"
+            delay={0.2}
           />
           <SummaryStatCard
             label="Detected Students"
             value={loading ? '…' : stats.detectedStudents}
             tone="danger"
+            delay={0.3}
           />
         </SummaryStatGrid>
 
-        <div className="panel">
+        <FadeIn className="panel" delay={0.4}>
           <div className="panel-header">
             <span className="panel-title">On-Going Examinations</span>
             <Link to={`${basePath}/classes`} className="panel-view-all">
@@ -136,9 +140,9 @@ export default function AdminDashboardPage({ basePath = '/admin' }) {
               ))
             )}
           </div>
-        </div>
+        </FadeIn>
 
-        <div className="panel">
+        <FadeIn className="panel" delay={0.5}>
           <div className="panel-header">
             <span className="panel-title">Detected Students</span>
             <Link to={`${basePath}/violations`} className="panel-view-all">
@@ -181,7 +185,7 @@ export default function AdminDashboardPage({ basePath = '/admin' }) {
               ))
             )}
           </div>
-        </div>
+        </FadeIn>
       </div>
       {ConfirmDialog}
     </div>

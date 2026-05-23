@@ -6,10 +6,9 @@ import {
   useMemo,
   useState,
 } from 'react'
-import { paletteById, THEME_PALETTES } from '@/config/themePalettes.js'
+import { DEFAULT_THEME_ID, defaultPalette, paletteById, THEME_PALETTES } from '@/config/themePalettes.js'
 import {
   applyInstitutionTheme,
-  clearInstitutionTheme,
   readDemoInstitution,
   readDemoThemeId,
   writeDemoInstitution,
@@ -21,8 +20,8 @@ import { useTheme } from '@/context/ThemeContext.jsx'
 const InstitutionThemeContext = createContext(null)
 
 const defaultInstitution = {
-  institutionName: 'Pamantasan ng Lungsod ng Pasig',
-  acronym: 'PLP',
+  institutionName: 'ACSIS',
+  acronym: '',
   logo: null,
   maxWarnings: 3,
 }
@@ -34,18 +33,25 @@ function applyFromTheme(theme, isDark) {
 
 /** @param {Record<string, unknown> | null | undefined} branding */
 function institutionFromBranding(branding) {
-  if (!branding) return { ...defaultInstitution, theme: paletteById(1) }
+  if (!branding) return { ...defaultInstitution, theme: defaultPalette() }
   return {
     institutionName: branding.institutionName || defaultInstitution.institutionName,
     acronym: branding.acronym || defaultInstitution.acronym,
     logo: branding.logo ?? null,
     maxWarnings: branding.maxWarnings ?? defaultInstitution.maxWarnings,
-    theme: branding.theme || paletteById(1),
+    theme: branding.theme || defaultPalette(),
   }
 }
 
+const platformInstitution = {
+  institutionName: 'ACSIS Platform',
+  acronym: 'ACSIS',
+  logo: null,
+  maxWarnings: 3,
+}
+
 export function InstitutionThemeProvider({ children }) {
-  const { authUser, sessionMode, refreshAuth } = useSession()
+  const { authUser, sessionMode, activeAccount, refreshAuth } = useSession()
   const { theme: colorMode } = useTheme()
   const isDark = colorMode === 'dark'
   const [institution, setInstitution] = useState(() => {
@@ -54,6 +60,21 @@ export function InstitutionThemeProvider({ children }) {
   })
 
   useEffect(() => {
+    const isPlatformOperator =
+      authUser?.isSuperAdmin === true ||
+      authUser?.portal === 'super_admin' ||
+      (sessionMode === 'demo' && activeAccount?.portal === 'super_admin')
+
+    if (isPlatformOperator) {
+      const slate = defaultPalette()
+      setInstitution({ ...platformInstitution, theme: slate })
+      applyFromTheme(slate, isDark)
+      if (sessionMode === 'demo') {
+        writeDemoThemeId(DEFAULT_THEME_ID)
+      }
+      return
+    }
+
     const branding = authUser?.branding
     if (branding?.theme) {
       const next = institutionFromBranding(branding)
@@ -70,9 +91,10 @@ export function InstitutionThemeProvider({ children }) {
       return
     }
 
-    setInstitution({ ...defaultInstitution, theme: paletteById(1) })
-    clearInstitutionTheme()
-  }, [authUser?.branding, sessionMode, isDark])
+    const slate = defaultPalette()
+    setInstitution({ ...defaultInstitution, theme: slate })
+    applyFromTheme(slate, isDark)
+  }, [authUser?.branding, authUser?.isSuperAdmin, authUser?.portal, sessionMode, activeAccount?.portal, isDark])
 
   const setInstitutionTheme = useCallback(
     async (themeId, { persistDemo = false } = {}) => {

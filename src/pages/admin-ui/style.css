@@ -13,18 +13,18 @@ html {
 
 /* LAYOUT — shared AppShell (tokens must appear before body uses var(--acsis-canvas)) */
 html:not(.dark) {
-    --acsis-canvas: var(--acsis-canvas-light, #DDEEE4);
+    --acsis-canvas: var(--acsis-canvas-light, #f1f5f9);
 }
 
 :root {
     --sidebar-width: 240px;
-    --acsis-brand: #16a34a;
-    --acsis-brand-hover: #15803d;
-    --acsis-brand-muted-bg: #f0faf4;
-    --acsis-brand-muted-text: #166534;
-    --acsis-canvas: #DDEEE4;
-    --acsis-sidebar-bg: #fafdfb;
-    --acsis-sidebar-border: #b8d4c4;
+    --acsis-brand: #334155;
+    --acsis-brand-hover: #1e293b;
+    --acsis-brand-muted-bg: #f1f5f9;
+    --acsis-brand-muted-text: #334155;
+    --acsis-canvas: #f1f5f9;
+    --acsis-sidebar-bg: #f8fafc;
+    --acsis-sidebar-border: #e2e8f0;
     --acsis-main-pad-x: clamp(14px, 2.5vw, 28px);
     --acsis-main-pad-y: clamp(12px, 2vw, 22px);
 }
@@ -74,7 +74,7 @@ body {
     width: 38px;
     height: 38px;
     border-radius: 50%;
-    background: var(--acsis-brand, #16a34a);
+    background: var(--acsis-brand, #334155);
     color: #fff;
     font-size: 15px;
     font-weight: 700;
@@ -439,6 +439,15 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
     align-items: stretch;
     padding: 4px 0 8px;
     background: var(--acsis-canvas, #DDEEE4);
+}
+
+/* Dashboard: stat row and panels share the same full column width */
+.content-body > .acsis-summary-stats,
+.content-body > .panel {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    align-self: stretch;
 }
 
 /* ========================

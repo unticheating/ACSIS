@@ -10,6 +10,7 @@ import {
   updateInstitutionTheme,
 } from '@/lib/adminSettingsApi.js'
 import { useSession } from '@/context/SessionContext.jsx'
+import FadeIn from '@/components/ui/fade-in.jsx'
 import '../../pages/admin-ui/style.css'
 
 const LOGO_MAX_BYTES = 500 * 1024
@@ -245,7 +246,7 @@ export default function AdminSettingsPage({ basePath = '/admin' }) {
         </div>
       </div>
       <div className="content-body admin-settings-page">
-        <div className="panel">
+        <FadeIn delay={0.05} className="panel">
           <div className="panel-header">
             <span className="panel-title">Institution profile</span>
           </div>
@@ -342,9 +343,9 @@ export default function AdminSettingsPage({ basePath = '/admin' }) {
               </div>
             </>
           )}
-        </div>
+        </FadeIn>
 
-        <div className="panel">
+        <FadeIn delay={0.1} className="panel">
           <div className="panel-header">
             <span className="panel-title">Institution colors</span>
           </div>
@@ -386,7 +387,7 @@ export default function AdminSettingsPage({ basePath = '/admin' }) {
               })}
             </div>
           )}
-        </div>
+        </FadeIn>
 
         <p className="admin-settings-back">
           <Link to={basePath}>← Back to dashboard</Link>

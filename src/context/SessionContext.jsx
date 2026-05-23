@@ -26,7 +26,7 @@ export const demoAccounts = [
   },
   {
     id: 'admin',
-    displayName: 'PLP Admin',
+    displayName: 'ACSIS Admin',
     roleLabel: 'Administrator',
     portal: 'admin',
     entryPath: '/admin',

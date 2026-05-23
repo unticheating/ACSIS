@@ -13,7 +13,7 @@ function PortalCard({ accountId, title, description, letter }) {
       onClick={() => {
         if (account) switchAccount(account)
       }}
-      className={cn('acsis-summary-stat', 'acsis-summary-stat--success')}
+      className={cn('acsis-summary-stat acsis-card-surface', 'acsis-summary-stat--success')}
       style={{ 
         textDecoration: 'none', 
         color: 'inherit', 
@@ -56,7 +56,7 @@ export default function DevPortalsPage() {
           <button 
             onClick={() => logout()} 
             style={{ 
-              color: 'var(--brand-plp, #14532d)', 
+              color: 'var(--brand-plp, var(--acsis-brand-800, #14532d))', 
               fontWeight: 600, 
               background: 'none', 
               border: 'none', 
@@ -69,8 +69,8 @@ export default function DevPortalsPage() {
             ← Back to login
           </button>
         </p>
-        <h1 style={{ fontSize: '1.75rem', color: 'var(--brand-mark, #14532d)', marginBottom: 8 }}>
-          PLP ACSIS — demo portals
+        <h1 style={{ fontSize: '1.75rem', color: 'var(--brand-mark, var(--acsis-brand-800, #14532d))', marginBottom: 8 }}>
+          ACSIS — demo portals
         </h1>
         <p style={{ color: '#4b5563', marginBottom: 32, lineHeight: 1.5 }}>
           Jump directly into a role layout without going through the login screen.

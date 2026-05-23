@@ -1,0 +1,78 @@
+/**
+ * Neumorphic card hover — dual edge shadows (light top-left, dark bottom-right).
+ * Brand tint via --card-glow (per card) or --acsis-brand / --acsis-card-neu-* (theme).
+ */
+
+.acsis-card-surface {
+  position: relative;
+  box-sizing: border-box;
+  --neu-brand: var(--card-glow, var(--acsis-brand, #334155));
+  --neu-offset: 6px;
+  --neu-blur: 12px;
+  transition:
+    box-shadow var(--motion-fast, 160ms) var(--ease-out, ease),
+    transform var(--motion-fast, 160ms) var(--ease-out, ease),
+    border-color var(--motion-fast, 160ms) var(--ease-out, ease);
+}
+
+/* Summary stats: keep equal grid columns; shadow space via gap, not grid padding */
+.acsis-summary-stats .acsis-card-surface {
+  width: 100%;
+  min-width: 0;
+}
+
+.acsis-card-surface > .acsis-course-card__accent,
+.acsis-card-surface > .super-admin-institution-card__accent,
+.acsis-card-surface > .acsis-stream-item__accent,
+.acsis-card-surface > .stu-stream-item__accent {
+  display: none;
+}
+
+/* Flat at rest */
+.acsis-card-surface:not(:hover):not(:focus-within) {
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+}
+
+/* Neumorphic edge glow on hover — light from upper-left */
+.acsis-card-surface:hover,
+.acsis-card-surface:focus-within {
+  box-shadow:
+    calc(var(--neu-offset) * -1) calc(var(--neu-offset) * -1) var(--neu-blur)
+      var(
+        --acsis-card-neu-highlight,
+        color-mix(in srgb, var(--neu-brand) 18%, var(--neu-surface-hi, #ffffff))
+      ),
+    var(--neu-offset) var(--neu-offset) var(--neu-blur)
+      var(
+        --acsis-card-neu-shadow,
+        color-mix(in srgb, var(--neu-brand) 42%, var(--neu-surface-lo, #0f172a))
+      );
+}
+
+html.dark .acsis-card-surface {
+  --neu-offset: 4px;
+  --neu-blur: 8px;
+}
+
+html.dark .acsis-card-surface:not(:hover):not(:focus-within) {
+  box-shadow: none;
+}
+
+html.dark .acsis-card-surface:hover,
+html.dark .acsis-card-surface:focus-within {
+  box-shadow:
+    calc(var(--neu-offset) * -1) calc(var(--neu-offset) * -1) var(--neu-blur)
+      var(--acsis-card-neu-highlight, rgba(255, 255, 255, 0.04)),
+    var(--neu-offset) var(--neu-offset) var(--neu-blur)
+      var(--acsis-card-neu-shadow, rgba(0, 0, 0, 0.5)) !important;
+}
+
+.acsis-summary-stat--danger.acsis-card-surface {
+  --neu-brand: var(--acsis-danger, #dc2626);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .acsis-card-surface {
+    transition: none;
+  }
+}

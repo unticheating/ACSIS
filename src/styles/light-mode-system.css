@@ -42,7 +42,7 @@ html:not(.dark) .acsis-class-card__menu-btn:hover {
 }
 
 html:not(.dark) .acsis-stream-item:hover {
-  border-color: var(--acsis-brand-ring, color-mix(in srgb, var(--acsis-brand) 25%, #e8eaed));
+  border-color: var(--border-default, #e8eaed);
 }
 
 /* ── Sidebar (light) — clearer hover ── */
@@ -91,7 +91,7 @@ html:not(.dark) .stu-class-card:hover [class*='group-hover:text-primary'] {
 }
 
 html:not(.dark) .stu-stream-item:hover {
-  border-color: var(--acsis-brand-ring, color-mix(in srgb, var(--acsis-brand) 25%, #e8eaed));
+  border-color: var(--border-default, #e8eaed);
 }
 
 /* ── Inputs / selects focus (shadcn + native) ── */

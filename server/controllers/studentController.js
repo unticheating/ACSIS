@@ -1,4 +1,4 @@
-import { enrollByAccessCode, getEnrolledClasses } from '../services/studentService.js';
+import { enrollByAccessCode, getEnrolledClasses, unenrollFromClass } from '../services/studentService.js';
 
 export async function enroll(req, res) {
   try {
@@ -25,6 +25,23 @@ export async function getClasses(req, res) {
     return res.json(classes);
   } catch (err) {
     console.error('[studentController.getClasses]', err);
+    return res.status(500).json({ error: 'Internal server error.' });
+  }
+}
+
+export async function unenroll(req, res) {
+  try {
+    const classId = req.params.classId;
+    if (!classId) {
+      return res.status(400).json({ error: 'Class id is required.' });
+    }
+    const result = await unenrollFromClass(req.memberId, classId);
+    if (!result.ok) {
+      return res.status(result.status || 400).json({ error: result.error });
+    }
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('[studentController.unenroll]', err);
     return res.status(500).json({ error: 'Internal server error.' });
   }
 }
