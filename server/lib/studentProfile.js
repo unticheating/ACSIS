@@ -1,48 +1,48 @@
-const YEAR_LEVEL_VALUES = new Set(['1st Year', '2nd Year', '3rd Year', '4th Year'])
+/**
+ * Student subtype row: institution-scoped student number (00-00000).
+ * Cohort (program, section, A.Y.) belongs on teaching_terms / classes, not here.
+ */
 
-export function validateStudentYearLevel(yearLevel) {
-  const v = String(yearLevel || '').trim()
-  if (!v) return 'Year level is required for students.'
-  if (!YEAR_LEVEL_VALUES.has(v)) return 'Select a valid year level.'
-  return null
+/**
+ * @param {import('pg').Pool | import('pg').PoolClient} db
+ * @param {number} memberId
+ * @param {number} institutionId
+ */
+export async function ensureStudentRow(db, memberId, institutionId) {
+  await db.query(
+    `INSERT INTO students (member_id, institution_id)
+     VALUES ($1, $2)
+     ON CONFLICT (member_id) DO NOTHING`,
+    [memberId, institutionId],
+  )
 }
 
 /**
  * @param {import('pg').Pool | import('pg').PoolClient} db
  * @param {number} memberId
  */
-export async function getStudentProfile(db, memberId) {
+export async function getStudentNumber(db, memberId) {
   const { rows } = await db.query(
-    `SELECT program_code AS "programCode", year_level AS "yearLevel", section_code AS "sectionCode"
-     FROM students WHERE member_id = $1`,
+    `SELECT student_number AS "studentNumber" FROM students WHERE member_id = $1`,
     [memberId],
   )
-  return (
-    rows[0] || {
-      programCode: null,
-      yearLevel: null,
-      sectionCode: null,
-    }
-  )
+  return rows[0]?.studentNumber ? String(rows[0].studentNumber).trim() : null
 }
 
 /**
  * @param {import('pg').Pool | import('pg').PoolClient} db
  * @param {number} memberId
- * @param {{ programCode?: string | null, yearLevel?: string | null, sectionCode?: string | null }} profile
+ * @param {number} institutionId
+ * @param {string | null | undefined} studentNumber
  */
-export async function upsertStudentProfile(db, memberId, profile) {
-  const programCode = profile.programCode ? String(profile.programCode).trim() : null
-  const yearLevel = profile.yearLevel ? String(profile.yearLevel).trim() : null
-  const sectionCode = profile.sectionCode ? String(profile.sectionCode).trim() : null
-
+export async function upsertStudentNumber(db, memberId, institutionId, studentNumber) {
+  const num = studentNumber ? String(studentNumber).trim() : null
   await db.query(
-    `INSERT INTO students (member_id, program_code, year_level, section_code)
-     VALUES ($1, $2, $3, $4)
+    `INSERT INTO students (member_id, institution_id, student_number)
+     VALUES ($1, $2, $3)
      ON CONFLICT (member_id) DO UPDATE SET
-       program_code = EXCLUDED.program_code,
-       year_level = EXCLUDED.year_level,
-       section_code = EXCLUDED.section_code`,
-    [memberId, programCode, yearLevel, sectionCode],
+       institution_id = EXCLUDED.institution_id,
+       student_number = EXCLUDED.student_number`,
+    [memberId, institutionId, num],
   )
 }

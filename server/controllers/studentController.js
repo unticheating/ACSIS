@@ -1,4 +1,6 @@
 import { enrollByAccessCode, getEnrolledClasses, unenrollFromClass } from '../services/studentService.js';
+import { upsertStudentNumber } from '../lib/studentProfile.js';
+import { getPool } from '../db.js';
 
 export async function enroll(req, res) {
   try {
@@ -42,6 +44,21 @@ export async function unenroll(req, res) {
     return res.json({ ok: true });
   } catch (err) {
     console.error('[studentController.unenroll]', err);
+    return res.status(500).json({ error: 'Internal server error.' });
+  }
+}
+
+export async function updateStudentNumber(req, res) {
+  try {
+    const { studentNumber } = req.body;
+    if (!studentNumber || typeof studentNumber !== 'string' || !studentNumber.trim()) {
+      return res.status(400).json({ error: 'Student number is required.' });
+    }
+    const pool = getPool();
+    await upsertStudentNumber(pool, req.memberId, req.institutionId, studentNumber.trim());
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('[studentController.updateStudentNumber]', err);
     return res.status(500).json({ error: 'Internal server error.' });
   }
 }

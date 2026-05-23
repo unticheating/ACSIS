@@ -1,9 +1,10 @@
 import { getPool } from '../db.js'
 import { getExamSessionUserColumn } from '../lib/schemaCompat.js'
+import { SQL_JOIN_STUDENTS, SQL_MEMBER_SCHOOL_ID } from '../lib/memberSql.js'
 
-async function sessionMemberJoin(esAlias = 'es', smAlias = 'sm') {
+async function sessionMemberJoin(esAlias = 'es', imAlias = 'im') {
   const col = await getExamSessionUserColumn(getPool())
-  return `${esAlias}.${col} = ${smAlias}.member_id`
+  return `${esAlias}.${col} = ${imAlias}.member_id`
 }
 
 function formatStudentName(row) {
@@ -16,7 +17,7 @@ function formatStudentName(row) {
 
 export async function listExamSessionsForExamQuery(classId, examId) {
   const pool = getPool()
-  const memberJoin = await sessionMemberJoin('es', 'sm')
+  const memberJoin = await sessionMemberJoin('es', 'im')
   const { rows } = await pool.query(
     `SELECT
        es.session_id AS "sessionId",
@@ -29,8 +30,8 @@ export async function listExamSessionsForExamQuery(classId, examId) {
        er.percentage,
        er.rank,
        er.score_released AS "scoreReleased",
-       sm.member_id AS "memberId",
-       sm.school_id AS "schoolId",
+       im.member_id AS "memberId",
+       ${SQL_MEMBER_SCHOOL_ID} AS "schoolId",
        u.uid,
        u.first_name,
        u.middle_name,
@@ -41,8 +42,9 @@ export async function listExamSessionsForExamQuery(classId, examId) {
        (SELECT COUNT(*)::int FROM cheating_logs cl WHERE cl.session_id = es.session_id) AS "violationCount"
      FROM exam_sessions es
      JOIN exams e ON es.exam_id = e.exam_id
-     JOIN institution_members sm ON ${memberJoin}
-     JOIN users u ON sm.uid = u.uid
+     JOIN institution_members im ON ${memberJoin}
+     ${SQL_JOIN_STUDENTS}
+     JOIN users u ON im.uid = u.uid
      LEFT JOIN exam_results er ON er.session_id = es.session_id
      WHERE e.exam_id = $1 AND e.class_id = $2
      ORDER BY er.rank ASC NULLS LAST, er.percentage DESC NULLS LAST, u.last_name, u.first_name`,
@@ -153,7 +155,7 @@ export async function computeExamRanksQuery(examId) {
 
 export async function getTopRankedSessionQuery(examId) {
   const pool = getPool()
-  const memberJoin = await sessionMemberJoin('es', 'sm')
+  const memberJoin = await sessionMemberJoin('es', 'im')
   const { rows } = await pool.query(
     `SELECT
        es.session_id AS "sessionId",
@@ -161,11 +163,12 @@ export async function getTopRankedSessionQuery(examId) {
        er.percentage,
        er.raw_score AS "rawScore",
        TRIM(u.first_name || ' ' || COALESCE(u.middle_name || ' ', '') || u.last_name) AS "studentName",
-       sm.school_id AS "schoolId"
+       ${SQL_MEMBER_SCHOOL_ID} AS "schoolId"
      FROM exam_results er
      JOIN exam_sessions es ON es.session_id = er.session_id
-     JOIN institution_members sm ON ${memberJoin}
-     JOIN users u ON sm.uid = u.uid
+     JOIN institution_members im ON ${memberJoin}
+     ${SQL_JOIN_STUDENTS}
+     JOIN users u ON im.uid = u.uid
      WHERE es.exam_id = $1 AND er.rank = 1
      ORDER BY er.percentage DESC NULLS LAST
      LIMIT 1`,
@@ -198,7 +201,7 @@ export async function releaseExamScoresQuery(examId) {
 
 export async function listSessionsForScoreEmailQuery(examId) {
   const pool = getPool()
-  const memberJoin = await sessionMemberJoin('es', 'sm')
+  const memberJoin = await sessionMemberJoin('es', 'im')
   const { rows } = await pool.query(
     `SELECT
        es.session_id AS "sessionId",
@@ -212,8 +215,9 @@ export async function listSessionsForScoreEmailQuery(examId) {
      FROM exam_sessions es
      JOIN exam_results er ON er.session_id = es.session_id
      JOIN exams e ON e.exam_id = es.exam_id
-     JOIN institution_members sm ON ${memberJoin}
-     JOIN users u ON sm.uid = u.uid
+     JOIN institution_members im ON ${memberJoin}
+     ${SQL_JOIN_STUDENTS}
+     JOIN users u ON im.uid = u.uid
      WHERE es.exam_id = $1 AND es.status = 'submitted'`,
     [examId],
   )
@@ -242,7 +246,7 @@ export async function getMemberDisplayNameQuery(memberId) {
 
 export async function listStudentPerformanceQuery(studentMemberId) {
   const pool = getPool()
-  const memberJoin = await sessionMemberJoin('es', 'sm')
+  const memberJoin = await sessionMemberJoin('es', 'im')
   const { rows } = await pool.query(
     `SELECT
        es.session_id AS "sessionId",
@@ -259,9 +263,10 @@ export async function listStudentPerformanceQuery(studentMemberId) {
      FROM exam_sessions es
      JOIN exams e ON es.exam_id = e.exam_id
      JOIN classes c ON e.class_id = c.class_id
-     JOIN institution_members sm ON ${memberJoin}
+     JOIN institution_members im ON ${memberJoin}
+     ${SQL_JOIN_STUDENTS}
      LEFT JOIN exam_results er ON er.session_id = es.session_id
-     WHERE sm.member_id = $1
+     WHERE im.member_id = $1
        AND (es.status != 'submitted' OR er.score_released = TRUE)
      ORDER BY es.submitted_at DESC NULLS LAST, es.started_at DESC`,
     [studentMemberId],
@@ -315,14 +320,15 @@ export async function listClassEnrolledStudentsQuery(classId) {
   const pool = getPool()
   const { rows } = await pool.query(
     `SELECT
-       sm.member_id AS "memberId",
-       sm.school_id AS "schoolId",
+       im.member_id AS "memberId",
+       ${SQL_MEMBER_SCHOOL_ID} AS "schoolId",
        u.first_name,
        u.middle_name,
        u.last_name
      FROM class_enrollments ce
-     JOIN institution_members sm ON ce.member_id = sm.member_id
-     JOIN users u ON sm.uid = u.uid
+     JOIN institution_members im ON ce.member_id = im.member_id
+     ${SQL_JOIN_STUDENTS}
+     JOIN users u ON im.uid = u.uid
      WHERE ce.class_id = $1
      ORDER BY u.last_name, u.first_name`,
     [classId],
@@ -357,7 +363,7 @@ export async function listExamsForTeacherReportsQuery(memberId) {
 
 export async function listCheatingLogsForExamQuery(examId) {
   const pool = getPool()
-  const memberJoin = await sessionMemberJoin('es', 'sm')
+  const memberJoin = await sessionMemberJoin('es', 'im')
   const { rows } = await pool.query(
     `SELECT
        cl.log_id AS id,
@@ -366,11 +372,12 @@ export async function listCheatingLogsForExamQuery(examId) {
        cl.details,
        cl.occurred_at AS "occurredAt",
        TRIM(u.first_name || ' ' || COALESCE(u.middle_name || ' ', '') || u.last_name) AS "studentName",
-       sm.school_id AS "schoolId"
+       ${SQL_MEMBER_SCHOOL_ID} AS "schoolId"
      FROM cheating_logs cl
      JOIN exam_sessions es ON cl.session_id = es.session_id
-     JOIN institution_members sm ON ${memberJoin}
-     JOIN users u ON sm.uid = u.uid
+     JOIN institution_members im ON ${memberJoin}
+     ${SQL_JOIN_STUDENTS}
+     JOIN users u ON im.uid = u.uid
      WHERE es.exam_id = $1
      ORDER BY cl.occurred_at DESC`,
     [examId],

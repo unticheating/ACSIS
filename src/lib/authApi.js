@@ -14,7 +14,15 @@ export function startGoogleSignIn() {
 }
 
 export async function fetchAuthMe() {
-  const res = await fetch(`${API_BASE}/api/auth/me`, { credentials: 'include' })
+  const res = await fetch(`${API_BASE}/api/auth/me`, { 
+    credentials: 'include',
+    cache: 'no-store',
+    headers: {
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    }
+  })
   if (res.status === 401) return { authenticated: false }
   return parseJson(res)
 }
@@ -84,4 +92,34 @@ export const AUTH_ERROR_MESSAGES = {
   auth_failed: 'Sign-in failed. Please try again or contact your administrator.',
   no_membership:
     'Your account is recognized, but you are not assigned to an institution yet. Ask your administrator to add you.',
+}
+
+export async function saveStudentNumber(studentNumber) {
+  const res = await fetch(`${API_BASE}/api/student/onboarding/student-number`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ studentNumber }),
+  })
+  return parseJson(res)
+}
+
+export async function joinClassByCode(accessCode) {
+  const res = await fetch(`${API_BASE}/api/student/enroll`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ accessCode }),
+  })
+  return parseJson(res)
+}
+
+export async function initialJoinClassByCode(accessCode) {
+  const res = await fetch(`${API_BASE}/api/auth/onboarding/join`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ accessCode }),
+  })
+  return parseJson(res)
 }

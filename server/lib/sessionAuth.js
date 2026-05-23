@@ -147,6 +147,41 @@ export async function requireStudentMember(req, res, next) {
 }
 
 /**
+ * Sets req.institutionId from the authenticated student's institution_members row.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ */
+export async function resolveStudentInstitution(req, res, next) {
+  if (!isDatabaseEnabled()) {
+    return res.status(503).json({ error: 'DATABASE_URL is not configured.' })
+  }
+  const pool = getPool()
+  if (!pool) {
+    return res.status(503).json({ error: 'Database unavailable.' })
+  }
+  if (!req.memberId) {
+    return res.status(403).json({ error: 'Student membership not found.' })
+  }
+  try {
+    const { rows } = await pool.query(
+      `SELECT institution_id FROM institution_members
+       WHERE member_id = $1 AND is_active = TRUE
+       LIMIT 1`,
+      [req.memberId],
+    )
+    if (!rows[0]?.institution_id) {
+      return res.status(403).json({ error: 'Student membership not found.' })
+    }
+    req.institutionId = rows[0].institution_id
+    return next()
+  } catch (err) {
+    console.error('[resolveStudentInstitution]', err)
+    return res.status(500).json({ error: 'Database error.' })
+  }
+}
+
+/**
  * Sets req.institutionId from the authenticated teacher's institution_members row.
  * @param {import('express').Request} req
  * @param {import('express').Response} res

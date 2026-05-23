@@ -1,10 +1,11 @@
 import { getPool } from '../db.js'
 import { ensureExamSessionTicketColumns } from '../lib/ensureTicketSchema.js'
 import { getExamSessionUserColumn } from '../lib/schemaCompat.js'
+import { SQL_JOIN_STUDENTS, SQL_MEMBER_SCHOOL_ID } from '../lib/memberSql.js'
 
-async function sessionMemberJoin(esAlias = 'es', smAlias = 'sm') {
+async function sessionMemberJoin(esAlias = 'es', imAlias = 'im') {
   const col = await getExamSessionUserColumn(getPool())
-  return `${esAlias}.${col} = ${smAlias}.member_id`
+  return `${esAlias}.${col} = ${imAlias}.member_id`
 }
 
 export async function getInstitutionMaxWarnings(institutionId) {
@@ -68,7 +69,7 @@ export async function listOngoingExamsQuery(institutionId, limit = 5) {
 export async function listDetectedStudentsQuery(institutionId, maxWarnings, limit = 5) {
   await ensureExamSessionTicketColumns()
   const pool = getPool()
-  const memberJoin = await sessionMemberJoin('es', 'sm')
+  const memberJoin = await sessionMemberJoin('es', 'im')
   const { rows } = await pool.query(
     `SELECT
        es.session_id AS "sessionId",
@@ -95,8 +96,8 @@ export async function listDetectedStudentsQuery(institutionId, maxWarnings, limi
      FROM exam_sessions es
      JOIN exams e ON es.exam_id = e.exam_id
      JOIN classes c ON e.class_id = c.class_id
-     JOIN institution_members sm ON ${memberJoin}
-     JOIN users su ON sm.uid = su.uid
+     JOIN institution_members im ON ${memberJoin}
+     JOIN users su ON im.uid = su.uid
      WHERE c.institution_id = $1 AND c.is_active = TRUE AND es.warning_count > 0
      ORDER BY es.warning_count DESC, es.started_at DESC
      LIMIT $3`,
@@ -137,7 +138,7 @@ export async function issueViolationTicketQuery(institutionId, sessionId, adminM
 
 export async function getViolationSessionDetailQuery(institutionId, sessionId) {
   const pool = getPool()
-  const memberJoin = await sessionMemberJoin('es', 'sm')
+  const memberJoin = await sessionMemberJoin('es', 'im')
   const { rows } = await pool.query(
     `SELECT
        es.session_id AS "sessionId",
@@ -146,7 +147,7 @@ export async function getViolationSessionDetailQuery(institutionId, sessionId) {
        es.started_at AS "startedAt",
        es.submitted_at AS "submittedAt",
        es.ticket_issued_at AS "ticketIssuedAt",
-       sm.school_id AS "schoolId",
+       ${SQL_MEMBER_SCHOOL_ID} AS "schoolId",
        TRIM(su.first_name || ' ' || COALESCE(su.middle_name || ' ', '') || su.last_name) AS student,
        e.exam_id AS "examId",
        e.title AS exam,
@@ -159,8 +160,9 @@ export async function getViolationSessionDetailQuery(institutionId, sessionId) {
      FROM exam_sessions es
      JOIN exams e ON es.exam_id = e.exam_id
      JOIN classes c ON e.class_id = c.class_id
-     JOIN institution_members sm ON ${memberJoin}
-     JOIN users su ON sm.uid = su.uid
+     JOIN institution_members im ON ${memberJoin}
+     ${SQL_JOIN_STUDENTS}
+     JOIN users su ON im.uid = su.uid
      LEFT JOIN exam_results er ON er.session_id = es.session_id
      WHERE es.session_id = $1 AND c.institution_id = $2 AND c.is_active = TRUE`,
     [sessionId, institutionId],
@@ -211,7 +213,7 @@ export async function getViolationSessionDetailQuery(institutionId, sessionId) {
 export async function listViolationsQuery(institutionId, maxWarnings) {
   await ensureExamSessionTicketColumns()
   const pool = getPool()
-  const memberJoin = await sessionMemberJoin('es', 'sm')
+  const memberJoin = await sessionMemberJoin('es', 'im')
   const { rows } = await pool.query(
     `SELECT
        es.session_id AS id,
@@ -230,8 +232,8 @@ export async function listViolationsQuery(institutionId, maxWarnings) {
      FROM exam_sessions es
      JOIN exams e ON es.exam_id = e.exam_id
      JOIN classes c ON e.class_id = c.class_id
-     JOIN institution_members sm ON ${memberJoin}
-     JOIN users su ON sm.uid = su.uid
+     JOIN institution_members im ON ${memberJoin}
+     JOIN users su ON im.uid = su.uid
      WHERE c.institution_id = $1 AND c.is_active = TRUE
        AND (es.warning_count > 0 OR EXISTS (
          SELECT 1 FROM cheating_logs cl WHERE cl.session_id = es.session_id
@@ -280,7 +282,7 @@ export async function getMonitoringStatsQuery(institutionId) {
 
 export async function listMonitoringActivityQuery(institutionId, limit = 20) {
   const pool = getPool()
-  const memberJoin = await sessionMemberJoin('es', 'sm')
+  const memberJoin = await sessionMemberJoin('es', 'im')
   const { rows } = await pool.query(
     `SELECT
        cl.log_id AS id,
@@ -294,8 +296,8 @@ export async function listMonitoringActivityQuery(institutionId, limit = 20) {
      JOIN exam_sessions es ON cl.session_id = es.session_id
      JOIN exams e ON es.exam_id = e.exam_id
      JOIN classes c ON e.class_id = c.class_id
-     JOIN institution_members sm ON ${memberJoin}
-     JOIN users su ON sm.uid = su.uid
+     JOIN institution_members im ON ${memberJoin}
+     JOIN users su ON im.uid = su.uid
      WHERE c.institution_id = $1 AND c.is_active = TRUE
      ORDER BY cl.occurred_at DESC
      LIMIT $2`,
@@ -324,7 +326,7 @@ export async function listMonitoringActivityQuery(institutionId, limit = 20) {
 
 export async function listActiveMonitoringSessionsQuery(institutionId) {
   const pool = getPool()
-  const memberJoin = await sessionMemberJoin('es', 'sm')
+  const memberJoin = await sessionMemberJoin('es', 'im')
   const { rows } = await pool.query(
     `SELECT
        es.session_id AS id,
@@ -335,8 +337,8 @@ export async function listActiveMonitoringSessionsQuery(institutionId) {
      FROM exam_sessions es
      JOIN exams e ON es.exam_id = e.exam_id
      JOIN classes c ON e.class_id = c.class_id
-     JOIN institution_members sm ON ${memberJoin}
-     JOIN users su ON sm.uid = su.uid
+     JOIN institution_members im ON ${memberJoin}
+     JOIN users su ON im.uid = su.uid
      WHERE c.institution_id = $1 AND c.is_active = TRUE
        AND es.status = 'in_progress' AND e.status IN ('open', 'waiting')
      ORDER BY es.started_at DESC`,

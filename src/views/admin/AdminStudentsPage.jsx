@@ -91,8 +91,6 @@ export default function AdminStudentsPage() {
                     <th>Student ID</th>
                     <th>Name</th>
                     <th>Email</th>
-                    <th>Year level</th>
-                    <th>Section</th>
                     <th>Status</th>
                     <th>Date created</th>
                   </tr>
@@ -100,7 +98,7 @@ export default function AdminStudentsPage() {
                 <tbody>
                   {filtered.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="um-empty">
+                      <td colSpan={5} className="um-empty">
                         No students found.
                       </td>
                     </tr>
@@ -110,8 +108,6 @@ export default function AdminStudentsPage() {
                         <td>{s.schoolId || '—'}</td>
                         <td className="um-name">{s.name}</td>
                         <td className="um-email">{s.email}</td>
-                        <td>{s.yearLevel || '—'}</td>
-                        <td>{s.section || '—'}</td>
                         <td>
                           <span
                             className={`um-status-badge${s.status !== 'active' ? ` um-status-badge--${s.status}` : ''}`}

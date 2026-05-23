@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { enroll, getClasses, unenroll } from '../controllers/studentController.js';
+import { enroll, getClasses, unenroll, updateStudentNumber } from '../controllers/studentController.js';
 import {
   getStudentClassStream,
   getStudentExamSession,
@@ -9,7 +9,7 @@ import {
   getStudentPerformance,
   postStudentVerifyExamPassword,
 } from '../controllers/examController.js';
-import { requireAuth, requireStudentMember } from '../lib/sessionAuth.js';
+import { requireAuth, requireStudentMember, resolveStudentInstitution } from '../lib/sessionAuth.js';
 
 const router = Router();
 
@@ -26,5 +26,7 @@ router.get('/classes/:classId/exams/:examId/session', getStudentExamSession);
 router.post('/classes/:classId/exams/:examId/verify-password', postStudentVerifyExamPassword);
 router.post('/classes/:classId/exams/:examId/cheating', logStudentCheating);
 router.post('/classes/:classId/exams/:examId/submit', submitStudentExam);
+
+router.post('/onboarding/student-number', resolveStudentInstitution, updateStudentNumber);
 
 export default router;

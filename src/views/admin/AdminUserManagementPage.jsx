@@ -16,12 +16,7 @@ import {
   statusLabel,
   updateAdminUser,
 } from '@/lib/adminUsersApi.js'
-import {
-  formatSchoolIdInput,
-  validateSchoolIdClient,
-  validateYearLevelClient,
-  YEAR_LEVEL_OPTIONS,
-} from '@/lib/userFormConstants.js'
+import { formatSchoolIdInput, validateSchoolIdClient } from '@/lib/userFormConstants.js'
 import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
 import { useAcsisConfirm } from '@/hooks/useAcsisConfirm.jsx'
 import FadeIn from '@/components/ui/fade-in.jsx'
@@ -41,9 +36,6 @@ const emptyForm = {
   email: '',
   role: 'student',
   schoolId: '',
-  programCode: '',
-  yearLevel: '',
-  section: '',
   password: '',
   pendingFaculty: false,
 }
@@ -111,9 +103,6 @@ export default function AdminUserManagementPage() {
       email: user.email || '',
       role: user.role,
       schoolId: user.schoolId || '',
-      programCode: user.programCode || '',
-      yearLevel: user.yearLevel || '',
-      section: user.section || '',
       password: '',
       pendingFaculty: false,
     })
@@ -127,12 +116,8 @@ export default function AdminUserManagementPage() {
   function validateForm() {
     const id = String(form.schoolId || '').trim()
     if (form.role === 'student' || id) {
-      const idErr = validateSchoolIdClient(form.schoolId, form.role === 'student')
+      const idErr = validateSchoolIdClient(form.schoolId, form.role === 'student', form.role)
       if (idErr) return idErr
-    }
-    if (form.role === 'student') {
-      const yearErr = validateYearLevelClient(form.yearLevel, true)
-      if (yearErr) return yearErr
     }
     return null
   }
@@ -155,9 +140,6 @@ export default function AdminUserManagementPage() {
         email: form.email,
         role: form.role,
         schoolId: form.schoolId,
-        programCode: form.programCode,
-        yearLevel: form.yearLevel,
-        section: form.section,
         password: form.role === 'admin' ? form.password : undefined,
         pendingFaculty: form.role === 'faculty' && form.pendingFaculty,
       })
@@ -191,11 +173,6 @@ export default function AdminUserManagementPage() {
         middleName: form.middleName || null,
         email: form.email,
         schoolId: form.schoolId,
-      }
-      if (form.role === 'student') {
-        payload.programCode = form.programCode
-        payload.yearLevel = form.yearLevel
-        payload.section = form.section
       }
       await updateAdminUser(editingUid, payload)
       setEditOpen(false)
@@ -299,11 +276,11 @@ export default function AdminUserManagementPage() {
         </label>
       ) : null}
       <label>
-        Student / employee ID
+        {form.role === 'student' ? 'Student number' : 'Employee ID'}
         <input
           type="text"
           inputMode="numeric"
-          required={form.role === 'student' && !editOpen}
+          required={form.role === 'student'}
           placeholder="00-00000"
           pattern="\d{2}-\d{5}"
           maxLength={8}
@@ -313,42 +290,6 @@ export default function AdminUserManagementPage() {
         />
         <span className="um-field-hint">Format: 00-00000 (example: 24-00123)</span>
       </label>
-      {form.role === 'student' ? (
-        <>
-          <label>
-            Program
-            <input
-              type="text"
-              placeholder="BSIT"
-              value={form.programCode}
-              onChange={(e) => patchForm('programCode', e.target.value)}
-            />
-          </label>
-          <label>
-            Year level
-            <select
-              required
-              value={form.yearLevel}
-              onChange={(e) => patchForm('yearLevel', e.target.value)}
-            >
-              {YEAR_LEVEL_OPTIONS.map((opt) => (
-                <option key={opt.value || 'empty'} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Section
-            <input
-              type="text"
-              placeholder="3D"
-              value={form.section}
-              onChange={(e) => patchForm('section', e.target.value)}
-            />
-          </label>
-        </>
-      ) : null}
       {!editOpen && form.role === 'admin' ? (
         <label className="um-form-full">
           Password <span className="um-optional">(for email login)</span>
@@ -443,7 +384,6 @@ export default function AdminUserManagementPage() {
                     <th>Name</th>
                     <th>Email</th>
                     <th>Student / ID no.</th>
-                    <th>Year &amp; section</th>
                     <th>Status</th>
                     <th>Role</th>
                     <th>Date created</th>
@@ -453,7 +393,7 @@ export default function AdminUserManagementPage() {
                 <tbody>
                   {filteredUsers.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="um-empty">
+                      <td colSpan={7} className="um-empty">
                         No users found. Add a user or adjust your filters.
                       </td>
                     </tr>
@@ -463,19 +403,6 @@ export default function AdminUserManagementPage() {
                         <td className="um-name">{u.name}</td>
                         <td className="um-email">{u.email}</td>
                         <td>{u.schoolId || '—'}</td>
-                        <td>
-                          {u.yearLevel || u.section ? (
-                            <>
-                              {u.yearLevel || '—'}
-                              {u.yearLevel && u.section ? (
-                                <span className="um-meta-sep"> · </span>
-                              ) : null}
-                              {u.section || ''}
-                            </>
-                          ) : (
-                            <span className="um-muted">—</span>
-                          )}
-                        </td>
                         <td>
                           <span
                             className={`um-status-badge${u.status !== 'active' ? ` um-status-badge--${u.status}` : ''}`}
