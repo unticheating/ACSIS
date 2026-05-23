@@ -350,6 +350,42 @@ export async function getTeacherMonitoringSnapshot(req, res) {
   return res.json(result);
 }
 
+/** Server-Sent Events: push when roster/cheating changes (replaces 5s polling at scale). */
+export async function streamTeacherMonitoringSnapshot(req, res) {
+  const { classId, examId } = req.params;
+  const { subscribeMonitoring } = await import('../lib/monitoringBroadcast.js');
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders?.();
+
+  async function pushSnapshot() {
+    const result = await getTeacherMonitoringSnapshotService(classId, examId, req.memberId);
+    if (!result.ok) {
+      res.write(`event: error\ndata: ${JSON.stringify({ error: result.error })}\n\n`);
+      return;
+    }
+    res.write(`data: ${JSON.stringify(result)}\n\n`);
+  }
+
+  await pushSnapshot();
+  const unsubscribe = subscribeMonitoring(classId, examId, () => {
+    pushSnapshot().catch((err) => {
+      console.error('[streamTeacherMonitoringSnapshot]', err);
+    });
+  });
+
+  const heartbeat = setInterval(() => {
+    res.write(': ping\n\n');
+  }, 25000);
+
+  req.on('close', () => {
+    clearInterval(heartbeat);
+    unsubscribe();
+  });
+}
+
 export async function listTeacherReportExams(req, res) {
   const result = await listTeacherReportExamsService(req.memberId);
   if (!result.ok) {

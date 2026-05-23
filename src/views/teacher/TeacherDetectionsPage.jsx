@@ -272,9 +272,42 @@ export default function TeacherDetectionsPage() {
 
   useEffect(() => {
     if (!activeExam?.classId || !activeExam?.id) return undefined
-    const interval = window.setInterval(() => refreshSessions(activeExam), 5000)
-    return () => window.clearInterval(interval)
-  }, [activeExam, refreshSessions])
+
+    const streamUrl = `/api/teacher/classes/${encodeURIComponent(activeExam.classId)}/exams/${encodeURIComponent(activeExam.id)}/monitoring/stream`
+    let es = null
+    let fallbackTimer = null
+
+    function startFallbackPoll() {
+      if (fallbackTimer) return
+      fallbackTimer = window.setInterval(() => refreshSessions(activeExam), 8000)
+    }
+
+    if (typeof EventSource !== 'undefined') {
+      es = new EventSource(streamUrl)
+      es.onmessage = (ev) => {
+        try {
+          const data = JSON.parse(ev.data)
+          if (data?.ok !== false) {
+            applyMonitoringData(data, activeExam)
+          }
+        } catch (err) {
+          console.error('[Detections] SSE parse error:', err)
+        }
+      }
+      es.onerror = () => {
+        es?.close()
+        es = null
+        startFallbackPoll()
+      }
+    } else {
+      startFallbackPoll()
+    }
+
+    return () => {
+      es?.close()
+      if (fallbackTimer) window.clearInterval(fallbackTimer)
+    }
+  }, [activeExam, refreshSessions, applyMonitoringData])
 
   useEffect(() => {
     if (!activeExam) return undefined

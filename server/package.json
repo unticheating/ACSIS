@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node index.js",
     "dev": "node --watch index.js",
+    "test": "node --test tests/**/*.test.js",
     "db:export": "node export_database.js"
   },
   "dependencies": {
