@@ -7,9 +7,10 @@ import { computeExamRanksQuery } from './examResultsRepository.js'
 export async function getExamForJoinQuery(classId, examId) {
   const pool = getPool()
   const { rows } = await pool.query(
-    `SELECT exam_id, title, password, time_limit, status, updated_at
-     FROM exams
-     WHERE exam_id = $1 AND class_id = $2 AND is_archived = FALSE`,
+    `SELECT e.exam_id, e.title, e.password, e.time_limit, e.status, e.updated_at, c.institution_id
+     FROM exams e
+     JOIN classes c ON c.class_id = e.class_id
+     WHERE e.exam_id = $1 AND e.class_id = $2 AND e.is_archived = FALSE`,
     [examId, classId],
   )
   return rows[0] || null
@@ -192,18 +193,27 @@ export async function isSessionScoreReleasedQuery(sessionId) {
   return Boolean(rows[0]?.score_released)
 }
 
-export async function markSessionSubmittedQuery(sessionId) {
+export async function markSessionSubmittedQuery(sessionId, autoSubmitted = false) {
   const pool = getPool()
   await pool.query(
     `UPDATE exam_sessions
-     SET status = 'submitted', submitted_at = NOW(), auto_submitted = FALSE
+     SET status = 'submitted', submitted_at = NOW(), auto_submitted = $2
      WHERE session_id = $1`,
-    [sessionId],
+    [sessionId, Boolean(autoSubmitted)],
   )
 }
 
 export async function upsertStudentAnswerQuery(sessionId, questionId, { choiceId, answerText }) {
   const pool = getPool()
+  const { rows: statusRows } = await pool.query(
+    `SELECT status FROM exam_sessions WHERE session_id = $1`,
+    [sessionId],
+  )
+  if (statusRows[0]?.status === 'submitted') {
+    const err = new Error('Exam session is already submitted.')
+    err.code = 'SESSION_CLOSED'
+    throw err
+  }
   const text = answerText != null ? String(answerText).trim().toUpperCase() : null
   await pool.query(
     `INSERT INTO student_answers (session_id, question_id, choice_id, answer_text)

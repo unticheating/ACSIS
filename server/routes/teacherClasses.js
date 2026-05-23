@@ -20,6 +20,7 @@ import {
   getTeacherExamSessionDetail,
   getTeacherActiveMonitoring,
   getTeacherMonitoringSnapshot,
+  streamTeacherMonitoringSnapshot,
   listTeacherReportExams,
   patchManualGrade,
   postExportExamReport,
@@ -55,6 +56,7 @@ router.post('/:classId/exams', createTeacherExam);
 router.get('/:classId/exams/:examId', getTeacherExamSession);
 router.get('/:classId/exams/:examId/results', getTeacherExamResults);
 router.get('/:classId/exams/:examId/monitoring', getTeacherMonitoringSnapshot);
+router.get('/:classId/exams/:examId/monitoring/stream', streamTeacherMonitoringSnapshot);
 router.get('/:classId/exams/:examId/results/:sessionId', getTeacherExamSessionDetail);
 router.patch(
   '/:classId/exams/:examId/results/:sessionId/answers/:answerId/grade',

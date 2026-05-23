@@ -12,8 +12,6 @@ import {
   UsersRound,
   Building2,
 } from 'lucide-react'
-import { getClassById, getExamInClass } from '../lib/classesExams.js'
-
 /** Navigation only — chrome (names, avatars) comes from SessionContext. */
 export const shellConfig = {
   teacher: {
@@ -62,14 +60,13 @@ export function resolveShellPageTitle(role, pathname) {
   }
 
   if (role === 'teacher') {
-    const examDetail = pathname.match(/^\/teacher\/my-classes\/([^/]+)\/exams\/([^/]+)$/)
-    if (examDetail) {
-      const hit = getExamInClass(examDetail[1], examDetail[2])
-      if (hit?.exam?.title) return hit.exam.title
-    }
     const sectionCourses = pathname.match(/^\/teacher\/my-classes\/(?:section|term)\/([^/]+)$/)
     if (sectionCourses) {
       return 'Courses'
+    }
+    const examDetail = pathname.match(/^\/teacher\/my-classes\/([^/]+)\/exams\/([^/]+)$/)
+    if (examDetail) {
+      return 'Exam'
     }
     const classStream = pathname.match(/^\/teacher\/my-classes\/(?!section\/|term\/)([^/]+)$/)
     if (classStream) {
@@ -80,8 +77,7 @@ export function resolveShellPageTitle(role, pathname) {
   if (role === 'student') {
     const clsPath = pathname.match(/^\/student\/my-classes\/([^/]+)$/)
     if (clsPath) {
-      const cls = getClassById(clsPath[1])
-      if (cls?.name) return cls.name
+      return 'Class'
     }
   }
 

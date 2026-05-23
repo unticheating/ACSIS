@@ -17,12 +17,6 @@ import {
   upsertStudentAnswerQuery,
 } from '../repositories/examSessionRepository.js'
 
-function percentageFromScores(scores) {
-  return scores.totalPoints > 0
-    ? Math.round((scores.rawScore / scores.totalPoints) * 10000) / 100
-    : 0
-}
-
 /** Students only receive numeric scores after faculty releases them. */
 async function buildStudentSubmitPayload(sessionId, scores) {
   const scoreReleased = await isSessionScoreReleasedQuery(sessionId)
@@ -42,6 +36,9 @@ import { applyLayoutToExamQuestions } from '../lib/examShuffle.js'
 import { getSessionShuffleLayoutQuery } from '../repositories/examSessionRepository.js'
 import { closeOtherTeacherOngoingExamsQuery } from '../repositories/examResultsRepository.js'
 import { checkEnrollment } from '../repositories/studentRepository.js'
+import { getInstitutionMaxWarnings } from '../repositories/adminRepository.js'
+import { percentageFromScores, shouldAutoSubmitExam } from '../lib/examSessionRules.js'
+import { notifyMonitoringUpdate } from '../lib/monitoringBroadcast.js'
 
 function mapExamMeta(row) {
   const status = (row.status || '').toLowerCase()
@@ -219,22 +216,27 @@ export async function logCheatingEventService(classId, examId, studentMemberId, 
 
   await insertCheatingLogQuery(gate.session.session_id, eventType, details || null)
   const warningCount = await incrementSessionWarningQuery(gate.session.session_id)
+  const maxWarnings = await getInstitutionMaxWarnings(gate.exam.institution_id)
 
   let autoSubmitted = false
   let scores = { rawScore: 0, totalPoints: 0 }
-  if (warningCount >= 3) {
-    await markSessionSubmittedQuery(gate.session.session_id)
+  if (shouldAutoSubmitExam(warningCount, maxWarnings)) {
+    await markSessionSubmittedQuery(gate.session.session_id, true)
     try {
       scores = await gradeSessionAnswersQuery(gate.session.session_id)
     } catch (err) {
       console.error('[examSessionService.logCheating] auto-submit grade failed:', err)
     }
     autoSubmitted = true
+    notifyMonitoringUpdate(classId, examId)
+  } else {
+    notifyMonitoringUpdate(classId, examId)
   }
 
   const payload = {
     ok: true,
     warningCount,
+    maxWarnings,
     autoSubmitted,
     ...(await buildStudentSubmitPayload(gate.session.session_id, scores)),
   }
@@ -257,16 +259,24 @@ export async function submitExamService(classId, examId, studentMemberId, answer
       choiceId = await findChoiceIdByTextQuery(questionId, answerText)
     }
 
-    await upsertStudentAnswerQuery(gate.session.session_id, questionId, { choiceId, answerText })
+    try {
+      await upsertStudentAnswerQuery(gate.session.session_id, questionId, { choiceId, answerText })
+    } catch (err) {
+      if (err?.code === 'SESSION_CLOSED') {
+        return { ok: false, status: 400, error: err.message }
+      }
+      throw err
+    }
   }
 
-  await markSessionSubmittedQuery(gate.session.session_id)
+  await markSessionSubmittedQuery(gate.session.session_id, false)
   let scores = { rawScore: 0, totalPoints: 0 }
   try {
     scores = await gradeSessionAnswersQuery(gate.session.session_id)
   } catch (err) {
     console.error('[examSessionService.submitExam] grading failed:', err)
   }
+  notifyMonitoringUpdate(classId, examId)
 
   return {
     ok: true,
