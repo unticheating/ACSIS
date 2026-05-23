@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { apiFetch } from '@/lib/apiFetch.js'
+import { acsisToastError } from '@/lib/acsisToast.js'
 import { isExamEnterableByStudent, labelForStudentExam } from '@/lib/examFlowUi.js'
 import { joinStudentExam } from '@/lib/studentExamApi.js'
 import '../../pages/student-ui/enrolled_classes.css'
@@ -54,7 +55,9 @@ export default function StudentClassStreamPage() {
         `/student/exam/session?classId=${encodeURIComponent(classId)}&examId=${encodeURIComponent(joinExamId)}`,
       )
     } catch (err) {
-      setJoinError(err instanceof Error ? err.message : 'Could not join exam.')
+      const msg = err instanceof Error ? err.message : 'Could not join exam.'
+      setJoinError(msg)
+      acsisToastError(msg)
     } finally {
       setJoining(false)
     }

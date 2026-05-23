@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
 import { fetchAdminUsers, formatDateCreated, statusLabel } from '@/lib/adminUsersApi.js'
+import { acsisToastError } from '@/lib/acsisToast.js'
 import '../../pages/admin-ui/style.css'
 
 export default function AdminStudentsPage() {
@@ -17,7 +18,9 @@ export default function AdminStudentsPage() {
       setStudents((data.users || []).filter((u) => u.role === 'student'))
     } catch (err) {
       setStudents([])
-      setError(err instanceof Error ? err.message : 'Failed to load students.')
+      const msg = err instanceof Error ? err.message : 'Failed to load students.'
+      setError(msg)
+      acsisToastError(msg)
     } finally {
       setLoading(false)
     }

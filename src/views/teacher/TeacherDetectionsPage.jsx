@@ -42,12 +42,17 @@ function violationsBySession(violations) {
   return map
 }
 
-/** Seat color: absent | submitted | ongoing | warn1 | warn2 | warn3 */
+/**
+ * Seat color: absent | ongoing | warn1 | warn2 | warn3 | submitted | done-warn3
+ * Auto-submit at 3 warnings → done-warn3 (red, still counts as Done).
+ */
 function resolveSeatTone(entry) {
   if (!entry.joined) return 'absent'
   const strikes = Number(entry.warningCount || 0)
+  if (strikes >= MAX_EXAM_WARNINGS) {
+    return entry.status === 'submitted' ? 'done-warn3' : 'warn3'
+  }
   if (entry.status === 'submitted') return 'submitted'
-  if (strikes >= MAX_EXAM_WARNINGS) return 'warn3'
   if (strikes === 2) return 'warn2'
   if (strikes === 1) return 'warn1'
   return 'ongoing'
@@ -59,10 +64,15 @@ function statusLabelForTone(tone) {
     ongoing: 'Active — no warnings',
     warn1: '1 warning',
     warn2: '2 warnings',
-    warn3: 'Max warnings (3+)',
+    warn3: '3 warnings — auto-submit pending',
+    'done-warn3': 'Auto-submitted (3 warnings)',
     submitted: 'Exam submitted',
   }
   return map[tone] || tone
+}
+
+function isDoneTone(tone) {
+  return tone === 'submitted' || tone === 'done-warn3'
 }
 
 function rosterEntryToSeat(entry, violationLabels = []) {
@@ -279,6 +289,8 @@ export default function TeacherDetectionsPage() {
   const isLive = Boolean(monitoringReady && activeExam)
   const presentStudents = students.filter((s) => s.tone !== 'empty')
   const countByTone = (tone) => (isLive ? presentStudents.filter((s) => s.tone === tone).length : null)
+  const countDone = () =>
+    isLive ? presentStudents.filter((s) => isDoneTone(s.tone)).length : null
 
   const examSubtitle = !monitoringReady
     ? 'Loading…'
@@ -326,7 +338,7 @@ export default function TeacherDetectionsPage() {
                 <span className="acsis-detections-stat__label">3 warns</span>
               </div>
               <div className="acsis-detections-stat acsis-detections-stat--submitted">
-                <span className="acsis-detections-stat__value">{statValue(countByTone('submitted'))}</span>
+                <span className="acsis-detections-stat__value">{statValue(countDone())}</span>
                 <span className="acsis-detections-stat__label">Done</span>
               </div>
               <div
@@ -432,11 +444,24 @@ export default function TeacherDetectionsPage() {
                         <div className={`acsis-detections-seat__avatar acsis-detections-seat__avatar--${tone}`}>
                           {initials}
                         </div>
+                        {student.strikes > 0 ? (
+                          <span
+                            className="acsis-detections-seat__strikes"
+                            title={`${student.strikes} / ${MAX_EXAM_WARNINGS} warnings`}
+                          >
+                            {student.strikes}/{MAX_EXAM_WARNINGS}
+                          </span>
+                        ) : null}
                       </div>
                       <div className="min-w-0">
                         <div className="acsis-detections-seat__name">{student.firstName}</div>
                         <div className="acsis-detections-seat__last">{student.lastName}</div>
                       </div>
+                      {tone === 'done-warn3' ? (
+                        <span className="acsis-detections-seat__badge acsis-detections-seat__badge--auto">
+                          Auto-submitted
+                        </span>
+                      ) : null}
                     </>
                   ) : (
                     <span className="acsis-detections-seat__empty-label">Empty</span>

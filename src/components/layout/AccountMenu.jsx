@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/dropdown-menu.jsx'
 import { useSession } from '@/context/SessionContext.jsx'
 import { useTheme } from '@/context/ThemeContext.jsx'
+import { useAcsisConfirm } from '@/hooks/useAcsisConfirm.jsx'
 
 /**
  * @param {{
@@ -28,6 +29,7 @@ export default function AccountMenu({
 }) {
   const { accounts, activeAccount, switchAccount, logout, sessionMode } = useSession()
   const { theme, toggleTheme } = useTheme()
+  const { confirm, ConfirmDialog } = useAcsisConfirm()
   const otherAccounts =
     sessionMode === 'demo' ? accounts.filter((a) => a.id !== activeAccount.id) : []
 
@@ -99,16 +101,22 @@ export default function AccountMenu({
         <DropdownMenuItem
           className="cursor-pointer text-red-600 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40 dark:focus:text-red-300"
           onSelect={(e) => {
-            if (!window.confirm('Are you sure you want to logout?')) {
-              e.preventDefault()
-            } else {
-              logout()
-            }
+            e.preventDefault()
+            void (async () => {
+              const ok = await confirm({
+                title: 'Log out?',
+                description: 'You will need to sign in again to continue.',
+                confirmLabel: 'Log out',
+                destructive: true,
+              })
+              if (ok) logout()
+            })()
           }}
         >
           Log out
         </DropdownMenuItem>
       </DropdownMenuContent>
+      {ConfirmDialog}
     </DropdownMenu>
   )
 }

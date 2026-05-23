@@ -21,6 +21,9 @@ import {
   getTeacherActiveMonitoring,
   getTeacherMonitoringSnapshot,
   listTeacherReportExams,
+  patchManualGrade,
+  postExportExamReport,
+  postReleaseExamScores,
 } from '../controllers/examController.js';
 import { requireAuth } from '../lib/sessionAuth.js';
 
@@ -53,6 +56,12 @@ router.get('/:classId/exams/:examId', getTeacherExamSession);
 router.get('/:classId/exams/:examId/results', getTeacherExamResults);
 router.get('/:classId/exams/:examId/monitoring', getTeacherMonitoringSnapshot);
 router.get('/:classId/exams/:examId/results/:sessionId', getTeacherExamSessionDetail);
+router.patch(
+  '/:classId/exams/:examId/results/:sessionId/answers/:answerId/grade',
+  patchManualGrade,
+);
+router.post('/:classId/exams/:examId/release-scores', postReleaseExamScores);
+router.post('/:classId/exams/:examId/reports/export', postExportExamReport);
 router.put('/:classId/exams/:examId', publishTeacherExam);
 router.put('/:classId/exams/:examId/start', startTeacherExam);
 router.put('/:classId/exams/:examId/close', closeTeacherExam);

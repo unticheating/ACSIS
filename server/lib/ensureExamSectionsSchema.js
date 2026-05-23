@@ -1,0 +1,23 @@
+import { getPool } from '../db.js'
+
+let ensured = false
+
+export async function ensureExamSectionsSchema() {
+  if (ensured) return
+  const pool = getPool()
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS exam_sections (
+      section_id   SERIAL PRIMARY KEY,
+      exam_id      INT NOT NULL REFERENCES exams (exam_id) ON DELETE CASCADE,
+      title        VARCHAR(200) NOT NULL DEFAULT '',
+      description  TEXT DEFAULT NULL,
+      order_num    INT NOT NULL DEFAULT 0
+    )
+  `)
+  await pool.query(`
+    ALTER TABLE questions
+      ADD COLUMN IF NOT EXISTS section_id INT DEFAULT NULL
+      REFERENCES exam_sections (section_id) ON DELETE CASCADE
+  `)
+  ensured = true
+}

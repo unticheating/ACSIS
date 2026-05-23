@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { fetchAdminMonitoring, formatRelativeTime } from '@/lib/adminMonitoringApi.js'
+import { acsisToastError } from '@/lib/acsisToast.js'
 import '../../pages/admin-ui/style.css'
 
 export default function AdminMonitoringPage() {
@@ -17,7 +18,9 @@ export default function AdminMonitoringPage() {
       setActivities(data.activities || [])
     } catch (err) {
       setActivities([])
-      setError(err instanceof Error ? err.message : 'Failed to load monitoring data.')
+      const msg = err instanceof Error ? err.message : 'Failed to load monitoring data.'
+      setError(msg)
+      acsisToastError(msg)
     } finally {
       setLoading(false)
     }

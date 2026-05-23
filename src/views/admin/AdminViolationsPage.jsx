@@ -6,6 +6,7 @@ import {
   formatViolationDateTime,
   violationStatusClass,
 } from '@/lib/adminViolationsApi.js'
+import { acsisToastError } from '@/lib/acsisToast.js'
 import '../../pages/admin-ui/style.css'
 
 export default function AdminViolationsPage() {
@@ -30,7 +31,9 @@ export default function AdminViolationsPage() {
       setMaxWarnings(data.maxWarnings ?? 3)
     } catch (err) {
       setViolations([])
-      setError(err instanceof Error ? err.message : 'Failed to load violations.')
+      const msg = err instanceof Error ? err.message : 'Failed to load violations.'
+      setError(msg)
+      acsisToastError(msg)
     } finally {
       setLoading(false)
     }
@@ -50,7 +53,9 @@ export default function AdminViolationsPage() {
       setDetail(data.detail)
       if (data.maxWarnings != null) setMaxWarnings(data.maxWarnings)
     } catch (err) {
-      setDetailError(err instanceof Error ? err.message : 'Failed to load session detail.')
+      const msg = err instanceof Error ? err.message : 'Failed to load session detail.'
+      setDetailError(msg)
+      acsisToastError(msg)
     } finally {
       setDetailLoading(false)
     }

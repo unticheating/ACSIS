@@ -323,6 +323,8 @@ CREATE TABLE IF NOT EXISTS exam_sessions (
     warning_count  SMALLINT NOT NULL DEFAULT 0,
     auto_submitted BOOLEAN NOT NULL DEFAULT FALSE,
     status         session_status NOT NULL DEFAULT 'in_progress',
+    question_order JSONB DEFAULT NULL,
+    choice_orders  JSONB DEFAULT NULL,
     UNIQUE (exam_id, member_id)
 );
 

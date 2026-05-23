@@ -3,6 +3,7 @@ import { ChevronDown } from 'lucide-react'
 import { Badge } from '@/components/ui/badge.jsx'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx'
 import { examStatusLabel, fetchAdminClasses } from '@/lib/adminClassesApi.js'
+import { acsisToastError } from '@/lib/acsisToast.js'
 import '../../pages/admin-ui/style.css'
 
 function ExamRow({ exam }) {
@@ -115,7 +116,9 @@ export default function AdminExaminationsPage({ pageTitle = 'Classes' }) {
       setClasses(data)
     } catch (err) {
       setClasses([])
-      setError(err instanceof Error ? err.message : 'Failed to load classes.')
+      const msg = err instanceof Error ? err.message : 'Failed to load classes.'
+      setError(msg)
+      acsisToastError(msg)
     } finally {
       setLoading(false)
     }

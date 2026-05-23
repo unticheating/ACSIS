@@ -187,6 +187,8 @@
   color: #1d4ed8;
 }
 
+/* Done includes normal submit (blue seats) + auto-submit at 3 warns (red seats) */
+
 .acsis-detections-stat--timer {
   background: #111827;
   border-color: #111827;
@@ -432,7 +434,7 @@
   background: #fee2e2;
 }
 
-/* Submitted — blue */
+/* Submitted — blue (voluntary / normal finish) */
 .acsis-detections-seat--submitted {
   border-color: #60a5fa;
   background: #eff6ff;
@@ -440,6 +442,16 @@
 
 .acsis-detections-seat--submitted:hover {
   background: #dbeafe;
+}
+
+/* Auto-submitted at max warnings — red, counted under Done */
+.acsis-detections-seat--done-warn3 {
+  border-color: #ef4444;
+  background: #fef2f2;
+}
+
+.acsis-detections-seat--done-warn3:hover {
+  background: #fee2e2;
 }
 
 /* Legacy aliases */
@@ -533,6 +545,11 @@
   color: #1e3a8a;
 }
 
+.acsis-detections-seat__avatar--done-warn3 {
+  background: #fecaca;
+  color: #991b1b;
+}
+
 .acsis-detections-seat__dot {
   width: 0.65rem;
   height: 0.65rem;
@@ -599,7 +616,8 @@
   background: #d97706;
 }
 
-.acsis-detections-seat--warn3 .acsis-detections-seat__strikes {
+.acsis-detections-seat--warn3 .acsis-detections-seat__strikes,
+.acsis-detections-seat--done-warn3 .acsis-detections-seat__strikes {
   background: #dc2626;
 }
 
@@ -617,6 +635,11 @@
   padding: 0.1rem 0.35rem;
   border-radius: 4px;
   white-space: nowrap;
+}
+
+.acsis-detections-seat__badge--auto {
+  color: #991b1b;
+  background: #fecaca;
 }
 
 .acsis-detections-legend {
@@ -701,6 +724,10 @@
   background: #2563eb;
 }
 
+.acsis-detections-modal__header--done-warn3 {
+  background: #dc2626;
+}
+
 .acsis-detections-modal__status--absent {
   color: #6b7280;
 }
@@ -723,6 +750,19 @@
 
 .acsis-detections-modal__status--submitted {
   color: #1d4ed8;
+}
+
+.acsis-detections-modal__status--done-warn3 {
+  color: #dc2626;
+}
+
+.acsis-detections-modal__violation-icon--done-warn3 {
+  color: #dc2626;
+}
+
+.acsis-detections-legend__swatch--done-warn3 {
+  background: #fef2f2;
+  border-color: #ef4444;
 }
 
 .acsis-detections-modal__violation-icon--warn3 {

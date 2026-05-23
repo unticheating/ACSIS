@@ -27,6 +27,8 @@ export async function listExamSessionsForExamQuery(classId, examId) {
        er.raw_score AS "rawScore",
        er.total_points AS "totalPoints",
        er.percentage,
+       er.rank,
+       er.score_released AS "scoreReleased",
        sm.member_id AS "memberId",
        sm.school_id AS "schoolId",
        u.uid,
@@ -34,6 +36,8 @@ export async function listExamSessionsForExamQuery(classId, examId) {
        u.middle_name,
        u.last_name,
        (SELECT COUNT(*)::int FROM student_answers sa WHERE sa.session_id = es.session_id) AS "answerCount",
+       (SELECT COUNT(*)::int FROM student_answers sa
+        WHERE sa.session_id = es.session_id AND sa.manually_checked = FALSE) AS "uncheckedCount",
        (SELECT COUNT(*)::int FROM cheating_logs cl WHERE cl.session_id = es.session_id) AS "violationCount"
      FROM exam_sessions es
      JOIN exams e ON es.exam_id = e.exam_id
@@ -41,7 +45,7 @@ export async function listExamSessionsForExamQuery(classId, examId) {
      JOIN users u ON sm.uid = u.uid
      LEFT JOIN exam_results er ON er.session_id = es.session_id
      WHERE e.exam_id = $1 AND e.class_id = $2
-     ORDER BY es.submitted_at DESC NULLS LAST, es.started_at DESC`,
+     ORDER BY er.rank ASC NULLS LAST, er.percentage DESC NULLS LAST, u.last_name, u.first_name`,
     [examId, classId],
   )
 
@@ -55,9 +59,15 @@ export async function listExamSessionsForExamQuery(classId, examId) {
     rawScore: r.rawScore != null ? Number(r.rawScore) : null,
     totalPoints: r.totalPoints != null ? Number(r.totalPoints) : null,
     percentage: r.percentage != null ? Number(r.percentage) : null,
+    rank: r.rank != null ? Number(r.rank) : null,
+    scoreReleased: Boolean(r.scoreReleased),
     schoolId: r.schoolId || '',
     studentName: formatStudentName(r) || 'Unknown student',
     answerCount: Number(r.answerCount || 0),
+    uncheckedCount: Number(r.uncheckedCount || 0),
+    reviewComplete:
+      r.status !== 'submitted' ||
+      (Number(r.answerCount || 0) > 0 && Number(r.uncheckedCount || 0) === 0),
     violationCount: Number(r.violationCount || 0),
   }))
 }
@@ -72,12 +82,19 @@ export async function listStudentAnswersForSessionQuery(sessionId) {
        q.question_type AS "questionType",
        sa.answer_text AS "answerText",
        c.choice_text AS "choiceText",
-       sa.is_correct AS "isCorrect"
+       sa.is_correct AS "isCorrect",
+       sa.manually_checked AS "manuallyChecked",
+       sa.checked_by AS "checkedBy",
+       sa.checked_at AS "checkedAt",
+       (SELECT c2.choice_text FROM choices c2
+        WHERE c2.question_id = q.question_id AND c2.is_correct = TRUE
+        LIMIT 1) AS "expectedAnswer"
      FROM student_answers sa
      JOIN questions q ON q.question_id = sa.question_id
+     LEFT JOIN exam_sections s ON s.section_id = q.section_id
      LEFT JOIN choices c ON c.choice_id = sa.choice_id
      WHERE sa.session_id = $1
-     ORDER BY q.order_num ASC`,
+     ORDER BY COALESCE(s.order_num, 9999), q.order_num ASC`,
     [sessionId],
   )
   return rows.map((r) => ({
@@ -87,7 +104,140 @@ export async function listStudentAnswersForSessionQuery(sessionId) {
     questionType: r.questionType,
     answer: r.choiceText || r.answerText || '—',
     isCorrect: r.isCorrect,
+    manuallyChecked: Boolean(r.manuallyChecked),
+    checkedBy: r.checkedBy,
+    checkedAt: r.checkedAt,
+    expectedAnswer: r.expectedAnswer || null,
   }))
+}
+
+export async function updateManualAnswerGradeQuery(sessionId, answerId, { isCorrect, checkedBy }) {
+  const pool = getPool()
+  const { rowCount } = await pool.query(
+    `UPDATE student_answers sa
+     SET is_correct = $1,
+         manually_checked = TRUE,
+         checked_by = $2,
+         checked_at = NOW()
+     FROM exam_sessions es
+     WHERE sa.answer_id = $3
+       AND sa.session_id = $4
+       AND es.session_id = sa.session_id`,
+    [Boolean(isCorrect), checkedBy, answerId, sessionId],
+  )
+  return rowCount > 0
+}
+
+/** Dense rank by raw_score desc, then earlier submit wins ties. */
+export async function computeExamRanksQuery(examId) {
+  const pool = getPool()
+  await pool.query(
+    `WITH ranked AS (
+       SELECT
+         er.result_id,
+         RANK() OVER (
+           ORDER BY er.raw_score DESC NULLS LAST,
+             es.submitted_at ASC NULLS LAST
+         )::int AS new_rank
+       FROM exam_results er
+       JOIN exam_sessions es ON es.session_id = er.session_id
+       WHERE es.exam_id = $1 AND es.status = 'submitted'
+     )
+     UPDATE exam_results er
+     SET rank = ranked.new_rank
+     FROM ranked
+     WHERE er.result_id = ranked.result_id`,
+    [examId],
+  )
+}
+
+export async function getTopRankedSessionQuery(examId) {
+  const pool = getPool()
+  const memberJoin = await sessionMemberJoin('es', 'sm')
+  const { rows } = await pool.query(
+    `SELECT
+       es.session_id AS "sessionId",
+       er.rank,
+       er.percentage,
+       er.raw_score AS "rawScore",
+       TRIM(u.first_name || ' ' || COALESCE(u.middle_name || ' ', '') || u.last_name) AS "studentName",
+       sm.school_id AS "schoolId"
+     FROM exam_results er
+     JOIN exam_sessions es ON es.session_id = er.session_id
+     JOIN institution_members sm ON ${memberJoin}
+     JOIN users u ON sm.uid = u.uid
+     WHERE es.exam_id = $1 AND er.rank = 1
+     ORDER BY er.percentage DESC NULLS LAST
+     LIMIT 1`,
+    [examId],
+  )
+  return rows[0] || null
+}
+
+export async function insertReportLogQuery(examId, generatedBy, reportType) {
+  const pool = getPool()
+  const { rows } = await pool.query(
+    `INSERT INTO report_logs (exam_id, generated_by, report_type)
+     VALUES ($1, $2, $3::report_type)
+     RETURNING report_log_id AS id, generated_at AS "generatedAt"`,
+    [examId, generatedBy, reportType],
+  )
+  return rows[0]
+}
+
+export async function releaseExamScoresQuery(examId) {
+  const pool = getPool()
+  await pool.query(
+    `UPDATE exam_results er
+     SET score_released = TRUE, released_at = COALESCE(released_at, NOW())
+     FROM exam_sessions es
+     WHERE er.session_id = es.session_id AND es.exam_id = $1`,
+    [examId],
+  )
+}
+
+export async function listSessionsForScoreEmailQuery(examId) {
+  const pool = getPool()
+  const memberJoin = await sessionMemberJoin('es', 'sm')
+  const { rows } = await pool.query(
+    `SELECT
+       es.session_id AS "sessionId",
+       er.raw_score AS "rawScore",
+       er.total_points AS "totalPoints",
+       er.percentage,
+       er.email_sent AS "emailSent",
+       u.email,
+       TRIM(u.first_name || ' ' || u.last_name) AS "studentName",
+       e.title AS "examTitle"
+     FROM exam_sessions es
+     JOIN exam_results er ON er.session_id = es.session_id
+     JOIN exams e ON e.exam_id = es.exam_id
+     JOIN institution_members sm ON ${memberJoin}
+     JOIN users u ON sm.uid = u.uid
+     WHERE es.exam_id = $1 AND es.status = 'submitted'`,
+    [examId],
+  )
+  return rows
+}
+
+export async function markResultEmailSentQuery(sessionId) {
+  const pool = getPool()
+  await pool.query(
+    `UPDATE exam_results SET email_sent = TRUE WHERE session_id = $1`,
+    [sessionId],
+  )
+}
+
+export async function getMemberDisplayNameQuery(memberId) {
+  const pool = getPool()
+  const { rows } = await pool.query(
+    `SELECT TRIM(u.first_name || ' ' || COALESCE(u.middle_name || ' ', '') || u.last_name) AS name
+     FROM institution_members im
+     JOIN users u ON u.uid = im.uid
+     WHERE im.member_id = $1`,
+    [memberId],
+  )
+  return rows[0]?.name || 'Faculty'
 }
 
 export async function listStudentPerformanceQuery(studentMemberId) {
@@ -112,6 +262,7 @@ export async function listStudentPerformanceQuery(studentMemberId) {
      JOIN institution_members sm ON ${memberJoin}
      LEFT JOIN exam_results er ON er.session_id = es.session_id
      WHERE sm.member_id = $1
+       AND (es.status != 'submitted' OR er.score_released = TRUE)
      ORDER BY es.submitted_at DESC NULLS LAST, es.started_at DESC`,
     [studentMemberId],
   )

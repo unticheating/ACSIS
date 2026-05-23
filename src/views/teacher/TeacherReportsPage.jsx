@@ -1,5 +1,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { fetchTeacherExamResults, fetchTeacherReportExams } from '@/lib/teacherExamResultsApi.js'
+import { exportExamReport } from '@/lib/teacherExamGradingApi.js'
+import { acsisToastError } from '@/lib/acsisToast.js'
 import '../../pages/teacher-ui/reports.css'
 
 function formatDate(iso) {
@@ -9,6 +11,15 @@ function formatDate(iso) {
   } catch {
     return '—'
   }
+}
+
+function sortSessionsByRank(sessions) {
+  return [...sessions].sort((a, b) => {
+    const ra = a.rank != null ? Number(a.rank) : 9999
+    const rb = b.rank != null ? Number(b.rank) : 9999
+    if (ra !== rb) return ra - rb
+    return String(a.studentName || '').localeCompare(String(b.studentName || ''))
+  })
 }
 
 export default function TeacherReportsPage() {
@@ -21,6 +32,8 @@ export default function TeacherReportsPage() {
   const [stats, setStats] = useState(null)
   const [sessions, setSessions] = useState([])
   const [violations, setViolations] = useState([])
+  const [topStudent, setTopStudent] = useState(null)
+  const [exporting, setExporting] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -64,6 +77,7 @@ export default function TeacherReportsPage() {
         setStats(data.stats || null)
         setSessions(data.sessions || [])
         setViolations(data.violations || [])
+        setTopStudent(data.topStudent || null)
       } catch (err) {
         if (!cancelled) {
           setReportError(err instanceof Error ? err.message : 'Failed to load report.')
@@ -84,8 +98,23 @@ export default function TeacherReportsPage() {
     }
   }, [currentExam?.classId, currentExam?.id])
 
-  const handleExport = (format) => {
-    window.alert(`Preparing ${format} download. The file will be saved shortly.`)
+  const sessionsByRank = useMemo(() => sortSessionsByRank(sessions), [sessions])
+
+  const handleExport = async (format) => {
+    if (!currentExam?.classId || !currentExam?.id) return
+    setExporting(true)
+    try {
+      const reportType =
+        activeTab === 'violations' ? 'violations' : activeTab === 'summary' ? 'summary' : 'detailed'
+      await exportExamReport(currentExam.classId, currentExam.id, {
+        format: format === 'CSV' ? 'csv' : 'pdf',
+        reportType,
+      })
+    } catch (err) {
+      acsisToastError(err instanceof Error ? err.message : 'Export failed.')
+    } finally {
+      setExporting(false)
+    }
   }
 
   const handleChangeExam = () => {
@@ -94,11 +123,11 @@ export default function TeacherReportsPage() {
   }
 
   const submittedSessions = sessions.filter((s) => s.status === 'submitted')
+  const scoredSessions = submittedSessions.filter((s) => s.percentage != null)
   const avgScore =
-    submittedSessions.filter((s) => s.percentage != null).length > 0
+    scoredSessions.length > 0
       ? Math.round(
-          submittedSessions.reduce((sum, s) => sum + Number(s.percentage || 0), 0) /
-            submittedSessions.filter((s) => s.percentage != null).length,
+          scoredSessions.reduce((sum, s) => sum + Number(s.percentage || 0), 0) / scoredSessions.length,
         )
       : null
 
@@ -173,16 +202,26 @@ export default function TeacherReportsPage() {
                     className={`tab-btn ${activeTab === 'detailed' ? 'active' : ''}`}
                     onClick={() => setActiveTab('detailed')}
                   >
-                    Detailed
+                    Results
                   </button>
                 </div>
 
                 <div className="action-group">
-                  <button type="button" className="btn-action btn-blue" onClick={() => handleExport('CSV')}>
+                  <button
+                    type="button"
+                    className="btn-action btn-blue"
+                    disabled={exporting}
+                    onClick={() => handleExport('CSV')}
+                  >
                     Download CSV
                   </button>
-                  <button type="button" className="btn-action btn-green" onClick={() => handleExport('PDF')}>
-                    Print PDF
+                  <button
+                    type="button"
+                    className="btn-action btn-green"
+                    disabled={exporting}
+                    onClick={() => handleExport('PDF')}
+                  >
+                    {exporting ? 'Exporting…' : 'Download PDF'}
                   </button>
                 </div>
               </div>
@@ -203,6 +242,19 @@ export default function TeacherReportsPage() {
                   <h3>Summary Report</h3>
                   <p>{currentExam.title}</p>
                 </div>
+                {topStudent ? (
+                  <div className="violation-alert-box" style={{ background: '#f0fdf4', borderColor: '#bbf7d0' }}>
+                    <div className="alert-title" style={{ color: '#166534' }}>
+                      Top 1 — Class rank
+                    </div>
+                    <div className="alert-count" style={{ color: '#15803d' }}>
+                      {topStudent.studentName}
+                    </div>
+                    <div className="alert-sub">
+                      {topStudent.schoolId || '—'} · {topStudent.percentage}% ({topStudent.rawScore} pts)
+                    </div>
+                  </div>
+                ) : null}
                 {stats ? (
                   <div className="sdc-stats" style={{ maxWidth: 520 }}>
                     <div className="sdc-stat">
@@ -265,18 +317,23 @@ export default function TeacherReportsPage() {
             {activeTab === 'detailed' && (
               <div className="tab-panel active panel">
                 <div className="report-header">
-                  <h3>Detailed Performance Report</h3>
-                  <p>{currentExam.title}</p>
+                  <h3>Student results</h3>
+                  <p>Sorted by rank — Rank #1 appears first.</p>
                 </div>
 
-                {sessions.length === 0 ? (
+                {sessionsByRank.length === 0 ? (
                   <p className="text-sm text-gray-500">No student sessions yet. Students must join and submit the exam.</p>
                 ) : (
-                  sessions.map((student) => (
+                  sessionsByRank.map((student) => (
                     <div key={student.sessionId} className="student-detail-card">
                       <div className="sdc-header">
                         <div className="sdc-info">
-                          <h4>{student.studentName}</h4>
+                          <h4>
+                            {student.rank != null ? (
+                              <span className="text-green font-bold mr-2">#{student.rank}</span>
+                            ) : null}
+                            {student.studentName}
+                          </h4>
                           <span>{student.schoolId || '—'} · {student.status}</span>
                         </div>
                         <div className="sdc-score">
@@ -286,6 +343,11 @@ export default function TeacherReportsPage() {
                               <div className="score-lbl">
                                 {student.rawScore}/{student.totalPoints} pts
                               </div>
+                            </>
+                          ) : student.status === 'submitted' ? (
+                            <>
+                              <div className="score-val text-gray">—</div>
+                              <div className="score-lbl">Grading pending</div>
                             </>
                           ) : (
                             <>
@@ -317,6 +379,7 @@ export default function TeacherReportsPage() {
           </>
         )}
       </div>
+
     </div>
   )
 }

@@ -3,6 +3,7 @@ import { SummaryStatCard, SummaryStatGrid } from '@/components/dashboard/Summary
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx'
 import { Badge } from '@/components/ui/badge.jsx'
 import { fetchStudentPerformance } from '@/lib/studentPerformanceApi.js'
+import { acsisToastError } from '@/lib/acsisToast.js'
 
 function formatDate(iso) {
   if (!iso) return '—'
@@ -26,7 +27,9 @@ export default function StudentPerformancePage() {
       setData(result)
     } catch (err) {
       setData(null)
-      setError(err instanceof Error ? err.message : 'Failed to load performance.')
+      const msg = err instanceof Error ? err.message : 'Failed to load performance.'
+      setError(msg)
+      acsisToastError(msg)
     } finally {
       setLoading(false)
     }

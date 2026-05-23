@@ -28,6 +28,9 @@ import {
 import { Input } from '@/components/ui/input.jsx'
 import { Label } from '@/components/ui/label.jsx'
 import { formatCourseBreadcrumbLabel } from '@/lib/sectionLabel.js'
+import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
+import { copyToClipboard } from '@/lib/copyToClipboard.js'
+import { useAcsisConfirm } from '@/hooks/useAcsisConfirm.jsx'
 import '../../pages/teacher-ui/my_classes.css'
 
 const EXAM_FILTER_OPTIONS = [
@@ -37,22 +40,10 @@ const EXAM_FILTER_OPTIONS = [
   { id: 'completed', label: 'Completed exams' },
 ]
 
-async function copyText(value) {
-  const text = value || ''
-  try {
-    await navigator.clipboard.writeText(text)
-  } catch {
-    window.prompt('Copy:', text)
-  }
-}
-
-async function copyExamCode(code) {
-  await copyText(code)
-}
-
 export default function TeacherClassExamsPage() {
   const { classId } = useParams()
   const navigate = useNavigate()
+  const { confirm, ConfirmDialog } = useAcsisConfirm()
   const [tick, setTick] = useState(0)
   const [filter, setFilter] = useState('all')
   const [pageView, setPageView] = useState('exams')
@@ -160,11 +151,13 @@ export default function TeacherClassExamsPage() {
         throw new Error(data.error || 'Failed to publish')
       }
       if (data.code) {
-        window.alert(`Exam published.\n\nShare this code with students: ${data.code}`)
+        acsisToastSuccess(`Exam published. Share this code with students: ${data.code}`)
+      } else {
+        acsisToastSuccess('Exam published.')
       }
       refresh()
     } catch (err) {
-      alert(err.message)
+      acsisToastError(err.message)
     }
   }
 
@@ -175,23 +168,31 @@ export default function TeacherClassExamsPage() {
         const data = await res.json()
         throw new Error(data.error || 'Failed to start exam')
       }
+      acsisToastSuccess('Exam is now live.')
       refresh()
     } catch (err) {
-      alert(err.message)
+      acsisToastError(err.message)
     }
   }
 
   async function removeExam(classId, examId, title) {
-    if (!window.confirm(`Delete “${title || 'this exam'}”? This cannot be undone.`)) return
+    const ok = await confirm({
+      title: `Delete “${title || 'this exam'}”?`,
+      description: 'This cannot be undone.',
+      confirmLabel: 'Delete exam',
+      destructive: true,
+    })
+    if (!ok) return
     try {
       const res = await apiFetch(`/api/teacher/classes/${classId}/exams/${examId}`, { method: 'DELETE' })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
         throw new Error(typeof data.error === 'string' ? data.error : 'Failed to delete exam.')
       }
+      acsisToastSuccess('Exam deleted.')
       refresh()
     } catch (err) {
-      alert(err.message)
+      acsisToastError(err.message)
     }
   }
 
@@ -205,7 +206,7 @@ export default function TeacherClassExamsPage() {
     const code = editCode.trim()
     const name = editName.trim()
     if (!code && !name) {
-      window.alert('Enter a subject code or course name.')
+      acsisToastError('Enter a subject code or course name.')
       return
     }
     setSavingCourse(true)
@@ -220,25 +221,33 @@ export default function TeacherClassExamsPage() {
         throw new Error(data.error || 'Failed to update course.')
       }
       setEditOpen(false)
+      acsisToastSuccess('Course updated.')
       refresh()
     } catch (err) {
-      window.alert(err.message)
+      acsisToastError(err.message)
     } finally {
       setSavingCourse(false)
     }
   }
 
   async function deleteCourse() {
-    if (!window.confirm(`Delete “${coursePrimary}”? Students will lose access. This cannot be undone.`)) return
+    const ok = await confirm({
+      title: `Delete “${coursePrimary}”?`,
+      description: 'Students will lose access. This cannot be undone.',
+      confirmLabel: 'Delete course',
+      destructive: true,
+    })
+    if (!ok) return
     try {
       const res = await apiFetch(`/api/teacher/classes/${cls.id}`, { method: 'DELETE' })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
         throw new Error(data.error || 'Failed to delete course.')
       }
+      acsisToastSuccess('Course deleted.')
       navigate('/teacher/my-classes')
     } catch (err) {
-      window.alert(err.message)
+      acsisToastError(err.message)
     }
   }
 
@@ -276,7 +285,7 @@ export default function TeacherClassExamsPage() {
             <button
               type="button"
               className="acsis-course-banner__code-btn"
-              onClick={() => copyText(cls.accessCode)}
+              onClick={() => void copyToClipboard(cls.accessCode, { successMessage: 'Access code copied.' })}
               title="Copy class code for students to enroll"
             >
               <code>{cls.accessCode}</code>
@@ -435,7 +444,11 @@ export default function TeacherClassExamsPage() {
                                 Start exam (go live)
                               </DropdownMenuItem>
                             ) : null}
-                            <DropdownMenuItem onSelect={() => copyExamCode(exam.code)}>
+                            <DropdownMenuItem
+                              onSelect={() =>
+                                void copyToClipboard(exam.code, { successMessage: 'Exam code copied.' })
+                              }
+                            >
                               Copy exam code
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
@@ -495,6 +508,7 @@ export default function TeacherClassExamsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {ConfirmDialog}
     </div>
   )
 }

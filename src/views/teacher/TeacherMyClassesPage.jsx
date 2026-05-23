@@ -11,6 +11,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu.jsx'
 import { apiFetch } from '@/lib/apiFetch.js'
+import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
+import { useAcsisConfirm } from '@/hooks/useAcsisConfirm.jsx'
 import TeacherPageHeader from '@/components/teacher/TeacherPageHeader.jsx'
 import TeacherCourseCard from '@/components/teacher/TeacherCourseCard.jsx'
 import TeacherAddCourseDialog from '@/components/teacher/TeacherAddCourseDialog.jsx'
@@ -177,6 +179,7 @@ function AddSectionButton({ onClick, className = 'acsis-mc-create-btn' }) {
 
 export default function TeacherMyClassesPage() {
   const location = useLocation()
+  const { confirm, ConfirmDialog } = useAcsisConfirm()
   const listRef = useRef(null)
   const [sections, setSections] = useState([])
   const [courses, setCourses] = useState([])
@@ -335,7 +338,7 @@ export default function TeacherMyClassesPage() {
     })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) {
-      window.alert(data.error || 'Could not update section.')
+      acsisToastError(data.error || 'Could not update section.')
       return false
     }
     await fetchAll()
@@ -343,13 +346,20 @@ export default function TeacherMyClassesPage() {
   }
 
   async function handleArchiveSection(id) {
-    if (!window.confirm('Archive this section? You can restore it from Archived.')) return
-    await patchSection(id, { isArchived: true })
+    const ok = await confirm({
+      title: 'Archive this section?',
+      description: 'You can restore it from Archived.',
+      confirmLabel: 'Archive',
+    })
+    if (!ok) return
+    const success = await patchSection(id, { isArchived: true })
+    if (success) acsisToastSuccess('Section archived.')
     if (String(id) === openSectionId) setOpenSectionId(null)
   }
 
   async function handleRestoreSection(id) {
-    await patchSection(id, { isArchived: false })
+    const success = await patchSection(id, { isArchived: false })
+    if (success) acsisToastSuccess('Section restored.')
   }
 
   async function handleDeleteSection(section) {
@@ -359,18 +369,25 @@ export default function TeacherMyClassesPage() {
       count > 0
         ? `This will permanently delete ${title} and all ${count} course(s) with their exams.`
         : `This will permanently delete ${title}.`
-    if (!window.confirm(`${detail} This cannot be undone. Continue?`)) return
+    const ok = await confirm({
+      title: 'Delete this section?',
+      description: `${detail} This cannot be undone.`,
+      confirmLabel: 'Delete',
+      destructive: true,
+    })
+    if (!ok) return
     try {
       const res = await apiFetch(`/api/teacher/terms/${encodeURIComponent(section.id)}`, { method: 'DELETE' })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        window.alert(data.error || 'Could not delete section.')
+        acsisToastError(data.error || 'Could not delete section.')
         return
       }
       if (String(section.id) === openSectionId) setOpenSectionId(null)
+      acsisToastSuccess('Section deleted.')
       await fetchAll()
     } catch {
-      window.alert('Network error.')
+      acsisToastError('Network error. Please try again.')
     }
   }
 
@@ -390,18 +407,18 @@ export default function TeacherMyClassesPage() {
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        window.alert(data.error || 'Failed to add section.')
+        acsisToastError(data.error || 'Failed to add section.')
         return
       }
-      const codeMsg = data.accessCode ? `\n\nClass access code for students: ${data.accessCode}` : ''
-      window.alert(`Class created.${codeMsg}`)
+      const codeMsg = data.accessCode ? ` Access code: ${data.accessCode}.` : ''
+      acsisToastSuccess(`Section created.${codeMsg}`)
       setCreateOpen(false)
       if (data.id != null) {
         setOpenSectionId(String(data.id))
       }
       await fetchAll()
     } catch {
-      window.alert('Network error. Please try again.')
+      acsisToastError('Network error. Please try again.')
     } finally {
       setCreating(false)
     }
@@ -560,6 +577,7 @@ export default function TeacherMyClassesPage() {
           </form>
         </DialogContent>
       </Dialog>
+      {ConfirmDialog}
     </div>
   )
 }

@@ -3,9 +3,12 @@ import { Link } from 'react-router-dom'
 import { SummaryStatCard, SummaryStatGrid } from '@/components/dashboard/SummaryStatCard.jsx'
 import { fetchAdminDashboard, formatRelativeTime } from '@/lib/adminDashboardApi.js'
 import { issueViolationTicket } from '@/lib/adminViolationsApi.js'
+import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
+import { useAcsisConfirm } from '@/hooks/useAcsisConfirm.jsx'
 import '../../pages/admin-ui/style.css'
 
 export default function AdminDashboardPage({ basePath = '/admin' }) {
+  const { confirm, ConfirmDialog } = useAcsisConfirm()
   const [stats, setStats] = useState({ ongoingExams: 0, totalExams: 0, detectedStudents: 0 })
   const [ongoingExams, setOngoingExams] = useState([])
   const [detectedStudents, setDetectedStudents] = useState([])
@@ -28,7 +31,9 @@ export default function AdminDashboardPage({ basePath = '/admin' }) {
       setHasMoreOngoing(Boolean(data.hasMoreOngoingExams))
       setHasMoreDetected(Boolean(data.hasMoreDetectedStudents))
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load dashboard.')
+      const msg = err instanceof Error ? err.message : 'Failed to load dashboard.'
+      setError(msg)
+      acsisToastError(msg)
     } finally {
       setLoading(false)
     }
@@ -40,14 +45,20 @@ export default function AdminDashboardPage({ basePath = '/admin' }) {
 
   async function ticketViolation(sessionId, alreadyTicketed) {
     if (alreadyTicketed) return
-    if (!window.confirm('Issue an official violation ticket for this student session?')) return
+    const ok = await confirm({
+      title: 'Issue violation ticket?',
+      description: 'This will create an official violation ticket for this student session.',
+      confirmLabel: 'Issue ticket',
+    })
+    if (!ok) return
 
     setTicketingId(sessionId)
     try {
       await issueViolationTicket(sessionId)
+      acsisToastSuccess('Violation ticket issued.')
       await load()
     } catch (err) {
-      window.alert(err instanceof Error ? err.message : 'Failed to issue ticket.')
+      acsisToastError(err instanceof Error ? err.message : 'Failed to issue ticket.')
     } finally {
       setTicketingId(null)
     }
@@ -172,6 +183,7 @@ export default function AdminDashboardPage({ basePath = '/admin' }) {
           </div>
         </div>
       </div>
+      {ConfirmDialog}
     </div>
   )
 }

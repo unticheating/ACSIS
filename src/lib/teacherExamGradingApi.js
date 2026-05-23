@@ -1,0 +1,53 @@
+import { apiFetch } from './apiFetch.js'
+
+async function parseJson(res) {
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    const message = typeof data.error === 'string' ? data.error : res.statusText
+    throw new Error(message || 'Request failed')
+  }
+  return data
+}
+
+export async function manualGradeAnswer(classId, examId, sessionId, answerId, isCorrect) {
+  const res = await apiFetch(
+    `/api/teacher/classes/${classId}/exams/${examId}/results/${sessionId}/answers/${answerId}/grade`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isCorrect }),
+    },
+  )
+  return parseJson(res)
+}
+
+export async function releaseExamScores(classId, examId, { sendEmail = true, includeAnswerKey = false } = {}) {
+  const res = await apiFetch(`/api/teacher/classes/${classId}/exams/${examId}/release-scores`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sendEmail, includeAnswerKey }),
+  })
+  return parseJson(res)
+}
+
+export async function exportExamReport(classId, examId, { format = 'pdf', reportType = 'class_results' } = {}) {
+  const res = await apiFetch(`/api/teacher/classes/${classId}/exams/${examId}/reports/export`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ format, reportType }),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error(data.error || 'Export failed')
+  }
+  const blob = await res.blob()
+  const disposition = res.headers.get('Content-Disposition') || ''
+  const match = disposition.match(/filename="([^"]+)"/)
+  const filename = match?.[1] || `acsis-report-${examId}.${format === 'csv' ? 'csv' : 'pdf'}`
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}

@@ -11,6 +11,7 @@ import {
 import { PG_EXAM_STATUS, normalizeExamStatus } from '@/lib/examFlowUi.js'
 import { MAX_EXAM_WARNINGS, labelForCheatEvent } from '@/lib/examAntiCheat.js'
 import { computeExamTimeDisplay } from '@/lib/examCountdown.js'
+import { acsisToastError } from '@/lib/acsisToast.js'
 
 import { useSession } from '@/context/SessionContext.jsx'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle.js'
@@ -65,7 +66,13 @@ export default function StudentExamSessionPage() {
       setWarningCount(Number(data.warningCount || 0))
       if (data.sessionStatus === 'submitted') {
         setHit({ exam: data.exam })
-        setSubmitResult(data.result || null)
+        setSubmitResult(
+          data.result
+            ? { ...data.result, scoreReleased: true }
+            : data.scorePending
+              ? { scorePending: true, scoreReleased: false }
+              : null,
+        )
         setScene('submitted')
         setError(null)
         return
@@ -73,7 +80,9 @@ export default function StudentExamSessionPage() {
       setHit({ exam: { ...data.exam, questions: data.questions || [] } })
       setError(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch exam.')
+      const msg = err instanceof Error ? err.message : 'Failed to fetch exam.'
+      setError(msg)
+      acsisToastError(msg)
     } finally {
       setLoading(false)
     }
@@ -105,7 +114,9 @@ export default function StudentExamSessionPage() {
       setLoading(true)
       await loadSession()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Incorrect exam code.')
+      const msg = err instanceof Error ? err.message : 'Incorrect exam code.'
+      setError(msg)
+      acsisToastError(msg)
     } finally {
       setJoining(false)
       setLoading(false)
@@ -145,7 +156,9 @@ export default function StudentExamSessionPage() {
       const result = await submitExamAnswers(classId, examId, payload)
       setSubmitResult(result)
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : 'Failed to submit exam.')
+      const msg = err instanceof Error ? err.message : 'Failed to submit exam.'
+      setSubmitError(msg)
+      acsisToastError(msg)
       console.error(err)
     }
     setScene('submitted')
@@ -241,6 +254,8 @@ export default function StudentExamSessionPage() {
 
         if (res.autoSubmitted) {
           setSubmitResult({
+            scoreReleased: res.scoreReleased,
+            scorePending: res.scorePending,
             rawScore: res.rawScore,
             totalPoints: res.totalPoints,
             percentage: res.percentage,
@@ -470,6 +485,12 @@ export default function StudentExamSessionPage() {
 
   const currentQ = questions[currentQuestionIndex]
 
+  const showSectionIntro =
+    currentQ &&
+    (currentQuestionIndex === 0 ||
+      questions[currentQuestionIndex - 1]?.sectionId !== currentQ.sectionId) &&
+    (currentQ.sectionTitle || currentQ.sectionDescription)
+
   // Lobby Scene
   if (scene === 'lobby') {
     return (
@@ -554,13 +575,17 @@ export default function StudentExamSessionPage() {
               {submitError} — contact your instructor if this persists.
             </p>
           ) : null}
-          {submitResult?.percentage != null ? (
+          {submitResult?.scoreReleased && submitResult?.percentage != null ? (
             <p className="text-gray-800 text-lg font-semibold mb-2">
               Score: {submitResult.percentage}% ({submitResult.rawScore}/{submitResult.totalPoints} points)
             </p>
-          ) : submitResult?.rawScore != null ? (
+          ) : submitResult?.scoreReleased && submitResult?.rawScore != null ? (
             <p className="text-gray-800 text-lg font-semibold mb-2">
               Score: {submitResult.rawScore}/{submitResult.totalPoints} points
+            </p>
+          ) : submitResult?.scorePending || (submitResult && !submitResult.scoreReleased) ? (
+            <p className="text-gray-700 text-base font-medium mb-2">
+              Your score will appear here after your instructor releases results.
             </p>
           ) : null}
           {warningCount >= MAX_EXAM_WARNINGS ? (
@@ -618,6 +643,21 @@ export default function StudentExamSessionPage() {
         <main className="flex-1 flex flex-col p-6 lg:p-10 lg:pr-6 min-w-0">
           {currentQ ? (
             <div className="flex-1 flex flex-col max-w-3xl w-full mx-auto">
+              {showSectionIntro ? (
+                <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50/80 px-5 py-4">
+                  {currentQ.sectionTitle ? (
+                    <p className="text-sm font-bold uppercase tracking-wide text-blue-800">
+                      {currentQ.sectionTitle}
+                    </p>
+                  ) : null}
+                  {currentQ.sectionDescription ? (
+                    <p className="mt-2 text-base text-blue-950 leading-relaxed whitespace-pre-wrap">
+                      {currentQ.sectionDescription}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+
               {/* Question Header */}
               <div className="mb-8">
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-sm font-medium mb-4">

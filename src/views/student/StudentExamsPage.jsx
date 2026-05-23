@@ -12,6 +12,7 @@ import {
 import { Input } from '@/components/ui/input.jsx'
 import { Label } from '@/components/ui/label.jsx'
 import { apiFetch } from '@/lib/apiFetch.js'
+import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
 import '../../pages/student-ui/enrolled_classes.css'
 
 const NEEDS_JOIN_CLASS_KEY = 'acsis.needsJoinClass'
@@ -52,7 +53,10 @@ export default function StudentExamsPage() {
     e?.preventDefault?.()
     setJoinMsg(null)
     const code = joinCode.trim()
-    if (!code) return
+    if (!code) {
+      acsisToastError('Enter your class access code.')
+      return
+    }
 
     setJoining(true)
     try {
@@ -64,14 +68,15 @@ export default function StudentExamsPage() {
       const data = await res.json()
 
       if (!res.ok) {
-        setJoinMsg({ type: 'err', text: data.error || 'Failed to enroll' })
+        const msg = data.error || 'Failed to enroll.'
+        setJoinMsg({ type: 'err', text: msg })
+        acsisToastError(msg)
         return
       }
 
-      setJoinMsg({
-        type: 'ok',
-        text: data.already ? `You are already in ${data.className}.` : `Added to ${data.className}.`,
-      })
+      const okText = data.already ? `You are already in ${data.className}.` : `Added to ${data.className}.`
+      setJoinMsg({ type: 'ok', text: okText })
+      acsisToastSuccess(okText)
       setJoinCode('')
       sessionStorage.removeItem(NEEDS_JOIN_CLASS_KEY)
       setNeedsJoinClass(false)
@@ -86,7 +91,9 @@ export default function StudentExamsPage() {
       
       await fetchClasses()
     } catch {
-      setJoinMsg({ type: 'err', text: 'Network error. Try again.' })
+      const msg = 'Network error. Try again.'
+      setJoinMsg({ type: 'err', text: msg })
+      acsisToastError(msg)
     } finally {
       setJoining(false)
     }

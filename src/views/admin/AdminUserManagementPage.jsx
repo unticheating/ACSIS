@@ -22,6 +22,8 @@ import {
   validateYearLevelClient,
   YEAR_LEVEL_OPTIONS,
 } from '@/lib/userFormConstants.js'
+import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
+import { useAcsisConfirm } from '@/hooks/useAcsisConfirm.jsx'
 import '../../pages/admin-ui/style.css'
 
 const TABS = [
@@ -46,6 +48,7 @@ const emptyForm = {
 }
 
 export default function AdminUserManagementPage() {
+  const { confirm, ConfirmDialog } = useAcsisConfirm()
   const [activeTab, setActiveTab] = useState('all')
   const [search, setSearch] = useState('')
   const [users, setUsers] = useState([])
@@ -68,7 +71,9 @@ export default function AdminUserManagementPage() {
       setPendingFaculty(data.pendingFaculty ?? 0)
     } catch (err) {
       setUsers([])
-      setBanner(err instanceof Error ? err.message : 'Failed to load users.')
+      const msg = err instanceof Error ? err.message : 'Failed to load users.'
+      setBanner(msg)
+      acsisToastError(msg)
     } finally {
       setLoading(false)
     }
@@ -136,6 +141,7 @@ export default function AdminUserManagementPage() {
     const validationError = validateForm()
     if (validationError) {
       setBanner(validationError)
+      acsisToastError(validationError)
       return
     }
     setSubmitting(true)
@@ -155,9 +161,12 @@ export default function AdminUserManagementPage() {
         pendingFaculty: form.role === 'faculty' && form.pendingFaculty,
       })
       setAddOpen(false)
+      acsisToastSuccess('User created.')
       await loadUsers()
     } catch (err) {
-      setBanner(err instanceof Error ? err.message : 'Failed to create user.')
+      const msg = err instanceof Error ? err.message : 'Failed to create user.'
+      setBanner(msg)
+      acsisToastError(msg)
     } finally {
       setSubmitting(false)
     }
@@ -169,6 +178,7 @@ export default function AdminUserManagementPage() {
     const validationError = validateForm()
     if (validationError) {
       setBanner(validationError)
+      acsisToastError(validationError)
       return
     }
     setSubmitting(true)
@@ -189,35 +199,53 @@ export default function AdminUserManagementPage() {
       await updateAdminUser(editingUid, payload)
       setEditOpen(false)
       setEditingUid(null)
+      acsisToastSuccess('User updated.')
       await loadUsers()
     } catch (err) {
-      setBanner(err instanceof Error ? err.message : 'Failed to update user.')
+      const msg = err instanceof Error ? err.message : 'Failed to update user.'
+      setBanner(msg)
+      acsisToastError(msg)
     } finally {
       setSubmitting(false)
     }
   }
 
   async function onDeactivate(user) {
-    if (!window.confirm(`Deactivate ${user.name}? They will not be able to sign in.`)) return
+    const ok = await confirm({
+      title: `Deactivate ${user.name}?`,
+      description: 'They will not be able to sign in.',
+      confirmLabel: 'Deactivate',
+      destructive: true,
+    })
+    if (!ok) return
     setBanner(null)
     try {
       await updateAdminUser(user.uid, { deactivate: true })
+      acsisToastSuccess(`${user.name} deactivated.`)
       await loadUsers()
     } catch (err) {
-      setBanner(err instanceof Error ? err.message : 'Failed to deactivate user.')
+      const msg = err instanceof Error ? err.message : 'Failed to deactivate user.'
+      setBanner(msg)
+      acsisToastError(msg)
     }
   }
 
   async function onApprove(user) {
-    if (!window.confirm(`Approve ${user.name}?`)) {
-      return
-    }
+    const ok = await confirm({
+      title: `Approve ${user.name}?`,
+      description: 'They will be able to sign in as faculty.',
+      confirmLabel: 'Approve',
+    })
+    if (!ok) return
     setBanner(null)
     try {
       await updateAdminUser(user.uid, { approve: true })
+      acsisToastSuccess(`${user.name} approved.`)
       await loadUsers()
     } catch (err) {
-      setBanner(err instanceof Error ? err.message : 'Failed to approve user.')
+      const msg = err instanceof Error ? err.message : 'Failed to approve user.'
+      setBanner(msg)
+      acsisToastError(msg)
     }
   }
 
@@ -536,6 +564,7 @@ export default function AdminUserManagementPage() {
           </form>
         </DialogContent>
       </Dialog>
+      {ConfirmDialog}
     </div>
   )
 }
