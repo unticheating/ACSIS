@@ -2,6 +2,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import PlpLogo from '@/components/brand/PlpLogo.jsx'
 import { getExamInClass } from '@/lib/classesExams.js'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx'
+import { useDocumentTitle } from '@/hooks/useDocumentTitle.js'
 import '../../styles/acsis-immersive.css'
 
 export default function StudentExamResultPage() {
@@ -10,6 +11,7 @@ export default function StudentExamResultPage() {
   const examId = searchParams.get('examId') || ''
   const hit = classId && examId ? getExamInClass(classId, examId) : null
   const title = hit?.exam?.title || 'Examination'
+  useDocumentTitle('Exam results')
 
   return (
     <div className="acsis-immersive">

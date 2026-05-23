@@ -12,6 +12,7 @@ import { PG_EXAM_STATUS, normalizeExamStatus } from '@/lib/examFlowUi.js'
 import { MAX_EXAM_WARNINGS, labelForCheatEvent } from '@/lib/examAntiCheat.js'
 
 import { useSession } from '@/context/SessionContext.jsx'
+import { useDocumentTitle } from '@/hooks/useDocumentTitle.js'
 // Removed legacy CSS import
 
 const LOBBY_MS = 4000
@@ -112,6 +113,7 @@ export default function StudentExamSessionPage() {
   }
 
   const examTitle = hit?.exam?.title || 'Examination'
+  useDocumentTitle(examTitle)
   const durationMin = Number(hit?.exam?.duration || 35)
   const instructorWait = useMemo(() => {
     if (activeAccount?.id === 'faculty') return activeAccount.displayName
