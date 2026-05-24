@@ -31,6 +31,12 @@ export default function TeacherDashboardPage() {
   const [selectedCourse, setSelectedCourse] = useState('')
   const [selectedSections, setSelectedSections] = useState([])
 
+  const resetCreateExamModal = () => {
+    setSelectedClassIds([])
+    setSelectedCourse('')
+    setSelectedSections([])
+  }
+
   useEffect(() => {
     apiFetch('/api/teacher/classes/dashboard')
       .then(res => res.json())
@@ -135,43 +141,66 @@ export default function TeacherDashboardPage() {
     classesByTermId.get(key).push(course)
   }
   const selectableTerms = terms.filter((term) => (classesByTermId.get(String(term.id)) || []).length > 0)
-  const selectedTermIds = new Set(
-    selectedClassIds
-      .map((classId) => classes.find((course) => String(course.id) === String(classId))?.termId)
-      .filter((termId) => termId != null)
-      .map((termId) => String(termId)),
-  )
+  const selectedTermIds = new Set(selectedSections.map((termId) => String(termId)))
   const selectedTermIdList = Array.from(selectedTermIds)
-  const selectedSectionCourseSets = selectedTermIdList
-    .map((termId) => {
-      const termClasses = classesByTermId.get(termId) || []
-      return new Set(
-        termClasses
-          .map((course) => course.course_code || course.courseCode)
-          .filter(Boolean),
-      )
-    })
-    .filter((courseSet) => courseSet.size > 0)
+  const normalizeCourseText = (value) => String(value || '').trim().replace(/\s+/g, ' ').toLowerCase()
+  const selectedSectionCourses = selectedTermIdList
+    .map((termId) => (classesByTermId.get(termId) || []).map((course) => ({
+      id: String(course.id),
+      courseCode: String(course.courseCode || course.course_code || '').trim(),
+      courseName: String(course.name || '').trim(),
+    })))
+    .filter((courseList) => courseList.length > 0)
 
-  const courseOptions = selectedSectionCourseSets.length > 0
-    ? Array.from(selectedSectionCourseSets.slice(1).reduce(
-        (shared, courseSet) => new Set([...shared].filter((code) => courseSet.has(code))),
-        selectedSectionCourseSets[0],
-      )).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+  const buildCourseKey = (courseCode, courseName) => {
+    const normalizedName = normalizeCourseText(courseName)
+    const normalizedCode = normalizeCourseText(courseCode)
+    return normalizedName || normalizedCode
+  }
+
+  const multiSectionCourseOptions = selectedSectionCourses.length > 0
+    ? Array.from(
+        selectedSectionCourses.slice(1).reduce((shared, courseList) => {
+          const currentKeys = new Set(courseList.map((course) => buildCourseKey(course.courseCode, course.courseName)))
+          return new Set([...shared].filter((key) => currentKeys.has(key)))
+        }, new Set(selectedSectionCourses[0].map((course) => buildCourseKey(course.courseCode, course.courseName)))),
+      )
+        .map((key) => {
+          const matchedCourse = selectedSectionCourses[0].find((course) => buildCourseKey(course.courseCode, course.courseName) === key)
+          const courseCode = matchedCourse?.courseCode || ''
+          const courseName = matchedCourse?.courseName || ''
+          return {
+            key,
+            label: courseName || courseCode || 'Course',
+            courseCode,
+            courseName,
+            matchedCourse,
+          }
+        })
+        .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }))
     : []
   const canContinue = selectedClassIds.length > 0
   const visibleExams = exams.filter((exam) => normalizeExamStatus(exam.status) !== PG_EXAM_STATUS.CLOSED)
 
   useEffect(() => {
-    if (courseOptions.length === 0) {
+    if (multiSectionCourseOptions.length === 0) {
       if (selectedCourse) setSelectedCourse('')
+      if (selectedClassIds.length) setSelectedClassIds([])
       return
     }
-    const currentExists = courseOptions.includes(selectedCourse)
+    const currentExists = multiSectionCourseOptions.some((course) => course.key === selectedCourse)
     if (!currentExists) {
-      setSelectedCourse(courseOptions[0])
+      if (selectedCourse) setSelectedCourse('')
+      if (selectedClassIds.length) setSelectedClassIds([])
+      return
     }
-  }, [selectedClassIds, classes])
+    const ids = selectedSections.flatMap((sid) => classesByTermId.get(String(sid)) || [])
+      .filter((c) => buildCourseKey(String(c.courseCode || c.course_code || '').trim(), String(c.name || '').trim()) === selectedCourse)
+      .map((c) => String(c.id))
+    if (ids.join(',') !== selectedClassIds.join(',')) {
+      setSelectedClassIds(ids)
+    }
+  }, [selectedClassIds, classes, selectedSections])
 
   return (
     <div className="acsis-view">
@@ -205,7 +234,10 @@ export default function TeacherDashboardPage() {
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => setCreateModalOpen(true)}
+              onClick={() => {
+                resetCreateExamModal()
+                setCreateModalOpen(true)
+              }}
               className="inline-flex items-center px-4 py-2 rounded border shadow-sm hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-offset-2"
               style={{
                 backgroundColor: 'var(--acsis-brand, #334155)',
@@ -350,7 +382,7 @@ export default function TeacherDashboardPage() {
           <div className="w-full max-w-2xl bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
             <div className="flex items-center justify-between mb-4">
               <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Create Exam — Select classes</h4>
-              <button onClick={() => setCreateModalOpen(false)} className="text-gray-500">✕</button>
+              <button onClick={() => { resetCreateExamModal(); setCreateModalOpen(false) }} className="text-gray-500">✕</button>
             </div>
               <div className="space-y-4 max-h-[60vh] overflow-y-auto">
               <p className="text-sm text-gray-600 dark:text-gray-300">Select one or more sections and then choose the course to create this exam in.</p>
@@ -404,20 +436,15 @@ export default function TeacherDashboardPage() {
                         setSelectedClassIds(val ? [val] : [])
                         setSelectedCourse(found ? (found.course_code || found.courseCode || found.name || String(found.id)) : '')
                       }} className="mt-1 block w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-800 dark:text-gray-100">
-                        <option value="" disabled hidden>Select Course</option>
+                        <option value="" disabled hidden>Select course</option>
                         {available.map((course) => (
-                          <option key={course.id} value={String(course.id)}>{course.name || course.course_code || course.courseCode || `Class ${course.id}`}</option>
+                            <option key={course.id} value={String(course.id)}>{course.name || 'Course'}</option>
                         ))}
                       </select>
                     )
                   }
 
-                  // multiple sections selected: compute intersection of course codes
-                  const perSectionCodes = selectedSections.map((sid) => new Set((classesByTermId.get(String(sid)) || []).map((c) => c.course_code || c.courseCode).filter(Boolean)))
-                  const intersection = perSectionCodes.reduce((acc, s) => new Set([...acc].filter((x) => s.has(x))), perSectionCodes[0] || new Set())
-                  const commonCodes = Array.from(intersection).sort()
-
-                  if (commonCodes.length === 0) {
+                  if (multiSectionCourseOptions.length === 0) {
                     return (
                       <select disabled className="mt-1 block w-full rounded-md border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-700 px-3 py-2 text-sm text-gray-500">
                         <option>No common course across selected sections</option>
@@ -427,14 +454,14 @@ export default function TeacherDashboardPage() {
 
                   return (
                     <select value={selectedCourse || ''} onChange={(e) => {
-                      const code = e.target.value
-                      setSelectedCourse(code)
-                      const ids = available.filter((c) => (c.course_code || c.courseCode) === code).map((c) => String(c.id))
+                      const key = e.target.value
+                      setSelectedCourse(key)
+                      const ids = available.filter((c) => buildCourseKey(String(c.courseCode || c.course_code || '').trim(), String(c.name || '').trim()) === key).map((c) => String(c.id))
                       setSelectedClassIds(ids)
                     }} className="mt-1 block w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-800 dark:text-gray-100">
-                      <option value="" disabled hidden>Select Course</option>
-                      {commonCodes.map((code) => (
-                        <option key={code} value={code}>{code}</option>
+                      <option value="" disabled hidden>Select course</option>
+                      {multiSectionCourseOptions.map((course) => (
+                        <option key={course.key} value={course.key}>{course.label}</option>
                       ))}
                     </select>
                   )
@@ -442,7 +469,7 @@ export default function TeacherDashboardPage() {
               </div>
             </div>
             <div className="mt-4 flex items-center justify-end gap-3">
-              <button className="px-4 py-2 rounded border" onClick={() => setCreateModalOpen(false)}>Cancel</button>
+              <button className="px-4 py-2 rounded border" onClick={() => { resetCreateExamModal(); setCreateModalOpen(false) }}>Cancel</button>
               <button
                 className={`px-4 py-2 rounded text-white ${canContinue ? '' : 'bg-gray-400 cursor-not-allowed dark:bg-gray-600'}`}
                 style={canContinue ? {
