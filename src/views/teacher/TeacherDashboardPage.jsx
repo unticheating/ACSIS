@@ -206,7 +206,12 @@ export default function TeacherDashboardPage() {
             <button
               type="button"
               onClick={() => setCreateModalOpen(true)}
-              className="inline-flex items-center px-4 py-2 rounded border border-acsis-brand/30 bg-acsis-brand text-white shadow-sm hover:bg-acsis-brand/90 focus:outline-none focus:ring-2 focus:ring-acsis-brand/30"
+              className="inline-flex items-center px-4 py-2 rounded border shadow-sm hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-offset-2"
+              style={{
+                backgroundColor: 'var(--acsis-brand, #334155)',
+                borderColor: 'var(--acsis-brand, #334155)',
+                color: '#fff',
+              }}
             >
               Create Exam
             </button>
@@ -439,7 +444,10 @@ export default function TeacherDashboardPage() {
             <div className="mt-4 flex items-center justify-end gap-3">
               <button className="px-4 py-2 rounded border" onClick={() => setCreateModalOpen(false)}>Cancel</button>
               <button
-                className={`px-4 py-2 rounded text-white ${canContinue ? 'bg-acsis-brand' : 'bg-gray-400 cursor-not-allowed dark:bg-gray-600'}`}
+                className={`px-4 py-2 rounded text-white ${canContinue ? '' : 'bg-gray-400 cursor-not-allowed dark:bg-gray-600'}`}
+                style={canContinue ? {
+                  backgroundColor: 'var(--acsis-brand, #334155)',
+                } : undefined}
                 disabled={!canContinue}
                 onClick={() => {
                   if (!canContinue) {
