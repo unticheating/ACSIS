@@ -49,7 +49,6 @@ export async function createExamService(memberId, classId, payload) {
       classId,
       payload.title,
       examPassword,
-      payload.duration || null,
       {
         sections: payload.sections,
         questions: payload.questions,
@@ -57,6 +56,9 @@ export async function createExamService(memberId, classId, payload) {
       {
         shuffleQuestions: Boolean(payload.shuffleQuestions),
         shuffleChoices: Boolean(payload.shuffleChoices),
+        scheduledStart: payload.scheduledStart,
+        scheduledEnd: payload.scheduledEnd,
+        isAutoPublish: Boolean(payload.isAutoPublish),
       },
     );
 
@@ -89,7 +91,6 @@ export async function updateExamDraftService(memberId, classId, examId, payload)
       examId,
       payload.title,
       examPassword,
-      payload.duration || null,
       {
         sections: payload.sections,
         questions: payload.questions,
@@ -97,6 +98,9 @@ export async function updateExamDraftService(memberId, classId, examId, payload)
       {
         shuffleQuestions: Boolean(payload.shuffleQuestions),
         shuffleChoices: Boolean(payload.shuffleChoices),
+        scheduledStart: payload.scheduledStart,
+        scheduledEnd: payload.scheduledEnd,
+        isAutoPublish: Boolean(payload.isAutoPublish),
       },
     );
 

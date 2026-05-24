@@ -283,7 +283,8 @@ export async function getTeacherActiveMonitoringExamQuery(teacherMemberId) {
        e.title,
        e.status,
        e.password AS code,
-       e.time_limit AS duration,
+       e.scheduled_start AS "scheduledStart",
+       e.scheduled_end AS "scheduledEnd",
        e.updated_at AS "updatedAt",
        c.class_id AS "classId",
        c.class_name AS "className"

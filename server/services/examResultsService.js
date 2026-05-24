@@ -18,16 +18,13 @@ import { EXAM_STATUS } from '../lib/examStatus.js'
 
 function mapMonitoringExamMeta(examRow) {
   const status = (examRow.status || '').toLowerCase()
-  const duration =
-    examRow.time_limit != null && examRow.time_limit !== ''
-      ? Number(examRow.time_limit)
-      : null
   return {
     id: examRow.exam_id,
     title: examRow.title,
     status: examRow.status,
     code: examRow.password,
-    duration: Number.isFinite(duration) && duration > 0 ? duration : null,
+    scheduledStart: examRow.scheduledStart || examRow.scheduled_start || null,
+    scheduledEnd: examRow.scheduledEnd || examRow.scheduled_end || null,
     openedAt: status === EXAM_STATUS.OPEN && examRow.updated_at ? examRow.updated_at : null,
     updatedAt: examRow.updated_at || null,
   }
@@ -86,10 +83,8 @@ export async function getTeacherActiveMonitoringService(teacherMemberId) {
         code: active.code,
         classId: active.classId,
         className: active.className,
-        duration:
-          active.duration != null && active.duration !== ''
-            ? Number(active.duration)
-            : null,
+        scheduledStart: active.scheduledStart || null,
+        scheduledEnd: active.scheduledEnd || null,
         openedAt:
           (active.status || '').toLowerCase() === EXAM_STATUS.OPEN && active.updatedAt
             ? active.updatedAt

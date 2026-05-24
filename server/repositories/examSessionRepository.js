@@ -7,7 +7,7 @@ import { computeExamRanksQuery } from './examResultsRepository.js'
 export async function getExamForJoinQuery(classId, examId) {
   const pool = getPool()
   const { rows } = await pool.query(
-    `SELECT e.exam_id, e.title, e.password, e.time_limit, e.status, e.updated_at, c.institution_id
+    `SELECT e.exam_id, e.title, e.password, e.scheduled_start, e.scheduled_end, e.status, e.updated_at, c.institution_id
      FROM exams e
      JOIN classes c ON c.class_id = e.class_id
      WHERE e.exam_id = $1 AND e.class_id = $2 AND e.is_archived = FALSE`,
@@ -300,12 +300,24 @@ export async function findChoiceIdByTextQuery(questionId, choiceText) {
   return ci[0]?.choice_id ?? null
 }
 
-export async function updateExamStatusByIdQuery(classId, examId, status) {
+export async function updateExamStatusByIdQuery(classId, examId, status, scheduledEnd = undefined) {
   const pool = getPool()
-  const { rowCount } = await pool.query(
-    `UPDATE exams SET status = $1, updated_at = NOW()
-     WHERE exam_id = $2 AND class_id = $3`,
-    [status, examId, classId],
-  )
+  let query = `UPDATE exams SET status = $1, updated_at = NOW()`
+  const params = [status]
+  
+  if (scheduledEnd !== undefined) {
+    query += `, scheduled_end = $2`
+    params.push(scheduledEnd ? new Date(scheduledEnd) : null)
+  }
+  
+  query += ` WHERE exam_id = $${params.length + 1} AND class_id = $${params.length + 2}`
+  params.push(examId, classId)
+
+  const { rowCount } = await pool.query(query, params)
   return rowCount > 0
+}
+
+export async function deleteExamSessionsQuery(examId) {
+  const pool = getPool()
+  await pool.query(`DELETE FROM exam_sessions WHERE exam_id = $1`, [examId])
 }

@@ -57,7 +57,6 @@ const sectionSchema = z.object({
 const createExamSchema = z
   .object({
     title: z.string().min(1, 'Exam title is required'),
-    duration: z.number().int().min(1, 'Duration must be at least 1 minute'),
     password: z
       .string()
       .max(20, 'Exam password must be 20 characters or fewer')
@@ -65,6 +64,9 @@ const createExamSchema = z
       .transform((v) => (v == null || v.trim() === '' ? undefined : v.trim())),
     shuffleQuestions: z.boolean().optional().default(false),
     shuffleChoices: z.boolean().optional().default(false),
+    scheduledStart: z.string().datetime().nullable().optional().default(null),
+    scheduledEnd: z.string().datetime().nullable().optional().default(null),
+    isAutoPublish: z.boolean().optional().default(false),
     sections: z.array(sectionSchema).optional(),
     questions: z.array(questionSchema).optional(),
   })
@@ -292,8 +294,9 @@ export async function closeTeacherExam(req, res) {
 
 export async function startTeacherExam(req, res) {
   const { classId, examId } = req.params;
+  const { newScheduledEnd } = req.body || {};
   try {
-    const result = await startExamService(classId, examId, req.memberId);
+    const result = await startExamService(classId, examId, req.memberId, { newScheduledEnd });
     if (!result.ok) {
       return res.status(result.status || 500).json({ error: result.error });
     }

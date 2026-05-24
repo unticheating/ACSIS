@@ -44,18 +44,17 @@ export async function insertExamTransaction(
   classId,
   title,
   password,
-  timeLimit,
   payload,
-  { shuffleQuestions = false, shuffleChoices = false } = {},
+  { shuffleQuestions = false, shuffleChoices = false, scheduledStart = null, scheduledEnd = null, isAutoPublish = false } = {},
 ) {
   await ensureExamSectionsSchema();
   const client = pool;
 
   const examResult = await client.query(
-    `INSERT INTO exams (class_id, title, password, time_limit, status, shuffle_questions, shuffle_choices, created_by)
-     VALUES ($1, $2, $3, $4, 'draft', $5, $6, $7)
+    `INSERT INTO exams (class_id, title, password, status, shuffle_questions, shuffle_choices, created_by, scheduled_start, scheduled_end, is_auto_publish)
+     VALUES ($1, $2, $3, 'draft', $4, $5, $6, $7, $8, $9)
      RETURNING exam_id`,
-    [classId, title, password || null, timeLimit, Boolean(shuffleQuestions), Boolean(shuffleChoices), memberId],
+    [classId, title, password || null, Boolean(shuffleQuestions), Boolean(shuffleChoices), memberId, scheduledStart, scheduledEnd, Boolean(isAutoPublish)],
   );
   const examId = examResult.rows[0].exam_id;
 
@@ -104,9 +103,8 @@ export async function updateExamDraftTransaction(
   examId,
   title,
   password,
-  timeLimit,
   payload,
-  { shuffleQuestions = false, shuffleChoices = false } = {},
+  { shuffleQuestions = false, shuffleChoices = false, scheduledStart = null, scheduledEnd = null, isAutoPublish = false } = {},
 ) {
   await ensureExamSectionsSchema();
 
@@ -118,17 +116,17 @@ export async function updateExamDraftTransaction(
     return false;
   }
 
-  let updateFields = [title, timeLimit, Boolean(shuffleQuestions), Boolean(shuffleChoices), examId];
+  let updateFields = [title, Boolean(shuffleQuestions), Boolean(shuffleChoices), scheduledStart, scheduledEnd, Boolean(isAutoPublish), examId];
   let updatePasswordStr = '';
   if (password !== undefined) {
-    updatePasswordStr = `, password = $6`;
+    updatePasswordStr = `, password = $8`;
     updateFields.push(password);
   }
 
   await client.query(
     `UPDATE exams 
-     SET title = $1, time_limit = $2, shuffle_questions = $3, shuffle_choices = $4${updatePasswordStr}
-     WHERE exam_id = $5`,
+     SET title = $1, shuffle_questions = $2, shuffle_choices = $3, scheduled_start = $4, scheduled_end = $5, is_auto_publish = $6${updatePasswordStr}
+     WHERE exam_id = $7`,
     updateFields
   );
 
@@ -185,8 +183,10 @@ export async function listTeacherExamsWithClassMetaQuery(memberId) {
       e.exam_id AS id,
       e.title,
       e.password AS code,
-      e.time_limit AS duration,
       e.status,
+      e.scheduled_start AS "scheduledStart",
+      e.scheduled_end AS "scheduledEnd",
+      e.is_auto_publish AS "isAutoPublish",
       e.class_id AS "classId",
       c.course_code AS "courseCode",
       c.class_name AS name,
@@ -214,8 +214,10 @@ export async function getExamsByClassIdQuery(classId, requireActive = false) {
       e.exam_id as id,
       e.title,
       e.password as code,
-      e.time_limit as duration,
       e.status,
+      e.scheduled_start as "scheduledStart",
+      e.scheduled_end as "scheduledEnd",
+      e.is_auto_publish as "isAutoPublish",
       (SELECT COUNT(*) FROM questions q WHERE q.exam_id = e.exam_id) as "questionCount"
     FROM exams e
     WHERE e.class_id = $1
@@ -363,8 +365,10 @@ export async function getExamWithQuestionsQuery(classId, examId, requireActive =
       exam_id as id,
       title,
       password as code,
-      time_limit as duration,
       status,
+      scheduled_start as "scheduledStart",
+      scheduled_end as "scheduledEnd",
+      is_auto_publish as "isAutoPublish",
       shuffle_questions as "shuffleQuestions",
       shuffle_choices as "shuffleChoices"
     FROM exams

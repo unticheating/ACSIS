@@ -7,6 +7,7 @@ import { fetchTeacherExamResults } from '@/lib/teacherExamResultsApi.js'
 import { releaseExamScores } from '@/lib/teacherExamGradingApi.js'
 import ExamAnswerReviewModal from '@/components/teacher/ExamAnswerReviewModal.jsx'
 import ReleaseScoresDialog from '@/components/teacher/ReleaseScoresDialog.jsx'
+import RestartExamDialog from '@/components/teacher/RestartExamDialog.jsx'
 import {
   isExamDraft,
   isExamOngoing,
@@ -36,6 +37,7 @@ export default function TeacherExamDetailPage() {
   const [reviewInitialSessionId, setReviewInitialSessionId] = useState(null)
   const [releasing, setReleasing] = useState(false)
   const [releaseDialogOpen, setReleaseDialogOpen] = useState(false)
+  const [restartDialogOpen, setRestartDialogOpen] = useState(false)
   const { confirm, ConfirmDialog } = useAcsisConfirm()
 
   useEffect(() => {
@@ -205,16 +207,18 @@ export default function TeacherExamDetailPage() {
     }
   }
 
-  async function startExam() {
+  async function startExam(payload = {}) {
     try {
       const res = await apiFetch(`/api/teacher/classes/${classId}/exams/${examId}/start`, {
         method: 'PUT',
+        body: JSON.stringify(payload),
       })
       if (!res.ok) {
         const err = await res.json()
         throw new Error(err.error || 'Failed to start exam.')
       }
       acsisToastSuccess('Exam is now live.')
+      setRestartDialogOpen(false)
       setRefreshTick((t) => t + 1)
     } catch (err) {
       acsisToastError(err.message)
@@ -308,13 +312,18 @@ export default function TeacherExamDetailPage() {
             </button>
           ) : null}
           {normalizeExamStatus(exam.status) === PG_EXAM_STATUS.WAITING ? (
-            <button type="button" className="acsis-btn-primary" onClick={startExam}>
+            <button type="button" className="acsis-btn-primary" onClick={() => startExam({})}>
               Start exam (go live)
             </button>
           ) : null}
           {active ? (
             <button type="button" className="acsis-btn-ghost" onClick={() => void endExam()}>
               End exam (close for students)
+            </button>
+          ) : null}
+          {closed && !draft ? (
+            <button type="button" className="acsis-btn-ghost" onClick={() => setRestartDialogOpen(true)}>
+              Restart exam (go live)
             </button>
           ) : null}
           {(closed || hasSubmissions) && !draft ? (
@@ -463,6 +472,14 @@ export default function TeacherExamDetailPage() {
         onRelease={(opts) => void handleReleaseScores(opts)}
       />
       {ConfirmDialog}
+      {restartDialogOpen && (
+        <RestartExamDialog
+          open={restartDialogOpen}
+          onOpenChange={setRestartDialogOpen}
+          onRestart={startExam}
+          defaultEnd={exam.scheduledEnd}
+        />
+      )}
     </div>
   )
 }

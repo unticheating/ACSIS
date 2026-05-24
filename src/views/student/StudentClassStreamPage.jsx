@@ -205,10 +205,16 @@ export default function StudentClassStreamPage() {
                           ? 'acsis-pill--draft'
                           : isExamEnterableByStudent(exam.status, exam.sessionStatus)
                             ? 'acsis-pill--live'
-                            : 'acsis-pill--draft'
+                            : exam.scheduledStart
+                              ? 'acsis-pill--draft'
+                              : 'acsis-pill--draft'
                       }`}
                     >
-                      {labelForStudentExam(exam)}
+                      {exam.sessionStatus === 'submitted'
+                        ? labelForStudentExam(exam)
+                        : exam.scheduledStart && !isExamEnterableByStudent(exam.status, exam.sessionStatus) && exam.status !== 'closed'
+                          ? `Starts ${new Date(exam.scheduledStart).toLocaleString()}`
+                          : labelForStudentExam(exam)}
                     </span>
                     {isExamEnterableByStudent(exam.status, exam.sessionStatus) ? (
                       <button

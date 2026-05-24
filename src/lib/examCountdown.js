@@ -7,54 +7,58 @@ import { PG_EXAM_STATUS, normalizeExamStatus } from '@/lib/examFlowUi.js'
  */
 export function computeExamTimeDisplay(exam, nowMs = Date.now()) {
   const status = normalizeExamStatus(exam?.status)
-  const durationMin = Number(exam?.duration)
-  const hasLimit = Number.isFinite(durationMin) && durationMin > 0
-  const limitSec = hasLimit ? durationMin * 60 : null
+  const endMs = exam?.scheduledEnd ? new Date(exam.scheduledEnd).getTime() : null
 
   if (status === PG_EXAM_STATUS.CLOSED) {
-    return { seconds: 0, label: 'Ended', display: '00:00', isLow: false }
+    return { seconds: 0, label: 'Ended', display: '00:00:00', isLow: false }
   }
+
+  if (!endMs || !Number.isFinite(endMs)) {
+    return { seconds: null, label: 'No time limit', display: '--:--:--', isLow: false }
+  }
+
+  const remainingSec = Math.max(0, Math.floor((endMs - nowMs) / 1000))
+  const display = formatHhMmSs(remainingSec)
 
   if (status === PG_EXAM_STATUS.WAITING) {
     return {
-      seconds: limitSec,
-      label: 'Not started',
-      display: limitSec != null ? formatMmSs(limitSec) : '--:--',
+      seconds: remainingSec,
+      label: 'Starts soon',
+      display,
       isLow: false,
     }
   }
 
   if (status !== PG_EXAM_STATUS.OPEN) {
     return {
-      seconds: limitSec,
+      seconds: remainingSec,
       label: 'Time',
-      display: limitSec != null ? formatMmSs(limitSec) : '--:--',
+      display,
       isLow: false,
     }
   }
 
-  if (!hasLimit) {
-    return { seconds: null, label: 'No limit', display: '--:--', isLow: false }
-  }
-
-  const openedMs = exam?.openedAt ? new Date(exam.openedAt).getTime() : NaN
-  if (!Number.isFinite(openedMs)) {
-    return {
-      seconds: limitSec,
-      label: 'Time left',
-      display: formatMmSs(limitSec),
-      isLow: false,
-    }
-  }
-
-  const elapsedSec = Math.floor((nowMs - openedMs) / 1000)
-  const remaining = Math.max(0, limitSec - elapsedSec)
   return {
-    seconds: remaining,
+    seconds: remainingSec,
     label: 'Time left',
-    display: formatMmSs(remaining),
-    isLow: remaining > 0 && remaining <= 300,
+    display,
+    isLow: remainingSec > 0 && remainingSec <= 300,
   }
+}
+
+export function formatHhMmSs(totalSeconds) {
+  const s = Math.max(0, Math.floor(totalSeconds))
+  const h = Math.floor(s / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  const r = s % 60
+  
+  const mStr = String(m).padStart(2, '0')
+  const sStr = String(r).padStart(2, '0')
+  
+  if (h > 0) {
+    return `${String(h).padStart(2, '0')}:${mStr}:${sStr}`
+  }
+  return `${mStr}:${sStr}`
 }
 
 export function formatMmSs(totalSeconds) {

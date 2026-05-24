@@ -43,7 +43,8 @@ export async function listAdminClassesQuery(institutionId) {
            'id', e.exam_id,
            'title', e.title,
            'code', e.password,
-           'duration', e.time_limit,
+           'scheduledStart', e.scheduled_start,
+           'scheduledEnd', e.scheduled_end,
            'status', e.status,
            'questionCount', (
              SELECT COUNT(*)::int FROM questions q WHERE q.exam_id = e.exam_id

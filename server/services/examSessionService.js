@@ -14,6 +14,7 @@ import {
   isSessionScoreReleasedQuery,
   markSessionSubmittedQuery,
   updateExamStatusByIdQuery,
+  deleteExamSessionsQuery,
   upsertStudentAnswerQuery,
 } from '../repositories/examSessionRepository.js'
 
@@ -45,7 +46,8 @@ function mapExamMeta(row) {
   return {
     id: row.exam_id,
     title: row.title,
-    duration: row.time_limit,
+    scheduledStart: row.scheduled_start,
+    scheduledEnd: row.scheduled_end,
     status: row.status,
     code: row.password,
     openedAt: status === EXAM_STATUS.OPEN && row.updated_at ? row.updated_at : null,
@@ -157,7 +159,8 @@ export async function getStudentExamSessionService(classId, examId, studentMembe
   return { ok: true, ...payload }
 }
 
-export async function startExamService(classId, examId, teacherMemberId = null) {
+export async function startExamService(classId, examId, teacherMemberId = null, opts = {}) {
+  const { newScheduledEnd } = opts
   const exam = await getExamForJoinQuery(classId, examId)
   if (!exam) {
     return { ok: false, status: 404, error: 'Exam not found.' }
@@ -165,14 +168,14 @@ export async function startExamService(classId, examId, teacherMemberId = null) 
 
   const next = nextStatusAfterStart(exam.status)
   if (!next) {
-    return { ok: false, status: 400, error: 'Only exams in the lobby (waiting) can be started.' }
+    return { ok: false, status: 400, error: 'Only exams in the lobby or closed can be started.' }
   }
 
   if (teacherMemberId) {
     await closeOtherTeacherOngoingExamsQuery(teacherMemberId, classId, examId)
   }
 
-  const updated = await updateExamStatusByIdQuery(classId, examId, next)
+  const updated = await updateExamStatusByIdQuery(classId, examId, next, newScheduledEnd)
   if (!updated) {
     return { ok: false, status: 500, error: 'Failed to start exam.' }
   }

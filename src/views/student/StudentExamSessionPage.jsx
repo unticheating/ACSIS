@@ -125,16 +125,14 @@ export default function StudentExamSessionPage() {
 
   const examTitle = hit?.exam?.title || 'Examination'
   useDocumentTitle(examTitle)
-  const durationMin = Number(hit?.exam?.duration || 35)
   const instructorWait = useMemo(() => {
     if (activeAccount?.id === 'faculty') return activeAccount.displayName
     return 'your instructor'
   }, [activeAccount])
 
   const questions = hit?.exam?.questions || []
-
   const [countdownNum, setCountdownNum] = useState(COUNTDOWN_SEC)
-  const [secondsLeft, setSecondsLeft] = useState(durationMin * 60)
+  const [secondsLeft, setSecondsLeft] = useState(0)
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [answers, setAnswers] = useState({})
   const [submitResult, setSubmitResult] = useState(null)
@@ -195,8 +193,7 @@ export default function StudentExamSessionPage() {
     const tick = () => {
       const { seconds } = computeExamTimeDisplay({
         status: hit.exam.status,
-        duration: hit.exam.duration ?? durationMin,
-        openedAt: hit.exam.openedAt,
+        scheduledEnd: hit.exam.scheduledEnd,
       })
       const left = seconds ?? 0
       setSecondsLeft(left)
@@ -208,7 +205,7 @@ export default function StudentExamSessionPage() {
     tick()
     const id = window.setInterval(tick, 1000)
     return () => window.clearInterval(id)
-  }, [scene, hit?.exam, durationMin, submitToServer])
+  }, [scene, hit?.exam, submitToServer])
 
   const showViolationOverlay = useCallback((returnTo) => {
     detectionRunningRef.current = true
@@ -511,7 +508,8 @@ export default function StudentExamSessionPage() {
             <PlpLogo className="w-8 h-8 mr-3 opacity-90" />
             <h1 className="font-semibold text-gray-200 truncate">{examTitle}</h1>
           </header>
-          <main className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+          <main className="flex-1 flex flex-col p-6 text-center overflow-y-auto">
+            <div className="my-auto w-full max-w-2xl mx-auto flex flex-col items-center py-8">
             <h1 className="text-4xl md:text-5xl font-bold mb-8 uppercase tracking-wider" style={{ color: '#f87171' }}>
               WARNING:
             </h1>
@@ -543,6 +541,7 @@ export default function StudentExamSessionPage() {
             <Link to={`/student/my-classes/${classId}`} className="mt-12 text-sm text-green-300 hover:text-green-100 transition-colors tracking-widest font-semibold">
               ← Back to class
             </Link>
+            </div>
           </main>
         </div>
       </div>
@@ -631,7 +630,7 @@ export default function StudentExamSessionPage() {
           </div>
           <div className="flex lg:hidden items-center gap-2 px-4 py-1.5 bg-gray-100 rounded-full font-mono text-gray-700 font-semibold">
             <Clock className="w-4 h-4" />
-            {formatClock(secondsLeft)}
+            {secondsLeft > 0 ? formatClock(secondsLeft) : '--:--'}
           </div>
         </div>
       </header>

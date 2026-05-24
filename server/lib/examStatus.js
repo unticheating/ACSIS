@@ -29,7 +29,7 @@ export function nextStatusAfterPublish(currentStatus) {
 /** Faculty starts the exam — students can answer (waiting → open). */
 export function nextStatusAfterStart(currentStatus) {
   const s = (currentStatus || '').toLowerCase()
-  if (s === EXAM_STATUS.WAITING) return EXAM_STATUS.OPEN
+  if (s === EXAM_STATUS.WAITING || s === EXAM_STATUS.CLOSED) return EXAM_STATUS.OPEN
   return null
 }
 

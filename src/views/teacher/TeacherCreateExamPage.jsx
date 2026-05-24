@@ -11,9 +11,7 @@ import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
 import { useAcsisConfirm } from '@/hooks/useAcsisConfirm.jsx'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import Editor from '@monaco-editor/react'
-
-const HOURS = [0, 1, 2, 3, 4]
-const MINUTES = Array.from({ length: 12 }, (_, i) => i * 5)
+import { DateTimePicker } from '@/components/ui/date-time-picker.jsx'
 
 function emptyMc() {
   return { opt1: '', opt2: '', opt3: '', opt4: '', correct: '' }
@@ -61,7 +59,9 @@ export default function TeacherCreateExamPage() {
   const [examTitle, setExamTitle] = useState('')
   const [examDescription, setExamDescription] = useState('')
   const [examPassword, setExamPassword] = useState('')
-  const [duration, setDuration] = useState('')
+  const [scheduledStart, setScheduledStart] = useState('')
+  const [scheduledEnd, setScheduledEnd] = useState('')
+  const [isAutoPublish, setIsAutoPublish] = useState(false)
 
   const [questionType, setQuestionType] = useState('multiple')
   const [questionText, setQuestionText] = useState('')
@@ -99,10 +99,6 @@ export default function TeacherCreateExamPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [lastSaved, setLastSaved] = useState(null)
   const [showQuestionForm, setShowQuestionForm] = useState(true)
-
-  const [timeModalOpen, setTimeModalOpen] = useState(false)
-  const [selectedHours, setSelectedHours] = useState(1)
-  const [selectedMinutes, setSelectedMinutes] = useState(0)
 
   const resetMc = useCallback(() => setMc(emptyMc()), [])
 
@@ -271,7 +267,6 @@ export default function TeacherCreateExamPage() {
         const payload = {
           title,
           description: examDescription.trim(),
-          duration: Number(duration) || 60,
           sections: sections.map((sec) => ({
             title: sec.title.trim() || 'Set',
             description: sec.description.trim(),
@@ -285,6 +280,9 @@ export default function TeacherCreateExamPage() {
           })),
           shuffleQuestions,
           shuffleChoices,
+          scheduledStart: scheduledStart ? new Date(scheduledStart).toISOString() : null,
+          scheduledEnd: scheduledEnd ? new Date(scheduledEnd).toISOString() : null,
+          isAutoPublish,
         }
         
         if (examPassword.trim()) {
@@ -320,28 +318,16 @@ export default function TeacherCreateExamPage() {
     }, 1500)
 
     return () => clearTimeout(timer)
-  }, [examTitle, examDescription, duration, sections, shuffleQuestions, shuffleChoices, selectedClass, examPassword, examId])
-
-
-  function saveTimeLimit() {
-    const totalMinutes = selectedHours * 60 + selectedMinutes
-    setDuration(totalMinutes > 0 ? String(totalMinutes) : '')
-    setTimeModalOpen(false)
-  }
+  }, [examTitle, examDescription, sections, shuffleQuestions, shuffleChoices, selectedClass, examPassword, examId, scheduledStart, scheduledEnd, isAutoPublish])
 
   async function createExam() {
     const title = examTitle.trim()
-    const dur = Number(duration)
     if (!selectedClass) {
       acsisToastError('No class is available.')
       return
     }
     if (!title) {
       acsisToastError('Please enter an exam title.')
-      return
-    }
-    if (!dur || dur < 1) {
-      acsisToastError('Please set a valid time limit.')
       return
     }
     if (totalQuestions === 0) {
@@ -352,7 +338,6 @@ export default function TeacherCreateExamPage() {
     const payload = {
       title,
       description: examDescription.trim(),
-      duration: dur,
       sections: sections.map((sec) => ({
         title: sec.title.trim() || 'Set',
         description: sec.description.trim(),
@@ -366,6 +351,9 @@ export default function TeacherCreateExamPage() {
       })),
       shuffleQuestions,
       shuffleChoices,
+      scheduledStart: scheduledStart ? new Date(scheduledStart).toISOString() : null,
+      scheduledEnd: scheduledEnd ? new Date(scheduledEnd).toISOString() : null,
+      isAutoPublish,
     }
     const pw = examPassword.trim()
     if (pw) payload.password = pw
@@ -700,21 +688,6 @@ export default function TeacherCreateExamPage() {
             </div>
 
             <div className="space-y-2">
-              <Label className="text-sm font-semibold">Time Limit (minutes)</Label>
-              <div className="relative">
-                <Input
-                  type="number"
-                  placeholder="Set time limit"
-                  readOnly
-                  value={duration}
-                  onClick={() => setTimeModalOpen(true)}
-                  className="cursor-pointer"
-                />
-                <Clock className="absolute right-3 top-2.5 text-muted-foreground" size={18} />
-              </div>
-            </div>
-
-            <div className="space-y-2">
               <Label htmlFor="exam-password" className="text-sm font-semibold">
                 Exam password <span className="font-normal text-muted-foreground">(optional)</span>
               </Label>
@@ -729,6 +702,49 @@ export default function TeacherCreateExamPage() {
               />
               <p className="text-xs text-muted-foreground leading-relaxed">{COPY.examPassword}</p>
               <p className="text-xs text-muted-foreground leading-relaxed">{COPY.classAccessCode}</p>
+            </div>
+
+            <div className="space-y-4 pt-5 mt-2 border-t border-border">
+              <div>
+                <p className="text-sm font-semibold text-foreground">Exam Scheduling</p>
+                <p className="text-xs text-muted-foreground mt-1">If set, the exam will strictly start and end at these times.</p>
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold flex items-center gap-2">
+                    <Clock size={14} className="text-muted-foreground" />
+                    Start Time
+                  </Label>
+                  <DateTimePicker
+                    value={scheduledStart}
+                    onChange={(dateStr) => setScheduledStart(dateStr)}
+                    placeholder="Select start date & time"
+                    className="w-full"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold flex items-center gap-2">
+                    <Clock size={14} className="text-muted-foreground" />
+                    End Time
+                  </Label>
+                  <DateTimePicker
+                    value={scheduledEnd}
+                    onChange={(dateStr) => setScheduledEnd(dateStr)}
+                    placeholder="Select end date & time"
+                    className="w-full"
+                  />
+                </div>
+              </div>
+              <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
+                <input
+                  type="checkbox"
+                  checked={isAutoPublish}
+                  onChange={(e) => setIsAutoPublish(e.target.checked)}
+                  className="rounded border-input text-primary focus:ring-primary"
+                />
+                Auto-publish exam at scheduled start time
+              </label>
             </div>
 
             <div className="space-y-2 pt-4 border-t border-border">
@@ -765,9 +781,8 @@ export default function TeacherCreateExamPage() {
           </Button>
         </div>
       </aside>
-
       {/* MAIN CONTENT - QUESTIONS BUILDER */}
-      <main className="flex-1 p-6 md:p-8 lg:p-12 overflow-y-auto">
+      <main className="flex-1 p-6 md:p-8 lg:p-12 overflow-y-auto relative">
         <div className="max-w-3xl mx-auto space-y-8">
           
           <div className="flex items-center justify-between pb-4 border-b border-border">
@@ -788,7 +803,7 @@ export default function TeacherCreateExamPage() {
             <Button
               variant="outline"
               onClick={addSection}
-              className="gap-2"
+              className="gap-2 shadow-sm"
             >
               <Layers size={16} />
               Add set
@@ -983,59 +998,6 @@ export default function TeacherCreateExamPage() {
         </div>
       </main>
 
-      {/* TIME PICKER MODAL */}
-      {timeModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <Card className="w-full max-w-sm shadow-xl border-border animate-in zoom-in-95 duration-200">
-            <CardHeader className="border-b border-border bg-card">
-              <CardTitle className="text-xl">Set Time Limit</CardTitle>
-              <CardDescription>How long should students have to complete this exam?</CardDescription>
-            </CardHeader>
-            <CardContent className="pt-6">
-              <div className="flex gap-4 h-[200px]">
-                <div className="flex-1 flex flex-col border border-border rounded-md overflow-hidden bg-background">
-                  <div className="bg-muted text-xs font-bold text-center py-2 border-b border-border text-muted-foreground uppercase tracking-wider">Hours</div>
-                  <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                    {HOURS.map((h) => (
-                      <button
-                        key={h}
-                        type="button"
-                        onClick={() => setSelectedHours(h)}
-                        className={`w-full py-2 px-3 text-center text-sm rounded-md transition-colors ${selectedHours === h ? 'bg-primary text-primary-foreground font-bold shadow-sm' : 'hover:bg-muted text-foreground'}`}
-                      >
-                        {hourLabel(h)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="flex-1 flex flex-col border border-border rounded-md overflow-hidden bg-background">
-                  <div className="bg-muted text-xs font-bold text-center py-2 border-b border-border text-muted-foreground uppercase tracking-wider">Minutes</div>
-                  <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                    {MINUTES.map((m) => (
-                      <button
-                        key={m}
-                        type="button"
-                        onClick={() => setSelectedMinutes(m)}
-                        className={`w-full py-2 px-3 text-center text-sm rounded-md transition-colors ${selectedMinutes === m ? 'bg-primary text-primary-foreground font-bold shadow-sm' : 'hover:bg-muted text-foreground'}`}
-                      >
-                        {m < 10 ? `0${m}` : String(m)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-            <CardFooter className="flex justify-end gap-3 bg-muted/40 py-4 border-t border-border">
-              <Button variant="ghost" onClick={() => setTimeModalOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={saveTimeLimit}>
-                Set Time Limit
-              </Button>
-            </CardFooter>
-          </Card>
-        </div>
-      )}
       {ConfirmDialog}
     </div>
   )
