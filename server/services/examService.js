@@ -1,6 +1,7 @@
 import { getPool } from '../db.js';
 import { 
-  insertExamTransaction, 
+  insertExamTransaction,
+  updateExamDraftTransaction,
   getExamsByClassIdQuery,
   listTeacherExamsWithClassMetaQuery,
   updateExamStatusQuery, 
@@ -65,6 +66,51 @@ export async function createExamService(memberId, classId, payload) {
     await client.query('ROLLBACK');
     console.error('[examService.createExam]', err);
     return { ok: false, error: 'Database transaction failed.' };
+  } finally {
+    client.release();
+  }
+}
+
+export async function updateExamDraftService(memberId, classId, examId, payload) {
+  const pool = getPool();
+  const client = await pool.connect();
+  
+  try {
+    await client.query('BEGIN');
+    
+    const examPassword = payload.password && String(payload.password).trim()
+      ? String(payload.password).trim().toUpperCase()
+      : undefined;
+
+    const success = await updateExamDraftTransaction(
+      client,
+      memberId,
+      classId,
+      examId,
+      payload.title,
+      examPassword,
+      payload.duration || null,
+      {
+        sections: payload.sections,
+        questions: payload.questions,
+      },
+      {
+        shuffleQuestions: Boolean(payload.shuffleQuestions),
+        shuffleChoices: Boolean(payload.shuffleChoices),
+      },
+    );
+
+    if (!success) {
+      await client.query('ROLLBACK');
+      return { ok: false, status: 404, error: 'Exam not found, not a draft, or permission denied.' };
+    }
+
+    await client.query('COMMIT');
+    return { ok: true };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[examService.updateExamDraft]', err);
+    return { ok: false, status: 500, error: 'Database transaction failed.' };
   } finally {
     client.release();
   }

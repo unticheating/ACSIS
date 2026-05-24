@@ -1,12 +1,16 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams, useNavigate } from 'react-router-dom'
-import { Clock, Plus, Shuffle, Trash2, ArrowLeft, GripVertical, CheckCircle2, Layers } from 'lucide-react'
+import { Clock, Plus, Shuffle, Trash2, ArrowLeft, GripVertical, CheckCircle2, Layers, ImageIcon, X } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card.jsx'
 import { Label } from '@/components/ui/label.jsx'
+import { Button } from '@/components/ui/button.jsx'
+import { Input } from '@/components/ui/input.jsx'
 import { apiFetch } from '@/lib/apiFetch.js'
 import { COPY } from '@/lib/examFlowUi.js'
 import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
 import { useAcsisConfirm } from '@/hooks/useAcsisConfirm.jsx'
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
+import Editor from '@monaco-editor/react'
 
 const HOURS = [0, 1, 2, 3, 4]
 const MINUTES = Array.from({ length: 12 }, (_, i) => i * 5)
@@ -64,12 +68,37 @@ export default function TeacherCreateExamPage() {
   const [mc, setMc] = useState(emptyMc)
   const [identAnswer, setIdentAnswer] = useState('')
   const [tfAnswer, setTfAnswer] = useState('')
+  const [codingAnswer, setCodingAnswer] = useState('')
+  const [codingLanguage, setCodingLanguage] = useState('javascript')
+  const [questionImage, setQuestionImage] = useState(null) // base64 data URI
+  const imageInputRef = useRef(null)
+
+  function handleImageUpload(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      acsisToastError('Please select a valid image file.')
+      return
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      acsisToastError('Image must be smaller than 2 MB.')
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = (ev) => setQuestionImage(ev.target.result)
+    reader.readAsDataURL(file)
+  }
 
   const [sections, setSections] = useState([INITIAL_EXAM_SECTION])
   const [activeSectionId, setActiveSectionId] = useState(INITIAL_EXAM_SECTION.id)
   const [shuffleQuestions, setShuffleQuestions] = useState(false)
   const [shuffleChoices, setShuffleChoices] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const [examId, setExamId] = useState(null)
+  const [isSaving, setIsSaving] = useState(false)
+  const [lastSaved, setLastSaved] = useState(null)
+  const [showQuestionForm, setShowQuestionForm] = useState(true)
 
   const [timeModalOpen, setTimeModalOpen] = useState(false)
   const [selectedHours, setSelectedHours] = useState(1)
@@ -83,6 +112,10 @@ export default function TeacherCreateExamPage() {
     resetMc()
     setIdentAnswer('')
     setTfAnswer('')
+    setCodingAnswer('')
+    setCodingLanguage('javascript')
+    setQuestionImage(null)
+    if (imageInputRef.current) imageInputRef.current.value = ''
   }, [resetMc])
 
   function addQuestion() {
@@ -120,6 +153,14 @@ export default function TeacherCreateExamPage() {
         return
       }
       correctAnswer = tfAnswer === 'true' ? 'True' : 'False'
+    } else if (questionType === 'coding') {
+      const code = codingAnswer.trim()
+      if (!code) {
+        acsisToastError('Please provide an expected solution or boilerplate code.')
+        return
+      }
+      correctAnswer = code
+      options = [codingLanguage]
     }
 
     const typeLabel = questionType === 'multiple' ? 'multiple-choice' : questionType
@@ -132,11 +173,12 @@ export default function TeacherCreateExamPage() {
               questions: [
                 ...sec.questions,
                 {
-                  id: Date.now(),
+                  id: String(Date.now()), // ensure string for draggable
                   type: typeLabel,
                   question: text,
                   options,
                   correctAnswer,
+                  imageUrl: questionImage || null,
                 },
               ],
             }
@@ -144,6 +186,7 @@ export default function TeacherCreateExamPage() {
       ),
     )
     resetQuestionForm()
+    setShowQuestionForm(false)
   }
 
   async function deleteQuestion(sectionId, questionId) {
@@ -181,6 +224,7 @@ export default function TeacherCreateExamPage() {
     setSections((prev) => {
       const next = newSection(prev.length + 1)
       setActiveSectionId(next.id)
+      setShowQuestionForm(true)
       return [...prev, next]
     })
   }
@@ -215,6 +259,70 @@ export default function TeacherCreateExamPage() {
     resetQuestionForm()
   }, [activeSectionId, resetQuestionForm])
 
+  // Autosave logic
+  useEffect(() => {
+    const title = examTitle.trim()
+    const totalQ = sections.reduce((n, s) => n + s.questions.length, 0)
+    if (!title || totalQ === 0) return
+
+    const timer = setTimeout(async () => {
+      setIsSaving(true)
+      try {
+        const payload = {
+          title,
+          description: examDescription.trim(),
+          duration: Number(duration) || 60,
+          sections: sections.map((sec) => ({
+            title: sec.title.trim() || 'Set',
+            description: sec.description.trim(),
+            questions: sec.questions.map(({ type, question, options, correctAnswer, imageUrl }) => ({
+              type,
+              question,
+              options,
+              correctAnswer,
+              imageUrl: imageUrl || null,
+            })),
+          })),
+          shuffleQuestions,
+          shuffleChoices,
+        }
+        
+        if (examPassword.trim()) {
+          payload.password = examPassword.trim()
+        }
+
+        if (!examId) {
+          const res = await apiFetch(`/api/teacher/classes/${selectedClass}/exams`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          })
+          if (res.ok) {
+            const data = await res.json()
+            setExamId(data.examId)
+            setLastSaved(new Date())
+          }
+        } else {
+          const res = await apiFetch(`/api/teacher/classes/${selectedClass}/exams/${examId}/content`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          })
+          if (res.ok) {
+            setLastSaved(new Date())
+          }
+        }
+      } catch (err) {
+        console.error('Autosave failed:', err)
+      } finally {
+        setIsSaving(false)
+      }
+    }, 1500)
+
+    return () => clearTimeout(timer)
+  }, [examTitle, examDescription, duration, sections, shuffleQuestions, shuffleChoices, selectedClass, examPassword, examId])
+
+
   function saveTimeLimit() {
     const totalMinutes = selectedHours * 60 + selectedMinutes
     setDuration(totalMinutes > 0 ? String(totalMinutes) : '')
@@ -248,11 +356,12 @@ export default function TeacherCreateExamPage() {
       sections: sections.map((sec) => ({
         title: sec.title.trim() || 'Set',
         description: sec.description.trim(),
-        questions: sec.questions.map(({ type, question, options, correctAnswer }) => ({
+        questions: sec.questions.map(({ type, question, options, correctAnswer, imageUrl }) => ({
           type,
           question,
           options,
           correctAnswer,
+          imageUrl: imageUrl || null,
         })),
       })),
       shuffleQuestions,
@@ -263,19 +372,29 @@ export default function TeacherCreateExamPage() {
 
     setIsSubmitting(true)
     try {
-      // Create for primary selectedClass
-      const res = await apiFetch(`/api/teacher/classes/${selectedClass}/exams`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to create exam.')
+      let mainExamId = examId
+      let examCode = ''
+      if (!mainExamId) {
+        const res = await apiFetch(`/api/teacher/classes/${selectedClass}/exams`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || 'Failed to create exam.')
+        mainExamId = data.examId
+        examCode = data.code
+      } else {
+        const res = await apiFetch(`/api/teacher/classes/${selectedClass}/exams/${mainExamId}/content`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+        if (!res.ok) throw new Error('Failed to update exam draft.')
       }
-      const createdIds = [data.examId]
+      
+      const createdIds = [mainExamId]
 
-      // If createForClasses includes additional class ids, duplicate exam for them
       const other = createForClasses.filter((id) => String(id) !== String(selectedClass))
       for (const clsId of other) {
         try {
@@ -291,17 +410,34 @@ export default function TeacherCreateExamPage() {
         }
       }
 
-      const codeMsg = data.code ? ` Exam code: ${data.code}.` : ''
+      const codeMsg = examCode ? ` Exam code: ${examCode}.` : ''
       acsisToastSuccess(
         `Exam "${title}" saved for ${createdIds.length} class(es) (${totalQuestions} questions, ${sections.length} set(s)).${codeMsg} Publish from the class page when ready.`,
       )
-      // Redirect to the class dashboard for the selected class
       navigate(`/teacher/my-classes/${selectedClass}`)
     } catch (err) {
       acsisToastError(err.message)
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  function onDragEnd(result) {
+    if (!result.destination) return
+    const sourceIndex = result.source.index
+    const destinationIndex = result.destination.index
+    if (sourceIndex === destinationIndex) return
+
+    const sectionId = result.source.droppableId
+    setSections((prev) =>
+      prev.map((sec) => {
+        if (sec.id !== sectionId) return sec
+        const newQuestions = Array.from(sec.questions)
+        const [moved] = newQuestions.splice(sourceIndex, 1)
+        newQuestions.splice(destinationIndex, 0, moved)
+        return { ...sec, questions: newQuestions }
+      })
+    )
   }
 
   const hourLabel = (h) => (h === 0 ? '00' : String(h))
@@ -313,13 +449,12 @@ export default function TeacherCreateExamPage() {
           <div className="space-y-2">
             <Label>Options</Label>
             {['opt1', 'opt2', 'opt3', 'opt4'].map((key, idx) => (
-              <input
+              <Input
                 key={key}
                 type="text"
                 placeholder={`Option ${idx + 1}`}
                 value={mc[key]}
                 onChange={(e) => setMc((m) => ({ ...m, [key]: e.target.value }))}
-                className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-50"
               />
             ))}
           </div>
@@ -328,7 +463,7 @@ export default function TeacherCreateExamPage() {
             <select
               value={mc.correct}
               onChange={(e) => setMc((m) => ({ ...m, correct: e.target.value }))}
-              className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-0"
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               <option value="">Select correct answer</option>
               <option value="1">Option 1</option>
@@ -344,12 +479,11 @@ export default function TeacherCreateExamPage() {
       return (
         <div className="space-y-2">
           <Label>Correct Answer</Label>
-          <input
+          <Input
             type="text"
             placeholder="Enter exact correct answer"
             value={identAnswer}
             onChange={(e) => setIdentAnswer(e.target.value)}
-            className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-0"
           />
         </div>
       )
@@ -361,7 +495,7 @@ export default function TeacherCreateExamPage() {
           <select 
             value={tfAnswer} 
             onChange={(e) => setTfAnswer(e.target.value)}
-            className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-0"
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             <option value="">Select True or False</option>
             <option value="true">True</option>
@@ -370,17 +504,63 @@ export default function TeacherCreateExamPage() {
         </div>
       )
     }
+    if (questionType === 'coding') {
+      return (
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Programming Language</Label>
+            <select
+              value={codingLanguage}
+              onChange={(e) => setCodingLanguage(e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <option value="javascript">JavaScript</option>
+              <option value="python">Python</option>
+              <option value="java">Java</option>
+              <option value="cpp">C++</option>
+              <option value="csharp">C#</option>
+              <option value="vb">VB.NET</option>
+              <option value="php">PHP</option>
+              <option value="html">HTML</option>
+              <option value="css">CSS</option>
+              <option value="xml">XML</option>
+              <option value="sql">SQL</option>
+            </select>
+          </div>
+          <div className="space-y-2">
+            <Label>Expected Solution / Boilerplate Code</Label>
+            <div className="border border-input rounded-md overflow-hidden h-[300px]">
+              <Editor
+                height="100%"
+                language={codingLanguage}
+                theme="vs-dark"
+                value={codingAnswer}
+                onChange={(val) => setCodingAnswer(val)}
+                options={{ 
+                  minimap: { enabled: false }, 
+                  fontSize: 14,
+                  quickSuggestions: false,
+                  suggestOnTriggerCharacters: false,
+                  wordBasedSuggestions: "off",
+                  parameterHints: { enabled: false }
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )
+    }
     return null
-  }, [identAnswer, mc, questionType, tfAnswer])
+  }, [identAnswer, mc, questionType, tfAnswer, codingAnswer, codingLanguage])
 
   const addQuestionForm = (
-    <div className="border-t-2 border-dashed border-blue-200 bg-blue-50/30 p-5 space-y-6">
-      <p className="text-sm font-semibold text-gray-900">Add question to this set</p>
+    <div className="border-t border-border bg-muted/30 p-5 space-y-6">
+      <p className="text-sm font-semibold text-foreground">Add question to this set</p>
       <div className="grid md:grid-cols-3 gap-6">
         <div className="space-y-2 md:col-span-1">
           <Label>Question Type</Label>
           <select
-            className="flex h-10 w-full rounded-md border border-input bg-white px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-0"
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             value={questionType}
             onChange={(e) => {
               setQuestionType(e.target.value)
@@ -391,50 +571,94 @@ export default function TeacherCreateExamPage() {
             <option value="multiple">Multiple Choice</option>
             <option value="identification">Identification</option>
             <option value="truefalse">True / False</option>
+            <option value="coding">Coding / Scripting</option>
           </select>
         </div>
         <div className="space-y-2 md:col-span-2">
           <Label>Question Text</Label>
           <textarea
-            rows={2}
-            className="flex w-full rounded-md border border-input bg-white px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-0 min-h-[80px]"
+            rows={3}
+            className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[80px]"
             placeholder="Enter your question here..."
             value={questionText}
             onChange={(e) => setQuestionText(e.target.value)}
           />
         </div>
       </div>
-      <div className="pt-2 border-t border-gray-200/80">{optionsBlock}</div>
-      <button
-        type="button"
-        onClick={addQuestion}
-        className="flex items-center justify-center gap-2 rounded-md bg-blue-600 border border-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700 w-full md:w-auto"
-      >
-        <Plus size={16} />
+
+      {/* Image Attachment */}
+      <div className="space-y-2">
+        <Label className="flex items-center gap-1.5">
+          <ImageIcon size={14} className="text-muted-foreground" />
+          Attach Image <span className="font-normal text-muted-foreground">(optional, max 2 MB)</span>
+        </Label>
+        {questionImage ? (
+          <div className="relative inline-block">
+            <img
+              src={questionImage}
+              alt="Question attachment"
+              className="max-h-48 max-w-full rounded-lg border border-border object-contain bg-muted"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                setQuestionImage(null)
+                if (imageInputRef.current) imageInputRef.current.value = ''
+              }}
+              className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center shadow-sm hover:bg-destructive/80 transition-colors"
+              aria-label="Remove image"
+            >
+              <X size={12} />
+            </button>
+          </div>
+        ) : (
+          <div
+            className="flex items-center justify-center border-2 border-dashed border-border rounded-lg p-6 cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all"
+            onClick={() => imageInputRef.current?.click()}
+          >
+            <div className="text-center">
+              <ImageIcon size={24} className="mx-auto text-muted-foreground mb-2" />
+              <p className="text-sm text-muted-foreground">Click to upload an image</p>
+              <p className="text-xs text-muted-foreground/60 mt-1">PNG, JPG, GIF up to 2MB</p>
+            </div>
+          </div>
+        )}
+        <input
+          ref={imageInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleImageUpload}
+        />
+      </div>
+
+      <div className="pt-4 border-t border-border">{optionsBlock}</div>
+      <Button onClick={addQuestion} className="w-full md:w-auto">
+        <Plus size={16} className="mr-2" />
         Save question
-      </button>
+      </Button>
     </div>
   )
 
-  const selectedClassObj = classes.find((c) => String(c.id) === String(selectedClass))
-
   return (
-    <div className="flex flex-col md:flex-row min-h-screen bg-gray-50">
+    <div className="flex flex-col md:flex-row h-full lg:h-[calc(100vh-64px)] bg-background">
       {/* LEFT SIDEBAR - EXAM DETAILS */}
-      <aside className="w-full md:w-[320px] lg:w-[380px] bg-white border-r border-gray-200 md:h-screen md:sticky top-0 flex flex-col shrink-0">
-        <div className="p-6 border-b border-gray-100 flex items-center gap-3">
-          <Link to={selectedClass ? `/teacher/my-classes/${selectedClass}` : '/teacher/my-classes'} className="p-2 -ml-2 rounded-full hover:bg-gray-100 transition-colors text-gray-500">
-            <ArrowLeft size={20} />
-          </Link>
-          <h1 className="text-xl font-bold tracking-tight text-gray-900">Create Exam</h1>
+      <aside className="w-full md:w-[320px] lg:w-[380px] bg-card border-r border-border md:h-full overflow-y-auto flex flex-col shrink-0">
+        <div className="p-6 border-b border-border flex items-center gap-3">
+          <Button variant="ghost" size="icon" asChild className="rounded-full text-muted-foreground hover:text-foreground">
+            <Link to={selectedClass ? `/teacher/my-classes/${selectedClass}` : '/teacher/my-classes'}>
+              <ArrowLeft size={20} />
+            </Link>
+          </Button>
+          <h1 className="text-xl font-bold tracking-tight text-foreground">Create Exam</h1>
         </div>
         
-        <div className="p-6 flex-1 overflow-y-auto space-y-8">
+        <div className="p-6 flex-1 space-y-8">
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label className="text-sm font-semibold text-gray-700">Target Class</Label>
+              <Label className="text-sm font-semibold">Target Class</Label>
               <select
-                className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 value={selectedClass}
                 onChange={(e) => setSelectedClass(e.target.value)}
               >
@@ -456,46 +680,45 @@ export default function TeacherCreateExamPage() {
             </div>
 
             <div className="space-y-2">
-              <Label className="text-sm font-semibold text-gray-700">Exam Title</Label>
-              <input 
+              <Label className="text-sm font-semibold">Exam Title</Label>
+              <Input 
                 type="text" 
                 placeholder="e.g. Midterm Examination"
                 value={examTitle} 
                 onChange={(e) => setExamTitle(e.target.value)} 
-                className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
               />
             </div>
 
             <div className="space-y-2">
-              <Label className="text-sm font-semibold text-gray-700">Exam Description (Optional)</Label>
+              <Label className="text-sm font-semibold">Exam Description (Optional)</Label>
               <textarea 
                 placeholder="Brief instructions or summary"
                 value={examDescription} 
                 onChange={(e) => setExamDescription(e.target.value)} 
-                className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 min-h-[60px]"
+                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[60px]"
               />
             </div>
 
             <div className="space-y-2">
-              <Label className="text-sm font-semibold text-gray-700">Time Limit (minutes)</Label>
+              <Label className="text-sm font-semibold">Time Limit (minutes)</Label>
               <div className="relative">
-                <input
+                <Input
                   type="number"
                   placeholder="Set time limit"
                   readOnly
                   value={duration}
                   onClick={() => setTimeModalOpen(true)}
-                  className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+                  className="cursor-pointer"
                 />
-                <Clock className="absolute right-3 top-2.5 text-gray-400" size={18} />
+                <Clock className="absolute right-3 top-2.5 text-muted-foreground" size={18} />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="exam-password" className="text-sm font-semibold text-gray-700">
-                Exam password <span className="font-normal text-gray-500">(optional)</span>
+              <Label htmlFor="exam-password" className="text-sm font-semibold">
+                Exam password <span className="font-normal text-muted-foreground">(optional)</span>
               </Label>
-              <input
+              <Input
                 id="exam-password"
                 type="text"
                 maxLength={20}
@@ -503,29 +726,28 @@ export default function TeacherCreateExamPage() {
                 placeholder="Leave blank for open lobby"
                 value={examPassword}
                 onChange={(e) => setExamPassword(e.target.value)}
-                className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
               />
-              <p className="text-xs text-gray-500 leading-relaxed">{COPY.examPassword}</p>
-              <p className="text-xs text-gray-500 leading-relaxed">{COPY.classAccessCode}</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">{COPY.examPassword}</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">{COPY.classAccessCode}</p>
             </div>
 
-            <div className="space-y-2 pt-2 border-t border-gray-100">
-              <p className="text-sm font-semibold text-gray-700">Per-student shuffle</p>
-              <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+            <div className="space-y-2 pt-4 border-t border-border">
+              <p className="text-sm font-semibold text-foreground">Per-student shuffle</p>
+              <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
                 <input
                   type="checkbox"
                   checked={shuffleQuestions}
                   onChange={(e) => setShuffleQuestions(e.target.checked)}
-                  className="rounded border-gray-300"
+                  className="rounded border-input text-primary focus:ring-primary"
                 />
                 Shuffle questions within each set (sets stay in order)
               </label>
-              <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+              <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
                 <input
                   type="checkbox"
                   checked={shuffleChoices}
                   onChange={(e) => setShuffleChoices(e.target.checked)}
-                  className="rounded border-gray-300"
+                  className="rounded border-input text-primary focus:ring-primary"
                 />
                 Shuffle choices within each question (MCQ / True-False)
               </label>
@@ -533,15 +755,14 @@ export default function TeacherCreateExamPage() {
           </div>
         </div>
 
-        <div className="p-6 border-t border-gray-100 bg-gray-50">
-          <button 
-            type="button" 
+        <div className="p-6 border-t border-border bg-muted/10">
+          <Button 
             onClick={createExam}
             disabled={isSubmitting}
-            className="w-full flex items-center justify-center gap-2 rounded-md bg-blue-600 px-4 py-3 text-sm font-medium text-white shadow transition-colors hover:bg-blue-700 disabled:opacity-50"
+            className="w-full py-6 text-md shadow-md acsis-mc-create-btn border-none"
           >
             {isSubmitting ? 'Saving Exam...' : 'Finish & Save Exam'}
-          </button>
+          </Button>
         </div>
       </aside>
 
@@ -549,189 +770,253 @@ export default function TeacherCreateExamPage() {
       <main className="flex-1 p-6 md:p-8 lg:p-12 overflow-y-auto">
         <div className="max-w-3xl mx-auto space-y-8">
           
-          <div className="flex items-center justify-between pb-4 border-b border-gray-200">
+          <div className="flex items-center justify-between pb-4 border-b border-border">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Question sets</h2>
-              <p className="text-sm text-gray-500 mt-1">
-                {sections.length} {sections.length === 1 ? 'set' : 'sets'} · {totalQuestions}{' '}
-                {totalQuestions === 1 ? 'question' : 'questions'}
-              </p>
+              <h2 className="text-xl font-bold text-foreground">Exam Builder</h2>
+              <div className="flex items-center gap-2 mt-1">
+                <p className="text-sm text-muted-foreground">
+                  {sections.length} {sections.length === 1 ? 'set' : 'sets'} · {totalQuestions}{' '}
+                  {totalQuestions === 1 ? 'question' : 'questions'}
+                </p>
+                {isSaving ? (
+                  <span className="text-xs font-medium text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded-full animate-pulse">Saving...</span>
+                ) : lastSaved ? (
+                  <span className="text-xs font-medium text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full">Draft saved</span>
+                ) : null}
+              </div>
             </div>
-            <button
-              type="button"
+            <Button
+              variant="outline"
               onClick={addSection}
-              className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-100 rounded-md hover:bg-blue-100 transition-colors"
+              className="gap-2"
             >
               <Layers size={16} />
               Add set
-            </button>
+            </Button>
           </div>
 
-          <div className="space-y-10">
-            {sections.map((sec, secIndex) => {
-              let qOffset = 0
-              for (let i = 0; i < secIndex; i++) qOffset += sections[i].questions.length
-              return (
-                <div key={sec.id} className="space-y-4">
-                  <Card
-                    className={`border shadow-sm overflow-hidden ${
-                      activeSectionId === sec.id ? 'border-blue-300 ring-1 ring-blue-200' : 'border-gray-200'
-                    }`}
-                  >
-                    <CardHeader className="pb-3 bg-gray-50/80 border-b border-gray-100">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1 space-y-3 min-w-0">
-                          <div className="space-y-1.5">
-                            <Label className="text-xs text-gray-500 uppercase tracking-wide">Set title</Label>
-                            <input
-                              type="text"
-                              value={sec.title}
-                              onChange={(e) => updateSection(sec.id, { title: e.target.value })}
-                              placeholder={`Set ${secIndex + 1}`}
-                              className="flex h-9 w-full rounded-md border border-input bg-white px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
-                            />
-                          </div>
-                          <div className="space-y-1.5">
-                            <Label className="text-xs text-gray-500 uppercase tracking-wide">
-                              Instructions for students
-                            </Label>
-                            <textarea
-                              rows={2}
-                              value={sec.description}
-                              onChange={(e) => updateSection(sec.id, { description: e.target.value })}
-                              placeholder="e.g. Write True or False. If False, write the correct answer."
-                              className="flex w-full rounded-md border border-input bg-white px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 min-h-[72px]"
-                            />
-                          </div>
-                        </div>
-                        <div className="flex flex-col gap-2 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => setActiveSectionId(sec.id)}
-                            className={`px-3 py-1.5 text-xs font-medium rounded-md border transition-colors ${
-                              activeSectionId === sec.id
-                                ? 'bg-blue-600 text-white border-blue-600'
-                                : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-                            }`}
-                          >
-                            {activeSectionId === sec.id ? 'Adding here' : 'Add questions here'}
-                          </button>
-                          {sections.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => void removeSection(sec.id)}
-                              className="px-3 py-1.5 text-xs font-medium text-red-600 border border-red-100 rounded-md hover:bg-red-50"
-                            >
-                              Remove set
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                      {sec.questions.length > 0 && (
-                        <div className="divide-y divide-gray-100">
-                          {sec.questions.length > 1 && (
-                            <div className="px-5 py-2 bg-gray-50 flex justify-end">
-                              <button
-                                type="button"
-                                onClick={() => shuffleSectionQuestions(sec.id)}
-                                className="flex items-center gap-1.5 text-xs font-medium text-gray-600 hover:text-gray-900"
-                              >
-                                <Shuffle size={14} />
-                                Shuffle this set
-                              </button>
+          <DragDropContext onDragEnd={onDragEnd}>
+            <div className="space-y-10">
+              {sections.map((sec, secIndex) => {
+                let qOffset = 0
+                for (let i = 0; i < secIndex; i++) qOffset += sections[i].questions.length
+                return (
+                  <div key={sec.id} className="space-y-4">
+                    <Card
+                      className={`overflow-hidden transition-shadow ${
+                        activeSectionId === sec.id ? 'border-primary ring-1 ring-primary shadow-md' : 'shadow-sm'
+                      }`}
+                    >
+                      <CardHeader className="pb-3 bg-muted/40 border-b border-border">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 space-y-3 min-w-0">
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-muted-foreground uppercase tracking-wider">Set title</Label>
+                              <Input
+                                type="text"
+                                value={sec.title}
+                                onChange={(e) => updateSection(sec.id, { title: e.target.value })}
+                                placeholder={`Set ${secIndex + 1}`}
+                                className="font-semibold h-9"
+                              />
                             </div>
-                          )}
-                          {sec.questions.map((q, index) => (
-                            <div key={q.id} className="flex group">
-                              <div className="w-12 bg-gray-50 flex flex-col items-center justify-center text-gray-400 border-r border-gray-100 shrink-0 py-4">
-                                <span className="text-xs font-bold text-gray-500">{qOffset + index + 1}</span>
-                                <GripVertical size={16} className="opacity-50" />
-                              </div>
-                              <div className="flex-1 p-5">
-                                <div className="flex justify-between items-start gap-4">
-                                  <h3 className="font-medium text-gray-900 leading-relaxed whitespace-pre-wrap">
-                                    {q.question}
-                                  </h3>
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                                Instructions for students
+                              </Label>
+                              <textarea
+                                rows={2}
+                                value={sec.description}
+                                onChange={(e) => updateSection(sec.id, { description: e.target.value })}
+                                placeholder="e.g. Write True or False. If False, write the correct answer."
+                                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[72px]"
+                              />
+                            </div>
+                          </div>
+                          <div className="flex flex-col gap-2 shrink-0">
+                            <Button
+                              variant={activeSectionId === sec.id ? 'default' : 'secondary'}
+                              size="sm"
+                              onClick={() => {
+                                setActiveSectionId(sec.id)
+                                setShowQuestionForm(true)
+                              }}
+                            >
+                              {activeSectionId === sec.id ? 'Adding here' : 'Add questions here'}
+                            </Button>
+                            {sections.length > 1 && (
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => void removeSection(sec.id)}
+                              >
+                                Remove set
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="p-0">
+                        <Droppable droppableId={sec.id}>
+                          {(provided) => (
+                            <div
+                              {...provided.droppableProps}
+                              ref={provided.innerRef}
+                              className="divide-y divide-border"
+                            >
+                              {sec.questions.length > 1 && (
+                                <div className="px-5 py-2 bg-muted/30 flex justify-end">
                                   <button
                                     type="button"
-                                    onClick={() => void deleteQuestion(sec.id, q.id)}
-                                    className="text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100 p-1 rounded-md hover:bg-red-50 shrink-0"
+                                    onClick={() => shuffleSectionQuestions(sec.id)}
+                                    className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
                                   >
-                                    <Trash2 size={18} />
+                                    <Shuffle size={14} />
+                                    Shuffle this set
                                   </button>
                                 </div>
-                                <div className="mt-3">
-                                  <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700">
-                                    {q.type === 'multiple-choice'
-                                      ? 'Multiple Choice'
-                                      : q.type === 'truefalse'
-                                        ? 'True/False'
-                                        : 'Identification'}
-                                  </span>
-                                </div>
-                                <div className="mt-3 flex items-center gap-2 text-sm text-gray-600">
-                                  <CheckCircle2 size={16} className="text-green-600 shrink-0" />
-                                  <span className="font-medium">Answer:</span>
-                                  <span className="text-gray-900 font-semibold">{q.correctAnswer}</span>
-                                </div>
-                              </div>
+                              )}
+                              {sec.questions.map((q, index) => (
+                                <Draggable key={q.id} draggableId={q.id} index={index}>
+                                  {(provided, snapshot) => (
+                                    <div
+                                      ref={provided.innerRef}
+                                      {...provided.draggableProps}
+                                      style={provided.draggableProps.style}
+                                      className={`flex group bg-background transition-colors ${snapshot.isDragging ? 'shadow-lg ring-1 ring-primary z-50' : ''}`}
+                                    >
+                                      <div
+                                        {...provided.dragHandleProps}
+                                        className="w-12 bg-muted/30 flex flex-col items-center justify-center text-muted-foreground border-r border-border shrink-0 py-4 cursor-grab active:cursor-grabbing hover:bg-muted/50 transition-colors"
+                                      >
+                                        <span className="text-xs font-bold mb-1">{qOffset + index + 1}</span>
+                                        <GripVertical size={16} />
+                                      </div>
+                                      <div className="flex-1 p-5">
+                                        <div className="flex justify-between items-start gap-4">
+                                          <h3 className="font-medium text-foreground leading-relaxed whitespace-pre-wrap">
+                                            {q.question}
+                                          </h3>
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => void deleteQuestion(sec.id, q.id)}
+                                            className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                                          >
+                                            <Trash2 size={18} />
+                                          </Button>
+                                        </div>
+                                        {q.imageUrl && (
+                                          <div className="mt-3">
+                                            <img
+                                              src={q.imageUrl}
+                                              alt="Question image"
+                                              className="max-h-40 max-w-full rounded-lg border border-border object-contain bg-muted"
+                                            />
+                                          </div>
+                                        )}
+                                        <div className="mt-3">
+                                          <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
+                                            {q.type === 'multiple-choice'
+                                              ? 'Multiple Choice'
+                                              : q.type === 'truefalse'
+                                                ? 'True/False'
+                                                : q.type === 'coding'
+                                                  ? 'Coding'
+                                                  : 'Identification'}
+                                          </span>
+                                        </div>
+                                        <div className="mt-3 flex items-start gap-2 text-sm text-muted-foreground">
+                                          <CheckCircle2 size={16} className="text-emerald-500 shrink-0 mt-0.5" />
+                                          <span className="font-medium shrink-0">Answer:</span>
+                                          {q.type === 'coding' ? (
+                                            <div className="w-full">
+                                              {q.options && q.options[0] && (
+                                                <span className="inline-block mb-1 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 bg-primary/10 text-primary rounded">{q.options[0]}</span>
+                                              )}
+                                              <div className="text-foreground font-mono text-xs whitespace-pre-wrap bg-muted p-2 rounded-md border w-full max-h-32 overflow-y-auto">
+                                                {q.correctAnswer}
+                                              </div>
+                                            </div>
+                                          ) : (
+                                            <span className="text-foreground font-semibold">{q.correctAnswer}</span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+                                </Draggable>
+                              ))}
+                              {provided.placeholder}
                             </div>
-                          ))}
-                        </div>
-                      )}
-                      {activeSectionId === sec.id
-                        ? addQuestionForm
-                        : sec.questions.length === 0 && (
-                            <p className="p-5 text-sm text-gray-500">
-                              Click <span className="font-medium">Add questions here</span> to add questions to this set.
-                            </p>
                           )}
-                    </CardContent>
-                  </Card>
-                </div>
-              )
-            })}
-          </div>
+                        </Droppable>
+                        {activeSectionId === sec.id ? (
+                          showQuestionForm ? (
+                            addQuestionForm
+                          ) : (
+                            <div className="p-5">
+                              <Button 
+                                variant="outline" 
+                                className="w-full border-dashed h-12 text-muted-foreground hover:text-foreground hover:border-primary/50 hover:bg-primary/5 transition-all" 
+                                onClick={() => setShowQuestionForm(true)}
+                              >
+                                <Plus className="mr-2" size={16} /> {sec.questions.length > 0 ? "Add another question" : "Add a question to this set"}
+                              </Button>
+                            </div>
+                          )
+                        ) : (
+                          sec.questions.length === 0 && (
+                            <p className="p-5 text-sm text-muted-foreground text-center italic bg-muted/10">
+                              Click <span className="font-medium text-foreground">Add questions here</span> to add questions to this set.
+                            </p>
+                          )
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+                )
+              })}
+            </div>
+          </DragDropContext>
 
         </div>
       </main>
 
       {/* TIME PICKER MODAL */}
       {timeModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <Card className="w-full max-w-sm shadow-xl border-0 animate-in zoom-in-95 duration-200">
-            <CardHeader>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <Card className="w-full max-w-sm shadow-xl border-border animate-in zoom-in-95 duration-200">
+            <CardHeader className="border-b border-border bg-card">
               <CardTitle className="text-xl">Set Time Limit</CardTitle>
               <CardDescription>How long should students have to complete this exam?</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-6">
               <div className="flex gap-4 h-[200px]">
-                <div className="flex-1 flex flex-col border rounded-md overflow-hidden">
-                  <div className="bg-gray-50 text-xs font-bold text-center py-2 border-b text-gray-500 uppercase tracking-wider">Hours</div>
+                <div className="flex-1 flex flex-col border border-border rounded-md overflow-hidden bg-background">
+                  <div className="bg-muted text-xs font-bold text-center py-2 border-b border-border text-muted-foreground uppercase tracking-wider">Hours</div>
                   <div className="flex-1 overflow-y-auto p-2 space-y-1">
                     {HOURS.map((h) => (
                       <button
                         key={h}
                         type="button"
                         onClick={() => setSelectedHours(h)}
-                        className={`w-full py-2 px-3 text-center text-sm rounded-md transition-colors ${selectedHours === h ? 'bg-blue-600 text-white font-bold shadow-sm' : 'hover:bg-gray-100 text-gray-700'}`}
+                        className={`w-full py-2 px-3 text-center text-sm rounded-md transition-colors ${selectedHours === h ? 'bg-primary text-primary-foreground font-bold shadow-sm' : 'hover:bg-muted text-foreground'}`}
                       >
                         {hourLabel(h)}
                       </button>
                     ))}
                   </div>
                 </div>
-                <div className="flex-1 flex flex-col border rounded-md overflow-hidden">
-                  <div className="bg-gray-50 text-xs font-bold text-center py-2 border-b text-gray-500 uppercase tracking-wider">Minutes</div>
+                <div className="flex-1 flex flex-col border border-border rounded-md overflow-hidden bg-background">
+                  <div className="bg-muted text-xs font-bold text-center py-2 border-b border-border text-muted-foreground uppercase tracking-wider">Minutes</div>
                   <div className="flex-1 overflow-y-auto p-2 space-y-1">
                     {MINUTES.map((m) => (
                       <button
                         key={m}
                         type="button"
                         onClick={() => setSelectedMinutes(m)}
-                        className={`w-full py-2 px-3 text-center text-sm rounded-md transition-colors ${selectedMinutes === m ? 'bg-blue-600 text-white font-bold shadow-sm' : 'hover:bg-gray-100 text-gray-700'}`}
+                        className={`w-full py-2 px-3 text-center text-sm rounded-md transition-colors ${selectedMinutes === m ? 'bg-primary text-primary-foreground font-bold shadow-sm' : 'hover:bg-muted text-foreground'}`}
                       >
                         {m < 10 ? `0${m}` : String(m)}
                       </button>
@@ -740,21 +1025,13 @@ export default function TeacherCreateExamPage() {
                 </div>
               </div>
             </CardContent>
-            <CardFooter className="flex justify-end gap-3 bg-gray-50 py-4 border-t">
-              <button 
-                type="button" 
-                onClick={() => setTimeModalOpen(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
-              >
+            <CardFooter className="flex justify-end gap-3 bg-muted/40 py-4 border-t border-border">
+              <Button variant="ghost" onClick={() => setTimeModalOpen(false)}>
                 Cancel
-              </button>
-              <button 
-                type="button" 
-                onClick={saveTimeLimit}
-                className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-md hover:bg-gray-800 transition-colors shadow-sm"
-              >
+              </Button>
+              <Button onClick={saveTimeLimit}>
                 Set Time Limit
-              </button>
+              </Button>
             </CardFooter>
           </Card>
         </div>

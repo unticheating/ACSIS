@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
   closeExamService,
   createExamService,
+  updateExamDraftService,
   getClassExamsService,
   listTeacherExamsWithClassMetaService,
   publishExamService,
@@ -32,10 +33,11 @@ import { releaseExamScoresService } from '../services/examReleaseService.js';
 const choiceSchema = z.string().min(1, 'Option text cannot be empty');
 
 const questionSchema = z.object({
-  type: z.enum(['multiple', 'multiple-choice', 'identification', 'truefalse']),
+  type: z.enum(['multiple', 'multiple-choice', 'identification', 'truefalse', 'coding']),
   question: z.string().min(1, 'Question text cannot be empty'),
   options: z.array(choiceSchema).optional(),
-  correctAnswer: z.string().min(1, 'Correct answer is required')
+  correctAnswer: z.string().min(1, 'Correct answer is required'),
+  imageUrl: z.string().optional().nullable(),
 }).superRefine((val, ctx) => {
   if ((val.type === 'multiple' || val.type === 'multiple-choice') && (!val.options || val.options.length < 2)) {
     ctx.addIssue({
@@ -116,10 +118,32 @@ export async function createTeacherExam(req, res) {
     return res.status(201).json({ ok: true, examId: result.examId, code: result.code });
   } catch (err) {
     if (err instanceof z.ZodError) {
-      return res.status(400).json({ error: err.errors[0].message, details: err.errors });
+      return res.status(400).json({ error: err.issues?.[0]?.message || 'Validation error', details: err.issues });
     }
     console.error('[examController.createTeacherExam]', err);
     return res.status(500).json({ error: 'Failed to create exam.' });
+  }
+}
+
+export async function updateTeacherExam(req, res) {
+  try {
+    const { classId, examId } = req.params;
+    if (!classId || !examId) return res.status(400).json({ error: 'Class ID and Exam ID are required.' });
+
+    const payload = createExamSchema.parse(req.body);
+
+    const result = await updateExamDraftService(req.memberId, classId, examId, payload);
+    if (!result.ok) {
+      return res.status(result.status || 500).json({ error: result.error });
+    }
+
+    return res.json({ ok: true });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: err.issues?.[0]?.message || 'Validation error', details: err.issues });
+    }
+    console.error('[examController.updateTeacherExam]', err);
+    return res.status(500).json({ error: 'Failed to update exam.' });
   }
 }
 

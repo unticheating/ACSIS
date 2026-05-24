@@ -667,6 +667,15 @@ export default function StudentExamSessionPage() {
                 <h2 className="text-2xl lg:text-3xl font-medium text-gray-900 leading-relaxed whitespace-pre-wrap">
                   {currentQ.question}
                 </h2>
+                {currentQ.imageUrl && (
+                  <div className="mt-6">
+                    <img
+                      src={currentQ.imageUrl}
+                      alt="Question image"
+                      className="max-h-80 max-w-full rounded-xl border border-gray-200 object-contain bg-white shadow-sm"
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Question Inputs */}

@@ -10,11 +10,12 @@ function mapQuestionTypeToDb(type) {
 
 async function insertQuestionWithChoices(client, examId, sectionId, q, orderNum) {
   const dbType = mapQuestionTypeToDb(q.type);
+  const imageUrl = q.imageUrl || null;
   const qResult = await client.query(
-    `INSERT INTO questions (exam_id, section_id, question_text, question_type, points, order_num)
-     VALUES ($1, $2, $3, $4, 1.00, $5)
+    `INSERT INTO questions (exam_id, section_id, question_text, question_type, points, order_num, image_url)
+     VALUES ($1, $2, $3, $4, 1.00, $5, $6)
      RETURNING question_id`,
-    [examId, sectionId, q.question, dbType, orderNum],
+    [examId, sectionId, q.question, dbType, orderNum, imageUrl],
   );
   const questionId = qResult.rows[0].question_id;
 
@@ -94,6 +95,87 @@ export async function insertExamTransaction(
   }
 
   return examId;
+}
+
+export async function updateExamDraftTransaction(
+  client,
+  memberId,
+  classId,
+  examId,
+  title,
+  password,
+  timeLimit,
+  payload,
+  { shuffleQuestions = false, shuffleChoices = false } = {},
+) {
+  await ensureExamSectionsSchema();
+
+  let ownerSql = `SELECT e.exam_id FROM exams e
+     JOIN classes c ON e.class_id = c.class_id
+     WHERE e.exam_id = $1 AND e.class_id = $2 AND c.member_id = $3 AND e.status = 'draft'`;
+  const owner = await client.query(ownerSql, [examId, classId, memberId]);
+  if (owner.rowCount === 0) {
+    return false;
+  }
+
+  let updateFields = [title, timeLimit, Boolean(shuffleQuestions), Boolean(shuffleChoices), examId];
+  let updatePasswordStr = '';
+  if (password !== undefined) {
+    updatePasswordStr = `, password = $6`;
+    updateFields.push(password);
+  }
+
+  await client.query(
+    `UPDATE exams 
+     SET title = $1, time_limit = $2, shuffle_questions = $3, shuffle_choices = $4${updatePasswordStr}
+     WHERE exam_id = $5`,
+    updateFields
+  );
+
+  await client.query(
+    `DELETE FROM choices
+     WHERE question_id IN (SELECT question_id FROM questions WHERE exam_id = $1)`,
+    [examId],
+  );
+  await client.query(`DELETE FROM questions WHERE exam_id = $1`, [examId]);
+  await client.query(`DELETE FROM exam_sections WHERE exam_id = $1`, [examId]);
+
+  const sections = Array.isArray(payload?.sections) ? payload.sections : null;
+  const flatQuestions = Array.isArray(payload?.questions) ? payload.questions : null;
+
+  let orderNum = 0;
+
+  if (sections?.length) {
+    for (let sIdx = 0; sIdx < sections.length; sIdx++) {
+      const sec = sections[sIdx];
+      const secResult = await client.query(
+        `INSERT INTO exam_sections (exam_id, title, description, order_num)
+         VALUES ($1, $2, $3, $4)
+         RETURNING section_id`,
+        [examId, String(sec.title || '').trim() || `Set ${sIdx + 1}`, sec.description?.trim() || null, sIdx + 1],
+      );
+      const sectionId = secResult.rows[0].section_id;
+      const secQuestions = sec.questions || [];
+      for (const q of secQuestions) {
+        orderNum += 1;
+        await insertQuestionWithChoices(client, examId, sectionId, q, orderNum);
+      }
+    }
+  } else if (flatQuestions?.length) {
+    const secResult = await client.query(
+      `INSERT INTO exam_sections (exam_id, title, description, order_num)
+       VALUES ($1, $2, NULL, 1)
+       RETURNING section_id`,
+      [examId, 'Set 1'],
+    );
+    const sectionId = secResult.rows[0].section_id;
+    for (const q of flatQuestions) {
+      orderNum += 1;
+      await insertQuestionWithChoices(client, examId, sectionId, q, orderNum);
+    }
+  }
+
+  return true;
 }
 
 export async function listTeacherExamsWithClassMetaQuery(memberId) {
@@ -242,6 +324,7 @@ async function attachChoicesToQuestion(pool, row) {
     type: qType,
     question: row.question,
     points: row.points,
+    imageUrl: row.imageUrl ?? null,
     sectionId: row.sectionId ?? null,
     sectionTitle: row.sectionTitle ?? null,
     sectionDescription: row.sectionDescription ?? null,
@@ -314,6 +397,7 @@ export async function getExamWithQuestionsQuery(classId, examId, requireActive =
        q.points,
        q.order_num AS "orderNum",
        q.section_id AS "sectionId",
+       q.image_url AS "imageUrl",
        s.title AS "sectionTitle",
        s.description AS "sectionDescription",
        s.order_num AS "sectionOrder"

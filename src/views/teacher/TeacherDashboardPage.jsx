@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { SummaryStatCard, SummaryStatGrid } from '@/components/dashboard/SummaryStatCard.jsx'
-import AnimatedHoverIcon from '@/components/icons/AnimatedHoverIcon.jsx'
-import { BookIcon, ChartBarIcon, UsersIcon } from '@/components/icons/hoverIcons.js'
+import { BookOpen, Activity, Users, MoreVertical, Copy, UploadCloud, Trash2 } from 'lucide-react'
 import { apiFetch } from '@/lib/apiFetch.js'
 import FadeIn from '@/components/ui/fade-in.jsx'
 import { formatSectionTitle } from '@/lib/sectionLabel.js'
@@ -13,6 +12,14 @@ import {
   normalizeExamStatus,
   PG_EXAM_STATUS,
 } from '@/lib/examFlowUi.js'
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card.jsx'
+import { Button } from '@/components/ui/button.jsx'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu.jsx'
 
 export default function TeacherDashboardPage() {
   const [stats, setStats] = useState({
@@ -204,57 +211,58 @@ export default function TeacherDashboardPage() {
 
   return (
     <div className="acsis-view">
-      <SummaryStatGrid>
-        <SummaryStatCard
-          label="My Classes"
-          value={totalClasses}
-          tone="success"
-          icon={<AnimatedHoverIcon icon={BookIcon} size={28} strokeWidth={1.5} />}
-          delay={0.1}
-        />
-        <SummaryStatCard
-          label="Active Exams"
-          value={activeExams}
-          tone="success"
-          icon={<AnimatedHoverIcon icon={ChartBarIcon} size={28} strokeWidth={1.5} />}
-          delay={0.2}
-        />
-        <SummaryStatCard
-          label="Total Students"
-          value={totalStudents}
-          tone="success"
-          icon={<AnimatedHoverIcon icon={UsersIcon} size={28} strokeWidth={1.5} />}
-          delay={0.3}
-        />
-      </SummaryStatGrid>
+      <div className="grid gap-4 md:grid-cols-3 mb-8">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">My Classes</CardTitle>
+            <BookOpen className="h-5 w-5 text-blue-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{totalClasses}</div>
+            <p className="text-xs text-muted-foreground mt-1">Total sections taught</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Exams</CardTitle>
+            <Activity className="h-5 w-5 text-emerald-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{activeExams}</div>
+            <p className="text-xs text-muted-foreground mt-1">Exams currently ongoing</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Students</CardTitle>
+            <Users className="h-5 w-5 text-purple-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">{totalStudents}</div>
+            <p className="text-xs text-muted-foreground mt-1">Enrolled across all classes</p>
+          </CardContent>
+        </Card>
+      </div>
       {/* Exams strip */}
-      <div className="mt-6 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-lg p-4">
-        <div className="flex items-start justify-between mb-4">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">My Exams</h3>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => {
-                resetCreateExamModal()
-                setCreateModalOpen(true)
-              }}
-              className="inline-flex items-center px-4 py-2 rounded border shadow-sm hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-offset-2"
-              style={{
-                backgroundColor: 'var(--acsis-brand, #334155)',
-                borderColor: 'var(--acsis-brand, #334155)',
-                color: '#fff',
-              }}
-            >
-              Create Exam
-            </button>
-          </div>
+      <div className="mt-8">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-2xl font-semibold tracking-tight text-foreground">My Exams</h3>
+          <Button
+            onClick={() => {
+              resetCreateExamModal()
+              setCreateModalOpen(true)
+            }}
+          >
+            Create Exam
+          </Button>
         </div>
-        <ul className="acsis-mc-course-grid acsis-mc-course-grid--top py-2">
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {loadingExams && (
-            <li className="text-sm text-gray-600 dark:text-gray-400 px-4">Loading exams…</li>
+            <div className="text-sm text-muted-foreground col-span-full">Loading exams…</div>
           )}
           {!loadingExams && visibleExams.length === 0 && (
-            <li className="text-sm text-gray-600 dark:text-gray-400 px-4">No exams yet. Create one to get started.</li>
+            <div className="text-sm text-muted-foreground col-span-full">No exams yet. Create one to get started.</div>
           )}
           {visibleExams.slice(0, 8).map((ex) => {
             const title = ex.title || ex.name || 'Untitled Exam'
@@ -271,21 +279,20 @@ export default function TeacherDashboardPage() {
             const draft = isExamDraft(status)
             const live = isExamOngoing(status)
             const statusLabel = labelForPgExamStatus(status)
-            const statusClass = draft ? 'text-gray-600 dark:text-gray-300' : live ? 'text-green-700 dark:text-green-300' : 'text-gray-600 dark:text-gray-300'
+            const statusClass = draft ? 'text-muted-foreground' : live ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-muted-foreground'
             const detailPath = ex.classId != null && ex.id != null
               ? `/teacher/my-classes/${encodeURIComponent(ex.classId)}/exams/${encodeURIComponent(ex.id)}`
               : null
             return (
-              <FadeIn as="li" key={ex.id || ex.exam_id} delay={0.05}>
-                <article
-                  className="acsis-course-card acsis-card-surface min-h-[150px] relative"
-                  role="button"
-                  tabIndex={0}
+              <FadeIn as="div" key={ex.id || ex.exam_id} delay={0.05}>
+                <Card
+                  className="relative h-full flex flex-col cursor-pointer transition-all hover:border-primary/50 hover:shadow-md group"
                   onClick={() => {
                     if (detailPath) {
                       navigate(detailPath)
                     }
                   }}
+                  tabIndex={0}
                   onKeyDown={(e) => {
                     if ((e.key === 'Enter' || e.key === ' ') && detailPath) {
                       e.preventDefault()
@@ -293,87 +300,89 @@ export default function TeacherDashboardPage() {
                     }
                   }}
                 >
-                  <div className="acsis-course-card__accent" aria-hidden />
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setActiveMenuId(activeMenuId === ex.id ? null : ex.id)
-                    }}
-                    className="absolute right-3 top-3 z-10 w-8 h-8 rounded-full hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center justify-center text-gray-500"
-                    aria-label="exam actions"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                      <path d="M3 9.5a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z" />
-                    </svg>
-                  </button>
-                  {activeMenuId === ex.id && (
-                    <div className="absolute right-3 top-12 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-md z-20 w-40">
-                      {!isExamOngoing(status) && !isExamDraft(status) ? null : isExamDraft(status) ? (
-                        <button
-                          className="block w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700"
+                  <CardHeader className="pb-3 pr-10">
+                    <CardTitle className="text-lg leading-tight line-clamp-2">{displayTitle}</CardTitle>
+                    <CardDescription className="line-clamp-1 mt-1.5">{courseLabel}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="flex-1 pb-3">
+                    <p className="text-sm text-muted-foreground">
+                      {questions} {questions === 1 ? 'question' : 'questions'}
+                    </p>
+                  </CardContent>
+                  <CardFooter className="pt-0 border-t mt-auto px-6 py-3 bg-muted/20">
+                    <div className="flex items-center justify-between w-full">
+                      <span className={`text-sm ${statusClass}`}>{statusLabel || 'Draft'}</span>
+                    </div>
+                  </CardFooter>
+
+                  <div className="absolute right-2 top-2 z-10" onClick={(e) => e.stopPropagation()}>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                          <span className="sr-only">Open menu</span>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-40">
+                        {isExamDraft(status) && (
+                          <DropdownMenuItem
+                            onClick={async (e) => {
+                              e.stopPropagation()
+                              try {
+                                await apiFetch(`/api/teacher/classes/${ex.classId}/exams/${ex.id}`, { method: 'PUT' })
+                                fetchExams()
+                              } catch (error) { console.error(error) }
+                            }}
+                          >
+                            <UploadCloud className="mr-2 h-4 w-4" />
+                            <span>Publish Exam</span>
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem
                           onClick={async (e) => {
                             e.stopPropagation()
                             try {
-                              await apiFetch(`/api/teacher/classes/${ex.classId}/exams/${ex.id}`, { method: 'PUT' })
-                              fetchExams()
+                              const code = ex.code || ex.password || ''
+                              await navigator.clipboard.writeText(code)
                             } catch (error) { console.error(error) }
-                            setActiveMenuId(null)
                           }}
                         >
-                          Publish Exam
-                        </button>
-                      ) : null}
-                      <button
-                        className="block w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-700"
-                        onClick={async (e) => {
-                          e.stopPropagation()
-                          try {
-                            const code = ex.code || ex.password || ''
-                            await navigator.clipboard.writeText(code)
-                          } catch (e) { console.error(e) }
-                          setActiveMenuId(null)
-                        }}
-                      >
-                        Copy Exam Code
-                      </button>
-                      <button
-                        className="block w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-gray-50 dark:hover:bg-gray-700"
-                        onClick={async (e) => {
-                          e.stopPropagation()
-                          const ok = window.confirm('Delete this exam? This action cannot be undone.')
-                          if (!ok) return
-                          try {
-                            await apiFetch(`/api/teacher/classes/${ex.classId}/exams/${ex.id}`, { method: 'DELETE' })
-                            fetchExams()
-                          } catch (e) { console.error(e) }
-                          setActiveMenuId(null)
-                        }}
-                      >
-                        Delete Exam
-                      </button>
-                    </div>
-                  )}
-                  <div className="acsis-course-card__body">
-                    <h3 className="acsis-course-card__code">{displayTitle}</h3>
-                    <p className="acsis-course-card__name">{courseLabel}</p>
-                    <p className="acsis-course-card__period">{questions} questions</p>
+                          <Copy className="mr-2 h-4 w-4" />
+                          <span>Copy Exam Code</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                          onClick={async (e) => {
+                            e.stopPropagation()
+                            const ok = window.confirm('Delete this exam? This action cannot be undone.')
+                            if (!ok) return
+                            try {
+                              await apiFetch(`/api/teacher/classes/${ex.classId}/exams/${ex.id}`, { method: 'DELETE' })
+                              fetchExams()
+                            } catch (error) { console.error(error) }
+                          }}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          <span>Delete Exam</span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
-                  <div className="acsis-course-card__footer">
-                    <span className="acsis-course-card__stat">{questions} {questions === 1 ? 'question' : 'questions'}</span>
-                    <span className={`acsis-course-card__status ${statusClass}`}>{statusLabel || 'Draft'}</span>
-                  </div>
-                </article>
+                </Card>
               </FadeIn>
             )
           })}
-        </ul>
-        <div className="text-center mt-4">
-          {visibleExams.length > 8 ? (
-            <Link to="/teacher/my-classes" className="text-sm text-gray-500 dark:text-gray-300">View All ({visibleExams.length})</Link>
-          ) : (
-            <Link to="/teacher/my-classes" className="text-sm text-gray-500 dark:text-gray-300">View All</Link>
-          )}
+        </div>
+        <div className="flex justify-center mt-8">
+          <Button variant="outline" asChild>
+            <Link to="/teacher/my-classes">
+              {visibleExams.length > 8 ? `View All (${visibleExams.length})` : 'View All'}
+            </Link>
+          </Button>
         </div>
       </div>
       {/* Create exam modal */}

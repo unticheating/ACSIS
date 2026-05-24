@@ -19,5 +19,9 @@ export async function ensureExamSectionsSchema() {
       ADD COLUMN IF NOT EXISTS section_id INT DEFAULT NULL
       REFERENCES exam_sections (section_id) ON DELETE CASCADE
   `)
+  await pool.query(`
+    ALTER TABLE questions
+      ADD COLUMN IF NOT EXISTS image_url TEXT DEFAULT NULL
+  `)
   ensured = true
 }

@@ -9,6 +9,7 @@ import {
 } from '../controllers/classController.js';
 import {
   createTeacherExam,
+  updateTeacherExam,
   getTeacherClassStream,
   getTeacherExamsCatalog,
   publishTeacherExam,
@@ -53,6 +54,7 @@ router.delete('/:classId', deleteTeacherClass);
 // Exam routes for a specific class
 router.get('/:classId/exams', getTeacherClassStream);
 router.post('/:classId/exams', createTeacherExam);
+router.put('/:classId/exams/:examId/content', updateTeacherExam);
 router.get('/:classId/exams/:examId', getTeacherExamSession);
 router.get('/:classId/exams/:examId/results', getTeacherExamResults);
 router.get('/:classId/exams/:examId/monitoring', getTeacherMonitoringSnapshot);
