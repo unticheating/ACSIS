@@ -402,7 +402,7 @@ export default function TeacherDetectionsPage() {
 
       {isLive ? (
       <div className="acsis-detections-body">
-        <div className="acsis-detections-board w-full flex items-center justify-center relative box-border">
+        <div className="acsis-detections-board w-full flex items-start justify-center relative box-border pt-1 sm:pt-2">
           <div className="absolute top-full w-full h-4 flex justify-around px-8 opacity-20 pointer-events-none" aria-hidden>
             <div className="w-2 h-full bg-muted-foreground/40" />
             <div className="w-2 h-full bg-muted-foreground/40" />
@@ -597,4 +597,4 @@ export default function TeacherDetectionsPage() {
   )
 }
 
-}
+

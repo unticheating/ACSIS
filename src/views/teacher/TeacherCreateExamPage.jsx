@@ -295,6 +295,7 @@ export default function TeacherCreateExamPage() {
       acsisToastSuccess(
         `Exam "${title}" saved for ${createdIds.length} class(es) (${totalQuestions} questions, ${sections.length} set(s)).${codeMsg} Publish from the class page when ready.`,
       )
+      // Redirect to the class dashboard for the selected class
       navigate(`/teacher/my-classes/${selectedClass}`)
     } catch (err) {
       acsisToastError(err.message)

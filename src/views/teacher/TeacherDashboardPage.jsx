@@ -29,6 +29,7 @@ export default function TeacherDashboardPage() {
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [selectedClassIds, setSelectedClassIds] = useState([])
   const [selectedCourse, setSelectedCourse] = useState('')
+  const [selectedSections, setSelectedSections] = useState([])
 
   useEffect(() => {
     apiFetch('/api/teacher/classes/dashboard')
@@ -125,6 +126,7 @@ export default function TeacherDashboardPage() {
 
   const { totalClasses, activeExams, totalStudents } = stats
   const termById = new Map(terms.map((term) => [String(term.id), term]))
+  const classById = new Map(classes.map((course) => [String(course.id), course]))
   const classesByTermId = new Map()
   for (const course of classes) {
     if (course.termId == null) continue
@@ -157,7 +159,7 @@ export default function TeacherDashboardPage() {
         selectedSectionCourseSets[0],
       )).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
     : []
-  const canContinue = selectedClassIds.length > 0 && courseOptions.length > 0 && selectedCourse.trim() !== ''
+  const canContinue = selectedClassIds.length > 0
   const visibleExams = exams.filter((exam) => normalizeExamStatus(exam.status) !== PG_EXAM_STATUS.CLOSED)
 
   useEffect(() => {
@@ -217,10 +219,16 @@ export default function TeacherDashboardPage() {
           {!loadingExams && visibleExams.length === 0 && (
             <li className="text-sm text-gray-600 dark:text-gray-400 px-4">No exams yet. Create one to get started.</li>
           )}
-          {visibleExams.map((ex) => {
+          {visibleExams.slice(0, 8).map((ex) => {
             const title = ex.title || ex.name || 'Untitled Exam'
             const questions = ex.questionCount ?? ex.questions_count ?? ex.question_count ?? 0
-            const className = ex.name || ex.courseCode || ex.course_code || ''
+            const classMeta = ex.classId != null ? classById.get(String(ex.classId)) : null
+            const sectionMeta = classMeta?.termId != null ? termById.get(String(classMeta.termId)) : classMeta
+            const sectionLabel = sectionMeta ? formatSectionTitle(sectionMeta) : ''
+            const courseCode = classMeta?.courseCode || classMeta?.course_code || ''
+            const courseName = classMeta?.name || ''
+            const courseLabel = [courseCode, courseName].filter(Boolean).join(' - ') || 'Course'
+            const displayTitle = sectionLabel ? `${sectionLabel} ${title}` : title
             const lastEdited = ex.updated_at || ex.last_edited_at || ex.created_at || null
             const status = normalizeExamStatus(ex.status)
             const draft = isExamDraft(status)
@@ -310,9 +318,9 @@ export default function TeacherDashboardPage() {
                     </div>
                   )}
                   <div className="acsis-course-card__body">
-                    <h3 className="acsis-course-card__code">{title}</h3>
-                    {className ? <p className="acsis-course-card__name">{className}</p> : null}
-                    <p className="acsis-course-card__period">{questions} questions · Last edited {lastEdited ? new Date(lastEdited).toLocaleDateString() : '—'}</p>
+                    <h3 className="acsis-course-card__code">{displayTitle}</h3>
+                    <p className="acsis-course-card__name">{courseLabel}</p>
+                    <p className="acsis-course-card__period">{questions} questions</p>
                   </div>
                   <div className="acsis-course-card__footer">
                     <span className="acsis-course-card__stat">{questions} {questions === 1 ? 'question' : 'questions'}</span>
@@ -324,7 +332,11 @@ export default function TeacherDashboardPage() {
           })}
         </ul>
         <div className="text-center mt-4">
-          <Link to="/teacher/my-classes" className="text-sm text-gray-500 dark:text-gray-300">View All</Link>
+          {visibleExams.length > 8 ? (
+            <Link to="/teacher/my-classes" className="text-sm text-gray-500 dark:text-gray-300">View All ({visibleExams.length})</Link>
+          ) : (
+            <Link to="/teacher/my-classes" className="text-sm text-gray-500 dark:text-gray-300">View All</Link>
+          )}
         </div>
       </div>
       {/* Create exam modal */}
@@ -335,50 +347,93 @@ export default function TeacherDashboardPage() {
               <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Create Exam — Select classes</h4>
               <button onClick={() => setCreateModalOpen(false)} className="text-gray-500">✕</button>
             </div>
-            <div className="space-y-4 max-h-[60vh] overflow-y-auto">
-              <p className="text-sm text-gray-600 dark:text-gray-300">Select one or more classes to create this exam in.</p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {selectableTerms.map((term) => {
-                  const termClasses = classesByTermId.get(String(term.id)) || []
-                  const shortLabel = formatSectionTitle(term)
-                  return (
-                    <label key={term.id} className="flex items-center gap-3 p-3 border rounded-md hover:bg-gray-50 dark:hover:bg-gray-700">
-                      <input
-                        type="checkbox"
-                        checked={termClasses.every((course) => selectedClassIds.includes(String(course.id)))}
-                        onChange={(e) => {
-                          const termCourseIds = termClasses.map((course) => String(course.id))
-                          setSelectedClassIds((prev) => {
-                            if (e.target.checked) {
-                              return Array.from(new Set([...prev, ...termCourseIds]))
-                            }
-                            return prev.filter((id) => !termCourseIds.includes(id))
-                          })
-                        }}
-                        className="w-4 h-4"
-                      />
-                      <div>
-                        <div className="font-medium text-sm text-gray-800 dark:text-gray-100">{shortLabel}</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">{termClasses.length} {termClasses.length === 1 ? 'class' : 'classes'}</div>
-                      </div>
-                    </label>
-                  )
-                })}
+              <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+              <p className="text-sm text-gray-600 dark:text-gray-300">Select one or more sections and then choose the course to create this exam in.</p>
+              <div>
+                <div className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">Section(s)</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {selectableTerms.map((term) => {
+                    const id = String(term.id)
+                    const checked = selectedSections.includes(id)
+                    return (
+                      <label key={id} className="flex items-center gap-2 p-2 border rounded hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => {
+                            const next = e.target.checked
+                              ? Array.from(new Set([...selectedSections, id]))
+                              : selectedSections.filter((s) => s !== id)
+                            setSelectedSections(next)
+                            setSelectedClassId('')
+                            setSelectedClassIds([])
+                          }}
+                          className="w-4 h-4"
+                        />
+                        <div className="text-sm">
+                          <div className="font-medium">{formatSectionTitle(term)}</div>
+                        </div>
+                      </label>
+                    )
+                  })}
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">Course</label>
-                <select value={selectedCourse} onChange={(e) => setSelectedCourse(e.target.value)} className="mt-1 block w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-800 dark:text-gray-100">
-                  {courseOptions.length === 0 ? (
-                    <option value="">There is no same course in this section</option>
-                  ) : (
-                    <>
-                      <option value="" disabled>Select course</option>
-                      {courseOptions.map((code) => (
+                {(() => {
+                  const available = selectedSections.flatMap((sid) => classesByTermId.get(String(sid)) || [])
+                  if (selectedSections.length === 0) {
+                    return (
+                      <select disabled className="mt-1 block w-full rounded-md border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-700 px-3 py-2 text-sm text-gray-500">
+                        <option>Select section(s) first</option>
+                      </select>
+                    )
+                  }
+
+                  if (selectedSections.length === 1) {
+                    // show classes for the single selected section
+                    return (
+                      <select value={selectedClassIds[0] || ''} onChange={(e) => {
+                        const val = e.target.value
+                        const found = available.find((c) => String(c.id) === String(val))
+                        setSelectedClassIds(val ? [val] : [])
+                        setSelectedCourse(found ? (found.course_code || found.courseCode || found.name || String(found.id)) : '')
+                      }} className="mt-1 block w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-800 dark:text-gray-100">
+                        <option value="" disabled hidden>Select Course</option>
+                        {available.map((course) => (
+                          <option key={course.id} value={String(course.id)}>{course.name || course.course_code || course.courseCode || `Class ${course.id}`}</option>
+                        ))}
+                      </select>
+                    )
+                  }
+
+                  // multiple sections selected: compute intersection of course codes
+                  const perSectionCodes = selectedSections.map((sid) => new Set((classesByTermId.get(String(sid)) || []).map((c) => c.course_code || c.courseCode).filter(Boolean)))
+                  const intersection = perSectionCodes.reduce((acc, s) => new Set([...acc].filter((x) => s.has(x))), perSectionCodes[0] || new Set())
+                  const commonCodes = Array.from(intersection).sort()
+
+                  if (commonCodes.length === 0) {
+                    return (
+                      <select disabled className="mt-1 block w-full rounded-md border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-700 px-3 py-2 text-sm text-gray-500">
+                        <option>No common course across selected sections</option>
+                      </select>
+                    )
+                  }
+
+                  return (
+                    <select value={selectedCourse || ''} onChange={(e) => {
+                      const code = e.target.value
+                      setSelectedCourse(code)
+                      const ids = available.filter((c) => (c.course_code || c.courseCode) === code).map((c) => String(c.id))
+                      setSelectedClassIds(ids)
+                    }} className="mt-1 block w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-800 dark:text-gray-100">
+                      <option value="" disabled hidden>Select Course</option>
+                      {commonCodes.map((code) => (
                         <option key={code} value={code}>{code}</option>
                       ))}
-                    </>
-                  )}
-                </select>
+                    </select>
+                  )
+                })()}
               </div>
             </div>
             <div className="mt-4 flex items-center justify-end gap-3">
