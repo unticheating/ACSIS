@@ -2,18 +2,20 @@
  * Platform-wide institution listing for super administrators.
  */
 
-/**
- * @param {import('pg').Pool} pool
- */
-export async function listInstitutionsForSuperAdmin(pool) {
-  const { rows } = await pool.query(
-    `SELECT i.institution_id, i.institution_name, i.acronym, i.logo, i.is_active,
+import { normalizeLogo } from './institutionSettings.js'
+
+const NAME_MAX = 100
+const WARNINGS_MIN = 1
+const WARNINGS_MAX = 20
+
+const INSTITUTION_SELECT = `SELECT i.institution_id, i.institution_name, i.acronym, i.logo, i.is_active,
             t.theme_id, t.theme_name, t.primary_color, t.secondary_color, t.base_color
      FROM institutions i
-     JOIN themes t ON t.theme_id = i.theme_id
-     ORDER BY i.institution_name ASC, i.institution_id ASC`,
-  )
-  return rows.map((r) => ({
+     JOIN themes t ON t.theme_id = i.theme_id`
+
+/** @param {Record<string, unknown>} r */
+function mapInstitutionRow(r) {
+  return {
     institutionId: r.institution_id,
     institutionName: r.institution_name,
     acronym: r.acronym,
@@ -26,5 +28,105 @@ export async function listInstitutionsForSuperAdmin(pool) {
       secondaryColor: r.secondary_color,
       baseColor: r.base_color,
     },
-  }))
+  }
+}
+
+/**
+ * @param {import('pg').Pool} pool
+ */
+export async function listInstitutionsForSuperAdmin(pool) {
+  const { rows } = await pool.query(
+    `${INSTITUTION_SELECT}
+     ORDER BY i.institution_name ASC, i.institution_id ASC`,
+  )
+  return rows.map(mapInstitutionRow)
+}
+
+/**
+ * @param {import('pg').Pool} pool
+ * @param {number} createdByUid
+ * @param {Record<string, unknown>} body
+ */
+export async function createInstitutionForSuperAdmin(pool, createdByUid, body) {
+  const name = typeof body.institutionName === 'string' ? body.institutionName.trim() : ''
+  if (name.length < 2 || name.length > NAME_MAX) {
+    return {
+      ok: false,
+      status: 400,
+      error: `Institution name must be 2–${NAME_MAX} characters.`,
+    }
+  }
+
+  const acronym = typeof body.acronym === 'string' ? body.acronym.trim().toUpperCase() : ''
+  if (!/^[A-Z0-9][A-Z0-9-]{0,19}$/.test(acronym)) {
+    return {
+      ok: false,
+      status: 400,
+      error: 'Acronym must be 1–20 letters, numbers, or hyphens (no spaces).',
+    }
+  }
+
+  const clash = await pool.query(
+    `SELECT institution_id FROM institutions WHERE LOWER(acronym) = LOWER($1)`,
+    [acronym],
+  )
+  if (clash.rows[0]) {
+    return { ok: false, status: 409, error: 'That acronym is already in use.' }
+  }
+
+  if (body.logo === undefined || body.logo === null || body.logo === '') {
+    return { ok: false, status: 400, error: 'Institution logo is required.' }
+  }
+  const logoResult = normalizeLogo(body.logo)
+  if (!logoResult.ok) {
+    return { ok: false, status: 400, error: logoResult.error }
+  }
+  if (!logoResult.value) {
+    return { ok: false, status: 400, error: 'Institution logo is required.' }
+  }
+
+  const themeId = Number(body.themeId)
+  if (!Number.isInteger(themeId) || themeId < 1) {
+    return { ok: false, status: 400, error: 'Please select a color theme.' }
+  }
+  const themeCheck = await pool.query(`SELECT theme_id FROM themes WHERE theme_id = $1`, [themeId])
+  if (!themeCheck.rows[0]) {
+    return { ok: false, status: 400, error: 'Unknown theme.' }
+  }
+
+  const maxWarnings =
+    body.maxWarnings !== undefined && body.maxWarnings !== null && body.maxWarnings !== ''
+      ? Number(body.maxWarnings)
+      : 3
+  if (!Number.isInteger(maxWarnings) || maxWarnings < WARNINGS_MIN || maxWarnings > WARNINGS_MAX) {
+    return {
+      ok: false,
+      status: 400,
+      error: `Max warnings must be between ${WARNINGS_MIN} and ${WARNINGS_MAX}.`,
+    }
+  }
+
+  if (!Number.isInteger(createdByUid) || createdByUid < 1) {
+    return { ok: false, status: 401, error: 'Not authenticated.' }
+  }
+
+  const insert = await pool.query(
+    `INSERT INTO institutions (
+       institution_name, acronym, logo, theme_id, max_warnings, is_active, created_by
+     ) VALUES ($1, $2, $3, $4, $5, TRUE, $6)
+     RETURNING institution_id`,
+    [name, acronym, logoResult.value, themeId, maxWarnings, createdByUid],
+  )
+
+  const institutionId = insert.rows[0]?.institution_id
+  if (!institutionId) {
+    return { ok: false, status: 500, error: 'Failed to create institution.' }
+  }
+
+  const { rows } = await pool.query(`${INSTITUTION_SELECT} WHERE i.institution_id = $1`, [institutionId])
+  if (!rows[0]) {
+    return { ok: false, status: 500, error: 'Institution created but could not be loaded.' }
+  }
+
+  return { ok: true, institution: mapInstitutionRow(rows[0]) }
 }

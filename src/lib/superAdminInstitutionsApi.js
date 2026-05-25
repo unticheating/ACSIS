@@ -14,3 +14,28 @@ export async function fetchSuperAdminInstitutions() {
   const data = await parseJson(res)
   return data.institutions || []
 }
+
+export async function fetchSuperAdminThemes() {
+  const res = await apiFetch('/api/super-admin/institutions/themes')
+  const data = await parseJson(res)
+  return data.themes || []
+}
+
+/**
+ * @param {{
+ *   institutionName: string
+ *   acronym: string
+ *   logo: string
+ *   themeId: number
+ *   maxWarnings?: number
+ * }} payload
+ */
+export async function createSuperAdminInstitution(payload) {
+  const res = await apiFetch('/api/super-admin/institutions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  const data = await parseJson(res)
+  return data.institution
+}
