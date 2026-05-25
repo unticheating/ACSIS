@@ -76,11 +76,13 @@ export async function listTeacherClassesQuery(memberId) {
        c.semester, 
        c.access_code as "accessCode",
        c.term_id as "termId",
+       t.section_code as "sectionCode",
        (SELECT COUNT(*)::int FROM exams e
         WHERE e.class_id = c.class_id AND e.is_archived = FALSE) as "examCount",
        (SELECT COUNT(*)::int FROM class_enrollments ce
         WHERE ce.class_id = c.class_id) as "enrollmentCount"
      FROM classes c
+     LEFT JOIN teaching_terms t ON t.term_id = c.term_id
      WHERE c.member_id = $1 AND c.is_active = TRUE
      ORDER BY c.created_at DESC`,
     [memberId]

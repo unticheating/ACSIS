@@ -45,8 +45,8 @@ export default function RestartExamDialog({ open, onOpenChange, onRestart, defau
         <DialogHeader>
           <DialogTitle>Restart Exam</DialogTitle>
           <DialogDescription>
-            Returns the exam to the lobby so students can enter the code again. Set when the lobby opens and when it
-            ends, then start the exam when you are ready.
+            This will allow students to re-join using the exam code.
+            The exam will be placed back into the lobby until you start it.
           </DialogDescription>
         </DialogHeader>
 

@@ -121,6 +121,92 @@ export async function updateExamDraftService(memberId, classId, examId, payload)
   }
 }
 
+export async function copyExamService(memberId, sourceClassId, targetClassId, examId, scheduledStart, scheduledEnd) {
+  try {
+    const sourceClass = await getTeacherClassByIdQuery(sourceClassId, memberId);
+    if (!sourceClass) {
+      return { ok: false, status: 403, error: 'Source class not found or permission denied.' };
+    }
+    const targetClass = await getTeacherClassByIdQuery(targetClassId, memberId);
+    if (!targetClass) {
+      return { ok: false, status: 403, error: 'Target class not found or permission denied.' };
+    }
+
+    const exam = await getExamWithQuestionsQuery(sourceClassId, examId, false);
+    if (!exam) {
+      return { ok: false, status: 404, error: 'Exam not found.' };
+    }
+
+    const pool = getPool();
+    const client = await pool.connect();
+    
+    try {
+      await client.query('BEGIN');
+      
+      const newTitle = `Copy of ${exam.title || 'Untitled exam'}`;
+      const examPassword = generateExamPassword();
+      
+      const sectionsMap = new Map();
+      const sections = [];
+      
+      for (const s of (exam.sections || [])) {
+        const newSec = { title: s.title, description: s.description, questions: [] };
+        sectionsMap.set(s.id, newSec);
+        sections.push(newSec);
+      }
+      
+      const flatQuestions = [];
+      for (const q of (exam.questions || [])) {
+        const qCopy = {
+          type: q.type,
+          question: q.question,
+          points: q.points,
+          imageUrl: q.imageUrl,
+          options: q.options,
+          correctAnswer: q.correctAnswer
+        };
+        if (q.sectionId && sectionsMap.has(q.sectionId)) {
+          sectionsMap.get(q.sectionId).questions.push(qCopy);
+        } else {
+          flatQuestions.push(qCopy);
+        }
+      }
+
+      const payload = {
+        sections: sections.length > 0 ? sections : undefined,
+        questions: sections.length === 0 ? flatQuestions : undefined
+      };
+
+      const newExamId = await insertExamTransaction(
+        client,
+        memberId,
+        targetClassId,
+        newTitle,
+        examPassword,
+        payload,
+        {
+          shuffleQuestions: Boolean(exam.shuffleQuestions),
+          shuffleChoices: Boolean(exam.shuffleChoices),
+          scheduledStart,
+          scheduledEnd,
+          isAutoPublish: false,
+        }
+      );
+
+      await client.query('COMMIT');
+      return { ok: true, examId: newExamId, classId: targetClassId };
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    console.error('[examService.copyExamService]', err);
+    return { ok: false, status: 500, error: 'Database transaction failed.' };
+  }
+}
+
 async function attachStudentSessionsToExams(exams, studentMemberId) {
   if (!studentMemberId || !exams.length) return exams
   const examIds = exams.map((e) => e.id)

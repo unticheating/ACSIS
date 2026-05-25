@@ -411,3 +411,14 @@ export async function deleteExamSessionsQuery(examId) {
   const pool = getPool()
   await pool.query(`DELETE FROM exam_sessions WHERE exam_id = $1`, [examId])
 }
+
+export async function unlockExamSessionsQuery(examId) {
+  await ensureExamSessionLockedColumns()
+  const pool = getPool()
+  await pool.query(
+    `UPDATE exam_sessions
+     SET locked_at = NULL, lock_reason = NULL
+     WHERE exam_id = $1 AND status = 'in_progress'`,
+    [examId]
+  )
+}

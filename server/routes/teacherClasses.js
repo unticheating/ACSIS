@@ -17,6 +17,7 @@ import {
   deleteTeacherExam,
   getTeacherExamSession,
   startTeacherExam,
+  copyTeacherExam,
   restartTeacherExam,
   closeTeacherExam,
   getTeacherExamResults,
@@ -71,6 +72,7 @@ router.post('/:classId/exams/:examId/reports/export', postExportExamReport);
 router.put('/:classId/exams/:examId', publishTeacherExam);
 router.patch('/:classId/exams/:examId/password', patchTeacherExamPassword);
 router.put('/:classId/exams/:examId/start', startTeacherExam);
+router.post('/:classId/exams/:examId/copy', copyTeacherExam);
 router.put('/:classId/exams/:examId/restart', restartTeacherExam);
 router.put('/:classId/exams/:examId/close', closeTeacherExam);
 router.delete('/:classId/exams/:examId', deleteTeacherExam);

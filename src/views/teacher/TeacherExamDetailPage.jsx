@@ -9,6 +9,7 @@ import { releaseExamScores } from '@/lib/teacherExamGradingApi.js'
 import ExamAnswerReviewModal from '@/components/teacher/ExamAnswerReviewModal.jsx'
 import ReleaseScoresDialog from '@/components/teacher/ReleaseScoresDialog.jsx'
 import RestartExamDialog from '@/components/teacher/RestartExamDialog.jsx'
+import CopyExamDialog from '@/components/teacher/CopyExamDialog.jsx'
 import {
   isExamDraft,
   isExamOngoing,
@@ -104,6 +105,7 @@ export default function TeacherExamDetailPage() {
   const [releasing, setReleasing] = useState(false)
   const [releaseDialogOpen, setReleaseDialogOpen] = useState(false)
   const [restartDialogOpen, setRestartDialogOpen] = useState(false)
+  const [copyDialogOpen, setCopyDialogOpen] = useState(false)
   const [tab, setTab] = useState('overview')
   const [examCodeVisible, setExamCodeVisible] = useState(true)
   const [examCodeEditing, setExamCodeEditing] = useState(false)
@@ -371,11 +373,39 @@ export default function TeacherExamDetailPage() {
         const err = await res.json()
         throw new Error(err.error || 'Failed to restart exam.')
       }
-      acsisToastSuccess('Exam reopened to the lobby. Students can enter the code again.')
+      acsisToastSuccess('Exam restarted and is now in the lobby.')
       setRestartDialogOpen(false)
       setRefreshTick((t) => t + 1)
     } catch (err) {
       acsisToastError(err.message)
+    }
+  }
+
+  async function copyExam(payload) {
+    try {
+      const res = await apiFetch(`/api/teacher/classes/${classId}/exams/${examId}/copy`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetClassId: payload.targetClassId,
+          scheduledStart: payload.newScheduledStart
+            ? new Date(payload.newScheduledStart).toISOString()
+            : null,
+          scheduledEnd: payload.newScheduledEnd
+            ? new Date(payload.newScheduledEnd).toISOString()
+            : null,
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Failed to copy exam.')
+      }
+      const data = await res.json()
+      acsisToastSuccess('Exam copied successfully.')
+      setCopyDialogOpen(false)
+    } catch (err) {
+      acsisToastError(err.message)
+      throw err
     }
   }
 
@@ -595,6 +625,7 @@ export default function TeacherExamDetailPage() {
                 </DropdownMenuActionItem>
               ) : null}
               <DropdownMenuSeparator />
+              <DropdownMenuActionItem onSelect={() => setCopyDialogOpen(true)}>Copy to another section</DropdownMenuActionItem>
               <DropdownMenuActionItem onSelect={() => navigate(createHref)}>New exam in this class</DropdownMenuActionItem>
               <DropdownMenuActionItem icon={Trash2} variant="destructive" onSelect={() => void remove()}>
                 Delete exam
@@ -932,6 +963,17 @@ export default function TeacherExamDetailPage() {
           open={restartDialogOpen}
           onOpenChange={setRestartDialogOpen}
           onRestart={restartExam}
+          defaultStart={exam.scheduledStart}
+          defaultEnd={exam.scheduledEnd}
+        />
+      ) : null}
+
+      {copyDialogOpen ? (
+        <CopyExamDialog
+          open={copyDialogOpen}
+          onOpenChange={setCopyDialogOpen}
+          currentClassId={classId}
+          onCopy={copyExam}
           defaultStart={exam.scheduledStart}
           defaultEnd={exam.scheduledEnd}
         />

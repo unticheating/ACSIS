@@ -17,6 +17,7 @@ import {
   markSessionSubmittedQuery,
   updateExamStatusByIdQuery,
   deleteExamSessionsQuery,
+  unlockExamSessionsQuery,
   upsertStudentAnswerQuery,
 } from '../repositories/examSessionRepository.js'
 
@@ -324,6 +325,8 @@ export async function restartExamService(classId, examId, teacherMemberId = null
   if (!updated) {
     return { ok: false, status: 500, error: 'Failed to restart exam.' }
   }
+
+  await unlockExamSessionsQuery(examId)
 
   return { ok: true, status: next }
 }

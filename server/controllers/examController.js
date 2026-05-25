@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
   closeExamService,
   createExamService,
+  copyExamService,
   updateExamDraftService,
   getClassExamsService,
   listTeacherExamsWithClassMetaService,
@@ -128,6 +129,42 @@ export async function createTeacherExam(req, res) {
     }
     console.error('[examController.createTeacherExam]', err);
     return res.status(500).json({ error: 'Failed to create exam.' });
+  }
+}
+
+const copyExamSchema = z.object({
+  targetClassId: z.string().min(1, 'Target class ID is required'),
+  scheduledStart: z.string().datetime().nullable().optional().default(null),
+  scheduledEnd: z.string().datetime().nullable().optional().default(null),
+});
+
+export async function copyTeacherExam(req, res) {
+  try {
+    const { classId, examId } = req.params;
+    if (!classId || !examId) return res.status(400).json({ error: 'Class ID and Exam ID are required.' });
+
+    const payload = copyExamSchema.parse(req.body);
+
+    const result = await copyExamService(
+      req.memberId,
+      classId,
+      payload.targetClassId,
+      examId,
+      payload.scheduledStart,
+      payload.scheduledEnd
+    );
+
+    if (!result.ok) {
+      return res.status(result.status || 500).json({ error: result.error });
+    }
+
+    return res.status(201).json({ ok: true, examId: result.examId, classId: result.classId });
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: err.issues?.[0]?.message || 'Validation error', details: err.issues });
+    }
+    console.error('[examController.copyTeacherExam]', err);
+    return res.status(500).json({ error: 'Failed to copy exam.' });
   }
 }
 
