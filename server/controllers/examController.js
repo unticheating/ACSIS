@@ -14,8 +14,10 @@ import {
 import {
   getStudentExamSessionService,
   joinExamService,
+  lockStudentExamSessionService,
   logCheatingEventService,
   restartExamService,
+  saveStudentAnswerService,
   startExamService,
   submitExamService,
 } from '../services/examSessionService.js';
@@ -242,17 +244,44 @@ export async function logStudentCheating(req, res) {
     return res.json({
       ok: true,
       warningCount: result.warningCount,
-      sessionId: result.sessionId,
-      autoSubmitted: Boolean(result.autoSubmitted),
-      scoreReleased: Boolean(result.scoreReleased),
-      scorePending: Boolean(result.scorePending),
-      rawScore: result.rawScore,
-      totalPoints: result.totalPoints,
-      percentage: result.percentage,
+      maxWarnings: result.maxWarnings,
+      sessionLocked: Boolean(result.sessionLocked),
+      autoSubmitted: false,
     });
   } catch (err) {
     console.error('[examController.logStudentCheating]', err);
     return res.status(500).json({ error: 'Failed to log event.' });
+  }
+}
+
+export async function lockStudentExam(req, res) {
+  const { classId, examId } = req.params;
+  const reason = typeof req.body?.reason === 'string' ? req.body.reason : 'time_up';
+
+  try {
+    const result = await lockStudentExamSessionService(classId, examId, req.memberId, reason);
+    if (!result.ok) {
+      return res.status(result.status || 500).json({ error: result.error });
+    }
+    return res.json(result);
+  } catch (err) {
+    console.error('[examController.lockStudentExam]', err);
+    return res.status(500).json({ error: 'Failed to lock exam.' });
+  }
+}
+
+export async function saveStudentExamAnswer(req, res) {
+  const { classId, examId } = req.params;
+
+  try {
+    const result = await saveStudentAnswerService(classId, examId, req.memberId, req.body);
+    if (!result.ok) {
+      return res.status(result.status || 500).json({ error: result.error });
+    }
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('[examController.saveStudentExamAnswer]', err);
+    return res.status(500).json({ error: 'Failed to save answer.' });
   }
 }
 

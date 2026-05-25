@@ -17,11 +17,13 @@ import {
 import {
   fetchStudentExamSession,
   joinStudentExam,
+  lockStudentExam,
   logExamCheating,
+  saveExamAnswer,
   submitExamAnswers,
 } from '@/lib/studentExamApi.js'
 import { PG_EXAM_STATUS, normalizeExamStatus } from '@/lib/examFlowUi.js'
-import { MAX_EXAM_WARNINGS, labelForCheatEvent } from '@/lib/examAntiCheat.js'
+import { labelForCheatEvent } from '@/lib/examAntiCheat.js'
 import { computeExamTimeDisplay } from '@/lib/examCountdown.js'
 import { acsisToastError } from '@/lib/acsisToast.js'
 
@@ -34,6 +36,7 @@ const DETECTION_RETURN_SEC = 5
 const OVERLAY_FADE_MS = 340
 const TAB_LEAVE_DEBOUNCE_MS = 450
 const POST_DETECTION_COOLDOWN_MS = 1400
+const AUTOSAVE_DEBOUNCE_MS = 800
 
 function isExamScene(name) {
   return name === 'question'
@@ -84,6 +87,12 @@ export default function StudentExamSessionPage() {
       }
       setNeedsPassword(false)
       setWarningCount(Number(data.warningCount || 0))
+      setMaxWarnings(Number(data.maxWarnings) > 0 ? Number(data.maxWarnings) : 3)
+      setExamLocked(Boolean(data.sessionLocked))
+      setLockReason(data.lockReason || null)
+      if (data.savedAnswers && typeof data.savedAnswers === 'object') {
+        setAnswers((prev) => ({ ...prev, ...data.savedAnswers }))
+      }
       if (data.sessionStatus === 'submitted') {
         setHit({ exam: data.exam })
         setSubmitResult(
@@ -158,29 +167,55 @@ export default function StudentExamSessionPage() {
   const [submitResult, setSubmitResult] = useState(null)
   const [submitError, setSubmitError] = useState(null)
   const [warningCount, setWarningCount] = useState(0)
+  const [maxWarnings, setMaxWarnings] = useState(3)
+  const [examLocked, setExamLocked] = useState(false)
+  const [lockReason, setLockReason] = useState(null)
   const [lastViolationLabel, setLastViolationLabel] = useState('')
+  const lockingRef = useRef(false)
+  const autosaveSkipRef = useRef(true)
+
+  const applyExamLock = useCallback(
+    async (reason = 'time_up') => {
+      if (!classId || !examId || lockingRef.current) return
+      lockingRef.current = true
+      try {
+        const res = await lockStudentExam(classId, examId, reason)
+        setExamLocked(true)
+        setLockReason(res.lockReason || reason)
+        if (res.maxWarnings != null) setMaxWarnings(Number(res.maxWarnings))
+        if (res.warningCount != null) setWarningCount(Number(res.warningCount))
+      } catch (err) {
+        console.error('[exam lock]', err)
+        setExamLocked(true)
+        setLockReason(reason)
+      }
+    },
+    [classId, examId],
+  )
 
   const submitToServer = useCallback(async () => {
     if (!classId || !examId) {
       setScene('submitted')
       return
     }
-    const payload = questions.map((q) => ({
-      questionId: q.id,
-      answerText: answers[q.id] != null ? String(answers[q.id]) : '',
-    }))
+    const payload = examLocked
+      ? []
+      : questions.map((q) => ({
+          questionId: q.id,
+          answerText: answers[q.id] != null ? String(answers[q.id]) : '',
+        }))
     setSubmitError(null)
     try {
       const result = await submitExamAnswers(classId, examId, payload)
       setSubmitResult(result)
+      setScene('submitted')
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to submit exam.'
       setSubmitError(msg)
       acsisToastError(msg)
       console.error(err)
     }
-    setScene('submitted')
-  }, [answers, classId, examId, questions])
+  }, [answers, classId, examId, examLocked, questions])
 
   useEffect(() => {
     sceneRef.current = scene
@@ -231,8 +266,6 @@ export default function StudentExamSessionPage() {
   const postCooldownUntilRef = useRef(0)
   const visibilityTimerRef = useRef(null)
   const returnSceneRef = useRef('question')
-  const autoSubmittingRef = useRef(false)
-
   useEffect(() => {
     if (scene !== 'question' || !hit?.exam) return undefined
     const tick = () => {
@@ -242,15 +275,35 @@ export default function StudentExamSessionPage() {
       })
       const left = seconds ?? 0
       setSecondsLeft(left)
-      if (left <= 0 && !autoSubmittingRef.current) {
-        autoSubmittingRef.current = true
-        submitToServer()
+      if (left <= 0 && !examLocked && !lockingRef.current) {
+        void applyExamLock('time_up')
       }
     }
     tick()
     const id = window.setInterval(tick, 1000)
     return () => window.clearInterval(id)
-  }, [scene, hit?.exam, submitToServer])
+  }, [scene, hit?.exam, examLocked, applyExamLock])
+
+  useEffect(() => {
+    if (scene !== 'question' || examLocked || !classId || !examId || questions.length === 0) {
+      return undefined
+    }
+    if (autosaveSkipRef.current) {
+      autosaveSkipRef.current = false
+      return undefined
+    }
+    const timer = window.setTimeout(() => {
+      for (const q of questions) {
+        const val = answers[q.id]
+        if (val == null || String(val).trim() === '') continue
+        void saveExamAnswer(classId, examId, {
+          questionId: q.id,
+          answerText: String(val),
+        }).catch((err) => console.error('[autosave]', err))
+      }
+    }, AUTOSAVE_DEBOUNCE_MS)
+    return () => window.clearTimeout(timer)
+  }, [answers, scene, examLocked, classId, examId, questions])
 
   const showViolationOverlay = useCallback((returnTo) => {
     detectionRunningRef.current = true
@@ -294,19 +347,13 @@ export default function StudentExamSessionPage() {
         const res = await logExamCheating(classId, examId, eventType, details)
         count = Number(res.warningCount ?? count + 1)
         setWarningCount(count)
+        if (res.maxWarnings != null) setMaxWarnings(Number(res.maxWarnings))
 
-        if (res.autoSubmitted) {
+        if (res.sessionLocked) {
+          setExamLocked(true)
+          setLockReason('max_warnings')
           setDetectionOpen(false)
           detectionRunningRef.current = false
-          setSubmitResult({
-            scoreReleased: res.scoreReleased,
-            scorePending: res.scorePending,
-            rawScore: res.rawScore,
-            totalPoints: res.totalPoints,
-            percentage: res.percentage,
-          })
-          setSubmitError(null)
-          setScene('submitted')
           return
         }
       } catch (err) {
@@ -316,23 +363,17 @@ export default function StudentExamSessionPage() {
           setLastViolationLabel(msg)
           return
         }
-        count = Math.min(MAX_EXAM_WARNINGS, warningCount + 1)
-        setWarningCount(count)
-        if (count >= MAX_EXAM_WARNINGS) {
-          setDetectionOpen(false)
-          detectionRunningRef.current = false
-          await submitToServer()
-          return
-        }
       }
 
-      if (count >= MAX_EXAM_WARNINGS) {
+      if (count >= maxWarnings) {
+        setExamLocked(true)
+        setLockReason('max_warnings')
         setDetectionOpen(false)
         detectionRunningRef.current = false
-        await submitToServer()
+        void applyExamLock('max_warnings')
       }
     },
-    [classId, examId, warningCount, showViolationOverlay, submitToServer],
+    [classId, examId, warningCount, maxWarnings, showViolationOverlay, applyExamLock],
   )
 
   const scheduleTabLeave = useCallback(() => {
@@ -656,9 +697,10 @@ export default function StudentExamSessionPage() {
                 Your score will appear after your instructor releases results.
               </p>
             ) : null}
-            {warningCount >= MAX_EXAM_WARNINGS ? (
+            {lockReason === 'max_warnings' ? (
               <p className="text-sm font-medium text-amber-300">
-                Your exam was auto-submitted after {MAX_EXAM_WARNINGS} integrity warnings.
+                Your exam was locked after reaching the maximum integrity warnings, then submitted
+                when you sent it.
               </p>
             ) : null}
             <Button className="w-full" asChild>
@@ -687,8 +729,10 @@ export default function StudentExamSessionPage() {
               instructor and administrator.
             </p>
             <p className="detection-strikes">
-              Strike {warningCount} of {MAX_EXAM_WARNINGS}
-              {warningCount >= MAX_EXAM_WARNINGS - 1 ? ' — one more ends your exam' : ''}
+              Strike {warningCount} of {maxWarnings}
+              {warningCount >= maxWarnings - 1 && warningCount < maxWarnings
+                ? ' — one more locks your exam'
+                : ''}
             </p>
             <p className="detection-countdown">
               Returning to exam in {detectionReturn} seconds…
@@ -714,10 +758,10 @@ export default function StudentExamSessionPage() {
                   ? 'bg-orange-900/40 text-orange-200'
                   : 'bg-white/10 text-white/80'
             }`}
-            title="Integrity warnings — 3 strikes auto-submits your exam"
+            title={`Integrity warnings — ${maxWarnings} strikes locks your exam for manual submit`}
           >
             <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden />
-            {warningCount} / {MAX_EXAM_WARNINGS} warnings
+            {warningCount} / {maxWarnings} warnings
           </div>
           <div className="exam-timer flex items-center gap-2 lg:hidden">
             <Clock className="w-4 h-4 shrink-0 opacity-80" aria-hidden />
@@ -730,6 +774,16 @@ export default function StudentExamSessionPage() {
         <main className="exam-stage flex-1 flex flex-col min-w-0">
           {currentQ ? (
             <div className="flex-1 flex flex-col max-w-3xl w-full mx-auto">
+              {examLocked ? (
+                <div
+                  className="mb-6 rounded-xl border border-amber-500/40 bg-amber-950/40 px-4 py-3 text-sm text-amber-100"
+                  role="status"
+                >
+                  {lockReason === 'max_warnings'
+                    ? 'Maximum warnings reached. You can review your answers but cannot change them. Click Send exam when ready.'
+                    : 'Time is up. You can review your answers but cannot change them. Click Send exam when ready.'}
+                </div>
+              ) : null}
               {showSectionIntro && currentQ.sectionDescription ? (
                 <div className="question-box question-box--section mb-6">
                   <p className="question-box--section__desc whitespace-pre-wrap">
@@ -769,7 +823,11 @@ export default function StudentExamSessionPage() {
                         <button
                           key={i}
                           type="button"
-                          onClick={() => setAnswers((prev) => ({ ...prev, [currentQ.id]: opt }))}
+                          disabled={examLocked}
+                          onClick={() =>
+                            !examLocked &&
+                            setAnswers((prev) => ({ ...prev, [currentQ.id]: opt }))
+                          }
                           className={`option-row${isSelected ? ' is-selected' : ''}`}
                         >
                           <span className="option-radio" aria-hidden />
@@ -788,7 +846,10 @@ export default function StudentExamSessionPage() {
                         <button
                           key={v}
                           type="button"
-                          onClick={() => setAnswers((prev) => ({ ...prev, [currentQ.id]: v }))}
+                          disabled={examLocked}
+                          onClick={() =>
+                            !examLocked && setAnswers((prev) => ({ ...prev, [currentQ.id]: v }))
+                          }
                           className={`option-row${isSelected ? ' is-selected' : ''}`}
                         >
                           <span className="option-radio" aria-hidden />
@@ -809,7 +870,9 @@ export default function StudentExamSessionPage() {
                       type="text"
                       className="id-input"
                       value={answers[currentQ.id] || ''}
+                      readOnly={examLocked}
                       onChange={(e) =>
+                        !examLocked &&
                         setAnswers((prev) => ({ ...prev, [currentQ.id]: e.target.value.toUpperCase() }))
                       }
                       placeholder="Your answer..."
@@ -830,9 +893,12 @@ export default function StudentExamSessionPage() {
                       theme={monacoThemeForApp(theme)}
                       value={answers[currentQ.id] || ''}
                       onChange={(val) =>
-                        setAnswers((prev) => ({ ...prev, [currentQ.id]: val ?? '' }))
+                        !examLocked && setAnswers((prev) => ({ ...prev, [currentQ.id]: val ?? '' }))
                       }
-                      options={MONACO_EXAM_EDITOR_OPTIONS}
+                      options={{
+                        ...MONACO_EXAM_EDITOR_OPTIONS,
+                        readOnly: examLocked,
+                      }}
                     />
                   </div>
                 )}
@@ -853,7 +919,11 @@ export default function StudentExamSessionPage() {
                   ← Previous
                 </button>
                 <div className="exam-footer-right">
-                  {currentQuestionIndex < questions.length - 1 ? (
+                  {examLocked ? (
+                    <button type="button" onClick={() => submitToServer()} className="btn-next">
+                      Send exam
+                    </button>
+                  ) : currentQuestionIndex < questions.length - 1 ? (
                     <button
                       type="button"
                       onClick={() => setCurrentQuestionIndex((i) => i + 1)}
@@ -943,7 +1013,7 @@ export default function StudentExamSessionPage() {
               </span>
             </div>
             <button type="button" onClick={() => submitToServer()} className="btn-next w-full justify-center">
-              Finish &amp; submit
+              {examLocked ? 'Send exam' : 'Finish & submit'}
             </button>
           </div>
         </aside>

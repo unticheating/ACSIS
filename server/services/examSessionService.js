@@ -12,6 +12,8 @@ import {
   insertCheatingLogQuery,
   isValidCheatEvent,
   isSessionScoreReleasedQuery,
+  lockExamSessionQuery,
+  listStudentAnswersForSessionQuery,
   markSessionSubmittedQuery,
   updateExamStatusByIdQuery,
   deleteExamSessionsQuery,
@@ -38,8 +40,41 @@ import { getSessionShuffleLayoutQuery } from '../repositories/examSessionReposit
 import { closeOtherTeacherOngoingExamsQuery } from '../repositories/examResultsRepository.js'
 import { checkEnrollment } from '../repositories/studentRepository.js'
 import { getInstitutionMaxWarnings } from '../repositories/adminRepository.js'
-import { percentageFromScores, shouldAutoSubmitExam } from '../lib/examSessionRules.js'
+import { percentageFromScores, shouldLockExam } from '../lib/examSessionRules.js'
 import { notifyMonitoringUpdate } from '../lib/monitoringBroadcast.js'
+
+function mapSavedAnswers(rows) {
+  const out = {}
+  for (const row of rows) {
+    const qid = Number(row.question_id)
+    const text = row.choice_text ?? row.answer_text
+    if (text != null && String(text).length > 0) {
+      out[qid] = String(text)
+    }
+  }
+  return out
+}
+
+async function syncSessionLockState(session, examRow, institutionId) {
+  if (!session || session.status === 'submitted' || session.locked_at) {
+    return session
+  }
+  const maxWarnings = await getInstitutionMaxWarnings(institutionId)
+  if (shouldLockExam(Number(session.warning_count ?? 0), maxWarnings)) {
+    const locked = await lockExamSessionQuery(session.session_id, 'max_warnings')
+    if (locked) {
+      return { ...session, locked_at: locked.locked_at, lock_reason: locked.lock_reason }
+    }
+  }
+  const endMs = examRow.scheduled_end ? new Date(examRow.scheduled_end).getTime() : NaN
+  if (Number.isFinite(endMs) && Date.now() >= endMs) {
+    const locked = await lockExamSessionQuery(session.session_id, 'time_up')
+    if (locked) {
+      return { ...session, locked_at: locked.locked_at, lock_reason: locked.lock_reason }
+    }
+  }
+  return session
+}
 
 function mapExamMeta(row) {
   const status = (row.status || '').toLowerCase()
@@ -93,13 +128,6 @@ export async function joinExamService(classId, examId, studentMemberId, password
   }
 
   let session = await findExamSessionQuery(examId, studentMemberId)
-  if (status === EXAM_STATUS.OPEN && !session) {
-    return {
-      ok: false,
-      status: 403,
-      error: 'The exam has already started. Late join is not allowed.',
-    }
-  }
   if (session?.status === 'submitted') {
     return { ok: false, status: 400, error: 'You already submitted this exam.' }
   }
@@ -131,13 +159,11 @@ export async function getStudentExamSessionService(classId, examId, studentMembe
     return { ok: false, status: 403, error: 'This exam is not published yet.' }
   }
 
-  const session = await findExamSessionQuery(examId, studentMemberId)
-  if (status === EXAM_STATUS.OPEN && !session) {
-    return {
-      ok: false,
-      status: 403,
-      error: 'The exam has already started. Late join is not allowed.',
-    }
+  let session = await findExamSessionQuery(examId, studentMemberId)
+
+  const maxWarnings = await getInstitutionMaxWarnings(examRow.institution_id)
+  if (session) {
+    session = await syncSessionLockState(session, examRow, examRow.institution_id)
   }
 
   const examMeta = mapExamMeta(examRow)
@@ -145,7 +171,11 @@ export async function getStudentExamSessionService(classId, examId, studentMembe
     joined: Boolean(session),
     sessionId: session?.session_id ?? null,
     sessionStatus: session?.status ?? null,
+    sessionLocked: Boolean(session?.locked_at),
+    lockReason: session?.lock_reason ?? null,
     warningCount: session?.warning_count ?? 0,
+    maxWarnings,
+    savedAnswers: {},
     exam: examMeta,
     questions: [],
     result: null,
@@ -179,9 +209,63 @@ export async function getStudentExamSessionService(classId, examId, studentMembe
       const { questions, correctAnswer, _choicesMeta, ...examPublic } = full
       payload.exam = { ...examMeta, ...examPublic, code: examMeta.code }
     }
+    const savedRows = await listStudentAnswersForSessionQuery(session.session_id)
+    payload.savedAnswers = mapSavedAnswers(savedRows)
   }
 
   return { ok: true, ...payload }
+}
+
+export async function lockStudentExamSessionService(classId, examId, studentMemberId, reason = 'time_up') {
+  const gate = await requireOpenSession(classId, examId, studentMemberId)
+  if (!gate.ok) return gate
+
+  const locked = await lockExamSessionQuery(gate.session.session_id, reason)
+  if (!locked) {
+    return { ok: false, status: 400, error: 'Could not lock exam session.' }
+  }
+
+  notifyMonitoringUpdate(classId, examId)
+  const maxWarnings = await getInstitutionMaxWarnings(gate.exam.institution_id)
+
+  return {
+    ok: true,
+    sessionLocked: true,
+    lockReason: locked.lock_reason,
+    warningCount: Number(gate.session.warning_count ?? 0),
+    maxWarnings,
+  }
+}
+
+export async function saveStudentAnswerService(classId, examId, studentMemberId, body) {
+  const gate = await requireOpenSession(classId, examId, studentMemberId)
+  if (!gate.ok) return gate
+
+  const questionId = Number(body?.questionId)
+  if (!Number.isFinite(questionId)) {
+    return { ok: false, status: 400, error: 'questionId is required.' }
+  }
+
+  let choiceId = body?.choiceId != null ? Number(body.choiceId) : null
+  const answerText = body?.answerText != null ? String(body.answerText) : null
+
+  if (!choiceId && answerText) {
+    choiceId = await findChoiceIdByTextQuery(questionId, answerText)
+  }
+
+  try {
+    await upsertStudentAnswerQuery(gate.session.session_id, questionId, { choiceId, answerText })
+  } catch (err) {
+    if (err?.code === 'SESSION_CLOSED') {
+      return { ok: false, status: 400, error: err.message }
+    }
+    if (err?.code === 'SESSION_LOCKED') {
+      return { ok: false, status: 400, error: err.message }
+    }
+    throw err
+  }
+
+  return { ok: true }
 }
 
 export async function startExamService(classId, examId, teacherMemberId = null, opts = {}) {
@@ -282,54 +366,55 @@ export async function logCheatingEventService(classId, examId, studentMemberId, 
   const warningCount = await incrementSessionWarningQuery(gate.session.session_id)
   const maxWarnings = await getInstitutionMaxWarnings(gate.exam.institution_id)
 
-  let autoSubmitted = false
-  let scores = { rawScore: 0, totalPoints: 0 }
-  if (shouldAutoSubmitExam(warningCount, maxWarnings)) {
-    await markSessionSubmittedQuery(gate.session.session_id, true)
-    try {
-      scores = await gradeSessionAnswersQuery(gate.session.session_id)
-    } catch (err) {
-      console.error('[examSessionService.logCheating] auto-submit grade failed:', err)
-    }
-    autoSubmitted = true
-    notifyMonitoringUpdate(classId, examId)
-  } else {
-    notifyMonitoringUpdate(classId, examId)
+  let sessionLocked = Boolean(gate.session.locked_at)
+  if (shouldLockExam(warningCount, maxWarnings)) {
+    const locked = await lockExamSessionQuery(gate.session.session_id, 'max_warnings')
+    sessionLocked = Boolean(locked?.locked_at ?? true)
   }
+  notifyMonitoringUpdate(classId, examId)
 
-  const payload = {
+  return {
     ok: true,
     warningCount,
     maxWarnings,
-    autoSubmitted,
-    ...(await buildStudentSubmitPayload(gate.session.session_id, scores)),
+    sessionLocked,
+    autoSubmitted: false,
   }
-  return payload
 }
 
 export async function submitExamService(classId, examId, studentMemberId, answersPayload) {
   const gate = await requireOpenSession(classId, examId, studentMemberId)
   if (!gate.ok) return gate
 
+  if (!gate.session.locked_at) {
+    const synced = await syncSessionLockState(gate.session, gate.exam, gate.exam.institution_id)
+    gate.session = synced
+  }
+
   const answers = Array.isArray(answersPayload) ? answersPayload : []
-  for (const row of answers) {
-    const questionId = Number(row?.questionId)
-    if (!Number.isFinite(questionId)) continue
+  if (!gate.session.locked_at) {
+    for (const row of answers) {
+      const questionId = Number(row?.questionId)
+      if (!Number.isFinite(questionId)) continue
 
-    let choiceId = row.choiceId != null ? Number(row.choiceId) : null
-    const answerText = row.answerText != null ? String(row.answerText) : null
+      let choiceId = row.choiceId != null ? Number(row.choiceId) : null
+      const answerText = row.answerText != null ? String(row.answerText) : null
 
-    if (!choiceId && answerText) {
-      choiceId = await findChoiceIdByTextQuery(questionId, answerText)
-    }
-
-    try {
-      await upsertStudentAnswerQuery(gate.session.session_id, questionId, { choiceId, answerText })
-    } catch (err) {
-      if (err?.code === 'SESSION_CLOSED') {
-        return { ok: false, status: 400, error: err.message }
+      if (!choiceId && answerText) {
+        choiceId = await findChoiceIdByTextQuery(questionId, answerText)
       }
-      throw err
+
+      try {
+        await upsertStudentAnswerQuery(gate.session.session_id, questionId, { choiceId, answerText })
+      } catch (err) {
+        if (err?.code === 'SESSION_CLOSED') {
+          return { ok: false, status: 400, error: err.message }
+        }
+        if (err?.code === 'SESSION_LOCKED') {
+          return { ok: false, status: 400, error: err.message }
+        }
+        throw err
+      }
     }
   }
 

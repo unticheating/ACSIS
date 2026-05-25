@@ -1,6 +1,7 @@
 import { getPool } from '../db.js'
 import { getExamSessionUserColumn } from '../lib/schemaCompat.js'
 import { ensureExamSessionShuffleColumns } from '../lib/ensureExamSessionShuffleSchema.js'
+import { ensureExamSessionLockedColumns } from '../lib/ensureExamSessionLockedSchema.js'
 import { buildShuffleLayout } from '../lib/examShuffle.js'
 import { computeExamRanksQuery } from './examResultsRepository.js'
 
@@ -17,10 +18,11 @@ export async function getExamForJoinQuery(classId, examId) {
 }
 
 export async function findExamSessionQuery(examId, studentMemberId) {
+  await ensureExamSessionLockedColumns()
   const pool = getPool()
   const col = await getExamSessionUserColumn(pool)
   const { rows } = await pool.query(
-    `SELECT session_id, status, warning_count, started_at
+    `SELECT session_id, status, warning_count, started_at, locked_at, lock_reason
      FROM exam_sessions
      WHERE exam_id = $1 AND ${col} = $2
      LIMIT 1`,
@@ -138,16 +140,53 @@ export async function getStudentSessionsForExamsQuery(examIds, studentMemberId) 
 }
 
 export async function getSessionForStudentQuery(examId, studentMemberId) {
+  await ensureExamSessionLockedColumns()
   const pool = getPool()
   const col = await getExamSessionUserColumn(pool)
   const { rows } = await pool.query(
-    `SELECT es.session_id, es.status, es.warning_count, es.exam_id
+    `SELECT es.session_id, es.status, es.warning_count, es.exam_id, es.locked_at, es.lock_reason
      FROM exam_sessions es
      WHERE es.exam_id = $1 AND es.${col} = $2
      LIMIT 1`,
     [examId, studentMemberId],
   )
   return rows[0] || null
+}
+
+export async function lockExamSessionQuery(sessionId, reason = null) {
+  await ensureExamSessionLockedColumns()
+  const pool = getPool()
+  const { rows } = await pool.query(
+    `UPDATE exam_sessions
+     SET locked_at = COALESCE(locked_at, NOW()),
+         lock_reason = COALESCE(lock_reason, $2)
+     WHERE session_id = $1 AND status = 'in_progress'
+     RETURNING session_id, locked_at, lock_reason`,
+    [sessionId, reason],
+  )
+  return rows[0] || null
+}
+
+export async function getQuestionTypeQuery(questionId) {
+  const pool = getPool()
+  const { rows } = await pool.query(
+    `SELECT question_type FROM questions WHERE question_id = $1`,
+    [questionId],
+  )
+  return rows[0]?.question_type ?? null
+}
+
+export async function listStudentAnswersForSessionQuery(sessionId) {
+  const pool = getPool()
+  const { rows } = await pool.query(
+    `SELECT sa.question_id, sa.choice_id, sa.answer_text, q.question_type, c.choice_text
+     FROM student_answers sa
+     JOIN questions q ON q.question_id = sa.question_id
+     LEFT JOIN choices c ON c.choice_id = sa.choice_id
+     WHERE sa.session_id = $1`,
+    [sessionId],
+  )
+  return rows
 }
 
 const CHEAT_EVENTS = new Set([
@@ -203,10 +242,10 @@ export async function markSessionSubmittedQuery(sessionId, autoSubmitted = false
   )
 }
 
-export async function upsertStudentAnswerQuery(sessionId, questionId, { choiceId, answerText }) {
+export async function upsertStudentAnswerQuery(sessionId, questionId, { choiceId, answerText, questionType }) {
   const pool = getPool()
   const { rows: statusRows } = await pool.query(
-    `SELECT status FROM exam_sessions WHERE session_id = $1`,
+    `SELECT status, locked_at FROM exam_sessions WHERE session_id = $1`,
     [sessionId],
   )
   if (statusRows[0]?.status === 'submitted') {
@@ -214,7 +253,16 @@ export async function upsertStudentAnswerQuery(sessionId, questionId, { choiceId
     err.code = 'SESSION_CLOSED'
     throw err
   }
-  const text = answerText != null ? String(answerText).trim().toUpperCase() : null
+  if (statusRows[0]?.locked_at) {
+    const err = new Error('Exam is locked. Use Send exam to submit your answers.')
+    err.code = 'SESSION_LOCKED'
+    throw err
+  }
+  let text = answerText != null ? String(answerText).trim() : null
+  const qType = questionType || (await getQuestionTypeQuery(questionId))
+  if (text && qType === 'identification') {
+    text = text.toUpperCase()
+  }
   await pool.query(
     `INSERT INTO student_answers (session_id, question_id, choice_id, answer_text)
      VALUES ($1, $2, $3, $4)

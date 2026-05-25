@@ -11,7 +11,7 @@ import { apiFetch } from '@/lib/apiFetch.js'
 import { acsisToastError } from '@/lib/acsisToast.js'
 import { formatCourseDisplayLabels, formatTermPeriod } from '@/lib/sectionLabel.js'
 import {
-  canStudentJoinExamLobby,
+  canStudentEnterExamCode,
   isExamEnterableByStudent,
   isExamLobbyScheduledFuture,
   labelForStudentExam,
@@ -235,7 +235,7 @@ export default function StudentClassStreamPage() {
                             )
                             return
                           }
-                          if (!canStudentJoinExamLobby(exam.status, exam.sessionStatus, exam.scheduledStart)) {
+                          if (!canStudentEnterExamCode(exam.status, exam.sessionStatus, exam.scheduledStart)) {
                             return
                           }
                           setJoinExamId(exam.id)
@@ -245,12 +245,25 @@ export default function StudentClassStreamPage() {
                       >
                         {(exam.sessionStatus || '').toLowerCase() === 'in_progress'
                           ? 'Continue exam'
+                          : normalizeExamStatus(exam.status) === PG_EXAM_STATUS.OPEN
+                            ? 'Join live exam'
+                            : 'Enter exam code'}
+                      </button>
+                    ) : canStudentEnterExamCode(exam.status, exam.sessionStatus, exam.scheduledStart) ? (
+                      <button
+                        type="button"
+                        className="acsis-mc-create-btn"
+                        style={{ padding: '6px 12px', fontSize: '0.8125rem' }}
+                        onClick={() => {
+                          setJoinExamId(exam.id)
+                          setJoinCode('')
+                          setJoinError(null)
+                        }}
+                      >
+                        {normalizeExamStatus(exam.status) === PG_EXAM_STATUS.OPEN
+                          ? 'Join live exam'
                           : 'Enter exam code'}
                       </button>
-                    ) : normalizeExamStatus(exam.status) === PG_EXAM_STATUS.OPEN ? (
-                      <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
-                        Started — late join closed
-                      </span>
                     ) : null}
                   </div>
                 </div>

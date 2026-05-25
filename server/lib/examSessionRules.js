@@ -9,7 +9,12 @@ export function percentageFromScores(scores) {
  * @param {number} warningCount
  * @param {number} maxWarnings
  */
-export function shouldAutoSubmitExam(warningCount, maxWarnings) {
+export function shouldLockExam(warningCount, maxWarnings) {
   const limit = Number.isFinite(maxWarnings) && maxWarnings > 0 ? maxWarnings : 3
   return Number(warningCount) >= limit
+}
+
+/** @deprecated Use shouldLockExam — exams lock for manual submit, not auto-submit. */
+export function shouldAutoSubmitExam(warningCount, maxWarnings) {
+  return shouldLockExam(warningCount, maxWarnings)
 }

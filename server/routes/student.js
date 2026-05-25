@@ -4,7 +4,9 @@ import {
   getStudentClassStream,
   getStudentExamSession,
   joinStudentExam,
+  lockStudentExam,
   logStudentCheating,
+  saveStudentExamAnswer,
   submitStudentExam,
   getStudentPerformance,
   postStudentVerifyExamPassword,
@@ -25,6 +27,8 @@ router.post('/classes/:classId/exams/:examId/join', joinStudentExam);
 router.get('/classes/:classId/exams/:examId/session', getStudentExamSession);
 router.post('/classes/:classId/exams/:examId/verify-password', postStudentVerifyExamPassword);
 router.post('/classes/:classId/exams/:examId/cheating', logStudentCheating);
+router.post('/classes/:classId/exams/:examId/lock', lockStudentExam);
+router.post('/classes/:classId/exams/:examId/answers', saveStudentExamAnswer);
 router.post('/classes/:classId/exams/:examId/submit', submitStudentExam);
 
 router.post('/onboarding/student-number', resolveStudentInstitution, updateStudentNumber);

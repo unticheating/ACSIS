@@ -3,45 +3,73 @@ import test from 'node:test'
 import { getPool } from '../db.js'
 import {
   createExamSessionQuery,
+  findExamSessionQuery,
+  lockExamSessionQuery,
   markSessionSubmittedQuery,
   upsertStudentAnswerQuery,
 } from '../repositories/examSessionRepository.js'
 
 const db = getPool()
 
-test('upsertStudentAnswer rejects submitted session', { skip: !db }, async () => {
-  const client = await db.connect()
-  try {
-    await client.query('BEGIN')
-    const examRes = await client.query(
-      `SELECT e.exam_id, c.class_id, ce.member_id
-       FROM exams e
-       JOIN classes c ON c.class_id = e.class_id
-       JOIN class_enrollments ce ON ce.class_id = c.class_id
-       LIMIT 1`,
-    )
-    const row = examRes.rows[0]
-    if (!row) {
-      await client.query('ROLLBACK')
-      return
-    }
+async function examEnrollmentFixture() {
+  const { rows } = await db.query(
+    `SELECT e.exam_id, ce.member_id
+     FROM exams e
+     JOIN classes c ON c.class_id = e.class_id
+     JOIN class_enrollments ce ON ce.class_id = c.class_id
+     LIMIT 1`,
+  )
+  return rows[0] || null
+}
 
-    const session = await createExamSessionQuery(row.exam_id, row.member_id)
-    await markSessionSubmittedQuery(session.session_id, false)
-
-    await assert.rejects(
-      () =>
-        upsertStudentAnswerQuery(session.session_id, 1, {
-          choiceId: null,
-          answerText: 'TEST',
-        }),
-      (err) => err?.code === 'SESSION_CLOSED',
-    )
-    await client.query('ROLLBACK')
-  } catch (err) {
-    await client.query('ROLLBACK')
-    throw err
-  } finally {
-    client.release()
+async function resetSessionForTest(examId, memberId) {
+  let session = await findExamSessionQuery(examId, memberId)
+  if (!session) {
+    session = await createExamSessionQuery(examId, memberId)
   }
+  await db.query(
+    `UPDATE exam_sessions
+     SET status = 'in_progress',
+         submitted_at = NULL,
+         auto_submitted = FALSE,
+         locked_at = NULL,
+         lock_reason = NULL
+     WHERE session_id = $1`,
+    [session.session_id],
+  )
+  return session
+}
+
+test('upsertStudentAnswer rejects submitted session', { skip: !db }, async () => {
+  const row = await examEnrollmentFixture()
+  if (!row) return
+
+  const session = await resetSessionForTest(row.exam_id, row.member_id)
+  await markSessionSubmittedQuery(session.session_id, false)
+
+  await assert.rejects(
+    () =>
+      upsertStudentAnswerQuery(session.session_id, 1, {
+        choiceId: null,
+        answerText: 'TEST',
+      }),
+    (err) => err?.code === 'SESSION_CLOSED',
+  )
+})
+
+test('upsertStudentAnswer rejects locked session', { skip: !db }, async () => {
+  const row = await examEnrollmentFixture()
+  if (!row) return
+
+  const session = await resetSessionForTest(row.exam_id, row.member_id)
+  await lockExamSessionQuery(session.session_id, 'time_up')
+
+  await assert.rejects(
+    () =>
+      upsertStudentAnswerQuery(session.session_id, 1, {
+        choiceId: null,
+        answerText: 'TEST',
+      }),
+    (err) => err?.code === 'SESSION_LOCKED',
+  )
 })

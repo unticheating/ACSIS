@@ -53,6 +53,19 @@ export function canStudentJoinExamLobby(status, sessionStatus, scheduledStart) {
 }
 
 /**
+ * Student may enter the exam code (lobby while waiting, or join while live if not yet in session).
+ */
+export function canStudentEnterExamCode(status, sessionStatus, scheduledStart) {
+  if ((sessionStatus || '').toLowerCase() === 'submitted') return false
+  const sess = (sessionStatus || '').toLowerCase()
+  if (sess === 'in_progress') return false
+  const s = normalizeExamStatus(status)
+  if (s === PG_EXAM_STATUS.WAITING) return isLobbyOpenForJoin(scheduledStart)
+  if (s === PG_EXAM_STATUS.OPEN) return true
+  return false
+}
+
+/**
  * Student can open the exam session UI: lobby join while waiting (after start time), or continue if already in session when live.
  */
 export function isExamEnterableByStudent(status, sessionStatus, scheduledStart) {
