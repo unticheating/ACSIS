@@ -9,16 +9,6 @@
   overflow-x: hidden;
 }
 
-/* Span full main column width (edge-to-edge inside shell) */
-.acsis-mc-view--full {
-  width: 100%;
-  max-width: 100%;
-  margin-inline: calc(-1 * var(--acsis-main-pad-x, 16px));
-  padding-inline: var(--acsis-main-pad-x, 16px);
-  box-sizing: border-box;
-  overflow: visible;
-}
-
 .acsis-mc-page-header {
   margin-bottom: var(--size-4, 16px);
 }
@@ -54,9 +44,9 @@
 }
 
 .acsis-mc-filter {
-  border: 1px solid #e5e7eb;
-  background: #fff;
-  color: #4b5563;
+  border: 1px solid var(--border-default, #e5e7eb);
+  background: var(--bg-surface, #fff);
+  color: var(--fg-muted, #4b5563);
   padding: 8px 14px;
   border-radius: 9999px;
   cursor: pointer;
@@ -64,14 +54,14 @@
 }
 
 .acsis-mc-filter:hover {
-  background: #f9fafb;
-  border-color: #d1d5db;
+  background: var(--bg-surface-muted, #f9fafb);
+  border-color: var(--border-default, #d1d5db);
 }
 
 .acsis-mc-filter--on {
-  background: var(--acsis-brand-muted-bg, #f0fdf4);
-  border-color: var(--acsis-brand-ring, #bbf7d0);
-  color: var(--acsis-brand-700, #166534);
+  background: var(--acsis-brand-muted-bg, color-mix(in srgb, var(--acsis-brand) 10%, var(--bg-surface)));
+  border-color: color-mix(in srgb, var(--acsis-brand) 32%, var(--border-default));
+  color: var(--acsis-brand-700, var(--acsis-brand));
 }
 
 .acsis-mc-content {
@@ -85,8 +75,8 @@
 }
 
 .acsis-mc-empty {
-  background: #fff;
-  border: 1px dashed #d1d5db;
+  background: var(--bg-surface, #fff);
+  border: 1px dashed var(--border-default, #d1d5db);
   border-radius: 14px;
   padding: 2.25rem 1.5rem;
   text-align: center;
@@ -118,9 +108,9 @@
   align-items: start;
 }
 
-@media (min-width: 1024px) {
+@media (min-width: 768px) {
   .acsis-section-card-list {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
     gap: 16px;
   }
 }
@@ -178,7 +168,7 @@
 }
 
 .acsis-archived-reveal__label {
-  color: #6b7280;
+  color: var(--fg-muted, #6b7280);
 }
 
 .acsis-archived-reveal__select {
@@ -198,15 +188,15 @@
   flex-direction: column;
   gap: 16px;
   padding: 16px;
-  border: 1px dashed #d1d5db;
+  border: 1px dashed var(--border-default, #d1d5db);
   border-radius: 14px;
-  background: #f9fafb;
+  background: var(--bg-surface-muted, var(--bg-elevated, #f9fafb));
 }
 
-@media (min-width: 1024px) {
+@media (min-width: 768px) {
   .acsis-archived-reveal__list {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
     gap: 16px;
   }
 }
@@ -234,10 +224,10 @@
 
 .acsis-section-card--open .acsis-section-card__surface {
   z-index: 2;
-  border-color: var(--acsis-brand-ring, #bbf7d0);
+  border-color: color-mix(in srgb, var(--acsis-brand) 32%, var(--border-default));
   border-bottom-left-radius: 0;
   border-bottom-right-radius: 0;
-  box-shadow: 0 4px 14px var(--acsis-brand-subtle, rgba(22, 163, 74, 0.1));
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--acsis-brand) 12%, transparent);
   transition:
     border-color 0.28s ease,
     border-radius 0.38s cubic-bezier(0.16, 1, 0.3, 1),
@@ -245,15 +235,15 @@
 }
 
 .acsis-section-card__surface:hover {
-  border-color: #d1d5db;
+  border-color: var(--border-default, #d1d5db);
 }
 
 .acsis-section-card--open .acsis-section-card__surface:hover {
-  border-color: var(--acsis-brand-ring, #bbf7d0);
+  border-color: color-mix(in srgb, var(--acsis-brand) 38%, var(--border-default));
 }
 
 .acsis-section-card__surface:focus-visible {
-  outline: 2px solid var(--acsis-brand, #16a34a);
+  outline: 2px solid var(--acsis-brand, hsl(var(--primary)));
   outline-offset: 2px;
 }
 
@@ -277,12 +267,12 @@
   align-items: center;
   gap: 6px;
   margin-top: 2px;
-  color: #6b7280;
+  color: var(--fg-muted, #6b7280);
 }
 
 .acsis-section-card__chev-wrap {
   display: inline-flex;
-  color: #6b7280;
+  color: var(--fg-muted, #6b7280);
   transition: transform 0.38s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -301,6 +291,7 @@
 
 .acsis-section-card__stat {
   margin: 0;
+  color: var(--fg-muted, hsl(var(--muted-foreground)));
 }
 
 .acsis-section-card__drop {
@@ -317,7 +308,7 @@
   transform-origin: top center;
   pointer-events: none;
   overflow: hidden;
-  background: #fff;
+  background: var(--bg-surface, #fff);
   border: 1px solid transparent;
   border-top-color: transparent;
   border-radius: 0 0 14px 14px;
@@ -338,22 +329,22 @@
   overflow-x: hidden;
   overflow-y: auto;
   max-height: min(440px, 65vh);
-  border-color: var(--acsis-brand-ring, #bbf7d0);
-  border-top-color: #e5e7eb;
+  border-color: color-mix(in srgb, var(--acsis-brand) 28%, var(--border-default));
+  border-top-color: var(--border-default, #e5e7eb);
   box-shadow:
-    0 16px 32px rgba(15, 23, 42, 0.12),
-    0 6px 14px rgba(15, 23, 42, 0.08);
+    0 16px 32px color-mix(in srgb, var(--fg-default, #0f172a) 12%, transparent),
+    0 6px 14px color-mix(in srgb, var(--fg-default, #0f172a) 8%, transparent);
 }
 
 .acsis-section-card__drop-inner {
   min-height: 0;
   overflow: hidden;
-  padding: 0 14px;
+  padding: 0 10px;
   transition: padding 0.42s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .acsis-section-card__drop--open .acsis-section-card__drop-inner {
-  padding: 14px;
+  padding: 8px;
   overflow: visible;
 }
 
@@ -361,7 +352,7 @@
   margin: 0;
   padding: 8px 4px;
   font-size: 0.8125rem;
-  color: #6b7280;
+  color: var(--fg-muted, #6b7280);
   line-height: 1.45;
 }
 
@@ -380,10 +371,10 @@
 .acsis-mc-course-grid {
   list-style: none;
   margin: 0;
-  padding: var(--size-2, 8px);
+  padding: 0;
   display: grid;
   grid-template-columns: 1fr;
-  gap: 10px;
+  gap: 8px;
   width: 100%;
 }
 
@@ -394,12 +385,12 @@
 
 .acsis-mc-course-grid--stack {
   grid-template-columns: 1fr;
-  gap: var(--size-4, 16px);
+  gap: 8px;
 }
 
 .acsis-mc-course-grid--top {
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
-  gap: var(--size-4, 16px);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 12px;
   padding: 0;
 }
 
@@ -448,7 +439,7 @@
 
 .acsis-section-card__drop .acsis-course-card__body {
   flex: 1;
-  padding: 12px 14px;
+  padding: 8px 10px;
 }
 
 .acsis-section-card__drop .acsis-course-card__footer {
@@ -457,9 +448,9 @@
   justify-content: center;
   align-items: flex-end;
   gap: 2px;
-  padding: 10px 14px;
+  padding: 6px 10px;
   border-top: none;
-  border-left: 1px solid #f3f4f6;
+  border-left: 1px solid var(--border-default, #f3f4f6);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -479,19 +470,24 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  min-height: 108px;
+  min-height: 96px;
   width: 100%;
   padding: 0;
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--bg-surface, #fff);
+  border: 1px solid var(--border-default, #e5e7eb);
   border-radius: 12px;
   cursor: pointer;
   text-align: left;
 }
 
+.acsis-course-card.acsis-card-surface {
+  --card-glow: var(--acsis-brand);
+}
+
 .acsis-course-card.acsis-card-surface:hover,
 .acsis-course-card.acsis-card-surface:focus-within {
   transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--acsis-brand) 24%, var(--border-default));
 }
 
 .acsis-course-card:active {
@@ -499,24 +495,26 @@
 }
 
 .acsis-course-card:focus-visible {
-  outline: 2px solid var(--acsis-brand, #334155);
+  outline: 2px solid var(--acsis-brand, hsl(var(--ring)));
   outline-offset: 2px;
 }
 
 .acsis-course-card__body {
   flex: 1;
-  padding: 12px 14px 10px;
+  padding: 8px 10px 6px;
   min-width: 0;
 }
 
 .acsis-course-card__code {
   margin: 0;
   overflow-wrap: anywhere;
+  color: var(--fg-default, hsl(var(--foreground)));
 }
 
 .acsis-course-card__name {
-  margin: 6px 0 0;
+  margin: 4px 0 0;
   overflow-wrap: anywhere;
+  color: var(--fg-muted, hsl(var(--muted-foreground)));
 }
 
 .acsis-course-card__period {
@@ -529,17 +527,23 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 14px;
+  padding: 6px 10px;
   border-top: 1px solid var(--border-default, #f3f4f6);
+  color: var(--fg-muted, hsl(var(--muted-foreground)));
+}
+
+.acsis-course-card__stat {
+  color: var(--fg-muted, hsl(var(--muted-foreground)));
 }
 
 .acsis-course-card__status {
-  color: var(--acsis-brand-muted-text, var(--acsis-brand, #334155));
+  color: var(--acsis-brand-700, var(--acsis-brand, hsl(var(--primary))));
 }
 
 .acsis-section-card__courses-title {
-  margin: 0 0 12px;
-  padding: 0 4px;
+  margin: 0 0 8px;
+  padding: 0 2px;
+  color: var(--acsis-brand-700, var(--acsis-brand, hsl(var(--primary))));
 }
 
 /* Class detail: course banner + toolbar */
@@ -688,10 +692,10 @@
 .acsis-class-toolbar__select {
   min-height: 40px;
   padding: 8px 36px 8px 14px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border-default, #e5e7eb);
   border-radius: 10px;
-  background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 12px center;
-  color: #111827;
+  background: var(--bg-surface, #fff) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 12px center;
+  color: var(--fg-default, #111827);
   cursor: pointer;
   appearance: none;
 }
@@ -699,23 +703,23 @@
 .acsis-class-toolbar__students-btn {
   min-height: 40px;
   padding: 8px 14px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border-default, #e5e7eb);
   border-radius: 10px;
-  background: #fff;
-  color: #374151;
+  background: var(--bg-surface, #fff);
+  color: var(--fg-default, #374151);
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 
 .acsis-class-toolbar__students-btn:hover {
-  background: #f9fafb;
-  border-color: #d1d5db;
+  background: var(--bg-surface-muted, #f9fafb);
+  border-color: var(--border-default, #d1d5db);
 }
 
 .acsis-class-toolbar__students-btn--on {
-  background: var(--acsis-brand-muted-bg, #f0fdf4);
-  border-color: var(--acsis-brand-ring, #86efac);
-  color: var(--acsis-brand-700, #166534);
+  background: var(--acsis-brand-muted-bg, color-mix(in srgb, var(--acsis-brand) 10%, var(--bg-surface)));
+  border-color: color-mix(in srgb, var(--acsis-brand) 32%, var(--border-default));
+  color: var(--acsis-brand-700, var(--acsis-brand));
 }
 
 .acsis-class-toolbar__back-exams {
@@ -724,10 +728,14 @@
   border: none;
   border-radius: 10px;
   background: transparent;
-  color: var(--acsis-brand, #16a34a);
+  color: var(--acsis-brand-700, var(--acsis-brand, hsl(var(--primary))));
   cursor: pointer;
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+
+.acsis-class-toolbar__back-exams:hover {
+  color: var(--acsis-brand-600, var(--acsis-brand, hsl(var(--primary))));
 }
 
 .acsis-class-toolbar__create {
@@ -751,8 +759,8 @@
   justify-content: space-between;
   gap: 8px 16px;
   padding: 14px 16px;
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  background: var(--bg-surface, #fff);
+  border: 1px solid var(--border-default, #e5e7eb);
   border-radius: 12px;
 }
 
@@ -765,15 +773,15 @@
 }
 
 .acsis-enrolled-list__name {
-  color: #111827;
+  color: var(--fg-default, #111827);
 }
 
 .acsis-enrolled-list__meta {
-  color: #6b7280;
+  color: var(--fg-muted, #6b7280);
 }
 
 .acsis-enrolled-list__date {
-  color: #9ca3af;
+  color: var(--fg-subtle, #9ca3af);
   white-space: nowrap;
 }
 
@@ -882,26 +890,26 @@
 .acsis-mc-tab {
   border: none;
   background: transparent;
-  color: #4b5563;
+  color: var(--fg-muted, hsl(var(--muted-foreground)));
   padding: 8px 16px;
   border-radius: 9999px;
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
 }
 
-.acsis-mc-tab:hover {
-  background: var(--acsis-brand-subtle, color-mix(in srgb, var(--acsis-brand, var(--acsis-brand, #16a34a)) 10%, transparent));
-  color: var(--acsis-brand-muted-text, var(--acsis-brand, var(--acsis-brand, #16a34a)));
+.acsis-mc-tab:hover:not(.acsis-mc-tab--active) {
+  background: var(--bg-surface-muted, color-mix(in srgb, var(--fg-default) 6%, transparent));
+  color: var(--fg-default, hsl(var(--foreground)));
 }
 
 .acsis-mc-tab--active {
-  background: var(--acsis-brand-600, var(--acsis-brand, var(--acsis-brand, #16a34a)));
-  color: #fff;
+  background: var(--acsis-brand-600, var(--acsis-brand, hsl(var(--primary))));
+  color: hsl(var(--primary-foreground));
 }
 
 .acsis-mc-tab--active:hover {
-  background: var(--acsis-brand-500, var(--acsis-brand, var(--acsis-brand, #16a34a)));
-  color: #fff;
+  background: var(--acsis-brand-500, var(--acsis-brand-hover, var(--acsis-brand, hsl(var(--primary)))));
+  color: hsl(var(--primary-foreground));
 }
 
 .acsis-mc-grid {
@@ -967,19 +975,19 @@
   display: block;
   margin-top: 6px;
   font-size: 0.75rem;
-  color: #6b7280;
+  color: var(--fg-muted, #6b7280);
 }
 
 .acsis-class-card__code-value {
   letter-spacing: 0.05em;
-  color: var(--acsis-brand-muted-text, var(--acsis-brand, var(--acsis-brand, #16a34a)));
+  color: var(--acsis-brand-700, var(--acsis-brand, hsl(var(--primary))));
   font-weight: 700;
 }
 
 .acsis-class-card__meta {
   margin: 0 0 16px;
   font-size: 0.8125rem;
-  color: #6b7280;
+  color: var(--fg-muted, hsl(var(--muted-foreground)));
   font-weight: 500;
   line-height: 1.45;
 }
@@ -993,16 +1001,17 @@
   padding-top: 12px;
   border-top: 1px solid var(--border-muted, #f3f4f6);
   font-size: 0.75rem;
-  color: #9ca3af;
+  color: var(--fg-subtle, #9ca3af);
 }
 
 .acsis-class-card__status {
   font-weight: 600;
   font-size: 0.75rem;
+  color: var(--fg-subtle, #9ca3af);
 }
 
 .acsis-class-card__status--open {
-  color: var(--acsis-brand-muted-text, var(--acsis-brand, var(--acsis-brand, #16a34a)));
+  color: var(--acsis-brand-700, var(--acsis-brand, hsl(var(--primary))));
 }
 
 .acsis-class-card__menu-btn {
@@ -1816,18 +1825,43 @@
     grid-template-columns: 1fr;
   }
 
+  .acsis-mc-page-header {
+    margin-bottom: 12px;
+  }
+
   .acsis-mc-page-header__row {
-    flex-direction: column;
-    align-items: stretch;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 12px;
+  }
+
+  .acsis-mc-page-header__intro {
+    flex: 1 1 10rem;
+    min-width: 0;
+  }
+
+  .acsis-mc-page-header__intro h1 {
+    font-size: 1.25rem;
+    line-height: 1.3;
+    margin-bottom: 0;
+  }
+
+  .acsis-mc-page-header__intro p {
+    margin-top: 4px;
+    margin-bottom: 0;
   }
 
   .acsis-mc-page-header__actions {
-    justify-content: stretch;
+    flex: 0 0 auto;
+    justify-content: flex-end;
+    align-self: center;
   }
 
   .acsis-mc-page-header__actions .acsis-mc-create-btn {
-    width: 100%;
-    justify-content: center;
+    width: auto;
+    min-height: 40px;
+    white-space: nowrap;
   }
 
   .acsis-mc-tabs {

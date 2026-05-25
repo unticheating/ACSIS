@@ -1,4 +1,5 @@
 import { lazy } from 'react'
+import TeacherClassExamsPage from './views/teacher/TeacherClassExamsPage.jsx'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import ProtectedRoute from './components/auth/ProtectedRoute.jsx'
 import LazyPage from './components/layout/LazyPage.jsx'
@@ -34,7 +35,6 @@ const StudentReportsPage = lazy(() => import('./views/student/StudentReportsPage
 const TeacherCreateExamPage = lazy(() => import('./views/teacher/TeacherCreateExamPage.jsx'))
 const TeacherDashboardPage = lazy(() => import('./views/teacher/TeacherDashboardPage.jsx'))
 const TeacherDetectionsPage = lazy(() => import('./views/teacher/TeacherDetectionsPage.jsx'))
-const TeacherClassExamsPage = lazy(() => import('./views/teacher/TeacherClassExamsPage.jsx'))
 const TeacherExamDetailPage = lazy(() => import('./views/teacher/TeacherExamDetailPage.jsx'))
 const TeacherMyClassesPage = lazy(() => import('./views/teacher/TeacherMyClassesPage.jsx'))
 const TeacherTermClassesPage = lazy(() => import('./views/teacher/TeacherTermClassesPage.jsx'))

@@ -96,6 +96,17 @@
     font-size: 1.0625rem;
     line-height: 1.25;
     letter-spacing: -0.02em;
+    overflow: hidden;
+  }
+
+  .acsis-mobile-top-bar__breadcrumb .breadcrumb__trail {
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+  }
+
+  .acsis-mobile-top-bar__breadcrumb .breadcrumb__segment:last-child .page-name {
+    max-width: none;
   }
 
   .acsis-mobile-top-bar__breadcrumb .brand-plp,

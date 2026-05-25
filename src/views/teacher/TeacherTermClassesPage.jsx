@@ -15,7 +15,7 @@ export default function TeacherTermClassesPage() {
   }, [navigate, resolvedTermId])
 
   return (
-    <div className="acsis-mc-view acsis-mc-view--full acsis-view">
+    <div className="acsis-mc-view acsis-view">
       <p className="acsis-mc-loading">Opening section…</p>
     </div>
   )

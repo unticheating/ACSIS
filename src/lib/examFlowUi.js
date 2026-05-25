@@ -1,3 +1,5 @@
+import { coerceDisplayString } from '@/lib/coerceDisplay.js'
+
 /**
  * PostgreSQL-aligned exam lifecycle labels (see `sql/acsis.sql`, enum `exam_status`).
  * Wire these when the UI reads from the API. Local mock data may still use legacy strings.
@@ -11,7 +13,9 @@ export const PG_EXAM_STATUS = {
 
 /** @param {string | null | undefined} status */
 export function normalizeExamStatus(status) {
-  return (status || '').toLowerCase()
+  if (status == null) return ''
+  if (typeof status === 'string') return status.toLowerCase()
+  return coerceDisplayString(status).toLowerCase()
 }
 
 /** Draft only — not yet published to students. */
@@ -102,7 +106,7 @@ export function labelForPgExamStatus(status) {
     open: 'Live',
     closed: 'Closed',
   }
-  return map[s] ?? (status ? String(status) : 'Draft')
+  return map[s] ?? (status != null ? coerceDisplayString(status, 'Draft') : 'Draft')
 }
 
 /** Class enroll vs exam lobby (schema: classes.access_code vs exams.password) */

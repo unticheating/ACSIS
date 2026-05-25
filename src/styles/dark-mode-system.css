@@ -94,6 +94,7 @@ html.dark .exam-progress,
 html.dark .card-label,
 html.dark .acsis-mc-sub,
 html.dark .acsis-class-card__meta,
+html.dark .acsis-course-card__stat,
 html.dark .um-email,
 html.dark .admin-placeholder-lead,
 html.dark .admin-settings-lead {
@@ -229,11 +230,21 @@ html.dark .acsis-profile-role {
 
 /* ── Tabs & settings palette ── */
 html.dark .tab-btn.active,
-html.dark .acsis-mc-tab--active,
 html.dark .admin-settings-mode.is-active {
   background: var(--acsis-brand-muted-bg) !important;
   color: var(--acsis-brand-muted-text, var(--fg-default)) !important;
   border-color: var(--acsis-brand-ring) !important;
+}
+
+html.dark .acsis-mc-tab:not(.acsis-mc-tab--active) {
+  color: var(--fg-muted, hsl(var(--muted-foreground))) !important;
+  background: transparent !important;
+  border-color: transparent !important;
+}
+
+html.dark .acsis-mc-tab:hover:not(.acsis-mc-tab--active) {
+  background: color-mix(in srgb, var(--fg-default) 8%, transparent) !important;
+  color: var(--fg-default, hsl(var(--foreground))) !important;
 }
 
 html.dark .tab-btn {
@@ -708,7 +719,14 @@ html.dark .exam-progress-bar {
 /* Teacher tabs (my classes) */
 html.dark .acsis-mc-tab--active {
   background: var(--acsis-brand-600, var(--acsis-brand)) !important;
-  color: #fff !important;
+  color: hsl(var(--primary-foreground)) !important;
+  border-color: transparent !important;
+}
+
+html.dark .acsis-class-toolbar__students-btn:not(.acsis-class-toolbar__students-btn--on) {
+  color: var(--fg-default, hsl(var(--foreground))) !important;
+  background: var(--bg-elevated, #212121) !important;
+  border-color: var(--border-default, #2a2a2a) !important;
 }
 
 /* Reports */

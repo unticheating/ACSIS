@@ -1,4 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
+import { coerceDisplayString } from '@/lib/coerceDisplay.js'
 import { resolveShellPageTitle } from '@/config/shellConfig.js'
 import { useInstitutionTheme } from '@/context/InstitutionThemeContext.jsx'
 import { useDetectionsToolbar } from '@/context/DetectionsToolbarContext.jsx'
@@ -13,23 +14,29 @@ function BreadcrumbTrail({ segments }) {
 
   return (
     <div className="breadcrumb">
-      <span className="brand-plp">{acronym}</span>
-      <span className="brand-acsis"> ACSIS</span>
-      {segments.map((item, index) => {
-        const isLast = index === segments.length - 1
-        return (
-          <span key={`${item.label}-${index}`} className="breadcrumb__segment">
-            <span className="sep">/</span>
-            {item.to && !isLast ? (
-              <Link to={item.to} state={item.state} className="breadcrumb__link">
-                {item.label}
-              </Link>
-            ) : (
-              <span className={isLast ? 'page-name' : 'breadcrumb__crumb'}>{item.label}</span>
-            )}
-          </span>
-        )
-      })}
+      <span className="breadcrumb__brand">
+        <span className="brand-plp">{coerceDisplayString(acronym)}</span>
+        <span className="brand-acsis"> ACSIS</span>
+      </span>
+      <span className="breadcrumb__trail">
+        {segments.map((item, index) => {
+          const isLast = index === segments.length - 1
+          return (
+            <span key={`${coerceDisplayString(item.label)}-${index}`} className="breadcrumb__segment">
+              <span className="sep">/</span>
+              {item.to && !isLast ? (
+                <Link to={item.to} state={item.state} className="breadcrumb__link">
+                  {coerceDisplayString(item.label)}
+                </Link>
+              ) : (
+                <span className={isLast ? 'page-name' : 'breadcrumb__crumb'}>
+                  {coerceDisplayString(item.label)}
+                </span>
+              )}
+            </span>
+          )
+        })}
+      </span>
     </div>
   )
 }

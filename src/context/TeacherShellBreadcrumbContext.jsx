@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import { coerceDisplayString } from '@/lib/coerceDisplay.js'
 
 /** @type {import('react').Context<{ segments: { label: string, to?: string }[], setSegments: (s: { label: string, to?: string }[] | null) => void } | null>} */
 const TeacherShellBreadcrumbContext = createContext(null)
@@ -21,7 +22,8 @@ export function useTeacherShellBreadcrumbSegments() {
  */
 export function useTeacherShellBreadcrumbTrail(trail) {
   const ctx = useContext(TeacherShellBreadcrumbContext)
-  const trailKey = trail?.map((s) => `${s.label}\0${s.to ?? ''}`).join('\n') ?? ''
+  const trailKey =
+    trail?.map((s) => `${coerceDisplayString(s.label)}\0${coerceDisplayString(s.to)}`).join('\n') ?? ''
   useEffect(() => {
     if (!ctx) return undefined
     ctx.setSegments(trail)

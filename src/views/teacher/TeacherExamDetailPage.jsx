@@ -17,6 +17,7 @@ import {
   PG_EXAM_STATUS,
   normalizeExamStatus,
 } from '@/lib/examFlowUi.js'
+import { coerceDisplayString, coerceRouteParam } from '@/lib/coerceDisplay.js'
 import { formatCourseBreadcrumbLabel, formatSectionTitle, formatTermPeriod } from '@/lib/sectionLabel.js'
 import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
 import { copyToClipboard } from '@/lib/copyToClipboard.js'
@@ -149,10 +150,10 @@ export default function TeacherExamDetailPage() {
     if (clsMeta) {
       trail.push({
         label: formatCourseBreadcrumbLabel(clsMeta),
-        to: `/teacher/my-classes/${encodeURIComponent(classId)}`,
+        to: `/teacher/my-classes/${coerceRouteParam(classId)}`,
       })
     }
-    trail.push({ label: hit.title || 'Exam' })
+    trail.push({ label: coerceDisplayString(hit.title, 'Exam') })
     return trail
   }, [hit, clsMeta, classId])
 
@@ -215,7 +216,7 @@ export default function TeacherExamDetailPage() {
   const classGroupLabel =
     classGroupParts.length > 0 ? classGroupParts.join(' · ') : (clsMeta?.name || '').trim() || null
 
-  const streamHref = `/teacher/my-classes/${encodeURIComponent(classId)}`
+  const streamHref = `/teacher/my-classes/${coerceRouteParam(classId)}`
   const questionCount = exam.questions ? exam.questions.length : exam.questionCount || 0
   const durationMins = computeDurationMinutes(exam)
   const typeSummary = summarizeQuestionTypes(exam.questions)
@@ -224,7 +225,7 @@ export default function TeacherExamDetailPage() {
     ? (results?.sessions || []).filter((s) => s.status === 'in_progress')
     : []
   const lobbyCount = lobbyStudents.length
-  const monitoringHref = `/teacher/detections?classId=${encodeURIComponent(classId)}&examId=${encodeURIComponent(examId)}`
+  const monitoringHref = `/teacher/detections?classId=${coerceRouteParam(classId)}&examId=${coerceRouteParam(examId)}`
 
   async function publish() {
     try {

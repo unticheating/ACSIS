@@ -28,6 +28,7 @@ import {
 import { Input } from '@/components/ui/input.jsx'
 import { Label } from '@/components/ui/label.jsx'
 import FadeIn from '@/components/ui/fade-in.jsx'
+import { coerceDisplayString, coerceRouteParam } from '@/lib/coerceDisplay.js'
 import { formatCourseBreadcrumbLabel, formatCourseDisplayLabels } from '@/lib/sectionLabel.js'
 import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
 import { copyToClipboard } from '@/lib/copyToClipboard.js'
@@ -117,7 +118,13 @@ export default function TeacherClassExamsPage() {
 
   useTeacherShellBreadcrumbTrail(breadcrumbTrail)
 
-  const enrollmentCount = Number(cls?.enrollmentCount ?? 0)
+  const enrollmentCount = useMemo(() => {
+    const fromApi = Number(cls?.enrollmentCount ?? 0)
+    if (pageView === 'students' && !enrolledLoading) {
+      return Math.max(fromApi, enrolled.length)
+    }
+    return fromApi
+  }, [cls?.enrollmentCount, pageView, enrolledLoading, enrolled.length])
 
   if (loading) {
     return (
@@ -138,7 +145,7 @@ export default function TeacherClassExamsPage() {
     )
   }
 
-  const createHref = `/teacher/create-exam?classId=${encodeURIComponent(cls.id)}`
+  const createHref = `/teacher/create-exam?classId=${coerceRouteParam(cls.id)}`
   const { primary: coursePrimary, secondary: courseSecondary } = formatCourseDisplayLabels(cls)
 
   async function publish(classId, examId) {
@@ -357,7 +364,12 @@ export default function TeacherClassExamsPage() {
           ) : (
             <ul className="acsis-enrolled-list">
               {enrolled.map((s, index) => (
-                <FadeIn as="li" key={s.memberId} delay={index * 0.05} className="acsis-enrolled-list__item">
+                <FadeIn
+                  as="li"
+                  key={coerceDisplayString(s.memberId, `enrolled-${index}`)}
+                  delay={index * 0.05}
+                  className="acsis-enrolled-list__item"
+                >
                   <div className="acsis-enrolled-list__main">
                     <span className="acsis-enrolled-list__name">{s.studentName}</span>
                     {s.schoolId ? (
@@ -389,7 +401,7 @@ export default function TeacherClassExamsPage() {
               {filtered.map((exam, index) => {
                 const active = isExamOngoing(exam.status)
                 const draft = isExamDraft(exam.status)
-                const detailPath = `/teacher/my-classes/${encodeURIComponent(cls.id)}/exams/${encodeURIComponent(exam.id)}`
+                const detailPath = `/teacher/my-classes/${coerceRouteParam(cls.id)}/exams/${coerceRouteParam(exam.id)}`
                 const meta = [
                   `${Number(exam.questionCount || 0)} questions`,
                   `${Number(exam.duration || 0)} min`,
@@ -399,7 +411,12 @@ export default function TeacherClassExamsPage() {
                   .join(' · ')
 
                 return (
-                  <FadeIn as="li" key={exam.id} delay={index * 0.05} className="acsis-stream-item acsis-card-surface">
+                  <FadeIn
+                    as="li"
+                    key={coerceDisplayString(exam.id, `exam-${index}`)}
+                    delay={index * 0.05}
+                    className="acsis-stream-item acsis-card-surface"
+                  >
                     <div className="acsis-stream-item__accent" aria-hidden />
                     <div className="acsis-stream-item__main">
                       <button

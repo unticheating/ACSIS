@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom'
+import { coerceRouteParam } from '@/lib/coerceDisplay.js'
 import FadeIn from '@/components/ui/fade-in.jsx'
 
 /**
@@ -10,7 +11,7 @@ export default function TeacherCourseCard({ course, dimmed = false, delay = 0 })
   const name = (course.name || '').trim()
   const primary = code || name || 'Course'
   const secondary = code && name && name !== code ? name : null
-  const path = `/teacher/my-classes/${encodeURIComponent(course.id)}`
+  const path = `/teacher/my-classes/${coerceRouteParam(course.id)}`
 
   function open() {
     navigate(path)

@@ -439,7 +439,7 @@ export default function TeacherMyClassesPage() {
   const headerMeta = loading ? undefined : `${activeSections.length} sections`
 
   return (
-    <div className="acsis-mc-view acsis-mc-view--full acsis-view">
+    <div className="acsis-mc-view acsis-view">
       <TeacherPageHeader
         title="My Classes"
         meta={headerMeta}

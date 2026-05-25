@@ -276,15 +276,22 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 12px;
     border-radius: 14px;
     border: 1px solid rgba(22, 101, 52, 0.1);
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
     margin-bottom: 14px;
     width: 100%;
+    min-width: 0;
     box-sizing: border-box;
     position: sticky;
     top: 0;
     z-index: var(--z-sticky, 120);
+}
+
+.content-header .breadcrumb {
+    flex: 1 1 auto;
+    min-width: 0;
 }
 
 @media (min-width: 768px) {
@@ -361,10 +368,47 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
 }
 
 .breadcrumb {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: nowrap;
+    gap: 0;
+    min-width: 0;
+    max-width: 100%;
     font-size: 14px;
     color: #3d5a47;
     font-weight: 400;
     letter-spacing: -0.01em;
+    overflow: hidden;
+}
+
+.breadcrumb__brand {
+    display: inline-flex;
+    align-items: baseline;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.breadcrumb__trail {
+    display: inline-flex;
+    align-items: baseline;
+    flex-wrap: nowrap;
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+}
+
+.breadcrumb__segment {
+    display: inline-flex;
+    align-items: baseline;
+    min-width: 0;
+    max-width: 100%;
+    flex-shrink: 1;
+}
+
+.breadcrumb__segment:last-child {
+    flex-shrink: 1;
+    min-width: 0;
+    overflow: hidden;
 }
 
 .breadcrumb .brand-plp {
@@ -380,11 +424,17 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
 .breadcrumb .sep {
     color: #6b7280;
     margin: 0 6px;
+    flex-shrink: 0;
 }
 
 .breadcrumb .page-name {
     color: var(--brand-page, #1a2e22);
     font-weight: 600;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
 }
 
 .breadcrumb__link,
@@ -392,6 +442,12 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
     color: var(--brand-mark, #14532d);
     font-weight: 600;
     text-decoration: none;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+    max-width: 14rem;
 }
 
 .breadcrumb__link:hover,
@@ -402,6 +458,18 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
 .breadcrumb__crumb {
     color: #4b5563;
     font-weight: 500;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+    max-width: 10rem;
+}
+
+.breadcrumb__segment:last-child .breadcrumb__link,
+.breadcrumb__segment:last-child .breadcrumb__crumb,
+.breadcrumb__segment:last-child .page-name {
+    max-width: none;
 }
 
 /* For pages without breadcrumb, use old header style */

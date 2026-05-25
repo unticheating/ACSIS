@@ -456,12 +456,22 @@ html.dark .acsis-mc-sub {
 }
 
 html.dark .acsis-mc-tab {
-  color: #b8d4c4;
+  color: var(--fg-muted, hsl(var(--muted-foreground)));
+}
+
+html.dark .acsis-mc-tab:hover:not(.acsis-mc-tab--active) {
+  background: color-mix(in srgb, var(--fg-default) 8%, transparent);
+  color: var(--fg-default, hsl(var(--foreground)));
 }
 
 html.dark .acsis-mc-tab--active {
-  background: var(--acsis-brand-600, var(--acsis-brand, var(--acsis-brand, #16a34a)));
-  color: #fff;
+  background: var(--acsis-brand-600, var(--acsis-brand, hsl(var(--primary))));
+  color: hsl(var(--primary-foreground));
+}
+
+html.dark .acsis-mc-tab--active:hover {
+  background: var(--acsis-brand-500, var(--acsis-brand-hover, var(--acsis-brand)));
+  color: hsl(var(--primary-foreground));
 }
 
 /* Teacher create exam (scoped wrapper) */
@@ -692,14 +702,6 @@ html.dark .acsis-mc-sub {
   color: #9cbcaa;
 }
 
-html.dark .acsis-mc-tab {
-  color: #b8d4c4;
-}
-
-html.dark .acsis-mc-tab:hover {
-  background: rgba(34, 197, 94, 0.12);
-  color: #ecfdf5;
-}
 
 html.dark .acsis-class-card {
   background: var(--bg-surface);
@@ -717,7 +719,7 @@ html.dark .acsis-class-card__name {
 
 html.dark .acsis-class-card__meta,
 html.dark .acsis-class-card__footer {
-  color: #9cbcaa;
+  color: var(--fg-muted, hsl(var(--muted-foreground)));
 }
 
 html.dark .acsis-section-card__surface {
@@ -727,32 +729,42 @@ html.dark .acsis-section-card__surface {
 }
 
 html.dark .acsis-section-card--open .acsis-section-card__surface {
-  border-color: rgba(74, 222, 128, 0.35);
+  border-color: color-mix(in srgb, var(--acsis-brand) 38%, var(--border-default));
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
 }
 
 html.dark .acsis-section-card__surface:hover {
-  border-color: rgba(74, 222, 128, 0.2);
+  border-color: color-mix(in srgb, var(--acsis-brand) 22%, var(--border-default));
 }
 
 html.dark .acsis-section-card__eyebrow,
-html.dark .acsis-section-card__stat {
-  color: #9cbcaa;
+html.dark .acsis-section-card__stat,
+html.dark .acsis-section-card__trail,
+html.dark .acsis-section-card__chev-wrap {
+  color: var(--fg-muted, #9cbcaa);
 }
 
 html.dark .acsis-section-card__title {
-  color: #ecfdf5;
+  color: var(--fg-default, #ecfdf5);
+}
+
+html.dark .acsis-section-card__drop {
+  background: var(--bg-surface);
+  transition:
+    grid-template-rows 0.42s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.28s ease,
+    box-shadow 0.42s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 html.dark .acsis-section-card__drop--open {
   background: var(--bg-surface);
-  border-color: rgba(74, 222, 128, 0.25);
+  border-color: color-mix(in srgb, var(--acsis-brand) 28%, var(--border-default));
   border-top-color: var(--border-default);
   box-shadow: 0 14px 32px rgba(0, 0, 0, 0.4);
 }
 
 html.dark .acsis-section-card__drop .acsis-course-card__footer {
-  border-top-color: var(--border-default, #2a2a2a);
+  border-left-color: var(--border-default);
 }
 
 html.dark .acsis-section-card__empty {
@@ -769,16 +781,21 @@ html.dark .acsis-course-card:hover {
 }
 
 html.dark .acsis-course-card__code {
-  color: #ecfdf5;
+  color: var(--fg-default, hsl(var(--foreground)));
 }
 
 html.dark .acsis-course-card__name,
-html.dark .acsis-course-card__footer {
-  color: #9cbcaa;
+html.dark .acsis-course-card__footer,
+html.dark .acsis-course-card__stat {
+  color: var(--fg-muted, hsl(var(--muted-foreground)));
 }
 
 html.dark .acsis-course-card__footer {
-  border-top-color: var(--border-default, #2a2a2a);
+  border-top-color: var(--border-default);
+}
+
+html.dark .acsis-section-card__courses-title {
+  color: var(--acsis-brand-muted-text, var(--acsis-brand-ring, hsl(var(--primary))));
 }
 
 html.dark .acsis-view .panel,
@@ -815,18 +832,17 @@ html.dark .acsis-mc-filter {
 
 html.dark .acsis-mc-filter:hover {
   background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(74, 222, 128, 0.25);
+  border-color: color-mix(in srgb, var(--acsis-brand) 25%, var(--border-default));
 }
 
 html.dark .acsis-mc-filter--on {
-  background: color-mix(in srgb, var(--acsis-brand, var(--acsis-brand, #16a34a)) 22%, transparent);
-  border-color: rgba(74, 222, 128, 0.35);
-  color: var(--acsis-brand-ring, #86efac);
+  background: color-mix(in srgb, var(--acsis-brand) 22%, transparent);
+  border-color: color-mix(in srgb, var(--acsis-brand) 35%, var(--border-default));
+  color: var(--acsis-brand-muted-text, var(--acsis-brand-ring));
 }
 
-html.dark .acsis-section-card__courses-title,
 html.dark .acsis-archived-reveal__label {
-  color: #9cbcaa;
+  color: var(--fg-muted, #9cbcaa);
 }
 
 html.dark .acsis-archived-reveal__select,
@@ -837,8 +853,8 @@ html.dark .acsis-class-toolbar__select {
 }
 
 html.dark .acsis-archived-reveal__list {
-  background: rgba(0, 0, 0, 0.2);
-  border-color: rgba(74, 222, 128, 0.12);
+  background: var(--bg-surface-muted, rgba(0, 0, 0, 0.2));
+  border-color: color-mix(in srgb, var(--acsis-brand) 12%, var(--border-default));
 }
 
 html.dark .acsis-section-card--dimmed {
@@ -854,11 +870,15 @@ html.dark .acsis-course-card--dimmed {
 }
 
 html.dark .acsis-course-card__stat {
-  color: #9cbcaa;
+  color: var(--fg-muted, hsl(var(--muted-foreground)));
 }
 
 html.dark .acsis-course-card__status {
-  color: #4ade80;
+  color: var(--acsis-brand-muted-text, var(--acsis-brand-ring, #86efac));
+}
+
+html.dark .acsis-section-card__drop--open .acsis-mc-course-grid--stack > li {
+  animation: none;
 }
 
 /* Class detail — banner, toolbar, stream */
@@ -875,25 +895,31 @@ html.dark .acsis-course-banner::before {
     linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
 }
 
-html.dark .acsis-class-toolbar__students-btn,
-html.dark .acsis-class-toolbar__back-exams {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: var(--acsis-shell-border-subtle, rgba(74, 222, 128, 0.15));
-  color: #c5e4d4;
+html.dark .acsis-class-toolbar__students-btn {
+  background: var(--bg-elevated, rgba(255, 255, 255, 0.06));
+  border-color: var(--border-default);
+  color: var(--fg-default, hsl(var(--foreground)));
 }
 
 html.dark .acsis-class-toolbar__students-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: color-mix(in srgb, var(--fg-default) 10%, var(--bg-surface));
+  border-color: var(--border-default);
 }
 
 html.dark .acsis-class-toolbar__students-btn--on {
-  background: color-mix(in srgb, var(--acsis-brand, var(--acsis-brand, #16a34a)) 22%, transparent);
-  border-color: rgba(74, 222, 128, 0.35);
-  color: var(--acsis-brand-ring, #86efac);
+  background: color-mix(in srgb, var(--acsis-brand) 22%, transparent);
+  border-color: color-mix(in srgb, var(--acsis-brand) 35%, var(--border-default));
+  color: var(--acsis-brand-muted-text, var(--acsis-brand-ring, hsl(var(--primary))));
 }
 
 html.dark .acsis-class-toolbar__back-exams {
-  color: var(--acsis-brand-ring, #86efac);
+  background: transparent;
+  border-color: transparent;
+  color: var(--fg-default, hsl(var(--foreground)));
+}
+
+html.dark .acsis-class-toolbar__back-exams:hover {
+  color: var(--acsis-brand-ring, hsl(var(--primary)));
 }
 
 html.dark .acsis-class-card__menu-btn {
