@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { SummaryStatCard, SummaryStatGrid } from '@/components/dashboard/SummaryStatCard.jsx'
-import { BookOpen, Activity, Users, MoreVertical, Copy, UploadCloud, Trash2 } from 'lucide-react'
+import { BookOpen, Activity, Users, MoreVertical, Copy, Send, Trash2 } from 'lucide-react'
 import { apiFetch } from '@/lib/apiFetch.js'
+import { copyToClipboard } from '@/lib/copyToClipboard.js'
 import FadeIn from '@/components/ui/fade-in.jsx'
 import { formatSectionTitle } from '@/lib/sectionLabel.js'
+import { useAcsisConfirm } from '@/hooks/useAcsisConfirm.jsx'
 import {
   isExamDraft,
   isExamOngoing,
@@ -13,13 +15,23 @@ import {
   PG_EXAM_STATUS,
 } from '@/lib/examFlowUi.js'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card.jsx'
-import { Button } from '@/components/ui/button.jsx'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog.jsx'
+import { Label } from '@/components/ui/label.jsx'
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu.jsx'
+import { DropdownMenuActionItem } from '@/components/ui/dropdown-menu-action-item.jsx'
+import '../../pages/teacher-ui/my_classes.css'
 
 export default function TeacherDashboardPage() {
   const [stats, setStats] = useState({
@@ -32,7 +44,7 @@ export default function TeacherDashboardPage() {
   const [classes, setClasses] = useState([])
   const [terms, setTerms] = useState([])
   const navigate = useNavigate()
-  const [activeMenuId, setActiveMenuId] = useState(null)
+  const { confirm, ConfirmDialog } = useAcsisConfirm()
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [selectedClassIds, setSelectedClassIds] = useState([])
   const [selectedCourse, setSelectedCourse] = useState('')
@@ -245,16 +257,23 @@ export default function TeacherDashboardPage() {
       </div>
       {/* Exams strip */}
       <div className="mt-8">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between gap-4 mb-6">
           <h3 className="text-2xl font-semibold tracking-tight text-foreground">My Exams</h3>
-          <Button
-            onClick={() => {
-              resetCreateExamModal()
-              setCreateModalOpen(true)
-            }}
-          >
-            Create Exam
-          </Button>
+          <div className="flex items-center gap-3 shrink-0">
+            <Link to="/teacher/my-classes" className="panel-view-all">
+              {visibleExams.length > 8 ? `View All (${visibleExams.length})` : 'View All'}
+            </Link>
+            <button
+              type="button"
+              className="acsis-mc-create-btn"
+              onClick={() => {
+                resetCreateExamModal()
+                setCreateModalOpen(true)
+              }}
+            >
+              Create Exam
+            </button>
+          </div>
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -309,7 +328,7 @@ export default function TeacherDashboardPage() {
                       {questions} {questions === 1 ? 'question' : 'questions'}
                     </p>
                   </CardContent>
-                  <CardFooter className="pt-0 border-t mt-auto px-6 py-3 bg-muted/20">
+                  <CardFooter className="pt-0 border-t border-border mt-auto px-6 py-3 bg-muted/20">
                     <div className="flex items-center justify-between w-full">
                       <span className={`text-sm ${statusClass}`}>{statusLabel || 'Draft'}</span>
                     </div>
@@ -318,57 +337,62 @@ export default function TeacherDashboardPage() {
                   <div className="absolute right-2 top-2 z-10" onClick={(e) => e.stopPropagation()}>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+                        <button
+                          type="button"
+                          className="acsis-class-card__menu-btn opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+                          aria-label="Exam options"
                         >
-                          <MoreVertical className="h-4 w-4" />
-                          <span className="sr-only">Open menu</span>
-                        </Button>
+                          <MoreVertical size={18} strokeWidth={2} />
+                        </button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-40">
+                      <DropdownMenuContent align="end" className="min-w-[11rem]">
                         {isExamDraft(status) && (
-                          <DropdownMenuItem
-                            onClick={async (e) => {
-                              e.stopPropagation()
+                          <DropdownMenuActionItem
+                            icon={Send}
+                            variant="success"
+                            onSelect={async () => {
                               try {
                                 await apiFetch(`/api/teacher/classes/${ex.classId}/exams/${ex.id}`, { method: 'PUT' })
                                 fetchExams()
-                              } catch (error) { console.error(error) }
+                              } catch (error) {
+                                console.error(error)
+                              }
                             }}
                           >
-                            <UploadCloud className="mr-2 h-4 w-4" />
-                            <span>Publish Exam</span>
-                          </DropdownMenuItem>
+                            Publish exam (share code)
+                          </DropdownMenuActionItem>
                         )}
-                        <DropdownMenuItem
-                          onClick={async (e) => {
-                            e.stopPropagation()
-                            try {
-                              const code = ex.code || ex.password || ''
-                              await navigator.clipboard.writeText(code)
-                            } catch (error) { console.error(error) }
-                          }}
+                        <DropdownMenuActionItem
+                          icon={Copy}
+                          onSelect={() =>
+                            void copyToClipboard(ex.code || ex.password || '', { successMessage: 'Exam code copied.' })
+                          }
                         >
-                          <Copy className="mr-2 h-4 w-4" />
-                          <span>Copy Exam Code</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-destructive focus:bg-destructive/10 focus:text-destructive"
-                          onClick={async (e) => {
-                            e.stopPropagation()
-                            const ok = window.confirm('Delete this exam? This action cannot be undone.')
+                          Copy exam code
+                        </DropdownMenuActionItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuActionItem
+                          icon={Trash2}
+                          variant="destructive"
+                          onSelect={async (e) => {
+                            e.preventDefault()
+                            const ok = await confirm({
+                              title: 'Delete exam?',
+                              description: 'This action cannot be undone.',
+                              confirmLabel: 'Delete',
+                              destructive: true,
+                            })
                             if (!ok) return
                             try {
                               await apiFetch(`/api/teacher/classes/${ex.classId}/exams/${ex.id}`, { method: 'DELETE' })
                               fetchExams()
-                            } catch (error) { console.error(error) }
+                            } catch (error) {
+                              console.error(error)
+                            }
                           }}
                         >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          <span>Delete Exam</span>
-                        </DropdownMenuItem>
+                          Delete exam
+                        </DropdownMenuActionItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
@@ -377,133 +401,172 @@ export default function TeacherDashboardPage() {
             )
           })}
         </div>
-        <div className="flex justify-center mt-8">
-          <Button variant="outline" asChild>
-            <Link to="/teacher/my-classes">
-              {visibleExams.length > 8 ? `View All (${visibleExams.length})` : 'View All'}
-            </Link>
-          </Button>
-        </div>
       </div>
-      {/* Create exam modal */}
-      {createModalOpen && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-2xl bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Create Exam — Select classes</h4>
-              <button onClick={() => { resetCreateExamModal(); setCreateModalOpen(false) }} className="text-gray-500">✕</button>
-            </div>
-              <div className="space-y-4 max-h-[60vh] overflow-y-auto">
-              <p className="text-sm text-gray-600 dark:text-gray-300">Select one or more sections and then choose the course to create this exam in.</p>
-              <div>
-                <div className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">Section(s)</div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {selectableTerms.map((term) => {
-                    const id = String(term.id)
-                    const checked = selectedSections.includes(id)
-                    return (
-                      <label key={id} className="flex items-center gap-2 p-2 border rounded hover:bg-gray-50 dark:hover:bg-gray-700">
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={(e) => {
-                            const next = e.target.checked
-                              ? Array.from(new Set([...selectedSections, id]))
-                              : selectedSections.filter((s) => s !== id)
-                            setSelectedSections(next)
-                            setSelectedClassId('')
-                            setSelectedClassIds([])
-                          }}
-                          className="w-4 h-4"
-                        />
-                        <div className="text-sm">
-                          <div className="font-medium">{formatSectionTitle(term)}</div>
-                        </div>
-                      </label>
-                    )
-                  })}
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-200">Course</label>
-                {(() => {
-                  const available = selectedSections.flatMap((sid) => classesByTermId.get(String(sid)) || [])
-                  if (selectedSections.length === 0) {
-                    return (
-                      <select disabled className="mt-1 block w-full rounded-md border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-700 px-3 py-2 text-sm text-gray-500">
-                        <option>Select section(s) first</option>
-                      </select>
-                    )
-                  }
 
-                  if (selectedSections.length === 1) {
-                    // show classes for the single selected section
-                    return (
-                      <select value={selectedClassIds[0] || ''} onChange={(e) => {
+      <Dialog
+        open={createModalOpen}
+        onOpenChange={(open) => {
+          if (!open) resetCreateExamModal()
+          setCreateModalOpen(open)
+        }}
+      >
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Create exam — select classes</DialogTitle>
+            <DialogDescription>
+              Select one or more sections, then choose the course to create this exam in.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 overflow-y-auto py-1 pr-1">
+            <div className="grid gap-2">
+              <Label>Sections</Label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {selectableTerms.map((term) => {
+                  const id = String(term.id)
+                  const checked = selectedSections.includes(id)
+                  return (
+                    <label
+                      key={id}
+                      className="flex items-center gap-2 p-2 border border-border rounded-md hover:bg-muted/50 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) => {
+                          const next = e.target.checked
+                            ? Array.from(new Set([...selectedSections, id]))
+                            : selectedSections.filter((s) => s !== id)
+                          setSelectedSections(next)
+                          setSelectedCourse('')
+                          setSelectedClassIds([])
+                        }}
+                        className="h-4 w-4 rounded border-input"
+                      />
+                      <span className="text-sm font-medium">{formatSectionTitle(term)}</span>
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="create-exam-course">Course</Label>
+              {(() => {
+                const available = selectedSections.flatMap((sid) => classesByTermId.get(String(sid)) || [])
+                if (selectedSections.length === 0) {
+                  return (
+                    <select
+                      id="create-exam-course"
+                      disabled
+                      className="acsis-class-toolbar__select w-full text-muted-foreground"
+                    >
+                      <option>Select section(s) first</option>
+                    </select>
+                  )
+                }
+
+                if (selectedSections.length === 1) {
+                  return (
+                    <select
+                      id="create-exam-course"
+                      value={selectedClassIds[0] || ''}
+                      onChange={(e) => {
                         const val = e.target.value
                         const found = available.find((c) => String(c.id) === String(val))
                         setSelectedClassIds(val ? [val] : [])
-                        setSelectedCourse(found ? (found.course_code || found.courseCode || found.name || String(found.id)) : '')
-                      }} className="mt-1 block w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-800 dark:text-gray-100">
-                        <option value="" disabled hidden>Select course</option>
-                        {available.map((course) => (
-                            <option key={course.id} value={String(course.id)}>{course.name || 'Course'}</option>
-                        ))}
-                      </select>
-                    )
-                  }
-
-                  if (multiSectionCourseOptions.length === 0) {
-                    return (
-                      <select disabled className="mt-1 block w-full rounded-md border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-700 px-3 py-2 text-sm text-gray-500">
-                        <option>No common course across selected sections</option>
-                      </select>
-                    )
-                  }
-
-                  return (
-                    <select value={selectedCourse || ''} onChange={(e) => {
-                      const key = e.target.value
-                      setSelectedCourse(key)
-                      const ids = available.filter((c) => buildCourseKey(String(c.courseCode || c.course_code || '').trim(), String(c.name || '').trim()) === key).map((c) => String(c.id))
-                      setSelectedClassIds(ids)
-                    }} className="mt-1 block w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-800 dark:text-gray-100">
-                      <option value="" disabled hidden>Select course</option>
-                      {multiSectionCourseOptions.map((course) => (
-                        <option key={course.key} value={course.key}>{course.label}</option>
+                        setSelectedCourse(
+                          found ? (found.course_code || found.courseCode || found.name || String(found.id)) : '',
+                        )
+                      }}
+                      className="acsis-class-toolbar__select w-full"
+                    >
+                      <option value="" disabled hidden>
+                        Select course
+                      </option>
+                      {available.map((course) => (
+                        <option key={course.id} value={String(course.id)}>
+                          {course.name || 'Course'}
+                        </option>
                       ))}
                     </select>
                   )
-                })()}
-              </div>
-            </div>
-            <div className="mt-4 flex items-center justify-end gap-3">
-              <button className="px-4 py-2 rounded border" onClick={() => { resetCreateExamModal(); setCreateModalOpen(false) }}>Cancel</button>
-              <button
-                className={`px-4 py-2 rounded text-white ${canContinue ? '' : 'bg-gray-400 cursor-not-allowed dark:bg-gray-600'}`}
-                style={canContinue ? {
-                  backgroundColor: 'var(--acsis-brand, #334155)',
-                } : undefined}
-                disabled={!canContinue}
-                onClick={() => {
-                  if (!canContinue) {
-                    alert('Please select at least one class.')
-                    return
-                  }
-                  // navigate to create-exam passing classes and course
-                  const q = new URLSearchParams()
-                  q.set('classes', selectedClassIds.join(','))
-                  if (selectedCourse) q.set('course', selectedCourse)
-                  setCreateModalOpen(false)
-                  navigate(`/teacher/create-exam?${q.toString()}`)
-                }}
-              >
-                Continue
-              </button>
+                }
+
+                if (multiSectionCourseOptions.length === 0) {
+                  return (
+                    <select
+                      id="create-exam-course"
+                      disabled
+                      className="acsis-class-toolbar__select w-full text-muted-foreground"
+                    >
+                      <option>No common course across selected sections</option>
+                    </select>
+                  )
+                }
+
+                return (
+                  <select
+                    id="create-exam-course"
+                    value={selectedCourse || ''}
+                    onChange={(e) => {
+                      const key = e.target.value
+                      setSelectedCourse(key)
+                      const ids = available
+                        .filter(
+                          (c) =>
+                            buildCourseKey(
+                              String(c.courseCode || c.course_code || '').trim(),
+                              String(c.name || '').trim(),
+                            ) === key,
+                        )
+                        .map((c) => String(c.id))
+                      setSelectedClassIds(ids)
+                    }}
+                    className="acsis-class-toolbar__select w-full"
+                  >
+                    <option value="" disabled hidden>
+                      Select course
+                    </option>
+                    {multiSectionCourseOptions.map((course) => (
+                      <option key={course.key} value={course.key}>
+                        {course.label}
+                      </option>
+                    ))}
+                  </select>
+                )
+              })()}
             </div>
           </div>
-        </div>
-      )}
+          <DialogFooter>
+            <button
+              type="button"
+              className="acsis-btn-ghost"
+              onClick={() => {
+                resetCreateExamModal()
+                setCreateModalOpen(false)
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="acsis-mc-create-btn"
+              style={{ border: 'none' }}
+              disabled={!canContinue}
+              onClick={() => {
+                if (!canContinue) return
+                const q = new URLSearchParams()
+                q.set('classes', selectedClassIds.join(','))
+                if (selectedCourse) q.set('course', selectedCourse)
+                setCreateModalOpen(false)
+                navigate(`/teacher/create-exam?${q.toString()}`)
+              }}
+            >
+              Continue
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {ConfirmDialog}
     </div>
   )
 }

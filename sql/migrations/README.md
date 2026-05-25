@@ -9,6 +9,7 @@ Fresh installs: `sql/acsis.sql` already includes the latest schema. Use these fi
 | `004_teaching_terms_and_profile_cleanup.sql` | `teaching_terms`, `classes.term_id`, student profile cleanup |
 | `005_exams_class_id_cleanup.sql` | `exams.class_id`, drop legacy `access_code` on exams |
 | `006_email_verification.sql` | `email_verification_codes` for login OTP |
+| `011_question_type_coding.sql` | Add `coding` to `question_type` enum |
 
 ## Quick fix: login OTP error
 

@@ -39,3 +39,10 @@ export function nextStatusAfterClose(currentStatus) {
   if (s === EXAM_STATUS.OPEN || s === EXAM_STATUS.WAITING) return EXAM_STATUS.CLOSED
   return null
 }
+
+/** Faculty restarts a live or ended exam — reopen lobby so students can join again (open/closed → waiting). */
+export function nextStatusAfterRestart(currentStatus) {
+  const s = (currentStatus || '').toLowerCase()
+  if (s === EXAM_STATUS.OPEN || s === EXAM_STATUS.CLOSED) return EXAM_STATUS.WAITING
+  return null
+}

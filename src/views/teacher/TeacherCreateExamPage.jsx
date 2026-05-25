@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams, useNavigate } from 'react-router-dom'
 import { Clock, Plus, Shuffle, Trash2, ArrowLeft, GripVertical, CheckCircle2, Layers, ImageIcon, X } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card.jsx'
 import { Label } from '@/components/ui/label.jsx'
 import { Button } from '@/components/ui/button.jsx'
 import { Input } from '@/components/ui/input.jsx'
@@ -11,7 +10,9 @@ import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
 import { useAcsisConfirm } from '@/hooks/useAcsisConfirm.jsx'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import Editor from '@monaco-editor/react'
+import { MONACO_EXAM_EDITOR_OPTIONS } from '@/lib/monacoExamEditor.js'
 import { DateTimePicker } from '@/components/ui/date-time-picker.jsx'
+import '../../pages/teacher-ui/create_exam.css'
 
 function emptyMc() {
   return { opt1: '', opt2: '', opt3: '', opt4: '', correct: '' }
@@ -524,14 +525,7 @@ export default function TeacherCreateExamPage() {
                 theme="vs-dark"
                 value={codingAnswer}
                 onChange={(val) => setCodingAnswer(val)}
-                options={{ 
-                  minimap: { enabled: false }, 
-                  fontSize: 14,
-                  quickSuggestions: false,
-                  suggestOnTriggerCharacters: false,
-                  wordBasedSuggestions: "off",
-                  parameterHints: { enabled: false }
-                }}
+                options={MONACO_EXAM_EDITOR_OPTIONS}
               />
             </div>
           </div>
@@ -542,8 +536,7 @@ export default function TeacherCreateExamPage() {
   }, [identAnswer, mc, questionType, tfAnswer, codingAnswer, codingLanguage])
 
   const addQuestionForm = (
-    <div className="border-t border-border bg-muted/30 p-5 space-y-6">
-      <p className="text-sm font-semibold text-foreground">Add question to this set</p>
+    <div className="exam-builder-panel__body space-y-6">
       <div className="grid md:grid-cols-3 gap-6">
         <div className="space-y-2 md:col-span-1">
           <Label>Question Type</Label>
@@ -620,7 +613,7 @@ export default function TeacherCreateExamPage() {
         />
       </div>
 
-      <div className="pt-4 border-t border-border">{optionsBlock}</div>
+      <div className="pt-4 exam-builder-options-divider">{optionsBlock}</div>
       <Button onClick={addQuestion} className="w-full md:w-auto">
         <Plus size={16} className="mr-2" />
         Save question
@@ -718,9 +711,10 @@ export default function TeacherCreateExamPage() {
                   </Label>
                   <DateTimePicker
                     value={scheduledStart}
-                    onChange={(dateStr) => setScheduledStart(dateStr)}
+                    onChange={(date) => setScheduledStart(date ? date.toISOString() : '')}
                     placeholder="Select start date & time"
                     className="w-full"
+                    disablePast
                   />
                 </div>
                 <div className="space-y-2">
@@ -730,9 +724,11 @@ export default function TeacherCreateExamPage() {
                   </Label>
                   <DateTimePicker
                     value={scheduledEnd}
-                    onChange={(dateStr) => setScheduledEnd(dateStr)}
+                    onChange={(date) => setScheduledEnd(date ? date.toISOString() : '')}
                     placeholder="Select end date & time"
                     className="w-full"
+                    disablePast
+                    minDateTime={scheduledStart || null}
                   />
                 </div>
               </div>
@@ -782,10 +778,10 @@ export default function TeacherCreateExamPage() {
         </div>
       </aside>
       {/* MAIN CONTENT - QUESTIONS BUILDER */}
-      <main className="flex-1 p-6 md:p-8 lg:p-12 overflow-y-auto relative">
+      <main className="exam-builder flex-1 p-6 md:p-8 lg:p-12 overflow-y-auto relative">
         <div className="max-w-3xl mx-auto space-y-8">
           
-          <div className="flex items-center justify-between pb-4 border-b border-border">
+          <div className="exam-builder-toolbar flex items-center justify-between pb-4">
             <div>
               <h2 className="text-xl font-bold text-foreground">Exam Builder</h2>
               <div className="flex items-center gap-2 mt-1">
@@ -811,85 +807,102 @@ export default function TeacherCreateExamPage() {
           </div>
 
           <DragDropContext onDragEnd={onDragEnd}>
-            <div className="space-y-10">
+            <div className="exam-builder-sets">
               {sections.map((sec, secIndex) => {
                 let qOffset = 0
                 for (let i = 0; i < secIndex; i++) qOffset += sections[i].questions.length
+                const isActiveSet = activeSectionId === sec.id
                 return (
-                  <div key={sec.id} className="space-y-4">
-                    <Card
-                      className={`overflow-hidden transition-shadow ${
-                        activeSectionId === sec.id ? 'border-primary ring-1 ring-primary shadow-md' : 'shadow-sm'
-                      }`}
+                  <div key={sec.id} className="exam-builder-set">
+                    <section
+                      className={`exam-builder-panel exam-builder-panel--meta${isActiveSet ? ' exam-builder-panel--active' : ''}`}
                     >
-                      <CardHeader className="pb-3 bg-muted/40 border-b border-border">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex-1 space-y-3 min-w-0">
-                            <div className="space-y-1.5">
-                              <Label className="text-xs text-muted-foreground uppercase tracking-wider">Set title</Label>
-                              <Input
-                                type="text"
-                                value={sec.title}
-                                onChange={(e) => updateSection(sec.id, { title: e.target.value })}
-                                placeholder={`Set ${secIndex + 1}`}
-                                className="font-semibold h-9"
-                              />
-                            </div>
-                            <div className="space-y-1.5">
-                              <Label className="text-xs text-muted-foreground uppercase tracking-wider">
-                                Instructions for students
-                              </Label>
-                              <textarea
-                                rows={2}
-                                value={sec.description}
-                                onChange={(e) => updateSection(sec.id, { description: e.target.value })}
-                                placeholder="e.g. Write True or False. If False, write the correct answer."
-                                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[72px]"
-                              />
-                            </div>
-                          </div>
-                          <div className="flex flex-col gap-2 shrink-0">
-                            <Button
-                              variant={activeSectionId === sec.id ? 'default' : 'secondary'}
-                              size="sm"
-                              onClick={() => {
-                                setActiveSectionId(sec.id)
-                                setShowQuestionForm(true)
-                              }}
-                            >
-                              {activeSectionId === sec.id ? 'Adding here' : 'Add questions here'}
-                            </Button>
-                            {sections.length > 1 && (
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                onClick={() => void removeSection(sec.id)}
-                              >
-                                Remove set
-                              </Button>
-                            )}
-                          </div>
+                      <div className="exam-builder-panel__head">
+                        <div>
+                          <p className="exam-builder-panel__eyebrow">Question set {secIndex + 1}</p>
+                          <p className="exam-builder-panel__title">Set details</p>
                         </div>
-                      </CardHeader>
-                      <CardContent className="p-0">
+                        <div className="exam-builder-panel__actions">
+                          <Button
+                            variant={isActiveSet ? 'default' : 'secondary'}
+                            size="sm"
+                            onClick={() => {
+                              setActiveSectionId(sec.id)
+                              setShowQuestionForm(true)
+                            }}
+                          >
+                            {isActiveSet ? 'Adding here' : 'Add questions here'}
+                          </Button>
+                          {sections.length > 1 && (
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => void removeSection(sec.id)}
+                            >
+                              Remove set
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                      <div className="exam-builder-panel__body exam-builder-panel__body--meta">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs font-semibold text-muted-foreground">Set title</Label>
+                          <Input
+                            type="text"
+                            value={sec.title}
+                            onChange={(e) => updateSection(sec.id, { title: e.target.value })}
+                            placeholder={`Set ${secIndex + 1}`}
+                            className="exam-builder-field font-semibold h-10 text-base"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs font-semibold text-muted-foreground">
+                            Instructions for students
+                          </Label>
+                          <textarea
+                            rows={2}
+                            value={sec.description}
+                            onChange={(e) => updateSection(sec.id, { description: e.target.value })}
+                            placeholder="e.g. Write True or False. If False, write the correct answer."
+                            className="exam-builder-field flex w-full rounded-md bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[72px]"
+                          />
+                        </div>
+                      </div>
+                    </section>
+
+                    <section className="exam-builder-panel exam-builder-panel--questions">
+                      <div className="exam-builder-panel__head">
+                        <div>
+                          <p className="exam-builder-panel__title">Questions</p>
+                          <p className="exam-builder-panel__subtitle">
+                            {sec.questions.length}{' '}
+                            {sec.questions.length === 1 ? 'question' : 'questions'} in this set
+                          </p>
+                        </div>
+                        {sec.questions.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => shuffleSectionQuestions(sec.id)}
+                            className="exam-builder-shuffle-btn"
+                          >
+                            <Shuffle size={14} />
+                            Shuffle
+                          </button>
+                        )}
+                      </div>
+                      <div className="exam-builder-panel__body exam-builder-panel__body--questions">
                         <Droppable droppableId={sec.id}>
                           {(provided) => (
                             <div
                               {...provided.droppableProps}
                               ref={provided.innerRef}
-                              className="divide-y divide-border"
+                              className="exam-builder-question-list"
                             >
-                              {sec.questions.length > 1 && (
-                                <div className="px-5 py-2 bg-muted/30 flex justify-end">
-                                  <button
-                                    type="button"
-                                    onClick={() => shuffleSectionQuestions(sec.id)}
-                                    className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
-                                  >
-                                    <Shuffle size={14} />
-                                    Shuffle this set
-                                  </button>
-                                </div>
+                              {sec.questions.length === 0 && !isActiveSet && (
+                                <p className="exam-builder-empty-hint">
+                                  Select <span className="font-medium text-foreground">Add questions here</span>{' '}
+                                  above to build this set.
+                                </p>
                               )}
                               {sec.questions.map((q, index) => (
                                 <Draggable key={q.id} draggableId={q.id} index={index}>
@@ -898,16 +911,16 @@ export default function TeacherCreateExamPage() {
                                       ref={provided.innerRef}
                                       {...provided.draggableProps}
                                       style={provided.draggableProps.style}
-                                      className={`flex group bg-background transition-colors ${snapshot.isDragging ? 'shadow-lg ring-1 ring-primary z-50' : ''}`}
+                                      className={`exam-builder-question group${snapshot.isDragging ? ' exam-builder-question--dragging' : ''}`}
                                     >
                                       <div
                                         {...provided.dragHandleProps}
-                                        className="w-12 bg-muted/30 flex flex-col items-center justify-center text-muted-foreground border-r border-border shrink-0 py-4 cursor-grab active:cursor-grabbing hover:bg-muted/50 transition-colors"
+                                        className="exam-builder-question__grip"
                                       >
-                                        <span className="text-xs font-bold mb-1">{qOffset + index + 1}</span>
+                                        <span className="exam-builder-question__num">{qOffset + index + 1}</span>
                                         <GripVertical size={16} />
                                       </div>
-                                      <div className="flex-1 p-5">
+                                      <div className="exam-builder-question__content">
                                         <div className="flex justify-between items-start gap-4">
                                           <h3 className="font-medium text-foreground leading-relaxed whitespace-pre-wrap">
                                             {q.question}
@@ -926,12 +939,12 @@ export default function TeacherCreateExamPage() {
                                             <img
                                               src={q.imageUrl}
                                               alt="Question image"
-                                              className="max-h-40 max-w-full rounded-lg border border-border object-contain bg-muted"
+                                              className="max-h-40 max-w-full rounded-lg object-contain bg-muted/80"
                                             />
                                           </div>
                                         )}
                                         <div className="mt-3">
-                                          <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
+                                          <span className="exam-builder-type-badge">
                                             {q.type === 'multiple-choice'
                                               ? 'Multiple Choice'
                                               : q.type === 'truefalse'
@@ -945,13 +958,13 @@ export default function TeacherCreateExamPage() {
                                           <CheckCircle2 size={16} className="text-emerald-500 shrink-0 mt-0.5" />
                                           <span className="font-medium shrink-0">Answer:</span>
                                           {q.type === 'coding' ? (
-                                            <div className="w-full">
+                                            <div className="w-full min-w-0">
                                               {q.options && q.options[0] && (
-                                                <span className="inline-block mb-1 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 bg-primary/10 text-primary rounded">{q.options[0]}</span>
+                                                <span className="inline-block mb-1 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 bg-primary/10 text-primary rounded">
+                                                  {q.options[0]}
+                                                </span>
                                               )}
-                                              <div className="text-foreground font-mono text-xs whitespace-pre-wrap bg-muted p-2 rounded-md border w-full max-h-32 overflow-y-auto">
-                                                {q.correctAnswer}
-                                              </div>
+                                              <div className="exam-builder-code-answer">{q.correctAnswer}</div>
                                             </div>
                                           ) : (
                                             <span className="text-foreground font-semibold">{q.correctAnswer}</span>
@@ -966,29 +979,33 @@ export default function TeacherCreateExamPage() {
                             </div>
                           )}
                         </Droppable>
-                        {activeSectionId === sec.id ? (
-                          showQuestionForm ? (
-                            addQuestionForm
-                          ) : (
-                            <div className="p-5">
-                              <Button 
-                                variant="outline" 
-                                className="w-full border-dashed h-12 text-muted-foreground hover:text-foreground hover:border-primary/50 hover:bg-primary/5 transition-all" 
-                                onClick={() => setShowQuestionForm(true)}
-                              >
-                                <Plus className="mr-2" size={16} /> {sec.questions.length > 0 ? "Add another question" : "Add a question to this set"}
-                              </Button>
-                            </div>
-                          )
+                      </div>
+                    </section>
+
+                    {isActiveSet && (
+                      <section className="exam-builder-panel exam-builder-panel--composer exam-builder-panel--active">
+                        <div className="exam-builder-panel__head">
+                          <div>
+                            <p className="exam-builder-panel__title">New question</p>
+                            <p className="exam-builder-panel__subtitle">Adds to {sec.title || `Set ${secIndex + 1}`}</p>
+                          </div>
+                        </div>
+                        {showQuestionForm ? (
+                          addQuestionForm
                         ) : (
-                          sec.questions.length === 0 && (
-                            <p className="p-5 text-sm text-muted-foreground text-center italic bg-muted/10">
-                              Click <span className="font-medium text-foreground">Add questions here</span> to add questions to this set.
-                            </p>
-                          )
+                          <div className="exam-builder-panel__body">
+                            <Button
+                              variant="outline"
+                              className="w-full exam-builder-add-trigger"
+                              onClick={() => setShowQuestionForm(true)}
+                            >
+                              <Plus className="mr-2" size={16} />
+                              {sec.questions.length > 0 ? 'Add another question' : 'Add first question'}
+                            </Button>
+                          </div>
                         )}
-                      </CardContent>
-                    </Card>
+                      </section>
+                    )}
                   </div>
                 )
               })}

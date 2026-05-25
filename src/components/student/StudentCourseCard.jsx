@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { formatCourseDisplayLabels, formatTermPeriod } from '@/lib/sectionLabel.js'
 import FadeIn from '@/components/ui/fade-in.jsx'
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card.jsx'
 
 /**
  * @param {{ course: { id: string|number, courseCode?: string, name?: string, academicYear?: string, semester?: string, exams?: object[] }, delay?: number }} props
@@ -17,12 +18,11 @@ export default function StudentCourseCard({ course, delay = 0 }) {
   }
 
   return (
-    <FadeIn as="li" delay={delay}>
-      <article
-        className="acsis-course-card acsis-card-surface"
-        role="button"
-        tabIndex={0}
+    <FadeIn as="li" delay={delay} className="h-full min-w-0">
+      <Card
+        className="relative h-full flex flex-col cursor-pointer transition-all hover:border-primary/50 hover:shadow-md"
         onClick={open}
+        tabIndex={0}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault()
@@ -30,19 +30,24 @@ export default function StudentCourseCard({ course, delay = 0 }) {
           }
         }}
       >
-        <div className="acsis-course-card__accent" aria-hidden />
-        <div className="acsis-course-card__body">
-          <h3 className="text-lg font-semibold tracking-tight text-foreground">{primary}</h3>
-          {secondary ? <p className="text-sm text-muted-foreground mt-1.5">{secondary}</p> : null}
-          {period ? <p className="text-xs text-muted-foreground/80 mt-1">{period}</p> : null}
-        </div>
-        <div className="acsis-course-card__footer">
-          <span className="acsis-course-card__stat">
-            {examCount} {examCount === 1 ? 'exam' : 'exams'} posted
-          </span>
-          <span className="acsis-course-card__status">View exams</span>
-        </div>
-      </article>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg leading-tight line-clamp-2">{primary}</CardTitle>
+          {secondary ? <CardDescription className="line-clamp-1 mt-1.5">{secondary}</CardDescription> : null}
+        </CardHeader>
+        <CardContent className="flex-1 pb-3">
+          {period ? <p className="text-sm text-muted-foreground">{period}</p> : null}
+        </CardContent>
+        <CardFooter className="pt-0 border-t border-border mt-auto px-6 py-3 bg-muted/20">
+          <div className="flex items-center justify-between w-full gap-2 min-w-0">
+            <span className="text-sm text-muted-foreground truncate">
+              {examCount} {examCount === 1 ? 'exam' : 'exams'} posted
+            </span>
+            <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400 shrink-0">
+              View exams
+            </span>
+          </div>
+        </CardFooter>
+      </Card>
     </FadeIn>
   )
 }

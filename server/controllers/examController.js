@@ -6,6 +6,7 @@ import {
   getClassExamsService,
   listTeacherExamsWithClassMetaService,
   publishExamService,
+  updateExamPasswordService,
   deleteExamService,
   getExamDetailsService,
   verifyExamPasswordService,
@@ -14,6 +15,7 @@ import {
   getStudentExamSessionService,
   joinExamService,
   logCheatingEventService,
+  restartExamService,
   startExamService,
   submitExamService,
 } from '../services/examSessionService.js';
@@ -307,6 +309,48 @@ export async function startTeacherExam(req, res) {
   }
 }
 
+const patchExamPasswordSchema = z.object({
+  password: z.string().min(1, 'Exam code is required').max(20, 'Exam code must be 20 characters or fewer'),
+});
+
+export async function patchTeacherExamPassword(req, res) {
+  const { classId, examId } = req.params;
+  const parsed = patchExamPasswordSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({
+      error: parsed.error.issues[0]?.message || 'Invalid exam code.',
+    });
+  }
+  try {
+    const result = await updateExamPasswordService(classId, examId, req.memberId, parsed.data.password);
+    if (!result.ok) {
+      return res.status(result.status || 500).json({ error: result.error });
+    }
+    return res.json({ ok: true, code: result.code });
+  } catch (err) {
+    console.error('[examController.patchTeacherExamPassword]', err);
+    return res.status(500).json({ error: 'Failed to update exam code.' });
+  }
+}
+
+export async function restartTeacherExam(req, res) {
+  const { classId, examId } = req.params;
+  const { newScheduledEnd, newScheduledStart } = req.body || {};
+  try {
+    const result = await restartExamService(classId, examId, req.memberId, {
+      newScheduledEnd,
+      newScheduledStart,
+    });
+    if (!result.ok) {
+      return res.status(result.status || 500).json({ error: result.error });
+    }
+    return res.json({ ok: true, status: result.status });
+  } catch (err) {
+    console.error('[examController.restartTeacherExam]', err);
+    return res.status(500).json({ error: 'Failed to restart exam.' });
+  }
+}
+
 const verifyExamPasswordSchema = z.object({
   password: z.string().min(1, 'Exam password is required').max(20),
 });
@@ -315,7 +359,9 @@ export async function postStudentVerifyExamPassword(req, res) {
   const { classId, examId } = req.params;
   const parsed = verifyExamPasswordSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ error: parsed.error.flatten().fieldErrors });
+    return res.status(400).json({
+      error: parsed.error.issues[0]?.message || 'Invalid exam code.',
+    });
   }
 
   const result = await verifyExamPasswordService(

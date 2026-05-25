@@ -8,6 +8,7 @@ import {
   deleteExamQuery,
   getExamWithQuestionsQuery,
   verifyExamPasswordQuery,
+  updateExamPasswordByTeacherQuery,
 } from '../repositories/examRepository.js';
 import { closeOtherTeacherOngoingExamsQuery } from '../repositories/examResultsRepository.js';
 import { finalizeExamResultsService } from './examReleaseService.js';
@@ -216,6 +217,27 @@ export async function publishExamService(classId, examId, teacherMemberId = null
   } catch (err) {
     console.error('[examService.publishExam]', err);
     return { ok: false, status: 500, error: 'Failed to publish exam.' };
+  }
+}
+
+export async function updateExamPasswordService(classId, examId, teacherMemberId, passwordInput) {
+  const raw = String(passwordInput || '').trim();
+  if (!raw) {
+    return { ok: false, status: 400, error: 'Exam code cannot be empty.' };
+  }
+  if (raw.length > 20) {
+    return { ok: false, status: 400, error: 'Exam code must be 20 characters or fewer.' };
+  }
+  const password = normalizeExamPassword(raw);
+  try {
+    const success = await updateExamPasswordByTeacherQuery(classId, examId, teacherMemberId, password);
+    if (!success) {
+      return { ok: false, status: 404, error: 'Exam not found or you do not have permission.' };
+    }
+    return { ok: true, code: password };
+  } catch (err) {
+    console.error('[examService.updateExamPassword]', err);
+    return { ok: false, status: 500, error: 'Failed to update exam code.' };
   }
 }
 

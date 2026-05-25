@@ -31,11 +31,40 @@ export function isExamOngoing(status) {
   return s === PG_EXAM_STATUS.WAITING || s === PG_EXAM_STATUS.OPEN
 }
 
-/** Student can open lobby / session UI (exam must be live/lobby and not yet submitted). */
-export function isExamEnterableByStudent(status, sessionStatus) {
+/** Lobby join window has opened (scheduled start is null or already passed). */
+export function isLobbyOpenForJoin(scheduledStart) {
+  if (!scheduledStart) return true
+  const opensAt = new Date(scheduledStart).getTime()
+  return Number.isFinite(opensAt) && Date.now() >= opensAt
+}
+
+/** Lobby is posted but scheduled start is still in the future. */
+export function isExamLobbyScheduledFuture(status, scheduledStart) {
+  if (normalizeExamStatus(status) !== PG_EXAM_STATUS.WAITING) return false
+  if (!scheduledStart) return false
+  return !isLobbyOpenForJoin(scheduledStart)
+}
+
+/** Student may enter the lobby with an exam code (lobby only, after scheduled start). */
+export function canStudentJoinExamLobby(status, sessionStatus, scheduledStart) {
+  if ((sessionStatus || '').toLowerCase() === 'submitted') return false
+  if (normalizeExamStatus(status) !== PG_EXAM_STATUS.WAITING) return false
+  return isLobbyOpenForJoin(scheduledStart)
+}
+
+/**
+ * Student can open the exam session UI: lobby join while waiting (after start time), or continue if already in session when live.
+ */
+export function isExamEnterableByStudent(status, sessionStatus, scheduledStart) {
   if ((sessionStatus || '').toLowerCase() === 'submitted') return false
   const s = normalizeExamStatus(status)
-  return s === PG_EXAM_STATUS.WAITING || s === PG_EXAM_STATUS.OPEN
+  const sess = (sessionStatus || '').toLowerCase()
+  if (s === PG_EXAM_STATUS.WAITING) {
+    if (sess === 'in_progress') return true
+    return isLobbyOpenForJoin(scheduledStart)
+  }
+  if (s === PG_EXAM_STATUS.OPEN && sess === 'in_progress') return true
+  return false
 }
 
 /** Badge label on student class stream — prefers personal session state. */

@@ -1,6 +1,6 @@
 import { getPool } from '../db.js'
 import { normalizeExamPassword } from '../lib/examCodes.js'
-import { EXAM_STATUS, nextStatusAfterStart } from '../lib/examStatus.js'
+import { EXAM_STATUS, nextStatusAfterRestart, nextStatusAfterStart } from '../lib/examStatus.js'
 import {
   createExamSessionQuery,
   findChoiceIdByTextQuery,
@@ -72,6 +72,16 @@ export async function joinExamService(classId, examId, studentMemberId, password
   if (status === EXAM_STATUS.CLOSED) {
     return { ok: false, status: 403, error: 'This exam has ended.' }
   }
+  if (status === EXAM_STATUS.WAITING && exam.scheduled_start) {
+    const opensAt = new Date(exam.scheduled_start).getTime()
+    if (Number.isFinite(opensAt) && Date.now() < opensAt) {
+      return {
+        ok: false,
+        status: 403,
+        error: `The exam lobby opens at ${new Date(exam.scheduled_start).toLocaleString()}.`,
+      }
+    }
+  }
 
   const expected = normalizeExamPassword(exam.password)
   const given = normalizeExamPassword(passwordInput)
@@ -83,6 +93,13 @@ export async function joinExamService(classId, examId, studentMemberId, password
   }
 
   let session = await findExamSessionQuery(examId, studentMemberId)
+  if (status === EXAM_STATUS.OPEN && !session) {
+    return {
+      ok: false,
+      status: 403,
+      error: 'The exam has already started. Late join is not allowed.',
+    }
+  }
   if (session?.status === 'submitted') {
     return { ok: false, status: 400, error: 'You already submitted this exam.' }
   }
@@ -115,6 +132,14 @@ export async function getStudentExamSessionService(classId, examId, studentMembe
   }
 
   const session = await findExamSessionQuery(examId, studentMemberId)
+  if (status === EXAM_STATUS.OPEN && !session) {
+    return {
+      ok: false,
+      status: 403,
+      error: 'The exam has already started. Late join is not allowed.',
+    }
+  }
+
   const examMeta = mapExamMeta(examRow)
   const payload = {
     joined: Boolean(session),
@@ -178,6 +203,42 @@ export async function startExamService(classId, examId, teacherMemberId = null, 
   const updated = await updateExamStatusByIdQuery(classId, examId, next, newScheduledEnd)
   if (!updated) {
     return { ok: false, status: 500, error: 'Failed to start exam.' }
+  }
+
+  return { ok: true, status: next }
+}
+
+export async function restartExamService(classId, examId, teacherMemberId = null, opts = {}) {
+  const { newScheduledEnd, newScheduledStart } = opts
+  const exam = await getExamForJoinQuery(classId, examId)
+  if (!exam) {
+    return { ok: false, status: 404, error: 'Exam not found.' }
+  }
+
+  const next = nextStatusAfterRestart(exam.status)
+  if (!next) {
+    return {
+      ok: false,
+      status: 400,
+      error: 'Only live or ended exams can be restarted. Use Start exam while the exam is in the lobby.',
+    }
+  }
+
+  if (teacherMemberId) {
+    await closeOtherTeacherOngoingExamsQuery(teacherMemberId, classId, examId)
+  }
+
+  const schedulePatch = {}
+  if (newScheduledStart !== undefined) {
+    schedulePatch.scheduledStart = newScheduledStart ? new Date(newScheduledStart) : null
+  }
+  if (newScheduledEnd !== undefined) {
+    schedulePatch.scheduledEnd = newScheduledEnd ? new Date(newScheduledEnd) : null
+  }
+
+  const updated = await updateExamStatusByIdQuery(classId, examId, next, schedulePatch)
+  if (!updated) {
+    return { ok: false, status: 500, error: 'Failed to restart exam.' }
   }
 
   return { ok: true, status: next }

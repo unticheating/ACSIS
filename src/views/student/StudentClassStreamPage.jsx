@@ -10,7 +10,14 @@ import { DropdownMenuActionItem } from '@/components/ui/dropdown-menu-action-ite
 import { apiFetch } from '@/lib/apiFetch.js'
 import { acsisToastError } from '@/lib/acsisToast.js'
 import { formatCourseDisplayLabels, formatTermPeriod } from '@/lib/sectionLabel.js'
-import { isExamEnterableByStudent, labelForStudentExam } from '@/lib/examFlowUi.js'
+import {
+  canStudentJoinExamLobby,
+  isExamEnterableByStudent,
+  isExamLobbyScheduledFuture,
+  labelForStudentExam,
+  normalizeExamStatus,
+  PG_EXAM_STATUS,
+} from '@/lib/examFlowUi.js'
 import { joinStudentExam } from '@/lib/studentExamApi.js'
 import FadeIn from '@/components/ui/fade-in.jsx'
 import '../../pages/teacher-ui/my_classes.css'
@@ -203,32 +210,47 @@ export default function StudentClassStreamPage() {
                       className={`acsis-pill ${
                         exam.sessionStatus === 'submitted'
                           ? 'acsis-pill--draft'
-                          : isExamEnterableByStudent(exam.status, exam.sessionStatus)
+                          : isExamEnterableByStudent(exam.status, exam.sessionStatus, exam.scheduledStart)
                             ? 'acsis-pill--live'
-                            : exam.scheduledStart
+                            : isExamLobbyScheduledFuture(exam.status, exam.scheduledStart)
                               ? 'acsis-pill--draft'
                               : 'acsis-pill--draft'
                       }`}
                     >
                       {exam.sessionStatus === 'submitted'
                         ? labelForStudentExam(exam)
-                        : exam.scheduledStart && !isExamEnterableByStudent(exam.status, exam.sessionStatus) && exam.status !== 'closed'
-                          ? `Starts ${new Date(exam.scheduledStart).toLocaleString()}`
+                        : isExamLobbyScheduledFuture(exam.status, exam.scheduledStart)
+                          ? `Opens ${new Date(exam.scheduledStart).toLocaleString()}`
                           : labelForStudentExam(exam)}
                     </span>
-                    {isExamEnterableByStudent(exam.status, exam.sessionStatus) ? (
+                    {isExamEnterableByStudent(exam.status, exam.sessionStatus, exam.scheduledStart) ? (
                       <button
                         type="button"
                         className="acsis-mc-create-btn"
                         style={{ padding: '6px 12px', fontSize: '0.8125rem' }}
                         onClick={() => {
+                          if ((exam.sessionStatus || '').toLowerCase() === 'in_progress') {
+                            navigate(
+                              `/student/exam/session?classId=${encodeURIComponent(classId)}&examId=${encodeURIComponent(exam.id)}`,
+                            )
+                            return
+                          }
+                          if (!canStudentJoinExamLobby(exam.status, exam.sessionStatus, exam.scheduledStart)) {
+                            return
+                          }
                           setJoinExamId(exam.id)
                           setJoinCode('')
                           setJoinError(null)
                         }}
                       >
-                        Enter exam code
+                        {(exam.sessionStatus || '').toLowerCase() === 'in_progress'
+                          ? 'Continue exam'
+                          : 'Enter exam code'}
                       </button>
+                    ) : normalizeExamStatus(exam.status) === PG_EXAM_STATUS.OPEN ? (
+                      <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
+                        Started — late join closed
+                      </span>
                     ) : null}
                   </div>
                 </div>

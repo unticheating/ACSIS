@@ -37,7 +37,7 @@ BEGIN
     -- closed  = exam ended, no more submissions
 
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'question_type') THEN
-        CREATE TYPE question_type AS ENUM ('mcq', 'identification', 'true_false');
+        CREATE TYPE question_type AS ENUM ('mcq', 'identification', 'true_false', 'coding');
     END IF;
 
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'session_status') THEN

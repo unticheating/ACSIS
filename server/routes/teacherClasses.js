@@ -13,9 +13,11 @@ import {
   getTeacherClassStream,
   getTeacherExamsCatalog,
   publishTeacherExam,
+  patchTeacherExamPassword,
   deleteTeacherExam,
   getTeacherExamSession,
   startTeacherExam,
+  restartTeacherExam,
   closeTeacherExam,
   getTeacherExamResults,
   getTeacherExamSessionDetail,
@@ -67,7 +69,9 @@ router.patch(
 router.post('/:classId/exams/:examId/release-scores', postReleaseExamScores);
 router.post('/:classId/exams/:examId/reports/export', postExportExamReport);
 router.put('/:classId/exams/:examId', publishTeacherExam);
+router.patch('/:classId/exams/:examId/password', patchTeacherExamPassword);
 router.put('/:classId/exams/:examId/start', startTeacherExam);
+router.put('/:classId/exams/:examId/restart', restartTeacherExam);
 router.put('/:classId/exams/:examId/close', closeTeacherExam);
 router.delete('/:classId/exams/:examId', deleteTeacherExam);
 

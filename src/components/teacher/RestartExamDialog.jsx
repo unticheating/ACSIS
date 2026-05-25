@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -9,15 +9,30 @@ import {
 } from '@/components/ui/dialog.jsx'
 import { DateTimePicker } from '@/components/ui/date-time-picker.jsx'
 
-export default function RestartExamDialog({ open, onOpenChange, onRestart, defaultEnd }) {
-  const [newEnd, setNewEnd] = useState(defaultEnd ? new Date(defaultEnd) : null)
+export default function RestartExamDialog({ open, onOpenChange, onRestart, defaultStart, defaultEnd }) {
+  const [newStart, setNewStart] = useState(null)
+  const [newEnd, setNewEnd] = useState(null)
   const [restarting, setRestarting] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+    const now = new Date()
+    let start = defaultStart ? new Date(defaultStart) : new Date()
+    if (Number.isNaN(start.getTime()) || start < now) start = now
+    let end = defaultEnd ? new Date(defaultEnd) : null
+    if (end && (Number.isNaN(end.getTime()) || end < start)) end = null
+    setNewStart(start)
+    setNewEnd(end)
+  }, [open, defaultStart, defaultEnd])
 
   async function handleConfirm(e) {
     e.preventDefault()
     setRestarting(true)
     try {
-      await onRestart({ newScheduledEnd: newEnd })
+      await onRestart({
+        newScheduledStart: newStart,
+        newScheduledEnd: newEnd,
+      })
       onOpenChange(false)
     } finally {
       setRestarting(false)
@@ -30,20 +45,31 @@ export default function RestartExamDialog({ open, onOpenChange, onRestart, defau
         <DialogHeader>
           <DialogTitle>Restart Exam</DialogTitle>
           <DialogDescription>
-            Reopening this exam allows students to enter it again.
+            Returns the exam to the lobby so students can enter the code again. Set when the lobby opens and when it
+            ends, then start the exam when you are ready.
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-4 py-4">
           <div className="grid gap-2">
-            <label className="text-sm font-medium text-gray-700">
-              New Exam Deadline (Optional)
-            </label>
+            <label className="text-sm font-medium text-gray-700">Lobby opens at</label>
+            <DateTimePicker
+              value={newStart}
+              onChange={setNewStart}
+              placeholder="When students can join"
+              disablePortal={true}
+              disablePast
+            />
+          </div>
+          <div className="grid gap-2">
+            <label className="text-sm font-medium text-gray-700">Exam deadline (optional)</label>
             <DateTimePicker
               value={newEnd}
               onChange={setNewEnd}
               placeholder="No fixed deadline"
               disablePortal={true}
+              disablePast
+              minDateTime={newStart}
             />
           </div>
 

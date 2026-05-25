@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Clock, AlertTriangle, ShieldAlert, X } from 'lucide-react'
 import { useDetectionsToolbar } from '@/context/DetectionsToolbarContext.jsx'
 import {
@@ -113,6 +114,10 @@ function seatInitials(student) {
 }
 
 export default function TeacherDetectionsPage() {
+  const [searchParams] = useSearchParams()
+  const classIdParam = searchParams.get('classId')
+  const examIdParam = searchParams.get('examId')
+
   const [activeExam, setActiveExam] = useState(null)
   const [clockTick, setClockTick] = useState(0)
   const [students, setStudents] = useState([])
@@ -247,6 +252,29 @@ export default function TeacherDetectionsPage() {
     let cancelled = false
     async function loadActiveExam() {
       try {
+        if (classIdParam && examIdParam) {
+          const data = await fetchTeacherMonitoringSnapshot(classIdParam, examIdParam)
+          if (cancelled) return
+          if (data.exam) {
+            const exam = {
+              id: data.exam.id,
+              classId: Number(classIdParam),
+              title: data.exam.title,
+              status: data.exam.status,
+              code: data.exam.code,
+              scheduledStart: data.exam.scheduledStart,
+              scheduledEnd: data.exam.scheduledEnd,
+              openedAt: data.exam.openedAt,
+              updatedAt: data.exam.updatedAt,
+            }
+            setActiveExam(exam)
+            applyMonitoringData(data, exam)
+          } else {
+            setActiveExam(null)
+          }
+          return
+        }
+
         const data = await fetchTeacherActiveMonitoring()
         if (cancelled) return
         if (data.activeExam) {
@@ -268,7 +296,7 @@ export default function TeacherDetectionsPage() {
     return () => {
       cancelled = true
     }
-  }, [applyMonitoringData])
+  }, [applyMonitoringData, classIdParam, examIdParam])
 
   useEffect(() => {
     if (!activeExam?.classId || !activeExam?.id) return undefined

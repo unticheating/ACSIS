@@ -73,31 +73,36 @@
 }
 
 .acsis-student-exam .exam-logo {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 9999px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .acsis-student-exam .exam-logo-img {
-  width: 100%;
-  height: 100%;
+  width: 1.75rem;
+  height: 1.75rem;
+  max-width: 100%;
+  max-height: 100%;
   object-fit: contain;
   display: block;
 }
 
 .acsis-student-exam .exam-title-bar {
   flex: 1;
+  min-width: 0;
   text-align: center;
-  font-size: clamp(13px, 2vw, 16px);
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  padding: 0 12px;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  padding: 0 0.75rem;
 }
 
 .acsis-student-exam .exam-timer {
@@ -136,11 +141,12 @@
 
 .acsis-student-exam .lobby-warning-title {
   color: var(--exam-warning-red);
-  font-size: clamp(28px, 5vw, 40px);
-  font-weight: 800;
+  font-size: 1.5rem;
+  line-height: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin-bottom: 28px;
+  margin-bottom: 1.5rem;
 }
 
 .acsis-student-exam .lobby-copy {
@@ -219,6 +225,38 @@
   margin: 0 auto;
 }
 
+.acsis-student-exam .exam-question-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-bottom: 10px;
+}
+
+.acsis-student-exam .exam-set-name {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+  min-width: 0;
+}
+
+.acsis-student-exam .exam-type-badge {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.65rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #bbf7d0;
+  background: rgba(34, 197, 94, 0.2);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+}
+
 .acsis-student-exam .exam-type-label {
   font-size: clamp(13px, 2vw, 15px);
   font-weight: 700;
@@ -246,7 +284,39 @@
   line-height: 1.55;
   font-weight: 500;
   margin-bottom: 20px;
-  border: 1px solid rgba(22, 101, 52, 0.15);
+  border: 1px solid var(--exam-question-border, rgba(22, 101, 52, 0.15));
+}
+
+.acsis-student-exam .question-box--section {
+  background: var(--exam-section-box-bg, rgba(232, 245, 236, 0.92));
+  color: var(--exam-section-box-text, #0f1f14);
+  border-color: var(--exam-section-box-border, rgba(22, 101, 52, 0.2));
+}
+
+.acsis-student-exam .question-box--section__title {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: inherit;
+}
+
+.acsis-student-exam .question-box--section__desc {
+  margin: 0.5rem 0 0;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: inherit;
+  opacity: 0.92;
+}
+
+.acsis-student-exam .question-box--prompt {
+  margin-bottom: 20px;
+}
+
+.acsis-student-exam .exam-question-image {
+  border: 1px solid var(--exam-question-border, rgba(255, 255, 255, 0.15));
+  background: rgba(0, 0, 0, 0.25);
 }
 
 .acsis-student-exam .options-list {
@@ -448,11 +518,11 @@
   transition: width 0.25s ease;
 }
 
-.acsis-student-exam .detection-overlay {
+.detection-overlay {
   position: fixed;
   inset: 0;
-  z-index: 10000;
-  background: var(--detection-red);
+  z-index: 100000;
+  background: var(--detection-red, #dc2626);
   color: #fff;
   display: flex;
   flex-direction: column;
@@ -466,13 +536,19 @@
   transition: opacity 0.32s ease, visibility 0.32s ease;
 }
 
-.acsis-student-exam .detection-overlay.is-active {
+.detection-overlay.is-active {
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
 }
 
-.acsis-student-exam .detection-title {
+.detection-overlay__icon {
+  width: 4.5rem;
+  height: 4.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.detection-overlay .detection-title {
   font-size: clamp(26px, 5vw, 38px);
   font-weight: 800;
   margin-bottom: 16px;
@@ -480,18 +556,20 @@
   line-height: 1.2;
 }
 
-.acsis-student-exam .detection-sub {
+.detection-overlay .detection-sub {
   font-size: clamp(16px, 2.5vw, 20px);
   font-weight: 400;
   margin-bottom: 24px;
+  max-width: 36rem;
 }
 
-.acsis-student-exam .detection-strikes {
+.detection-overlay .detection-strikes {
   font-size: clamp(20px, 3.5vw, 26px);
   font-weight: 700;
+  margin-bottom: 8px;
 }
 
-.acsis-student-exam .detection-countdown {
+.detection-overlay .detection-countdown {
   position: absolute;
   bottom: clamp(32px, 6vh, 56px);
   left: 50%;

@@ -5,6 +5,7 @@ import { ensureExamSectionsSchema } from '../lib/ensureExamSectionsSchema.js';
 function mapQuestionTypeToDb(type) {
   if (type === 'multiple-choice' || type === 'multiple') return 'mcq';
   if (type === 'truefalse') return 'true_false';
+  if (type === 'coding') return 'coding';
   return 'identification';
 }
 
@@ -29,6 +30,19 @@ async function insertQuestionWithChoices(client, examId, sectionId, q, orderNum)
         [questionId, choiceText, isCorrect, j + 1],
       );
     }
+  } else if (dbType === 'coding') {
+    const language =
+      Array.isArray(q.options) && q.options[0] ? String(q.options[0]).trim() : 'javascript';
+    await client.query(
+      `INSERT INTO choices (question_id, choice_text, is_correct, order_num)
+       VALUES ($1, $2, FALSE, 1)`,
+      [questionId, language],
+    );
+    await client.query(
+      `INSERT INTO choices (question_id, choice_text, is_correct, order_num)
+       VALUES ($1, $2, TRUE, 2)`,
+      [questionId, q.correctAnswer],
+    );
   } else {
     await client.query(
       `INSERT INTO choices (question_id, choice_text, is_correct, order_num)
@@ -257,6 +271,22 @@ export async function verifyExamPasswordQuery(classId, examId, password, require
   return result.rowCount > 0;
 }
 
+export async function updateExamPasswordByTeacherQuery(classId, examId, teacherMemberId, password) {
+  const pool = getPool();
+  const { rowCount } = await pool.query(
+    `UPDATE exams e
+     SET password = $1, updated_at = NOW()
+     FROM classes c
+     WHERE e.class_id = c.class_id
+       AND e.exam_id = $2
+       AND e.class_id = $3
+       AND c.member_id = $4
+       AND e.status IN ('draft', 'waiting', 'open', 'closed')`,
+    [password, examId, classId, teacherMemberId],
+  );
+  return rowCount > 0;
+}
+
 /** Deletes exam and dependent rows (FK-safe when sessions/answers exist). */
 export async function deleteExamQuery(classId, examId, teacherMemberId = null) {
   const pool = getPool();
@@ -318,8 +348,15 @@ export async function deleteExamQuery(classId, examId, teacherMemberId = null) {
   }
 }
 
+function mapQuestionTypeFromDb(dbType) {
+  if (dbType === 'mcq') return 'multiple-choice';
+  if (dbType === 'true_false') return 'truefalse';
+  if (dbType === 'coding') return 'coding';
+  return 'identification';
+}
+
 async function attachChoicesToQuestion(pool, row) {
-  const qType = row.type === 'mcq' ? 'multiple-choice' : row.type === 'true_false' ? 'truefalse' : 'identification';
+  const qType = mapQuestionTypeFromDb(row.type);
 
   const qObj = {
     id: row.id,
@@ -346,10 +383,17 @@ async function attachChoicesToQuestion(pool, row) {
     qObj.correctAnswer = cResult.rows.find((c) => c.is_correct)?.choice_text || '';
   } else {
     const cResult = await pool.query(
-      `SELECT choice_text FROM choices WHERE question_id = $1 AND is_correct = TRUE LIMIT 1`,
+      `SELECT choice_text, is_correct FROM choices WHERE question_id = $1 ORDER BY order_num ASC`,
       [row.id],
     );
-    qObj.correctAnswer = cResult.rows[0]?.choice_text || '';
+    const correct = cResult.rows.find((c) => c.is_correct);
+    qObj.correctAnswer = correct?.choice_text || '';
+    if (qType === 'coding') {
+      const langRow = cResult.rows.find((c) => !c.is_correct);
+      const language = langRow?.choice_text || 'javascript';
+      qObj.language = language;
+      qObj.options = [language];
+    }
   }
 
   return qObj;

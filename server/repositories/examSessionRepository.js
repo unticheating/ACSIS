@@ -237,7 +237,14 @@ export async function gradeSessionAnswersQuery(sessionId) {
          EXISTS (
            SELECT 1 FROM choices c
            WHERE c.question_id = sa.question_id AND c.is_correct = TRUE
-             AND UPPER(TRIM(c.choice_text)) = COALESCE(sa.answer_text, '')
+             AND UPPER(TRIM(c.choice_text)) = UPPER(TRIM(COALESCE(sa.answer_text, '')))
+         )
+       )
+       WHEN q.question_type = 'coding' THEN (
+         EXISTS (
+           SELECT 1 FROM choices c
+           WHERE c.question_id = sa.question_id AND c.is_correct = TRUE
+             AND TRIM(c.choice_text) = TRIM(COALESCE(sa.answer_text, ''))
          )
        )
        ELSE NULL
@@ -300,16 +307,35 @@ export async function findChoiceIdByTextQuery(questionId, choiceText) {
   return ci[0]?.choice_id ?? null
 }
 
-export async function updateExamStatusByIdQuery(classId, examId, status, scheduledEnd = undefined) {
+function normalizeSchedulePatch(schedulePatch) {
+  if (schedulePatch === undefined) return {}
+  if (schedulePatch instanceof Date || schedulePatch === null) {
+    return { scheduledEnd: schedulePatch }
+  }
+  if (typeof schedulePatch === 'object' && schedulePatch !== null) {
+    const out = {}
+    if ('scheduledEnd' in schedulePatch) out.scheduledEnd = schedulePatch.scheduledEnd
+    if ('scheduledStart' in schedulePatch) out.scheduledStart = schedulePatch.scheduledStart
+    return out
+  }
+  return {}
+}
+
+export async function updateExamStatusByIdQuery(classId, examId, status, schedulePatch = undefined) {
   const pool = getPool()
+  const patch = normalizeSchedulePatch(schedulePatch)
   let query = `UPDATE exams SET status = $1, updated_at = NOW()`
   const params = [status]
-  
-  if (scheduledEnd !== undefined) {
-    query += `, scheduled_end = $2`
-    params.push(scheduledEnd ? new Date(scheduledEnd) : null)
+
+  if ('scheduledStart' in patch) {
+    params.push(patch.scheduledStart ? new Date(patch.scheduledStart) : null)
+    query += `, scheduled_start = $${params.length}`
   }
-  
+  if ('scheduledEnd' in patch) {
+    params.push(patch.scheduledEnd ? new Date(patch.scheduledEnd) : null)
+    query += `, scheduled_end = $${params.length}`
+  }
+
   query += ` WHERE exam_id = $${params.length + 1} AND class_id = $${params.length + 2}`
   params.push(examId, classId)
 
