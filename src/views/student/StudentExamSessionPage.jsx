@@ -23,7 +23,14 @@ import {
   submitExamAnswers,
 } from '@/lib/studentExamApi.js'
 import { PG_EXAM_STATUS, normalizeExamStatus } from '@/lib/examFlowUi.js'
-import { labelForCheatEvent } from '@/lib/examAntiCheat.js'
+import {
+  displayStrikeCount,
+  labelForCheatEvent,
+  resolveMaxWarnings,
+  warningCountBadgeClass,
+} from '@/lib/examAntiCheat.js'
+import { getFocusViolationFromKey, isFullscreenRestoreKey } from '@/lib/examScreenshotGuard.js'
+import { useInstitutionTheme } from '@/context/InstitutionThemeContext.jsx'
 import { computeExamTimeDisplay } from '@/lib/examCountdown.js'
 import { acsisToastError } from '@/lib/acsisToast.js'
 
@@ -41,6 +48,7 @@ const AUTOSAVE_DEBOUNCE_MS = 800
 function isExamScene(name) {
   return name === 'question'
 }
+
 
 function questionTypeLabel(type) {
   if (type === 'multiple-choice') return 'Multiple choice'
@@ -62,6 +70,8 @@ export default function StudentExamSessionPage() {
   const examId = searchParams.get('examId') || ''
   const { activeAccount } = useSession()
   const { theme } = useTheme()
+  const { institution } = useInstitutionTheme()
+  const institutionMaxWarnings = institution?.maxWarnings
 
   const [hit, setHit] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -86,8 +96,9 @@ export default function StudentExamSessionPage() {
         return
       }
       setNeedsPassword(false)
-      setWarningCount(Number(data.warningCount || 0))
-      setMaxWarnings(Number(data.maxWarnings) > 0 ? Number(data.maxWarnings) : 3)
+      const loadedMax = resolveMaxWarnings(data.maxWarnings, institutionMaxWarnings)
+      setMaxWarnings(loadedMax)
+      setWarningCount(displayStrikeCount(data.warningCount, loadedMax))
       setExamLocked(Boolean(data.sessionLocked))
       setLockReason(data.lockReason || null)
       if (data.savedAnswers && typeof data.savedAnswers === 'object') {
@@ -115,7 +126,7 @@ export default function StudentExamSessionPage() {
     } finally {
       setLoading(false)
     }
-  }, [classId, examId])
+  }, [classId, examId, institutionMaxWarnings])
 
   useEffect(() => {
     setLoading(true)
@@ -167,12 +178,43 @@ export default function StudentExamSessionPage() {
   const [submitResult, setSubmitResult] = useState(null)
   const [submitError, setSubmitError] = useState(null)
   const [warningCount, setWarningCount] = useState(0)
-  const [maxWarnings, setMaxWarnings] = useState(3)
+  const [maxWarnings, setMaxWarnings] = useState(() =>
+    resolveMaxWarnings(undefined, institutionMaxWarnings),
+  )
   const [examLocked, setExamLocked] = useState(false)
   const [lockReason, setLockReason] = useState(null)
   const [lastViolationLabel, setLastViolationLabel] = useState('')
   const lockingRef = useRef(false)
   const autosaveSkipRef = useRef(true)
+  const fullscreenKeyHandledUntilRef = useRef(0)
+  const examLockedRef = useRef(false)
+  const warningCountRef = useRef(0)
+  const maxWarningsRef = useRef(resolveMaxWarnings(undefined, institutionMaxWarnings))
+
+  useEffect(() => {
+    examLockedRef.current = examLocked
+  }, [examLocked])
+  useEffect(() => {
+    warningCountRef.current = warningCount
+  }, [warningCount])
+  useEffect(() => {
+    maxWarningsRef.current = maxWarnings
+  }, [maxWarnings])
+
+  const requestExamFullscreen = useCallback(() => {
+    const el = document.documentElement
+    if (!document.fullscreenElement && el.requestFullscreen) {
+      el.requestFullscreen().catch(() => {})
+    }
+  }, [])
+
+  const markFullscreenKeyHandled = useCallback(() => {
+    fullscreenKeyHandledUntilRef.current = Date.now() + 900
+  }, [])
+
+  const wasFullscreenKeyRecent = useCallback(() => {
+    return Date.now() < fullscreenKeyHandledUntilRef.current
+  }, [])
 
   const applyExamLock = useCallback(
     async (reason = 'time_up') => {
@@ -182,15 +224,19 @@ export default function StudentExamSessionPage() {
         const res = await lockStudentExam(classId, examId, reason)
         setExamLocked(true)
         setLockReason(res.lockReason || reason)
-        if (res.maxWarnings != null) setMaxWarnings(Number(res.maxWarnings))
-        if (res.warningCount != null) setWarningCount(Number(res.warningCount))
+        setMaxWarnings(resolveMaxWarnings(res.maxWarnings, institutionMaxWarnings))
+        if (res.warningCount != null) {
+          setWarningCount(
+            displayStrikeCount(res.warningCount, resolveMaxWarnings(res.maxWarnings, institutionMaxWarnings)),
+          )
+        }
       } catch (err) {
         console.error('[exam lock]', err)
         setExamLocked(true)
         setLockReason(reason)
       }
     },
-    [classId, examId],
+    [classId, examId, institutionMaxWarnings],
   )
 
   const submitToServer = useCallback(async () => {
@@ -262,7 +308,9 @@ export default function StudentExamSessionPage() {
 
   const [detectionOpen, setDetectionOpen] = useState(false)
   const [detectionReturn, setDetectionReturn] = useState(DETECTION_RETURN_SEC)
+  const [overlayStrikeDisplay, setOverlayStrikeDisplay] = useState(null)
   const detectionRunningRef = useRef(false)
+  const pendingMaxWarningsLockRef = useRef(false)
   const postCooldownUntilRef = useRef(0)
   const visibilityTimerRef = useRef(null)
   const returnSceneRef = useRef('question')
@@ -305,29 +353,39 @@ export default function StudentExamSessionPage() {
     return () => window.clearTimeout(timer)
   }, [answers, scene, examLocked, classId, examId, questions])
 
-  const showViolationOverlay = useCallback((returnTo) => {
-    detectionRunningRef.current = true
-    returnSceneRef.current = returnTo
-    setDetectionReturn(DETECTION_RETURN_SEC)
-    setDetectionOpen(true)
+  const showViolationOverlay = useCallback(
+    (returnTo, { restoreFullscreenAfter = false } = {}) => {
+      detectionRunningRef.current = true
+      returnSceneRef.current = returnTo
+      setDetectionReturn(DETECTION_RETURN_SEC)
+      setDetectionOpen(true)
 
-    let left = DETECTION_RETURN_SEC
-    const tick = () => {
-      setDetectionReturn(left)
-      if (left <= 0) {
-        setDetectionOpen(false)
-        window.setTimeout(() => {
-          setScene(returnSceneRef.current)
-          detectionRunningRef.current = false
-          postCooldownUntilRef.current = Date.now() + POST_DETECTION_COOLDOWN_MS
-        }, OVERLAY_FADE_MS)
-        return
+      let left = DETECTION_RETURN_SEC
+      const tick = () => {
+        setDetectionReturn(left)
+        if (left <= 0) {
+          setDetectionOpen(false)
+          window.setTimeout(() => {
+            setScene(returnSceneRef.current)
+            detectionRunningRef.current = false
+            setOverlayStrikeDisplay(null)
+            postCooldownUntilRef.current = Date.now() + POST_DETECTION_COOLDOWN_MS
+            if (pendingMaxWarningsLockRef.current) {
+              pendingMaxWarningsLockRef.current = false
+              void applyExamLock('max_warnings')
+            } else if (restoreFullscreenAfter && isExamScene(returnSceneRef.current)) {
+              requestExamFullscreen()
+            }
+          }, OVERLAY_FADE_MS)
+          return
+        }
+        left -= 1
+        window.setTimeout(tick, 1000)
       }
-      left -= 1
-      window.setTimeout(tick, 1000)
-    }
-    tick()
-  }, [])
+      tick()
+    },
+    [requestExamFullscreen, applyExamLock],
+  )
 
   const recordViolation = useCallback(
     async (eventType, details = null, opts = {}) => {
@@ -335,25 +393,57 @@ export default function StudentExamSessionPage() {
       if (!opts.skipCooldown && Date.now() < postCooldownUntilRef.current) return
       if (!isExamScene(sceneRef.current)) return
       if (!classId || !examId) return
+
+      const strikeMax = resolveMaxWarnings(maxWarningsRef.current, institutionMaxWarnings)
+      const strikesNow = Number(warningCountRef.current) || 0
+      if (examLockedRef.current || strikesNow >= strikeMax) return
+
+      detectionRunningRef.current = true
       if (!opts.skipCooldown) {
         postCooldownUntilRef.current = Date.now() + 1500
       }
 
-      setLastViolationLabel(labelForCheatEvent(eventType))
-      showViolationOverlay(sceneRef.current)
+      const nextStrike = Math.min(strikesNow + 1, strikeMax)
+      const isFinalStrike = nextStrike >= strikeMax
 
-      let count = warningCount
+      setLastViolationLabel(
+        details ? `${labelForCheatEvent(eventType)} (${details})` : labelForCheatEvent(eventType),
+      )
+      setOverlayStrikeDisplay(nextStrike)
+      showViolationOverlay(sceneRef.current, {
+        restoreFullscreenAfter: Boolean(opts.restoreFullscreenAfter) && !isFinalStrike,
+      })
+
+      let count = strikesNow
       try {
-        const res = await logExamCheating(classId, examId, eventType, details)
-        count = Number(res.warningCount ?? count + 1)
+        let res
+        try {
+          res = await logExamCheating(classId, examId, eventType, details)
+        } catch (firstErr) {
+          if (eventType !== 'other') {
+            res = await logExamCheating(
+              classId,
+              examId,
+              'other',
+              `${eventType}${details ? `: ${details}` : ''}`,
+            )
+          } else {
+            throw firstErr
+          }
+        }
+        const resolvedMax = resolveMaxWarnings(res.maxWarnings, institutionMaxWarnings)
+        count = displayStrikeCount(res.warningCount ?? count + 1, resolvedMax)
         setWarningCount(count)
-        if (res.maxWarnings != null) setMaxWarnings(Number(res.maxWarnings))
+        warningCountRef.current = count
+        setOverlayStrikeDisplay(count)
+        setMaxWarnings(resolvedMax)
+        maxWarningsRef.current = resolvedMax
 
         if (res.sessionLocked) {
           setExamLocked(true)
+          examLockedRef.current = true
           setLockReason('max_warnings')
-          setDetectionOpen(false)
-          detectionRunningRef.current = false
+          pendingMaxWarningsLockRef.current = true
           return
         }
       } catch (err) {
@@ -365,15 +455,22 @@ export default function StudentExamSessionPage() {
         }
       }
 
-      if (count >= maxWarnings) {
+      if (count >= strikeMax) {
         setExamLocked(true)
+        examLockedRef.current = true
         setLockReason('max_warnings')
-        setDetectionOpen(false)
-        detectionRunningRef.current = false
-        void applyExamLock('max_warnings')
+        pendingMaxWarningsLockRef.current = true
       }
     },
-    [classId, examId, warningCount, maxWarnings, showViolationOverlay, applyExamLock],
+    [
+      classId,
+      examId,
+      warningCount,
+      maxWarnings,
+      institutionMaxWarnings,
+      showViolationOverlay,
+      applyExamLock,
+    ],
   )
 
   const scheduleTabLeave = useCallback(() => {
@@ -407,15 +504,61 @@ export default function StudentExamSessionPage() {
       if (!isExamScene(sceneRef.current) || detectionRunningRef.current) return
       scheduleTabLeave()
     }
+    let lastFullscreenExitLogAt = 0
     function onFullscreenChange() {
       if (!isExamScene(sceneRef.current) || detectionRunningRef.current) return
       if (!document.fullscreenElement) {
-        recordViolation('window_blur', 'Exited fullscreen')
+        if (wasFullscreenKeyRecent()) return
+        const strikeMax = resolveMaxWarnings(maxWarningsRef.current, institutionMaxWarnings)
+        if (examLockedRef.current || (Number(warningCountRef.current) || 0) >= strikeMax) return
+        const now = Date.now()
+        if (now - lastFullscreenExitLogAt < 2000) return
+        lastFullscreenExitLogAt = now
+        recordViolation('window_blur', 'Exited fullscreen', { restoreFullscreenAfter: true })
       }
     }
+    let lastFocusKeyLogAt = 0
+    let lastFullscreenKeyStrikeAt = 0
+    function blockFocusKeys(ev) {
+      if (detectionRunningRef.current) return false
+      if (!isExamScene(sceneRef.current)) return false
+      const violation = getFocusViolationFromKey(ev)
+      if (!violation) return false
+      ev.preventDefault()
+      ev.stopPropagation()
+      const now = Date.now()
+      if (now - lastFocusKeyLogAt < 600) return true
+      lastFocusKeyLogAt = now
+      recordViolation(violation.eventType, violation.details, { skipCooldown: true })
+      return true
+    }
+    function blockFullscreenExitKey(ev) {
+      if (!isExamScene(sceneRef.current)) return false
+      if (!isFullscreenRestoreKey(ev)) return false
+      ev.preventDefault()
+      ev.stopPropagation()
+      if (ev.type === 'keyup') return true
+      if (ev.repeat) return true
+      const strikeMax = resolveMaxWarnings(maxWarningsRef.current, institutionMaxWarnings)
+      if (examLockedRef.current || (Number(warningCountRef.current) || 0) >= strikeMax) return true
+      if (detectionRunningRef.current) return true
+      const now = Date.now()
+      if (now - lastFullscreenKeyStrikeAt < 800) return true
+      lastFullscreenKeyStrikeAt = now
+      markFullscreenKeyHandled()
+      const label = ev.code === 'F11' ? 'Pressed F11' : 'Pressed Escape'
+      recordViolation('window_blur', label, { restoreFullscreenAfter: true, skipCooldown: true })
+      return true
+    }
+    function onFocusKeyUp(ev) {
+      if (blockFullscreenExitKey(ev)) return
+      blockFocusKeys(ev)
+    }
     function onKey(ev) {
-      if (detectionRunningRef.current) return
       if (!isExamScene(sceneRef.current)) return
+      if (blockFullscreenExitKey(ev)) return
+      if (detectionRunningRef.current) return
+      if (blockFocusKeys(ev)) return
       if (ev.code === 'F8') {
         ev.preventDefault()
         recordViolation('devtools_open', 'F8 pressed', { skipCooldown: true })
@@ -452,7 +595,9 @@ export default function StudentExamSessionPage() {
     window.addEventListener('blur', onWindowBlur)
     document.addEventListener('visibilitychange', onVis)
     document.addEventListener('fullscreenchange', onFullscreenChange)
+    document.addEventListener('webkitfullscreenchange', onFullscreenChange)
     document.addEventListener('keydown', onKey, true)
+    document.addEventListener('keyup', onFocusKeyUp, true)
     document.addEventListener('copy', onCopy, true)
     document.addEventListener('cut', onCut, true)
     document.addEventListener('paste', onPaste, true)
@@ -460,13 +605,22 @@ export default function StudentExamSessionPage() {
       window.removeEventListener('blur', onWindowBlur)
       document.removeEventListener('visibilitychange', onVis)
       document.removeEventListener('fullscreenchange', onFullscreenChange)
+      document.removeEventListener('webkitfullscreenchange', onFullscreenChange)
       document.removeEventListener('keydown', onKey, true)
+      document.removeEventListener('keyup', onFocusKeyUp, true)
       document.removeEventListener('copy', onCopy, true)
       document.removeEventListener('cut', onCut, true)
       document.removeEventListener('paste', onPaste, true)
       cancelTabLeave()
     }
-  }, [cancelTabLeave, scheduleTabLeave, recordViolation])
+  }, [
+    cancelTabLeave,
+    scheduleTabLeave,
+    recordViolation,
+    markFullscreenKeyHandled,
+    wasFullscreenKeyRecent,
+    requestExamFullscreen,
+  ])
 
   useEffect(() => {
     if (scene !== 'question') return undefined
@@ -480,16 +634,23 @@ export default function StudentExamSessionPage() {
 
   useEffect(() => {
     if (scene !== 'question') return undefined
-    const root = document.documentElement
-    if (root.requestFullscreen) {
-      root.requestFullscreen().catch(() => {})
-    }
+    requestExamFullscreen()
+    const guard = window.setInterval(() => {
+      if (
+        sceneRef.current === 'question' &&
+        !document.fullscreenElement &&
+        !detectionRunningRef.current
+      ) {
+        requestExamFullscreen()
+      }
+    }, 500)
     return () => {
+      window.clearInterval(guard)
       if (document.fullscreenElement && document.exitFullscreen) {
         document.exitFullscreen().catch(() => {})
       }
     }
-  }, [scene])
+  }, [scene, requestExamFullscreen])
 
   useEffect(() => {
     if (scene !== 'countdown') return undefined
@@ -616,12 +777,13 @@ export default function StudentExamSessionPage() {
             <p>This examination system monitors your activity to ensure academic fairness.</p>
             <p>
               Actions like <strong>tab switching</strong>, <strong>leaving the exam page</strong>,{' '}
-              <strong>screenshots</strong>, or <strong>right-clicking</strong> are detected. Avoid pressing the
-              Windows key.
+              <strong>screenshots</strong>, <strong>right-clicking</strong>, pressing the{' '}
+              <strong>Windows key</strong>, or leaving fullscreen (<strong>F11</strong> / <strong>Esc</strong>) are
+              counted as strikes. After an F11/Esc warning, you will return to fullscreen automatically.
             </p>
             <p>
-              You are allowed up to <strong>3 strikes</strong> only. If this limit is exceeded, your exam will be
-              automatically submitted.
+              You are allowed up to <strong>{maxWarnings} strikes</strong> only. If this limit is exceeded, your
+              exam will be automatically submitted.
             </p>
             <p>Please remain on this page and complete the exam honestly.</p>
           </div>
@@ -713,29 +875,53 @@ export default function StudentExamSessionPage() {
   }
 
   // Main Question Layout
+  const overlayStrikes =
+    overlayStrikeDisplay ?? displayStrikeCount(warningCount, maxWarnings)
+  const overlayIsFinalStrike = overlayStrikes >= maxWarnings
+
   const detectionOverlay =
     typeof document !== 'undefined'
       ? createPortal(
           <div
-            className={`detection-overlay${detectionOpen ? ' is-active' : ''}`}
+            className={`detection-overlay${detectionOpen ? ' is-active' : ''}${
+              overlayIsFinalStrike ? ' detection-overlay--final' : ''
+            }`}
             role="alertdialog"
             aria-modal="true"
             aria-live="assertive"
           >
             <AlertTriangle className="detection-overlay__icon" aria-hidden />
-            <h2 className="detection-title">Warning — Suspicious Activity!</h2>
+            <h2 className="detection-title">
+              {overlayIsFinalStrike
+                ? 'Final Warning — Maximum Strikes Reached'
+                : 'Warning — Suspicious Activity!'}
+            </h2>
             <p className="detection-sub">
-              {lastViolationLabel || 'A proctoring rule was violated.'} This incident was logged for your
-              instructor and administrator.
+              {overlayIsFinalStrike ? (
+                <>
+                  You have reached <strong>{maxWarnings} of {maxWarnings}</strong> integrity warnings.
+                  Your exam is now <strong>locked</strong> — you may review answers but cannot change them.
+                  Click <strong>Send exam</strong> when you are ready to submit.
+                </>
+              ) : (
+                <>
+                  {lastViolationLabel || 'A proctoring rule was violated.'} This incident was logged for
+                  your instructor and administrator.
+                </>
+              )}
             </p>
             <p className="detection-strikes">
-              Strike {warningCount} of {maxWarnings}
-              {warningCount >= maxWarnings - 1 && warningCount < maxWarnings
-                ? ' — one more locks your exam'
-                : ''}
+              Strike {overlayStrikes} of {maxWarnings}
+              {overlayIsFinalStrike
+                ? ' — no further warnings remain'
+                : overlayStrikes >= maxWarnings - 1 && overlayStrikes < maxWarnings
+                  ? ' — one more locks your exam'
+                  : ''}
             </p>
             <p className="detection-countdown">
-              Returning to exam in {detectionReturn} seconds…
+              {overlayIsFinalStrike
+                ? `Returning to your locked exam in ${detectionReturn} seconds…`
+                : `Returning to exam in ${detectionReturn} seconds…`}
             </p>
           </div>,
           document.body,
@@ -751,17 +937,14 @@ export default function StudentExamSessionPage() {
       >
         <div className="flex items-center gap-3 ml-auto shrink-0">
           <div
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold ${
-              warningCount >= 2
-                ? 'bg-red-900/40 text-red-200'
-                : warningCount >= 1
-                  ? 'bg-orange-900/40 text-orange-200'
-                  : 'bg-white/10 text-white/80'
-            }`}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold ${warningCountBadgeClass(
+              displayStrikeCount(warningCount, maxWarnings),
+              maxWarnings,
+            )}`}
             title={`Integrity warnings — ${maxWarnings} strikes locks your exam for manual submit`}
           >
             <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden />
-            {warningCount} / {maxWarnings} warnings
+            {displayStrikeCount(warningCount, maxWarnings)} / {maxWarnings} warnings
           </div>
           <div className="exam-timer flex items-center gap-2 lg:hidden">
             <Clock className="w-4 h-4 shrink-0 opacity-80" aria-hidden />

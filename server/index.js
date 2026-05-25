@@ -16,6 +16,7 @@ import teacherTermsRouter from './routes/teacherTerms.js'
 import studentRouter from './routes/student.js'
 import { logSmtpStatus } from './lib/sendEmail.js'
 import { ensurePasswordResetSchema } from './lib/ensurePasswordResetSchema.js'
+import { ensureCheatEventSchema } from './lib/ensureCheatEventSchema.js'
 
 try {
   if (config.google.clientId && config.google.clientSecret) {
@@ -57,6 +58,7 @@ app.listen(config.port, async () => {
   if (config.databaseUrl) {
     try {
       await ensurePasswordResetSchema()
+      await ensureCheatEventSchema()
     } catch (err) {
       console.warn('  Password reset schema check failed:', err.message)
     }

@@ -362,9 +362,15 @@ export async function logCheatingEventService(classId, examId, studentMemberId, 
   const gate = await requireOpenSession(classId, examId, studentMemberId)
   if (!gate.ok) return gate
 
-  await insertCheatingLogQuery(gate.session.session_id, eventType, details || null)
-  const warningCount = await incrementSessionWarningQuery(gate.session.session_id)
   const maxWarnings = await getInstitutionMaxWarnings(gate.exam.institution_id)
+  const priorWarnings = Number(gate.session.warning_count ?? 0)
+
+  await insertCheatingLogQuery(gate.session.session_id, eventType, details || null)
+
+  let warningCount = priorWarnings
+  if (!shouldLockExam(priorWarnings, maxWarnings)) {
+    warningCount = await incrementSessionWarningQuery(gate.session.session_id)
+  }
 
   let sessionLocked = Boolean(gate.session.locked_at)
   if (shouldLockExam(warningCount, maxWarnings)) {

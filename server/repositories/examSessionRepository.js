@@ -1,4 +1,5 @@
 import { getPool } from '../db.js'
+import { ensureCheatEventSchema } from '../lib/ensureCheatEventSchema.js'
 import { getExamSessionUserColumn } from '../lib/schemaCompat.js'
 import { ensureExamSessionShuffleColumns } from '../lib/ensureExamSessionShuffleSchema.js'
 import { ensureExamSessionLockedColumns } from '../lib/ensureExamSessionLockedSchema.js'
@@ -195,6 +196,8 @@ const CHEAT_EVENTS = new Set([
   'paste_attempt',
   'window_blur',
   'devtools_open',
+  'screenshot_attempt',
+  'win_key',
   'other',
 ])
 
@@ -203,12 +206,25 @@ export function isValidCheatEvent(type) {
 }
 
 export async function insertCheatingLogQuery(sessionId, eventType, details = null) {
+  await ensureCheatEventSchema()
   const pool = getPool()
-  await pool.query(
-    `INSERT INTO cheating_logs (session_id, event_type, details)
-     VALUES ($1, $2::cheat_event, $3)`,
-    [sessionId, eventType, details],
-  )
+  try {
+    await pool.query(
+      `INSERT INTO cheating_logs (session_id, event_type, details)
+       VALUES ($1, $2::cheat_event, $3)`,
+      [sessionId, eventType, details],
+    )
+  } catch (err) {
+    const msg = String(err?.message || '')
+    const invalidEnum =
+      err?.code === '22P02' || msg.includes('invalid input value for enum') || msg.includes('cheat_event')
+    if (eventType === 'other' || !invalidEnum) throw err
+    await pool.query(
+      `INSERT INTO cheating_logs (session_id, event_type, details)
+       VALUES ($1, 'other'::cheat_event, $2)`,
+      [sessionId, `[${eventType}] ${details || ''}`.slice(0, 500)],
+    )
+  }
 }
 
 export async function incrementSessionWarningQuery(sessionId) {

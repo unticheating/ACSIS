@@ -385,6 +385,8 @@ function formatCheatEventLabel(event) {
     paste_attempt: 'Paste attempt',
     window_blur: 'Window blur',
     devtools_open: 'Developer tools opened',
+    screenshot_attempt: 'Screenshot attempt',
+    win_key: 'Windows / system key',
     other: 'Suspicious activity',
   }
   return map[event] || String(event || 'Activity')

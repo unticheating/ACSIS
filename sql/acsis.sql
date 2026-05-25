@@ -51,6 +51,8 @@ BEGIN
             'paste_attempt',
             'window_blur',
             'devtools_open',
+            'screenshot_attempt',
+            'win_key',
             'other'
         );
     END IF;
