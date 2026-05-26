@@ -1,5 +1,6 @@
-import { Link, useLocation } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 import { coerceDisplayString } from '@/lib/coerceDisplay.js'
+import BreadcrumbTrailNav from '@/components/layout/BreadcrumbTrailNav.jsx'
 import InstitutionLogo from '@/components/brand/InstitutionLogo.jsx'
 import { useInstitutionTheme } from '@/context/InstitutionThemeContext.jsx'
 import { useDetectionsToolbar } from '@/context/DetectionsToolbarContext.jsx'
@@ -48,25 +49,8 @@ export default function MobileTopBar({ settingsPath = null, role }) {
             <span className="brand-plp">{coerceDisplayString(acronym)}</span>
             <span className="brand-acsis"> ACSIS</span>
           </span>
-          <span className="breadcrumb__trail">
-            {items.map((item, index) => {
-              const isLast = index === items.length - 1
-              return (
-                <span key={`${coerceDisplayString(item.label)}-${index}`} className="breadcrumb__segment">
-                  <span className="sep">/</span>
-                  {item.to && !isLast ? (
-                    <Link to={item.to} className="breadcrumb__link">
-                      {coerceDisplayString(item.label)}
-                    </Link>
-                  ) : (
-                    <span className={isLast ? 'page-name' : 'breadcrumb__crumb'}>
-                      {coerceDisplayString(item.label)}
-                    </span>
-                  )}
-                </span>
-              )
-            })}
-          </span>
+          {items.length > 0 ? <span className="sep">/</span> : null}
+          <BreadcrumbTrailNav segments={items} />
         </div>
       </div>
       <div className="acsis-mobile-top-bar__actions">

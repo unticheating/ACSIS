@@ -579,6 +579,11 @@ html.dark .acsis-student-exam .exam-question-image {
     color: #6b8f7a;
   }
 
+  html.dark .acsis-mobile-top-bar__breadcrumb .breadcrumb__ellipsis,
+  html.dark .acsis-mobile-top-bar__breadcrumb .breadcrumb__link {
+    color: var(--brand-mark, #4ade80);
+  }
+
   html.dark .acsis-mobile-account-trigger {
     background: rgba(255, 255, 255, 0.06);
     border-color: var(--acsis-shell-border-subtle, rgba(74, 222, 128, 0.15));

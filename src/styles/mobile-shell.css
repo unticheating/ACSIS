@@ -85,7 +85,7 @@
     min-width: 0;
     flex: 1;
     display: flex;
-    align-items: baseline;
+    align-items: center;
     flex-wrap: nowrap;
     gap: 0;
     margin: 0;
@@ -99,14 +99,74 @@
     overflow: hidden;
   }
 
+  .acsis-mobile-top-bar__breadcrumb .breadcrumb__brand {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
   .acsis-mobile-top-bar__breadcrumb .breadcrumb__trail {
     min-width: 0;
     flex: 1 1 auto;
+    display: flex;
+    align-items: center;
     overflow: hidden;
   }
 
-  .acsis-mobile-top-bar__breadcrumb .breadcrumb__segment:last-child .page-name {
+  .acsis-mobile-top-bar__breadcrumb .breadcrumb__trail-full {
+    display: none;
+  }
+
+  .acsis-mobile-top-bar__breadcrumb .breadcrumb__trail-mobile {
+    display: inline-flex;
+    align-items: center;
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+    max-width: 100%;
+  }
+
+  .acsis-mobile-top-bar__breadcrumb .breadcrumb__current {
+    flex-shrink: 0;
+    overflow: visible;
+    text-overflow: clip;
     max-width: none;
+    white-space: nowrap;
+  }
+
+  .acsis-mobile-top-bar__breadcrumb .breadcrumb__ellipsis {
+    appearance: none;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    flex-shrink: 0;
+    font-family: inherit;
+    font-size: 1.0625rem;
+    font-weight: 700;
+    line-height: 1.25;
+    color: var(--brand-mark, #14532d);
+    padding: 2px 4px;
+    margin: 0;
+    border-radius: 6px;
+    user-select: none;
+  }
+
+  .acsis-mobile-top-bar__breadcrumb .breadcrumb__ellipsis:hover,
+  .acsis-mobile-top-bar__breadcrumb .breadcrumb__ellipsis:focus-visible {
+    background: rgba(22, 163, 74, 0.12);
+    outline: none;
+  }
+
+  .acsis-mobile-top-bar__breadcrumb .breadcrumb__link {
+    color: var(--brand-mark, #14532d);
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .acsis-mobile-top-bar__breadcrumb .breadcrumb__link:hover {
+    text-decoration: underline;
   }
 
   .acsis-mobile-top-bar__breadcrumb .brand-plp,
