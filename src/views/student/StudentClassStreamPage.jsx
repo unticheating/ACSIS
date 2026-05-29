@@ -9,7 +9,8 @@ import {
 import { DropdownMenuActionItem } from '@/components/ui/dropdown-menu-action-item.jsx'
 import { apiFetch } from '@/lib/apiFetch.js'
 import { acsisToastError } from '@/lib/acsisToast.js'
-import { formatCourseDisplayLabels, formatTermPeriod } from '@/lib/sectionLabel.js'
+import ClassCourseHeader from '@/components/classes/ClassCourseHeader.jsx'
+import { formatCourseDisplayLabels } from '@/lib/sectionLabel.js'
 import {
   canStudentEnterExamCode,
   isExamEnterableByStudent,
@@ -21,6 +22,7 @@ import {
 import { joinStudentExam } from '@/lib/studentExamApi.js'
 import FadeIn from '@/components/ui/fade-in.jsx'
 import '../../pages/teacher-ui/my_classes.css'
+import '../../styles/class-card-patterns.css'
 import '../../pages/student-ui/enrolled_classes.css'
 
 export default function StudentClassStreamPage() {
@@ -149,38 +151,32 @@ export default function StudentClassStreamPage() {
     )
   }
 
-  const { primary, secondary } = formatCourseDisplayLabels(cls)
-  const period = formatTermPeriod(cls)
-
   return (
     <div className="acsis-mc-view acsis-view">
       <Link to="/student/my-classes" className="acsis-stream-back">
         ← Enrolled classes
       </Link>
 
-      <FadeIn as="section" delay={0.05} className="acsis-course-banner cyber-banner" aria-label="Course details">
-        <div className="acsis-course-banner__menu">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button type="button" className="acsis-class-card__menu-btn" aria-label="Class options">
-                <MoreVertical size={18} strokeWidth={2} />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-[11rem]">
-              <DropdownMenuActionItem icon={UserMinus} variant="destructive" onSelect={unenrollFromClass}>
-                Unenroll from class
-              </DropdownMenuActionItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-
-        <div className="acsis-course-banner__bottom-row">
-          <div className="acsis-course-banner__copy">
-            <h1 className="acsis-course-banner__code">{primary}</h1>
-            {secondary ? <p className="acsis-course-banner__name">{secondary}</p> : null}
-            {period ? <p className="acsis-course-banner__period">{period}</p> : null}
-          </div>
-        </div>
+      <FadeIn as="div" delay={0.05}>
+        <ClassCourseHeader
+          course={cls}
+          size="banner"
+          className="cyber-banner"
+          menu={
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button type="button" className="acsis-class-card__menu-btn" aria-label="Class options">
+                  <MoreVertical size={18} strokeWidth={2} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-[11rem]">
+                <DropdownMenuActionItem icon={UserMinus} variant="destructive" onSelect={unenrollFromClass}>
+                  Unenroll from class
+                </DropdownMenuActionItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          }
+        />
       </FadeIn>
 
       {examsSorted.length === 0 ? (

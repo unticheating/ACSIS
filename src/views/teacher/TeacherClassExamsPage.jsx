@@ -9,7 +9,11 @@ import {
   PG_EXAM_STATUS,
   normalizeExamStatus,
 } from '@/lib/examFlowUi.js'
-import { Copy, MoreVertical, Pencil, Play, Send, Trash2 } from 'lucide-react'
+import { Copy, MoreVertical, Palette, Pencil, Play, Send, Trash2 } from 'lucide-react'
+import ClassCourseHeader from '@/components/classes/ClassCourseHeader.jsx'
+import ClassHeaderAppearancePicker from '@/components/classes/ClassHeaderAppearancePicker.jsx'
+import { normalizeHeaderPattern } from '@/lib/classCardPatterns.js'
+import { normalizeHeaderColor } from '@/lib/classHeaderColor.js'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,6 +38,7 @@ import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
 import { copyToClipboard } from '@/lib/copyToClipboard.js'
 import { useAcsisConfirm } from '@/hooks/useAcsisConfirm.jsx'
 import '../../pages/teacher-ui/my_classes.css'
+import '../../styles/class-card-patterns.css'
 
 const EXAM_FILTER_OPTIONS = [
   { id: 'all', label: 'All exams' },
@@ -63,6 +68,11 @@ export default function TeacherClassExamsPage() {
   const [editCode, setEditCode] = useState('')
   const [editName, setEditName] = useState('')
   const [savingCourse, setSavingCourse] = useState(false)
+
+  const [appearanceOpen, setAppearanceOpen] = useState(false)
+  const [patternDraft, setPatternDraft] = useState('grid')
+  const [colorDraft, setColorDraft] = useState(null)
+  const [savingAppearance, setSavingAppearance] = useState(false)
 
   useEffect(() => {
     async function loadData() {
@@ -235,6 +245,47 @@ export default function TeacherClassExamsPage() {
     }
   }
 
+  function openAppearanceDialog() {
+    setPatternDraft(normalizeHeaderPattern(cls?.headerPattern))
+    setColorDraft(normalizeHeaderColor(cls?.headerColor))
+    setAppearanceOpen(true)
+  }
+
+  async function saveAppearance() {
+    if (!cls?.id) return
+    setSavingAppearance(true)
+    try {
+      const res = await apiFetch(`/api/teacher/classes/${cls.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          headerPattern: patternDraft,
+          headerColor: colorDraft,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to update background.')
+      }
+      setCls((prev) =>
+        prev
+          ? {
+              ...prev,
+              headerPattern: patternDraft,
+              headerColor: colorDraft,
+            }
+          : prev,
+      )
+      acsisToastSuccess('Class appearance updated.')
+      setAppearanceOpen(false)
+      refresh()
+    } catch (err) {
+      acsisToastError(err instanceof Error ? err.message : 'Failed to update background.')
+    } finally {
+      setSavingAppearance(false)
+    }
+  }
+
   async function deleteCourse() {
     const ok = await confirm({
       title: `Delete “${coursePrimary}”?`,
@@ -258,8 +309,9 @@ export default function TeacherClassExamsPage() {
 
   return (
     <div className="acsis-mc-view acsis-view">
-      <section className="acsis-course-banner" aria-label="Course details">
-        <div className="acsis-course-banner__menu">
+      <ClassCourseHeader
+        course={cls}
+        menu={
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button type="button" className="acsis-class-card__menu-btn" aria-label="Course options">
@@ -267,6 +319,9 @@ export default function TeacherClassExamsPage() {
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-[11rem]">
+              <DropdownMenuActionItem icon={Palette} onSelect={openAppearanceDialog}>
+                Change background
+              </DropdownMenuActionItem>
               <DropdownMenuActionItem icon={Pencil} onSelect={openEditCourse}>
                 Edit course
               </DropdownMenuActionItem>
@@ -276,15 +331,9 @@ export default function TeacherClassExamsPage() {
               </DropdownMenuActionItem>
             </DropdownMenuContent>
           </DropdownMenu>
-        </div>
-
-        <div className="acsis-course-banner__bottom-row">
-          <div className="acsis-course-banner__copy">
-            <h1 className="acsis-course-banner__code">{coursePrimary}</h1>
-            {courseSecondary ? <p className="acsis-course-banner__name">{courseSecondary}</p> : null}
-          </div>
-
-          {cls.accessCode ? (
+        }
+        extra={
+          cls.accessCode ? (
             <div className="acsis-course-banner__code-block">
               <span className="acsis-course-banner__code-label">Class code</span>
               <button
@@ -298,9 +347,9 @@ export default function TeacherClassExamsPage() {
                 <span className="acsis-sr-only">Copy class code</span>
               </button>
             </div>
-          ) : null}
-        </div>
-      </section>
+          ) : null
+        }
+      />
 
       <div className="acsis-class-toolbar">
         <div className="acsis-class-toolbar__filters">
@@ -529,6 +578,42 @@ export default function TeacherClassExamsPage() {
             </button>
             <button type="button" className="acsis-mc-create-btn" onClick={saveCourse} disabled={savingCourse}>
               {savingCourse ? 'Saving…' : 'Save'}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={appearanceOpen} onOpenChange={setAppearanceOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Class background</DialogTitle>
+            <DialogDescription>
+              Pick a background color and pattern. Students see the same look on the class page and enrolled classes list.
+            </DialogDescription>
+          </DialogHeader>
+          <ClassHeaderAppearancePicker
+            pattern={patternDraft}
+            onPatternChange={setPatternDraft}
+            color={colorDraft}
+            onColorChange={setColorDraft}
+            disabled={savingAppearance}
+          />
+          <DialogFooter>
+            <button
+              type="button"
+              className="acsis-btn-ghost"
+              onClick={() => setAppearanceOpen(false)}
+              disabled={savingAppearance}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="acsis-mc-create-btn"
+              onClick={saveAppearance}
+              disabled={savingAppearance}
+            >
+              {savingAppearance ? 'Saving…' : 'Save'}
             </button>
           </DialogFooter>
         </DialogContent>

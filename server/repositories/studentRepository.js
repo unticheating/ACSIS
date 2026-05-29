@@ -51,9 +51,19 @@ export async function unenrollStudent(memberId, classId) {
 export async function getEnrolledClasses(memberId) {
   const pool = getPool();
   const result = await pool.query(
-    `SELECT c.class_id as id, c.course_code as "courseCode", c.class_name as name, c.school_year as "academicYear", c.semester
+    `SELECT
+       c.class_id as id,
+       c.course_code as "courseCode",
+       c.class_name as name,
+       c.school_year as "academicYear",
+       c.semester,
+       c.header_pattern as "headerPattern",
+       c.header_color as "headerColor",
+       TRIM(u.first_name || ' ' || u.last_name) as "instructorName"
      FROM classes c
      JOIN class_enrollments ce ON ce.class_id = c.class_id
+     JOIN institution_members im ON c.member_id = im.member_id
+     JOIN users u ON im.uid = u.uid
      WHERE ce.member_id = $1 AND c.is_active = TRUE
      ORDER BY ce.enrolled_at DESC`,
     [memberId]

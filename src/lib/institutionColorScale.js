@@ -84,3 +84,12 @@ export function buildBrandScale(primaryHex) {
     700: shade(primary, 0.25),
   }
 }
+
+/** Dark enough brand text on white / light gray UI (WCAG-friendly). */
+export function readableBrandTextOnLight(primaryHex) {
+  const primary = normalizeHex(primaryHex)
+  const { l } = hexToHslComponents(primary)
+  if (l <= 38) return shade(primary, 0.2)
+  if (l <= 52) return shade(primary, 0.42)
+  return shade(primary, 0.58)
+}

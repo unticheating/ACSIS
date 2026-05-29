@@ -15,7 +15,7 @@ export async function createClassQuery(
   const result = await pool.query(
     `INSERT INTO classes (institution_id, member_id, course_code, class_name, school_year, semester, access_code, term_id)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-     RETURNING class_id as id, course_code as "courseCode", class_name as name, school_year as "academicYear", semester, access_code as "accessCode", term_id as "termId"`,
+     RETURNING class_id as id, course_code as "courseCode", class_name as name, school_year as "academicYear", semester, access_code as "accessCode", term_id as "termId", header_pattern as "headerPattern", header_color as "headerColor"`,
     [institutionId, memberId, courseCode, className, schoolYear, semester, accessCode, termId],
   );
   return result.rows[0];
@@ -75,6 +75,8 @@ export async function listTeacherClassesQuery(memberId) {
        c.school_year as "academicYear", 
        c.semester, 
        c.access_code as "accessCode",
+       c.header_pattern as "headerPattern",
+       c.header_color as "headerColor",
        c.term_id as "termId",
        t.section_code as "sectionCode",
        (SELECT COUNT(*)::int FROM exams e
@@ -103,6 +105,8 @@ export async function getClassByIdQuery(classId) {
        c.school_year as "academicYear", 
        c.semester,
        c.access_code as "accessCode",
+       c.header_pattern as "headerPattern",
+       c.header_color as "headerColor",
        c.term_id as "termId",
        t.program_code as "programCode",
        t.section_code as "sectionCode",
@@ -127,6 +131,8 @@ export async function getTeacherClassByIdQuery(classId, memberId) {
        c.school_year as "academicYear", 
        c.semester,
        c.access_code as "accessCode",
+       c.header_pattern as "headerPattern",
+       c.header_color as "headerColor",
        c.term_id as "termId",
        t.program_code as "programCode",
        t.section_code as "sectionCode",
@@ -171,17 +177,21 @@ export async function listClassEnrolledStudentsQuery(classId, memberId) {
   });
 }
 
-export async function updateTeacherClassQuery(classId, memberId, { courseCode, name }) {
+export async function updateTeacherClassQuery(classId, memberId, { courseCode, name, headerPattern, headerColor }) {
   const pool = getPool();
+  const colorParam = headerColor === undefined ? '__KEEP__' : headerColor;
   const { rows } = await pool.query(
     `UPDATE classes
      SET course_code = COALESCE($3, course_code),
          class_name = COALESCE($4, class_name),
+         header_pattern = COALESCE($5, header_pattern),
+         header_color = CASE WHEN $6::text = '__KEEP__' THEN header_color ELSE $6::text END,
          updated_at = NOW()
      WHERE class_id = $1 AND member_id = $2 AND is_active = TRUE
      RETURNING class_id AS id, course_code AS "courseCode", class_name AS name,
-               school_year AS "academicYear", semester, access_code AS "accessCode", term_id AS "termId"`,
-    [classId, memberId, courseCode ?? null, name ?? null],
+               school_year AS "academicYear", semester, access_code AS "accessCode", term_id AS "termId",
+               header_pattern AS "headerPattern", header_color AS "headerColor"`,
+    [classId, memberId, courseCode ?? null, name ?? null, headerPattern ?? null, colorParam],
   );
   return rows[0] || null;
 }

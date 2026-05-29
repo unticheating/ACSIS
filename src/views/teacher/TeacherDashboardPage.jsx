@@ -70,7 +70,7 @@ export default function TeacherDashboardPage() {
   const fetchExams = async () => {
     setLoadingExams(true)
     try {
-      const res = await apiFetch('/api/teacher/exams')
+      const res = await apiFetch('/api/teacher/classes/exams')
       const data = await res.json().catch(() => [])
       if (res.ok && Array.isArray(data) && data.length > 0) {
         setExams(data)

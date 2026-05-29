@@ -6,6 +6,7 @@ export function Toaster() {
     <Sonner
       position="bottom-center"
       offset={24}
+      mobileOffset={{ bottom: 16, left: 16, right: 16 }}
       gap={10}
       closeButton
       richColors={false}

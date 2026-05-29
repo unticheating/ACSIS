@@ -8,6 +8,7 @@ import {
   hexToHslComponents,
   hexToRgba,
   normalizeHex,
+  readableBrandTextOnLight,
   shade,
   tint,
 } from './institutionColorScale.js'
@@ -58,6 +59,7 @@ const THEME_CSS_KEYS = [
   '--acsis-canvas',
   '--acsis-canvas-light',
   '--acsis-sidebar-bg',
+  '--acsis-sidebar-border',
   '--acsis-dark-surface',
   '--acsis-dark-surface-muted',
   '--acsis-dark-elevated',
@@ -132,6 +134,7 @@ function applyBrandScale(root, primary) {
  */
 function applyNavTokens(root, primary, isDark) {
   if (isDark) {
+    root.style.setProperty('--acsis-on-brand', '#ffffff')
     root.style.setProperty('--acsis-brand-muted-bg', hexToRgba(primary, 0.14))
     root.style.setProperty('--acsis-brand-muted-text', tint(primary, 0.5))
     root.style.setProperty('--acsis-brand-subtle', hexToRgba(primary, 0.08))
@@ -149,20 +152,22 @@ function applyNavTokens(root, primary, isDark) {
     return
   }
 
-  root.style.setProperty('--acsis-brand-muted-bg', tint(primary, 0.92))
-  root.style.setProperty('--acsis-brand-muted-text', shade(primary, 0.35))
+  const brandText = readableBrandTextOnLight(primary)
+  root.style.setProperty('--acsis-brand-muted-bg', tint(primary, 0.9))
+  root.style.setProperty('--acsis-brand-muted-text', brandText)
   root.style.setProperty('--acsis-brand-subtle', tint(primary, 0.96))
   root.style.setProperty('--acsis-brand-ring', hexToRgba(primary, 0.35))
+  root.style.setProperty('--acsis-on-brand', '#ffffff')
   root.style.setProperty('--acsis-nav-active-fill', primary)
   root.style.setProperty('--acsis-nav-active-fg', '#ffffff')
   root.style.setProperty('--acsis-nav-active-icon', '#ffffff')
-  root.style.setProperty('--acsis-nav-hover-fg', shade(primary, 0.15))
+  root.style.setProperty('--acsis-nav-hover-fg', brandText)
   root.style.setProperty('--acsis-nav-hover-bg', hexToRgba(primary, 0.12))
   root.style.setProperty(
     '--acsis-nav-active-shadow',
     `0 4px 14px ${hexToRgba(primary, 0.35)}`,
   )
-  root.style.setProperty('--brand-mark', shade(primary, 0.55))
+  root.style.setProperty('--brand-mark', brandText)
 }
 
 /**
@@ -173,6 +178,7 @@ function applyDarkNeutralSurfaces(root, primary) {
   const n = DARK_NEUTRALS
   root.style.setProperty('--acsis-canvas', n.canvas)
   root.style.setProperty('--acsis-sidebar-bg', n.sidebar)
+  root.style.setProperty('--acsis-sidebar-border', hexToRgba(primary, 0.22))
   root.style.setProperty('--acsis-dark-surface', n.surface)
   root.style.setProperty('--acsis-dark-surface-muted', n.surfaceMuted)
   root.style.setProperty('--acsis-dark-elevated', n.elevated)
@@ -204,7 +210,12 @@ function applyLightSurfaces(root, primary, secondary, baseColor) {
   const surface = baseColor ? normalizeHex(baseColor) : '#FFFFFF'
   root.style.setProperty('--acsis-canvas', secondary)
   root.style.setProperty('--acsis-canvas-light', secondary)
-  root.style.setProperty('--acsis-sidebar-bg', tint(secondary, 0.35))
+  const sidebarBg = tint(secondary, 0.35)
+  root.style.setProperty('--acsis-sidebar-bg', sidebarBg)
+  root.style.setProperty(
+    '--acsis-sidebar-border',
+    `color-mix(in srgb, ${primary} 14%, #e5e7eb)`,
+  )
   root.style.setProperty('--bg-canvas', secondary)
   root.style.setProperty('--bg-surface', surface)
   root.style.setProperty('--bg-surface-muted', tint(secondary, 0.5))

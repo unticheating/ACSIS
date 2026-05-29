@@ -235,6 +235,9 @@ CREATE TABLE IF NOT EXISTS classes (
     school_year    VARCHAR(10) NOT NULL, -- denormalized from term for reporting
     semester       semester_type NOT NULL,
     access_code    VARCHAR(20) NOT NULL UNIQUE, -- students enter this to enroll
+    header_pattern VARCHAR(20) NOT NULL DEFAULT 'grid'
+        CHECK (header_pattern IN ('grid', 'honeycomb', 'diamond', 'floral', 'ruled')),
+    header_color   VARCHAR(7) DEFAULT NULL,
     is_active      BOOLEAN NOT NULL DEFAULT TRUE,
     created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()

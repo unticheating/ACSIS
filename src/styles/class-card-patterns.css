@@ -1,0 +1,301 @@
+/**
+ * Class header patterns — tints from --class-header-bg (or institution brand).
+ * Larger tile sizes = fewer repeats. Grid matches original banner (light lines + edge vignette).
+ */
+
+.acsis-class-header {
+  background-color: var(--class-header-bg, var(--acsis-brand, #14532d));
+}
+
+.acsis-class-header__pattern,
+.stu-course-card__pattern {
+  --pattern-c1: color-mix(in srgb, var(--class-header-bg, var(--acsis-brand, #14532d)) 72%, #0f172a);
+  --pattern-c2: color-mix(in srgb, var(--class-header-bg, var(--acsis-brand, #2563eb)) 58%, #1e293b);
+  --pattern-c3: color-mix(in srgb, var(--class-header-bg, var(--acsis-brand, #3b82f6)) 48%, #334155);
+}
+
+/* Grid — line layers only; edge vignette lives on __vignette (see my_classes.css) */
+.acsis-class-header__pattern[data-pattern='grid'],
+.stu-course-card__pattern[data-pattern='grid'] {
+  opacity: 1;
+  background-color: transparent;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.15) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.15) 1px, transparent 1px),
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size:
+    60px 60px,
+    60px 60px,
+    20px 20px,
+    20px 20px;
+}
+
+.acsis-class-header--card .acsis-class-header__pattern[data-pattern='grid'] {
+  background-size:
+    48px 48px,
+    48px 48px,
+    16px 16px,
+    16px 16px;
+}
+
+.acsis-class-header--strip .acsis-class-header__pattern[data-pattern='grid'] {
+  background-size:
+    12px 12px,
+    12px 12px,
+    4px 4px,
+    4px 4px;
+}
+
+/* Honeycomb */
+.acsis-class-header--banner .acsis-class-header__pattern[data-pattern='honeycomb'] {
+  --s: 128px;
+}
+
+.acsis-class-header--card .acsis-class-header__pattern[data-pattern='honeycomb'] {
+  --s: 88px;
+}
+
+.acsis-class-header--strip .acsis-class-header__pattern[data-pattern='honeycomb'] {
+  --s: 28px;
+}
+
+.acsis-class-header__pattern[data-pattern='honeycomb'],
+.stu-course-card__pattern[data-pattern='honeycomb'] {
+  --s: 96px;
+  background: repeating-conic-gradient(
+      from 30deg,
+      #0000 0 120deg,
+      var(--pattern-c3) 0 180deg
+    )
+    calc(0.5 * var(--s)) calc(0.5 * var(--s) * 0.577),
+    repeating-conic-gradient(
+      from 30deg,
+      var(--pattern-c1) 0 60deg,
+      var(--pattern-c2) 0 120deg,
+      var(--pattern-c3) 0 180deg
+    );
+  background-size: var(--s) calc(var(--s) * 0.577);
+}
+
+/* Diamond weave */
+.acsis-class-header--banner .acsis-class-header__pattern[data-pattern='diamond'] {
+  background-size: 64px 64px;
+}
+
+.acsis-class-header--card .acsis-class-header__pattern[data-pattern='diamond'] {
+  background-size: 48px 48px;
+}
+
+.acsis-class-header--strip .acsis-class-header__pattern[data-pattern='diamond'] {
+  background-size: 20px 20px;
+}
+
+.acsis-class-header__pattern[data-pattern='diamond'],
+.stu-course-card__pattern[data-pattern='diamond'] {
+  background:
+    repeating-linear-gradient(
+        45deg,
+        #0000 calc(-650% / 13) calc(50% / 13),
+        var(--pattern-c1) 0 calc(100% / 13),
+        #0000 0 calc(150% / 13),
+        var(--pattern-c1) 0 calc(200% / 13),
+        #0000 0 calc(250% / 13),
+        var(--pattern-c1) 0 calc(300% / 13)
+      )
+      0 0,
+    repeating-linear-gradient(
+        -45deg,
+        #0000 calc(-650% / 13) calc(50% / 13),
+        var(--pattern-c2) 0 calc(100% / 13),
+        #0000 0 calc(150% / 13),
+        var(--pattern-c2) 0 calc(200% / 13),
+        #0000 0 calc(250% / 13),
+        var(--pattern-c2) 0 calc(300% / 13)
+      )
+      32px 32px,
+    var(--pattern-c3);
+  background-size: 48px 48px;
+}
+
+/* Floral */
+.acsis-class-header--banner .acsis-class-header__pattern[data-pattern='floral'] {
+  --s: 112px;
+}
+
+.acsis-class-header--card .acsis-class-header__pattern[data-pattern='floral'] {
+  --s: 72px;
+}
+
+.acsis-class-header--strip .acsis-class-header__pattern[data-pattern='floral'] {
+  --s: 24px;
+}
+
+.acsis-class-header__pattern[data-pattern='floral'],
+.stu-course-card__pattern[data-pattern='floral'] {
+  --s: 80px;
+  --_l: #0000 calc(25% / 3), var(--pattern-c2) 0 25%, #0000 0;
+  --_g: conic-gradient(from 120deg at 50% 87.5%, var(--pattern-c2) 120deg, #0000 0);
+  background:
+    var(--_g),
+    var(--_g) 0 calc(var(--s) / 2),
+    conic-gradient(from 180deg at 75%, var(--pattern-c3) 60deg, #0000 0),
+    linear-gradient(150deg, var(--_l)) 0 calc(var(--s) / 2),
+    var(--pattern-c1);
+  background-size: calc(0.866 * var(--s)) var(--s);
+}
+
+/* Ruled */
+.acsis-class-header--banner .acsis-class-header__pattern[data-pattern='ruled'] {
+  background-size: 100% 36px, 100% 100%;
+}
+
+.acsis-class-header--card .acsis-class-header__pattern[data-pattern='ruled'] {
+  background-size: 100% 28px, 100% 100%;
+}
+
+.acsis-class-header--strip .acsis-class-header__pattern[data-pattern='ruled'] {
+  background-size: 100% 10px, 100% 100%;
+}
+
+.acsis-class-header__pattern[data-pattern='ruled'],
+.stu-course-card__pattern[data-pattern='ruled'] {
+  background:
+    linear-gradient(
+      color-mix(in srgb, var(--pattern-c2) 45%, transparent) 12%,
+      color-mix(in srgb, var(--pattern-c3) 28%, transparent) 12%
+    ),
+    linear-gradient(
+      to right,
+      transparent 10%,
+      color-mix(in srgb, var(--pattern-c1) 55%, #7f1d1d) 10% 10.5%,
+      transparent 10.8%
+    );
+  background-size: 100% 32px, 100% 100%;
+  background-repeat: repeat, no-repeat;
+}
+
+/* Pattern picker swatches */
+.acsis-pattern-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+  gap: 10px;
+}
+
+.acsis-pattern-picker__option {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 8px;
+  border: 2px solid var(--border-default, #e5e7eb);
+  border-radius: 10px;
+  background: var(--bg-surface, #fff);
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.acsis-pattern-picker__option:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--acsis-brand) 40%, var(--border-default, #e5e7eb));
+}
+
+.acsis-pattern-picker__option--on {
+  border-color: var(--acsis-brand, hsl(var(--primary)));
+  box-shadow: 0 0 0 1px var(--acsis-brand, hsl(var(--primary)));
+}
+
+.acsis-pattern-picker__option:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.acsis-pattern-picker__swatch {
+  position: relative;
+  display: block;
+  height: 52px;
+  border-radius: 6px;
+  overflow: hidden;
+  background-color: var(--class-header-bg, var(--acsis-brand, #14532d));
+}
+
+.acsis-pattern-picker__label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--fg-default, #111827);
+}
+
+/* Appearance dialog: colors + patterns */
+.acsis-appearance-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.acsis-appearance-picker__heading {
+  margin: 0 0 10px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--fg-muted, #6b7280);
+}
+
+.acsis-color-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+}
+
+.acsis-color-picker__chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 6px;
+  border: 2px solid var(--border-default, #e5e7eb);
+  border-radius: 10px;
+  background: var(--bg-surface, #fff);
+  cursor: pointer;
+}
+
+.acsis-color-picker__chip--on {
+  border-color: var(--acsis-brand, hsl(var(--primary)));
+  box-shadow: 0 0 0 1px var(--acsis-brand, hsl(var(--primary)));
+}
+
+.acsis-color-picker__swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+
+.acsis-color-picker__label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-align: center;
+  color: var(--fg-default, #111827);
+}
+
+.acsis-color-picker__custom {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.acsis-color-picker__custom-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--fg-default, #111827);
+}
+
+.acsis-color-picker__custom input[type='color'] {
+  width: 48px;
+  height: 36px;
+  padding: 2px;
+  border: 1px solid var(--border-default, #e5e7eb);
+  border-radius: 8px;
+  cursor: pointer;
+  background: var(--bg-surface, #fff);
+}

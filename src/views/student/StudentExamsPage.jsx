@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button.jsx'
 import { apiFetch } from '@/lib/apiFetch.js'
 import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
 import '../../pages/teacher-ui/my_classes.css'
+import '../../styles/class-card-patterns.css'
 import '../../pages/student-ui/enrolled_classes.css'
 
 const NEEDS_JOIN_CLASS_KEY = 'acsis.needsJoinClass'

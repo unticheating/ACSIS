@@ -4,16 +4,42 @@
   z-index: 9999 !important;
 }
 
-[data-sonner-toaster][data-y-position='bottom'] {
-  left: 50% !important;
-  right: auto !important;
-  transform: translateX(-50%);
-  width: min(420px, calc(100vw - 32px));
+/* Desktop: cap width; Sonner handles left: 50% + translateX(-50%) for center */
+@media (min-width: 601px) {
+  [data-sonner-toaster][data-x-position='center'] {
+    width: min(420px, calc(100vw - 32px));
+  }
 }
 
-[data-sonner-toaster][data-y-position='bottom'] [data-sonner-toast] {
+[data-sonner-toaster][data-x-position='center'] [data-sonner-toast] {
   margin-left: auto;
   margin-right: auto;
+}
+
+/* Mobile: do not fight Sonner's full-width center layout (avoid left: 50% !important) */
+@media (max-width: 600px) {
+  [data-sonner-toaster][data-x-position='center'] {
+    left: var(--mobile-offset-left, 16px) !important;
+    right: var(--mobile-offset-right, 16px) !important;
+    transform: none !important;
+    width: auto !important;
+  }
+
+  [data-sonner-toaster] [data-sonner-toast] {
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+}
+
+/* Shell bottom nav (≤767px): lift toasts above the tab bar */
+@media (max-width: 767px) {
+  [data-sonner-toaster][data-y-position='bottom'] {
+    bottom: calc(
+      var(--acsis-bottom-nav-height, 84px) + env(safe-area-inset-bottom, 0px) + 12px
+    ) !important;
+  }
 }
 
 .acsis-toast {
@@ -22,6 +48,7 @@
   align-items: center;
   justify-content: flex-start;
   gap: 10px;
+  box-sizing: border-box;
   width: 100%;
   max-width: 420px;
   margin: 0 auto;
@@ -42,6 +69,8 @@
   flex: 1;
   min-width: 0;
   text-align: left;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .acsis-toast__title {

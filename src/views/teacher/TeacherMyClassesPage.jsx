@@ -29,6 +29,8 @@ import { Input } from '@/components/ui/input.jsx'
 import { Label } from '@/components/ui/label.jsx'
 import FadeIn from '@/components/ui/fade-in.jsx'
 import '../../pages/teacher-ui/my_classes.css'
+import '../../styles/class-card-patterns.css'
+import '../../pages/student-ui/enrolled_classes.css'
 
 /**
  * @param {{
@@ -193,6 +195,7 @@ export default function TeacherMyClassesPage() {
   const location = useLocation()
   const { confirm, ConfirmDialog } = useAcsisConfirm()
   const listRef = useRef(null)
+  const archivedListRef = useRef(null)
   const [sections, setSections] = useState([])
   const [courses, setCourses] = useState([])
   const [loading, setLoading] = useState(true)
@@ -228,14 +231,16 @@ export default function TeacherMyClassesPage() {
   }, [fetchAll])
 
   useEffect(() => {
-    if (!openSectionId) return undefined
+    if (!openSectionId && !openArchivedSectionId) return undefined
     function onPointerDown(e) {
       if (listRef.current?.contains(e.target)) return
+      if (archivedListRef.current?.contains(e.target)) return
       setOpenSectionId(null)
+      setOpenArchivedSectionId(null)
     }
     document.addEventListener('pointerdown', onPointerDown)
     return () => document.removeEventListener('pointerdown', onPointerDown)
-  }, [openSectionId])
+  }, [openSectionId, openArchivedSectionId])
 
   const termById = useMemo(() => {
     const map = new Map()
@@ -475,27 +480,33 @@ export default function TeacherMyClassesPage() {
 
             {archivedSections.length > 0 ? (
               <div className="acsis-archived-reveal">
-                <label className="acsis-archived-reveal__field">
-                  <span className="acsis-archived-reveal__label">Archived</span>
-                  <select
-                    className="acsis-archived-reveal__select"
-                    value={archivedOpen ? 'show' : 'hide'}
-                    onChange={(e) => {
-                      const show = e.target.value === 'show'
-                      setArchivedOpen(show)
-                      if (!show) setOpenArchivedSectionId(null)
-                    }}
-                    aria-label="Show archived sections"
-                  >
-                    <option value="hide">Hide archived sections</option>
-                    <option value="show">
-                      Show archived sections ({archivedSections.length})
-                    </option>
-                  </select>
-                </label>
+                <button
+                  type="button"
+                  className="acsis-archived-reveal__toggle"
+                  aria-expanded={archivedOpen}
+                  onClick={() => {
+                    setArchivedOpen((prev) => {
+                      if (prev) setOpenArchivedSectionId(null)
+                      return !prev
+                    })
+                  }}
+                >
+                  <span>
+                    {archivedOpen
+                      ? 'Hide archived sections'
+                      : `Archived sections (${archivedSections.length})`}
+                  </span>
+                  <ChevronDown
+                    className={`acsis-archived-reveal__chevron${archivedOpen ? ' acsis-archived-reveal__chevron--open' : ''}`}
+                    aria-hidden
+                  />
+                </button>
 
                 {archivedOpen ? (
-                  <div className="acsis-archived-reveal__list">
+                  <div
+                    ref={archivedListRef}
+                    className="acsis-section-card-list acsis-section-card-list--archived"
+                  >
                     {archivedSectionGroups.map((group, index) => (
                       <SectionCardItem
                         key={group.term.id}

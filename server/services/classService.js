@@ -1,3 +1,5 @@
+import { normalizeHeaderPattern } from '../lib/classHeaderPattern.js';
+import { normalizeHeaderColor } from '../lib/classHeaderColor.js';
 import {
   createClassQuery,
   listAdminClassesQuery,
@@ -88,13 +90,21 @@ export async function getTeacherClassEnrollmentsService(memberId, classId) {
 export async function updateTeacherClassService(memberId, classId, body) {
   const courseCode = typeof body.courseCode === 'string' ? body.courseCode.trim() : '';
   const name = typeof body.name === 'string' ? body.name.trim() : '';
-  if (!courseCode && !name) {
-    return { ok: false, status: 400, error: 'Subject code or course name is required.' };
+  const headerPattern =
+    body.headerPattern !== undefined && body.headerPattern !== null
+      ? normalizeHeaderPattern(body.headerPattern)
+      : undefined;
+  const headerColor =
+    body.headerColor !== undefined ? normalizeHeaderColor(body.headerColor) : undefined;
+  if (!courseCode && !name && headerPattern === undefined && headerColor === undefined) {
+    return { ok: false, status: 400, error: 'Nothing to update.' };
   }
   try {
     const updated = await updateTeacherClassQuery(classId, memberId, {
       courseCode: courseCode || null,
       name: name || null,
+      headerPattern: headerPattern ?? null,
+      headerColor: headerColor === undefined ? null : headerColor,
     });
     if (!updated) {
       return { ok: false, status: 404, error: 'Class not found.' };

@@ -846,32 +846,40 @@ html.dark .acsis-mc-filter--on {
   color: var(--acsis-brand-muted-text, var(--acsis-brand-ring));
 }
 
-html.dark .acsis-archived-reveal__label {
+html.dark .acsis-archived-reveal__toggle {
   color: var(--fg-muted, #9cbcaa);
 }
 
-html.dark .acsis-archived-reveal__select,
+html.dark .acsis-archived-reveal__toggle:hover {
+  color: #ecfdf5;
+}
+
 html.dark .acsis-class-toolbar__select {
   background-color: rgba(0, 0, 0, 0.28);
   border-color: var(--acsis-shell-border-subtle, rgba(74, 222, 128, 0.18));
   color: #ecfdf5;
 }
 
-html.dark .acsis-archived-reveal__list {
-  background: var(--bg-surface-muted, rgba(0, 0, 0, 0.2));
-  border-color: color-mix(in srgb, var(--acsis-brand) 12%, var(--border-default));
+html.dark .acsis-section-card--dimmed .acsis-section-card__surface {
+  background: var(--bg-surface-muted, rgba(0, 0, 0, 0.22));
+  border-color: var(--acsis-shell-border-subtle, rgba(74, 222, 128, 0.12));
 }
 
-html.dark .acsis-section-card--dimmed {
-  opacity: 0.5;
+html.dark .acsis-section-card--dimmed .acsis-section-card__drop {
+  background: var(--bg-surface-muted, rgba(0, 0, 0, 0.22));
 }
 
-html.dark .acsis-section-card--dimmed.acsis-section-card--open {
-  opacity: 0.65;
+html.dark .acsis-section-card--dimmed .acsis-section-card__title {
+  color: color-mix(in srgb, #ecfdf5 55%, var(--fg-muted, #9cbcaa));
 }
 
-html.dark .acsis-course-card--dimmed {
-  opacity: 0.55;
+html.dark .acsis-teacher-course-card--dimmed .acsis-teacher-course-card__code {
+  color: color-mix(in srgb, #ecfdf5 55%, var(--fg-muted, #9cbcaa));
+}
+
+html.dark .acsis-teacher-course-card--dimmed .acsis-teacher-course-card__name,
+html.dark .acsis-teacher-course-card--dimmed .acsis-teacher-course-card__stat {
+  color: var(--fg-muted, #9cbcaa);
 }
 
 html.dark .acsis-course-card__stat {
@@ -891,13 +899,21 @@ html.dark .acsis-course-banner {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
 }
 
-html.dark .acsis-course-banner::before {
+html.dark .acsis-course-banner:not(:has(.acsis-class-header__pattern))::before {
   background-image: 
     radial-gradient(circle at center, transparent 30%, rgba(0, 0, 0, 0.7) 90%),
     linear-gradient(rgba(255, 255, 255, 0.15) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255, 255, 255, 0.15) 1px, transparent 1px),
     linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+}
+
+html.dark .acsis-class-header__vignette,
+html.dark .acsis-class-header[data-pattern='grid'] .acsis-class-header__vignette {
+  background-image:
+    radial-gradient(circle at center, transparent 30%, rgba(0, 0, 0, 0.55) 90%),
+    radial-gradient(ellipse 120% 90% at 12% 0%, rgba(255, 255, 255, 0.12) 0%, transparent 52%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.12) 0%, transparent 42%, rgba(0, 0, 0, 0.35) 100%);
 }
 
 html.dark .acsis-class-toolbar__students-btn {

@@ -69,9 +69,6 @@ export function InstitutionThemeProvider({ children }) {
       const slate = defaultPalette()
       setInstitution({ ...platformInstitution, theme: slate })
       applyFromTheme(slate, isDark)
-      if (sessionMode === 'demo') {
-        writeDemoThemeId(DEFAULT_THEME_ID)
-      }
       return
     }
 
@@ -80,6 +77,7 @@ export function InstitutionThemeProvider({ children }) {
       const next = institutionFromBranding(branding)
       setInstitution(next)
       applyFromTheme(next.theme, isDark)
+      writeDemoThemeId(next.theme.themeId)
       return
     }
 
@@ -94,16 +92,22 @@ export function InstitutionThemeProvider({ children }) {
     const slate = defaultPalette()
     setInstitution({ ...defaultInstitution, theme: slate })
     applyFromTheme(slate, isDark)
-  }, [authUser?.branding, authUser?.isSuperAdmin, authUser?.portal, sessionMode, activeAccount?.portal, isDark])
+  }, [
+    authUser?.branding,
+    authUser?.isSuperAdmin,
+    authUser?.portal,
+    sessionMode,
+    activeAccount?.portal,
+    activeAccount?.id,
+    isDark,
+  ])
 
   const setInstitutionTheme = useCallback(
     async (themeId, { persistDemo = false } = {}) => {
       const nextTheme = paletteById(themeId)
       setInstitution((prev) => ({ ...prev, theme: nextTheme }))
       applyFromTheme(nextTheme, isDark)
-      if (persistDemo || sessionMode === 'demo') {
-        writeDemoThemeId(themeId)
-      }
+      writeDemoThemeId(themeId)
       if (sessionMode === 'auth') {
         await refreshAuth()
       }
