@@ -177,21 +177,49 @@ export async function listClassEnrolledStudentsQuery(classId, memberId) {
   });
 }
 
-export async function updateTeacherClassQuery(classId, memberId, { courseCode, name, headerPattern, headerColor }) {
+const CLASS_UPDATE_RETURNING = `class_id AS id, course_code AS "courseCode", class_name AS name,
+               school_year AS "academicYear", semester, access_code AS "accessCode", term_id AS "termId",
+               header_pattern AS "headerPattern", header_color AS "headerColor"`;
+
+/**
+ * Partial update — only columns present on `patch` are written.
+ * @param {number} classId
+ * @param {number} memberId
+ * @param {{ courseCode?: string, name?: string, headerPattern?: string, headerColor?: string | null }} patch
+ */
+export async function updateTeacherClassQuery(classId, memberId, patch) {
   const pool = getPool();
-  const colorParam = headerColor === undefined ? '__KEEP__' : headerColor;
+  const sets = ['updated_at = NOW()'];
+  const params = [classId, memberId];
+  let idx = 3;
+
+  if (Object.hasOwn(patch, 'courseCode')) {
+    sets.push(`course_code = $${idx++}`);
+    params.push(patch.courseCode);
+  }
+  if (Object.hasOwn(patch, 'name')) {
+    sets.push(`class_name = $${idx++}`);
+    params.push(patch.name);
+  }
+  if (Object.hasOwn(patch, 'headerPattern')) {
+    sets.push(`header_pattern = $${idx++}`);
+    params.push(patch.headerPattern);
+  }
+  if (Object.hasOwn(patch, 'headerColor')) {
+    sets.push(`header_color = $${idx++}`);
+    params.push(patch.headerColor);
+  }
+
+  if (sets.length === 1) {
+    return null;
+  }
+
   const { rows } = await pool.query(
     `UPDATE classes
-     SET course_code = COALESCE($3, course_code),
-         class_name = COALESCE($4, class_name),
-         header_pattern = COALESCE($5, header_pattern),
-         header_color = CASE WHEN $6::text = '__KEEP__' THEN header_color ELSE $6::text END,
-         updated_at = NOW()
+     SET ${sets.join(', ')}
      WHERE class_id = $1 AND member_id = $2 AND is_active = TRUE
-     RETURNING class_id AS id, course_code AS "courseCode", class_name AS name,
-               school_year AS "academicYear", semester, access_code AS "accessCode", term_id AS "termId",
-               header_pattern AS "headerPattern", header_color AS "headerColor"`,
-    [classId, memberId, courseCode ?? null, name ?? null, headerPattern ?? null, colorParam],
+     RETURNING ${CLASS_UPDATE_RETURNING}`,
+    params,
   );
   return rows[0] || null;
 }

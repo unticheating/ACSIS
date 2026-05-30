@@ -235,6 +235,18 @@ export default function TeacherClassExamsPage() {
       if (!res.ok) {
         throw new Error(data.error || 'Failed to update course.')
       }
+      setCls((prev) =>
+        prev
+          ? {
+              ...prev,
+              ...data,
+              exams: prev.exams,
+              headerPattern: data.headerPattern ?? prev.headerPattern,
+              headerColor:
+                Object.hasOwn(data, 'headerColor') ? data.headerColor : prev.headerColor,
+            }
+          : prev,
+      )
       setEditOpen(false)
       acsisToastSuccess('Course updated.')
       refresh()

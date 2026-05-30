@@ -88,24 +88,30 @@ export async function getTeacherClassEnrollmentsService(memberId, classId) {
 }
 
 export async function updateTeacherClassService(memberId, classId, body) {
-  const courseCode = typeof body.courseCode === 'string' ? body.courseCode.trim() : '';
-  const name = typeof body.name === 'string' ? body.name.trim() : '';
-  const headerPattern =
-    body.headerPattern !== undefined && body.headerPattern !== null
-      ? normalizeHeaderPattern(body.headerPattern)
-      : undefined;
-  const headerColor =
-    body.headerColor !== undefined ? normalizeHeaderColor(body.headerColor) : undefined;
-  if (!courseCode && !name && headerPattern === undefined && headerColor === undefined) {
+  /** @type {{ courseCode?: string, name?: string, headerPattern?: string, headerColor?: string | null }} */
+  const patch = {};
+
+  if (Object.hasOwn(body, 'courseCode') && typeof body.courseCode === 'string') {
+    const v = body.courseCode.trim();
+    if (v) patch.courseCode = v;
+  }
+  if (Object.hasOwn(body, 'name') && typeof body.name === 'string') {
+    const v = body.name.trim();
+    if (v) patch.name = v;
+  }
+  if (Object.hasOwn(body, 'headerPattern')) {
+    patch.headerPattern = normalizeHeaderPattern(body.headerPattern);
+  }
+  if (Object.hasOwn(body, 'headerColor')) {
+    patch.headerColor = normalizeHeaderColor(body.headerColor);
+  }
+
+  if (Object.keys(patch).length === 0) {
     return { ok: false, status: 400, error: 'Nothing to update.' };
   }
+
   try {
-    const updated = await updateTeacherClassQuery(classId, memberId, {
-      courseCode: courseCode || null,
-      name: name || null,
-      headerPattern: headerPattern ?? null,
-      headerColor: headerColor === undefined ? null : headerColor,
-    });
+    const updated = await updateTeacherClassQuery(classId, memberId, patch);
     if (!updated) {
       return { ok: false, status: 404, error: 'Class not found.' };
     }
