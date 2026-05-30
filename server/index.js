@@ -11,6 +11,7 @@ import adminViolationsRouter from './routes/adminViolations.js'
 import adminMonitoringRouter from './routes/adminMonitoring.js'
 import adminReportsRouter from './routes/adminReports.js'
 import superAdminInstitutionsRouter from './routes/superAdminInstitutions.js'
+import superAdminAnalyticsRouter from './routes/superAdminAnalytics.js'
 import teacherClassesRouter from './routes/teacherClasses.js'
 import teacherTermsRouter from './routes/teacherTerms.js'
 import studentRouter from './routes/student.js'
@@ -50,6 +51,7 @@ app.use('/api/admin/violations', adminViolationsRouter)
 app.use('/api/admin/monitoring', adminMonitoringRouter)
 app.use('/api/admin/reports', adminReportsRouter)
 app.use('/api/super-admin/institutions', superAdminInstitutionsRouter)
+app.use('/api/super-admin/analytics', superAdminAnalyticsRouter)
 app.use('/api/teacher/terms', teacherTermsRouter)
 app.use('/api/teacher/classes', teacherClassesRouter)
 app.use('/api/student', studentRouter)

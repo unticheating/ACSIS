@@ -42,6 +42,7 @@ const TeacherReportsPage = lazy(() => import('./views/teacher/TeacherReportsPage
 
 const SuperAdminDashboardPage = lazy(() => import('./views/super-admin/SuperAdminDashboardPage.jsx'))
 const SuperAdminInstitutionsPage = lazy(() => import('./views/super-admin/SuperAdminInstitutionsPage.jsx'))
+const SuperAdminAnalyticsPage = lazy(() => import('./views/super-admin/SuperAdminAnalyticsPage.jsx'))
 
 export default function App() {
   const { authUser, sessionMode, refreshAuth } = useSession()
@@ -162,7 +163,7 @@ export default function App() {
         <Route path="classes" element={<Navigate to="/super-admin/institutions" replace />} />
         <Route path="examinations" element={<Navigate to="/super-admin/institutions" replace />} />
         <Route path="monitoring" element={<AdminPlaceholderPage title="Monitoring" />} />
-        <Route path="analytics" element={<AdminPlaceholderPage title="System Analytics" />} />
+        <Route path="analytics" element={<SuperAdminAnalyticsPage />} />
         <Route path="violations" element={<Navigate to="/super-admin/analytics" replace />} />
         <Route path="users" element={<AdminUserManagementPage basePath="/super-admin" />} />
         <Route path="reports" element={<AdminPlaceholderPage title="Reports" />} />

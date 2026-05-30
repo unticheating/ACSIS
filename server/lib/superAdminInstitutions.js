@@ -3,6 +3,7 @@
  */
 
 import { normalizeLogo } from './institutionSettings.js'
+import { createInstitutionUser } from './institutionUsers.js'
 
 const NAME_MAX = 100
 const WARNINGS_MIN = 1
@@ -128,5 +129,28 @@ export async function createInstitutionForSuperAdmin(pool, createdByUid, body) {
     return { ok: false, status: 500, error: 'Institution created but could not be loaded.' }
   }
 
-  return { ok: true, institution: mapInstitutionRow(rows[0]) }
+  let bootstrapAdmin = null
+  const adminBody = body.admin
+  if (adminBody && typeof adminBody === 'object') {
+    const adminResult = await createInstitutionUser(pool, institutionId, {
+      firstName: adminBody.firstName,
+      lastName: adminBody.lastName,
+      middleName: adminBody.middleName,
+      email: adminBody.email,
+      password: adminBody.password,
+      schoolId: adminBody.schoolId,
+      role: 'admin',
+    })
+    if (!adminResult.ok) {
+      return {
+        ok: false,
+        status: adminResult.status || 400,
+        error: `Institution created, but admin setup failed: ${adminResult.error}`,
+        institution: mapInstitutionRow(rows[0]),
+      }
+    }
+    bootstrapAdmin = adminResult.user
+  }
+
+  return { ok: true, institution: mapInstitutionRow(rows[0]), bootstrapAdmin }
 }

@@ -188,8 +188,23 @@ export async function insertReportLogQuery(examId, generatedBy, reportType) {
   return rows[0]
 }
 
-export async function releaseExamScoresQuery(examId) {
+export async function releaseExamScoresQuery(examId, sessionIds = null) {
   const pool = getPool()
+  const ids = Array.isArray(sessionIds)
+    ? sessionIds.map(Number).filter(Number.isFinite)
+    : null
+  if (ids?.length) {
+    await pool.query(
+      `UPDATE exam_results er
+       SET score_released = TRUE, released_at = COALESCE(released_at, NOW())
+       FROM exam_sessions es
+       WHERE er.session_id = es.session_id
+         AND es.exam_id = $1
+         AND er.session_id = ANY($2::int[])`,
+      [examId, ids],
+    )
+    return
+  }
   await pool.query(
     `UPDATE exam_results er
      SET score_released = TRUE, released_at = COALESCE(released_at, NOW())
@@ -199,9 +214,31 @@ export async function releaseExamScoresQuery(examId) {
   )
 }
 
-export async function listSessionsForScoreEmailQuery(examId) {
+export async function validateExamSessionIdsQuery(examId, sessionIds) {
+  const pool = getPool()
+  const ids = sessionIds.map(Number).filter(Number.isFinite)
+  if (!ids.length) return []
+  const { rows } = await pool.query(
+    `SELECT es.session_id
+     FROM exam_sessions es
+     WHERE es.exam_id = $1 AND es.session_id = ANY($2::int[]) AND es.status = 'submitted'`,
+    [examId, ids],
+  )
+  return rows.map((r) => Number(r.session_id))
+}
+
+export async function listSessionsForScoreEmailQuery(examId, sessionIds = null) {
   const pool = getPool()
   const memberJoin = await sessionMemberJoin('es', 'im')
+  const ids = Array.isArray(sessionIds)
+    ? sessionIds.map(Number).filter(Number.isFinite)
+    : null
+  const params = [examId]
+  let sessionFilter = ''
+  if (ids?.length) {
+    params.push(ids)
+    sessionFilter = `AND es.session_id = ANY($${params.length}::int[])`
+  }
   const { rows } = await pool.query(
     `SELECT
        es.session_id AS "sessionId",
@@ -218,8 +255,12 @@ export async function listSessionsForScoreEmailQuery(examId) {
      JOIN institution_members im ON ${memberJoin}
      ${SQL_JOIN_STUDENTS}
      JOIN users u ON im.uid = u.uid
-     WHERE es.exam_id = $1 AND es.status = 'submitted'`,
-    [examId],
+     WHERE es.exam_id = $1
+       AND es.status = 'submitted'
+       AND er.score_released = TRUE
+       AND er.email_sent = FALSE
+       ${sessionFilter}`,
+    params,
   )
   return rows
 }

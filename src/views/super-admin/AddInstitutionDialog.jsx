@@ -21,6 +21,12 @@ const emptyForm = {
   logo: null,
   themeId: '',
   maxWarnings: '3',
+  createAdmin: false,
+  adminFirstName: '',
+  adminLastName: '',
+  adminEmail: '',
+  adminPassword: '',
+  adminSchoolId: '',
 }
 
 /**
@@ -137,6 +143,15 @@ export default function AddInstitutionDialog({ open, onOpenChange, onCreated }) 
       logo: form.logo,
       themeId,
       maxWarnings: warnings,
+      admin: form.createAdmin
+        ? {
+            firstName: form.adminFirstName.trim(),
+            lastName: form.adminLastName.trim(),
+            email: form.adminEmail.trim().toLowerCase(),
+            password: form.adminPassword,
+            schoolId: form.adminSchoolId.trim() || undefined,
+          }
+        : undefined,
     }
   }
 
@@ -148,7 +163,11 @@ export default function AddInstitutionDialog({ open, onOpenChange, onCreated }) 
     setSubmitting(true)
     try {
       const institution = await createSuperAdminInstitution(payload)
-      acsisToastSuccess(`${institution.institutionName} has been added.`)
+      acsisToastSuccess(
+        payload.admin
+          ? `${institution.institutionName} added with initial admin.`
+          : `${institution.institutionName} has been added.`,
+      )
       onCreated(institution)
       onOpenChange(false)
     } catch (err) {
@@ -341,6 +360,67 @@ export default function AddInstitutionDialog({ open, onOpenChange, onCreated }) 
                 <span className="super-admin-add-institution-dialog__error" role="alert">
                   {fieldErrors.themeId}
                 </span>
+              ) : null}
+            </section>
+
+            <div className="super-admin-add-institution-dialog__divider" aria-hidden />
+
+            <section className="super-admin-add-institution-dialog__section">
+              <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.createAdmin}
+                  onChange={(e) => setField('createAdmin', e.target.checked)}
+                  disabled={submitting}
+                />
+                Create initial institution admin
+              </label>
+              {form.createAdmin ? (
+                <div className="mt-3 grid gap-3">
+                  <div className="super-admin-add-institution-dialog__row">
+                    <label className="super-admin-add-institution-dialog__field super-admin-add-institution-dialog__field--grow">
+                      <span className="super-admin-add-institution-dialog__label">First name</span>
+                      <input
+                        type="text"
+                        className="super-admin-add-institution-dialog__input"
+                        value={form.adminFirstName}
+                        onChange={(e) => setField('adminFirstName', e.target.value)}
+                        disabled={submitting}
+                      />
+                    </label>
+                    <label className="super-admin-add-institution-dialog__field super-admin-add-institution-dialog__field--grow">
+                      <span className="super-admin-add-institution-dialog__label">Last name</span>
+                      <input
+                        type="text"
+                        className="super-admin-add-institution-dialog__input"
+                        value={form.adminLastName}
+                        onChange={(e) => setField('adminLastName', e.target.value)}
+                        disabled={submitting}
+                      />
+                    </label>
+                  </div>
+                  <label className="super-admin-add-institution-dialog__field super-admin-add-institution-dialog__field--full">
+                    <span className="super-admin-add-institution-dialog__label">Admin email</span>
+                    <input
+                      type="email"
+                      className="super-admin-add-institution-dialog__input"
+                      value={form.adminEmail}
+                      onChange={(e) => setField('adminEmail', e.target.value)}
+                      disabled={submitting}
+                    />
+                  </label>
+                  <label className="super-admin-add-institution-dialog__field super-admin-add-institution-dialog__field--full">
+                    <span className="super-admin-add-institution-dialog__label">Temporary password</span>
+                    <input
+                      type="password"
+                      className="super-admin-add-institution-dialog__input"
+                      value={form.adminPassword}
+                      onChange={(e) => setField('adminPassword', e.target.value)}
+                      minLength={8}
+                      disabled={submitting}
+                    />
+                  </label>
+                </div>
               ) : null}
             </section>
           </div>

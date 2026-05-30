@@ -21,11 +21,19 @@ export async function manualGradeAnswer(classId, examId, sessionId, answerId, is
   return parseJson(res)
 }
 
-export async function releaseExamScores(classId, examId, { sendEmail = true, includeAnswerKey = false } = {}) {
+export async function releaseExamScores(
+  classId,
+  examId,
+  { sendEmail = true, includeAnswerKey = false, sessionIds = null } = {},
+) {
+  const body = { sendEmail, includeAnswerKey }
+  if (Array.isArray(sessionIds) && sessionIds.length > 0) {
+    body.sessionIds = sessionIds
+  }
   const res = await apiFetch(`/api/teacher/classes/${classId}/exams/${examId}/release-scores`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sendEmail, includeAnswerKey }),
+    body: JSON.stringify(body),
   })
   return parseJson(res)
 }

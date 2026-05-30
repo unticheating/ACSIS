@@ -28,6 +28,7 @@ export async function fetchSuperAdminThemes() {
  *   logo: string
  *   themeId: number
  *   maxWarnings?: number
+ *   admin?: { firstName: string, lastName: string, email: string, password: string, schoolId?: string }
  * }} payload
  */
 export async function createSuperAdminInstitution(payload) {

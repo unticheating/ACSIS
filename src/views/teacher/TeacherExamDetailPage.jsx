@@ -276,17 +276,39 @@ export default function TeacherExamDetailPage() {
     }
   }
 
-  async function handleReleaseScores({ sendEmail, includeAnswerKey }) {
+  async function handleReleaseScores({ sendEmail, includeAnswerKey, sessionIds }) {
     setReleasing(true)
     try {
-      const data = await releaseExamScores(classId, examId, { sendEmail, includeAnswerKey })
+      const data = await releaseExamScores(classId, examId, {
+        sendEmail,
+        includeAnswerKey,
+        sessionIds,
+      })
+      const count = data.releasedCount ?? sessionIds?.length ?? 'all'
       const topMsg = data.topStudent ? ` Top 1: ${data.topStudent.studentName}.` : ''
-      acsisToastSuccess(`Scores released. Emails sent: ${data.emailsSent ?? 0}.${topMsg}`)
+      acsisToastSuccess(`Released ${count} score(s). Emails sent: ${data.emailsSent ?? 0}.${topMsg}`)
       setReleaseDialogOpen(false)
       const refreshed = await fetchTeacherExamResults(classId, examId)
       setResults(refreshed)
     } catch (err) {
       acsisToastError(err instanceof Error ? err.message : 'Failed to release scores.')
+    } finally {
+      setReleasing(false)
+    }
+  }
+
+  async function handleReleaseOneStudent(sessionId) {
+    setReleasing(true)
+    try {
+      const data = await releaseExamScores(classId, examId, {
+        sendEmail: false,
+        sessionIds: [sessionId],
+      })
+      acsisToastSuccess(`Score released for 1 student.${data.emailsSent ? ` Email sent.` : ''}`)
+      const refreshed = await fetchTeacherExamResults(classId, examId)
+      setResults(refreshed)
+    } catch (err) {
+      acsisToastError(err instanceof Error ? err.message : 'Failed to release score.')
     } finally {
       setReleasing(false)
     }
@@ -792,7 +814,24 @@ export default function TeacherExamDetailPage() {
                             : '—'}
                         </td>
                         <td>{s.rank != null ? `#${s.rank}` : '—'}</td>
-                        <td>{s.status === 'submitted' ? (s.scoreReleased ? 'Yes' : 'Pending') : '—'}</td>
+                        <td>
+                          {s.status === 'submitted' ? (
+                            s.scoreReleased ? (
+                              'Yes'
+                            ) : (
+                              <button
+                                type="button"
+                                className="acsis-exam-detail__review-link"
+                                disabled={releasing}
+                                onClick={() => void handleReleaseOneStudent(s.sessionId)}
+                              >
+                                Release
+                              </button>
+                            )
+                          ) : (
+                            '—'
+                          )}
+                        </td>
                         <td>{s.warningCount}</td>
                         <td>
                           {s.status === 'submitted' && s.sessionId ? (
@@ -929,6 +968,7 @@ export default function TeacherExamDetailPage() {
       <ReleaseScoresDialog
         open={releaseDialogOpen}
         onOpenChange={setReleaseDialogOpen}
+        students={results?.sessions || []}
         releasing={releasing}
         onRelease={(opts) => void handleReleaseScores(opts)}
       />

@@ -6,10 +6,11 @@ import { cardNeuStyleVars } from '@/lib/cardNeuStyle.js'
 import { fetchSuperAdminInstitutions } from '@/lib/superAdminInstitutionsApi.js'
 import { useTheme } from '@/context/ThemeContext.jsx'
 import AddInstitutionDialog from './AddInstitutionDialog.jsx'
+import AssignInstitutionAdminDialog from './AssignInstitutionAdminDialog.jsx'
 import '../../pages/admin-ui/style.css'
 import '../../styles/super-admin-institutions.css'
 
-function InstitutionCard({ institution, isDark }) {
+function InstitutionCard({ institution, isDark, onAssignAdmin }) {
   const primary = institution.theme?.primaryColor || '#334155'
 
   return (
@@ -45,9 +46,18 @@ function InstitutionCard({ institution, isDark }) {
             />
             {institution.theme?.themeName || 'Theme'}
           </span>
-          <Badge variant={institution.isActive ? 'default' : 'muted'}>
-            {institution.isActive ? 'Active' : 'Inactive'}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="text-xs font-semibold text-primary hover:underline"
+              onClick={() => onAssignAdmin(institution)}
+            >
+              Assign admin
+            </button>
+            <Badge variant={institution.isActive ? 'default' : 'muted'}>
+              {institution.isActive ? 'Active' : 'Inactive'}
+            </Badge>
+          </div>
         </div>
       </article>
     </li>
@@ -61,6 +71,7 @@ export default function SuperAdminInstitutionsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [addOpen, setAddOpen] = useState(false)
+  const [assignInstitution, setAssignInstitution] = useState(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -128,7 +139,12 @@ export default function SuperAdminInstitutionsPage() {
         {!loading && institutions.length > 0 ? (
           <ul className="super-admin-institutions-grid" aria-label="Institutions">
             {institutions.map((inst) => (
-              <InstitutionCard key={inst.institutionId} institution={inst} isDark={isDark} />
+              <InstitutionCard
+                key={inst.institutionId}
+                institution={inst}
+                isDark={isDark}
+                onAssignAdmin={setAssignInstitution}
+              />
             ))}
           </ul>
         ) : null}
@@ -138,6 +154,14 @@ export default function SuperAdminInstitutionsPage() {
         open={addOpen}
         onOpenChange={setAddOpen}
         onCreated={onInstitutionCreated}
+      />
+
+      <AssignInstitutionAdminDialog
+        open={Boolean(assignInstitution)}
+        onOpenChange={(open) => {
+          if (!open) setAssignInstitution(null)
+        }}
+        institution={assignInstitution}
       />
     </div>
   )

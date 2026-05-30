@@ -94,6 +94,7 @@ const manualGradeSchema = z.object({
 const releaseScoresSchema = z.object({
   sendEmail: z.boolean().optional().default(true),
   includeAnswerKey: z.boolean().optional().default(false),
+  sessionIds: z.array(z.number().int().positive()).optional(),
 });
 
 const exportReportSchema = z.object({
