@@ -5,6 +5,7 @@ import { useInstitutionTheme } from '@/context/InstitutionThemeContext.jsx'
 import { useDetectionsToolbar } from '@/context/DetectionsToolbarContext.jsx'
 import { useTeacherShellBreadcrumbSegments } from '@/context/TeacherShellBreadcrumbContext.jsx'
 import DetectionsSeatSettingsMenu from '@/components/teacher/DetectionsSeatSettingsMenu.jsx'
+import DetectionsViewModeToggle from '@/components/teacher/DetectionsViewModeToggle.jsx'
 
 /**
  * @param {{ role: 'teacher' | 'student', segments: { label: string, to?: string, state?: object }[] }} props
@@ -75,20 +76,32 @@ export default function ShellBreadcrumb({ role }) {
       : [{ label: resolveShellPageTitle(role, pathname) }]
 
   return (
-    <header className={`content-header w-full${isDetectionsPage ? ' content-header--detections' : ''}`}>
+    <header className="content-header w-full">
       <BreadcrumbTrail segments={segments} />
       {isDetectionsPage ? (
-        <div className="content-header__actions">
+        <div className="content-header__actions acsis-detections-header-actions">
           {toolbar ? (
-            <DetectionsSeatSettingsMenu
-              seatSettings={toolbar.seatSettings}
-              onFillModeChange={toolbar.onFillModeChange}
-            />
+            <>
+              <DetectionsViewModeToggle
+                viewMode={toolbar.viewMode}
+                onViewModeChange={toolbar.onViewModeChange}
+              />
+              <DetectionsSeatSettingsMenu
+                seatSettings={toolbar.seatSettings}
+                onFillModeChange={toolbar.onFillModeChange}
+              />
+            </>
           ) : (
-            <span
-              className="acsis-detections-settings-btn acsis-detections-settings-btn--placeholder"
-              aria-hidden
-            />
+            <>
+              <span
+                className="acsis-detections-view-toggle acsis-detections-view-toggle--placeholder"
+                aria-hidden
+              />
+              <span
+                className="acsis-detections-settings-btn acsis-detections-settings-btn--placeholder"
+                aria-hidden
+              />
+            </>
           )}
         </div>
       ) : null}

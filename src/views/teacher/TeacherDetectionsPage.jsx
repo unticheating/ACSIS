@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Clock, AlertTriangle, ShieldAlert, X } from 'lucide-react'
+import { Clock, AlertTriangle, Search, ShieldAlert, X } from 'lucide-react'
 import { useDetectionsToolbar } from '@/context/DetectionsToolbarContext.jsx'
 import {
   fetchTeacherActiveMonitoring,
@@ -17,6 +17,7 @@ import {
   moveSeatAt,
   saveSeatLayout,
   saveSeatSettings,
+  VIEW_MODES,
 } from '@/lib/detectionsSeatLayout.js'
 import FadeIn from '@/components/ui/fade-in.jsx'
 import '../../pages/teacher-ui/reports.css'
@@ -77,6 +78,45 @@ function isDoneTone(tone) {
   return tone === 'submitted' || tone === 'done-warn3'
 }
 
+function isViolator(student) {
+  const strikes = Number(student.strikes || 0)
+  if (strikes > 0) return true
+  return student.tone === 'warn1' || student.tone === 'warn2' || student.tone === 'warn3' || student.tone === 'done-warn3'
+}
+
+const VIOLATOR_TONE_RANK = {
+  warn3: 0,
+  'done-warn3': 0,
+  warn2: 1,
+  warn1: 2,
+}
+
+function compareListStudents(a, b) {
+  const aViolator = isViolator(a)
+  const bViolator = isViolator(b)
+  if (aViolator !== bViolator) return aViolator ? -1 : 1
+  if (aViolator && bViolator) {
+    const strikeDiff = Number(b.strikes || 0) - Number(a.strikes || 0)
+    if (strikeDiff !== 0) return strikeDiff
+    const toneDiff =
+      (VIOLATOR_TONE_RANK[a.tone] ?? 9) - (VIOLATOR_TONE_RANK[b.tone] ?? 9)
+    if (toneDiff !== 0) return toneDiff
+  }
+  const lastCmp = (a.lastName || '').localeCompare(b.lastName || '', undefined, { sensitivity: 'base' })
+  if (lastCmp !== 0) return lastCmp
+  return (a.firstName || '').localeCompare(b.firstName || '', undefined, { sensitivity: 'base' })
+}
+
+function studentMatchesListSearch(student, query) {
+  const q = query.trim().toLowerCase()
+  if (!q) return true
+  const haystack = [student.firstName, student.lastName, student.schoolId, statusLabelForTone(student.tone)]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+  return haystack.includes(q)
+}
+
 function rosterEntryToSeat(entry, violationLabels = []) {
   const { firstName, lastName } = splitName(entry.studentName)
   const strikes = Number(entry.warningCount || 0)
@@ -125,6 +165,7 @@ export default function TeacherDetectionsPage() {
   const [dragSourceIdx, setDragSourceIdx] = useState(null)
   const [dragOverIdx, setDragOverIdx] = useState(null)
   const [seatSettings, setSeatSettings] = useState(() => ({ ...DEFAULT_SEAT_SETTINGS }))
+  const [listSearchQuery, setListSearchQuery] = useState('')
   const dragMovedRef = useRef(false)
   const monitoringRef = useRef(null)
 
@@ -175,6 +216,16 @@ export default function TeacherDetectionsPage() {
     [activeExam, seatSettings, applySettingsLayout],
   )
 
+  const handleViewModeChange = useCallback(
+    (viewMode) => {
+      if (!activeExam?.classId || !activeExam?.id) return
+      const next = { ...seatSettings, viewMode }
+      setSeatSettings(next)
+      saveSeatSettings(activeExam.classId, activeExam.id, next)
+    },
+    [activeExam, seatSettings],
+  )
+
   const { setToolbar } = useDetectionsToolbar() || {}
   const [monitoringReady, setMonitoringReady] = useState(false)
 
@@ -191,9 +242,11 @@ export default function TeacherDetectionsPage() {
     }
     setToolbar({
       seatSettings,
+      viewMode: seatSettings.viewMode ?? VIEW_MODES.CLASSROOM,
       onFillModeChange: handleFillModeChange,
+      onViewModeChange: handleViewModeChange,
     })
-  }, [activeExam, seatSettings, handleFillModeChange, setToolbar])
+  }, [activeExam, seatSettings, handleFillModeChange, handleViewModeChange, setToolbar])
 
   const handleSeatDrop = useCallback(
     (fromIdx, toIdx) => {
@@ -349,7 +402,22 @@ export default function TeacherDetectionsPage() {
   )
 
   const isLive = Boolean(monitoringReady && activeExam)
+  const isClassroomView = (seatSettings.viewMode ?? VIEW_MODES.CLASSROOM) !== VIEW_MODES.LIST
   const presentStudents = students.filter((s) => s.tone !== 'empty')
+  const sortedListStudents = useMemo(
+    () => presentStudents.slice().sort(compareListStudents),
+    [presentStudents],
+  )
+
+  const filteredListStudents = useMemo(
+    () => sortedListStudents.filter((s) => studentMatchesListSearch(s, listSearchQuery)),
+    [sortedListStudents, listSearchQuery],
+  )
+
+  const listViolatorCount = useMemo(
+    () => sortedListStudents.filter(isViolator).length,
+    [sortedListStudents],
+  )
   const countByTone = (tone) => (isLive ? presentStudents.filter((s) => s.tone === tone).length : null)
   const countDone = () =>
     isLive ? presentStudents.filter((s) => isDoneTone(s.tone)).length : null
@@ -429,7 +497,9 @@ export default function TeacherDetectionsPage() {
       </div>
 
       {isLive ? (
-      <div className="acsis-detections-body">
+      <div className={`acsis-detections-body${!isClassroomView ? ' acsis-detections-body--list' : ''}`}>
+        {isClassroomView ? (
+          <>
         <div className="acsis-detections-board w-full flex items-start justify-center relative box-border pt-1 sm:pt-2">
           <div className="absolute top-full w-full h-4 flex justify-around px-8 opacity-20 pointer-events-none" aria-hidden>
             <div className="w-2 h-full bg-muted-foreground/40" />
@@ -535,6 +605,100 @@ export default function TeacherDetectionsPage() {
             )
           })}
         </div>
+          </>
+        ) : (
+          <div className="acsis-detections-list-view">
+            <div className="acsis-detections-list-view__toolbar">
+              <label className="acsis-detections-list-view__search-wrap">
+                <Search className="acsis-detections-list-view__search-icon" aria-hidden />
+                <input
+                  type="search"
+                  className="acsis-detections-list-view__search"
+                  placeholder="Search by name, ID, or status…"
+                  value={listSearchQuery}
+                  onChange={(e) => setListSearchQuery(e.target.value)}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+              </label>
+              {listViolatorCount > 0 && !listSearchQuery.trim() ? (
+                <p className="acsis-detections-list-view__hint">
+                  {listViolatorCount} student{listViolatorCount === 1 ? '' : 's'} with warnings — shown first
+                </p>
+              ) : null}
+            </div>
+
+            <ul className="acsis-detections-list-view__cards acsis-scroll-y">
+              {filteredListStudents.length === 0 ? (
+                <li className="acsis-detections-list-view__empty">
+                  {listSearchQuery.trim()
+                    ? 'No students match your search.'
+                    : 'No students in this exam yet.'}
+                </li>
+              ) : (
+                filteredListStudents.map((student, index) => {
+                  const prev = filteredListStudents[index - 1]
+                  const showDivider =
+                    !listSearchQuery.trim() &&
+                    prev &&
+                    isViolator(prev) &&
+                    !isViolator(student)
+
+                  return (
+                    <React.Fragment key={student.id}>
+                      {showDivider ? (
+                        <li className="acsis-detections-list-view__divider" aria-hidden>
+                          Other students
+                        </li>
+                      ) : null}
+                      <li>
+                        <button
+                          type="button"
+                          className={`acsis-detections-list-card acsis-detections-list-card--${student.tone}${isViolator(student) ? ' acsis-detections-list-card--violator' : ''}`}
+                          onClick={() => openStudentDetail(student)}
+                        >
+                          <div
+                            className={`acsis-detections-list-card__strikes${student.strikes > 0 ? ` acsis-detections-list-card__strikes--${student.tone}` : ' acsis-detections-list-card__strikes--none'}`}
+                            aria-label={`${student.strikes} of ${MAX_EXAM_WARNINGS} warnings`}
+                          >
+                            <span className="acsis-detections-list-card__strikes-value">
+                              {student.strikes > 0 ? student.strikes : '—'}
+                            </span>
+                            <span className="acsis-detections-list-card__strikes-label">
+                              /{MAX_EXAM_WARNINGS}
+                            </span>
+                          </div>
+                          <div className="acsis-detections-list-card__body">
+                            <span
+                              className={`acsis-detections-list-card__avatar acsis-detections-list-card__avatar--${student.tone}`}
+                            >
+                              {seatInitials(student)}
+                            </span>
+                            <span className="acsis-detections-list-card__meta">
+                              <span className="acsis-detections-list-card__name">
+                                {student.firstName} {student.lastName}
+                              </span>
+                              <span className="acsis-detections-list-card__sub">
+                                {student.schoolId ? (
+                                  <span className="acsis-detections-list-card__id">{student.schoolId}</span>
+                                ) : null}
+                                <span
+                                  className={`acsis-detections-list-card__status acsis-detections-list-card__status--${student.tone}`}
+                                >
+                                  {statusLabelForTone(student.tone)}
+                                </span>
+                              </span>
+                            </span>
+                          </div>
+                        </button>
+                      </li>
+                    </React.Fragment>
+                  )
+                })
+              )}
+            </ul>
+          </div>
+        )}
       </div>
       ) : null}
 

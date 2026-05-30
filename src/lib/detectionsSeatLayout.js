@@ -15,9 +15,20 @@ const LEGACY_FILL_MODES = {
   snake: FILL_MODES.SNAKE_LEFT,
 }
 
+export const VIEW_MODES = {
+  CLASSROOM: 'classroom',
+  LIST: 'list',
+}
+
 export const DEFAULT_SEAT_SETTINGS = {
   sortBy: 'surname',
   fillMode: FILL_MODES.SNAKE_LEFT,
+  viewMode: VIEW_MODES.CLASSROOM,
+}
+
+function normalizeViewMode(mode) {
+  if (mode === VIEW_MODES.LIST || mode === VIEW_MODES.CLASSROOM) return mode
+  return DEFAULT_SEAT_SETTINGS.viewMode
 }
 
 function normalizeFillMode(mode) {
@@ -63,7 +74,11 @@ export function loadSeatSettings(classId, examId) {
     if (!raw) return { ...DEFAULT_SEAT_SETTINGS }
     const parsed = JSON.parse(raw)
     const fillMode = normalizeFillMode(parsed?.fillMode)
-    return { sortBy: 'surname', fillMode }
+    return {
+      sortBy: parsed?.sortBy === 'surname' ? 'surname' : DEFAULT_SEAT_SETTINGS.sortBy,
+      fillMode,
+      viewMode: normalizeViewMode(parsed?.viewMode),
+    }
   } catch {
     return { ...DEFAULT_SEAT_SETTINGS }
   }

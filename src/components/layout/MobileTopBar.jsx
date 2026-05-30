@@ -6,6 +6,7 @@ import { useInstitutionTheme } from '@/context/InstitutionThemeContext.jsx'
 import { useDetectionsToolbar } from '@/context/DetectionsToolbarContext.jsx'
 import AccountMenu from '@/components/layout/AccountMenu.jsx'
 import DetectionsSeatSettingsMenu from '@/components/teacher/DetectionsSeatSettingsMenu.jsx'
+import DetectionsViewModeToggle from '@/components/teacher/DetectionsViewModeToggle.jsx'
 import { resolveShellPageTitle } from '@/config/shellConfig.js'
 import { useTeacherShellBreadcrumbSegments } from '@/context/TeacherShellBreadcrumbContext.jsx'
 
@@ -37,9 +38,7 @@ export default function MobileTopBar({ settingsPath = null, role }) {
   }
 
   return (
-    <header
-      className={`acsis-mobile-top-bar${isDetectionsPage ? ' acsis-mobile-top-bar--detections' : ''}`}
-    >
+    <header className="acsis-mobile-top-bar">
       <div className="acsis-mobile-top-bar__brand">
         <div className="acsis-mobile-top-bar__logo">
           <InstitutionLogo logo={logo} alt="" responsive />
@@ -56,16 +55,29 @@ export default function MobileTopBar({ settingsPath = null, role }) {
       <div className="acsis-mobile-top-bar__actions">
         {isDetectionsPage ? (
           toolbar ? (
-            <DetectionsSeatSettingsMenu
-              seatSettings={toolbar.seatSettings}
-              onFillModeChange={toolbar.onFillModeChange}
-              triggerClassName="acsis-detections-settings-btn acsis-detections-settings-btn--mobile"
-            />
+            <>
+              <DetectionsViewModeToggle
+                viewMode={toolbar.viewMode}
+                onViewModeChange={toolbar.onViewModeChange}
+                className="acsis-detections-view-toggle--mobile"
+              />
+              <DetectionsSeatSettingsMenu
+                seatSettings={toolbar.seatSettings}
+                onFillModeChange={toolbar.onFillModeChange}
+                triggerClassName="acsis-detections-settings-btn acsis-detections-settings-btn--mobile"
+              />
+            </>
           ) : (
-            <span
-              className="acsis-detections-settings-btn acsis-detections-settings-btn--mobile acsis-detections-settings-btn--placeholder"
-              aria-hidden
-            />
+            <>
+              <span
+                className="acsis-detections-view-toggle acsis-detections-view-toggle--mobile acsis-detections-view-toggle--placeholder"
+                aria-hidden
+              />
+              <span
+                className="acsis-detections-settings-btn acsis-detections-settings-btn--mobile acsis-detections-settings-btn--placeholder"
+                aria-hidden
+              />
+            </>
           )
         ) : null}
         <AccountMenu

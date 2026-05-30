@@ -328,19 +328,78 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
     margin-left: auto;
 }
 
-/* Detections settings in breadcrumb: align with text line (avoid taller centered row) */
-.content-header--detections {
-    align-items: flex-start;
+.acsis-detections-header-actions {
+    gap: 0.5rem;
 }
 
-.content-header--detections .content-header__actions {
-    margin-top: 3px;
+.acsis-detections-view-toggle {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    padding: 2px;
+    height: 2.25rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--border-default, #e5e7eb);
+    background: var(--bg-surface-muted, #f3f4f6);
+    box-sizing: border-box;
 }
 
-@media (min-width: 768px) {
-    .content-header--detections .content-header__actions {
-        margin-top: 4px;
-    }
+.acsis-detections-view-toggle__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    height: calc(2.25rem - 4px);
+    padding: 0 0.65rem;
+    border: none;
+    border-radius: calc(0.5rem - 2px);
+    background: transparent;
+    color: var(--fg-muted, #6b7280);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1;
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.acsis-detections-view-toggle__btn:hover {
+    color: var(--fg-default, #111827);
+}
+
+.acsis-detections-view-toggle__btn.is-active {
+    background: var(--bg-surface, #fff);
+    color: var(--fg-default, #111827);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+
+.acsis-detections-view-toggle__btn:focus-visible {
+    outline: 2px solid #3b82f6;
+    outline-offset: 1px;
+}
+
+.acsis-detections-view-toggle__icon {
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+}
+
+.acsis-detections-view-toggle--mobile .acsis-detections-view-toggle__label {
+    display: none;
+}
+
+.acsis-detections-view-toggle--mobile .acsis-detections-view-toggle__btn {
+    padding: 0 0.5rem;
+    width: 2rem;
+}
+
+.acsis-detections-view-toggle--placeholder {
+    visibility: hidden;
+    pointer-events: none;
+    width: 11rem;
+}
+
+.acsis-detections-view-toggle--mobile.acsis-detections-view-toggle--placeholder {
+    width: 4.5rem;
 }
 
 .acsis-detections-settings-btn {

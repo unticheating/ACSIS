@@ -53,15 +53,6 @@
     flex-shrink: 0;
   }
 
-  .acsis-mobile-top-bar--detections {
-    align-items: flex-start;
-    padding-top: 12px;
-  }
-
-  .acsis-mobile-top-bar--detections .acsis-mobile-top-bar__actions {
-    margin-top: 2px;
-  }
-
   .acsis-mobile-top-bar__logo {
     width: clamp(32px, 9vw, 40px);
     height: clamp(32px, 9vw, 40px);
