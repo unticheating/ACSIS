@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Copy, Eye, EyeOff, MoreVertical, Play, Radio, Send, Trash2 } from 'lucide-react'
+import { Copy, Eye, EyeOff, MoreVertical, Pencil, Play, Radio, Send, Trash2 } from 'lucide-react'
 import { useTeacherShellBreadcrumbTrail } from '@/context/TeacherShellBreadcrumbContext.jsx'
 import TeacherMcTabs from '@/components/teacher/TeacherMcTabs.jsx'
 import { apiFetch } from '@/lib/apiFetch.js'
@@ -21,6 +21,7 @@ import { coerceDisplayString, coerceRouteParam } from '@/lib/coerceDisplay.js'
 import { formatCourseBreadcrumbLabel, formatSectionTitle, formatTermPeriod } from '@/lib/sectionLabel.js'
 import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
 import { copyToClipboard } from '@/lib/copyToClipboard.js'
+import { labelForQuestionType, summarizeQuestionTypes, uniqueQuestionTypeLabels } from '@/lib/questionTypes.js'
 import { useAcsisConfirm } from '@/hooks/useAcsisConfirm.jsx'
 import {
   DropdownMenu,
@@ -46,22 +47,26 @@ const EXAM_TABS = [
   { id: 'settings', label: 'Settings' },
 ]
 
-const QUESTION_TYPE_LABELS = {
-  multiple: 'MCQ',
-  multiple_choice: 'MCQ',
-  identification: 'Identification',
-  true_false: 'True / False',
-  coding: 'Coding',
+function formatSessionStatus(status) {
+  if (status === 'submitted') return 'Submitted'
+  if (status === 'in_progress') return 'In progress'
+  if (!status) return '—'
+  return String(status).replace(/_/g, ' ')
 }
 
-function summarizeQuestionTypes(questions) {
-  if (!Array.isArray(questions) || questions.length === 0) return '—'
-  const types = [
-    ...new Set(
-      questions.map((q) => QUESTION_TYPE_LABELS[q.type] || q.type || 'Question').filter(Boolean),
-    ),
-  ]
-  return types.join(', ') || '—'
+function sessionStatusClass(status) {
+  if (status === 'submitted') return 'acsis-exam-detail__session-status--submitted'
+  if (status === 'in_progress') return 'acsis-exam-detail__session-status--active'
+  return ''
+}
+
+function statusBadgeClass(status) {
+  const s = normalizeExamStatus(status)
+  if (s === PG_EXAM_STATUS.DRAFT) return 'acsis-exam-detail__status-badge--draft'
+  if (s === PG_EXAM_STATUS.WAITING) return 'acsis-exam-detail__status-badge--waiting'
+  if (s === PG_EXAM_STATUS.OPEN) return 'acsis-exam-detail__status-badge--live'
+  if (s === PG_EXAM_STATUS.CLOSED) return 'acsis-exam-detail__status-badge--closed'
+  return ''
 }
 
 function displayStatusLabel(status) {
@@ -83,6 +88,8 @@ function computeDurationMinutes(exam) {
 }
 
 function overviewDescription(exam) {
+  const examDesc = exam?.description?.trim()
+  if (examDesc) return examDesc
   const sectionDesc = exam?.sections?.find((s) => s.description?.trim())?.description?.trim()
   if (sectionDesc) return sectionDesc
   const fromQuestion = exam?.questions?.find((q) => q.sectionDescription?.trim())?.sectionDescription?.trim()
@@ -108,7 +115,7 @@ export default function TeacherExamDetailPage() {
   const [restartDialogOpen, setRestartDialogOpen] = useState(false)
   const [copyDialogOpen, setCopyDialogOpen] = useState(false)
   const [tab, setTab] = useState('overview')
-  const [examCodeVisible, setExamCodeVisible] = useState(true)
+  const [examCodeVisible, setExamCodeVisible] = useState(false)
   const [examCodeEditing, setExamCodeEditing] = useState(false)
   const [examCodeDraft, setExamCodeDraft] = useState('')
   const [examCodeSaving, setExamCodeSaving] = useState(false)
@@ -220,6 +227,8 @@ export default function TeacherExamDetailPage() {
   const questionCount = exam.questions ? exam.questions.length : exam.questionCount || 0
   const durationMins = computeDurationMinutes(exam)
   const typeSummary = summarizeQuestionTypes(exam.questions)
+  const typeLabels = uniqueQuestionTypeLabels(exam.questions)
+  const overviewDesc = overviewDescription(exam)
   const stats = results?.stats
   const lobbyStudents = waiting
     ? (results?.sessions || []).filter((s) => s.status === 'in_progress')
@@ -457,6 +466,7 @@ export default function TeacherExamDetailPage() {
 
   const qs = new URLSearchParams({ classId })
   const createHref = `/teacher/create-exam?${qs.toString()}`
+  const editHref = `/teacher/create-exam?classId=${coerceRouteParam(classId)}&examId=${coerceRouteParam(examId)}`
 
   const classHint = clsMeta
     ? [clsMeta.name || clsMeta.courseCode, formatTermPeriod(clsMeta)].filter(Boolean).join(' · ')
@@ -541,13 +551,18 @@ export default function TeacherExamDetailPage() {
 
       <header className="acsis-exam-detail__hero">
         <div className="acsis-exam-detail__hero-main">
-          <h1 className="acsis-exam-detail__hero-title">{exam.title || 'Untitled exam'}</h1>
+          <div className="acsis-exam-detail__hero-title-row">
+            <h1 className="acsis-exam-detail__hero-title">{exam.title || 'Untitled exam'}</h1>
+            <span className={`acsis-exam-detail__status-badge ${statusBadgeClass(exam.status)}`}>
+              {displayStatusLabel(exam.status)}
+            </span>
+          </div>
           {classHint ? <p className="acsis-exam-detail__hero-sub">{classHint}</p> : null}
         </div>
         <div className="acsis-exam-detail__hero-tools">
           {exam.code ? (
             <div className="acsis-exam-detail__code-wrap">
-              <span className="acsis-exam-detail__code-label">Exam code</span>
+              <span className="acsis-exam-detail__code-label">Exam password</span>
               <div className="acsis-exam-detail__code-pill">
                 {examCodeEditing ? (
                   <input
@@ -569,13 +584,13 @@ export default function TeacherExamDetailPage() {
                     maxLength={12}
                     autoFocus
                     disabled={examCodeSaving}
-                    aria-label="Edit exam code"
+                    aria-label="Edit exam password"
                   />
                 ) : (
                   <code
                     role="button"
                     tabIndex={0}
-                    title="Double-click to change exam code"
+                    title="Double-click to change exam password"
                     onDoubleClick={beginExamCodeEdit}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') beginExamCodeEdit()
@@ -587,7 +602,7 @@ export default function TeacherExamDetailPage() {
                 <button
                   type="button"
                   className="acsis-exam-detail__code-toggle"
-                  aria-label={examCodeVisible ? 'Hide exam code' : 'Show exam code'}
+                  aria-label={examCodeVisible ? 'Hide exam password' : 'Show exam password'}
                   aria-pressed={examCodeVisible}
                   onClick={() => setExamCodeVisible((v) => !v)}
                 >
@@ -600,15 +615,14 @@ export default function TeacherExamDetailPage() {
                 <button
                   type="button"
                   className="acsis-exam-detail__code-copy"
-                  aria-label="Copy exam code"
-                  onClick={() => void copyToClipboard(exam.code, { successMessage: 'Exam code copied.' })}
+                  aria-label="Copy exam password"
+                  onClick={() => void copyToClipboard(exam.code, { successMessage: 'Exam password copied.' })}
                 >
                   <Copy size={16} strokeWidth={2} aria-hidden />
                 </button>
               </div>
             </div>
           ) : null}
-          <span className="acsis-exam-detail__status-text">{displayStatusLabel(exam.status)}</span>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button type="button" className="acsis-class-card__menu-btn" aria-label="Exam options">
@@ -618,9 +632,9 @@ export default function TeacherExamDetailPage() {
             <DropdownMenuContent align="end" className="min-w-[11rem]">
               <DropdownMenuActionItem
                 icon={Copy}
-                onSelect={() => void copyToClipboard(exam.code, { successMessage: 'Exam code copied.' })}
+                onSelect={() => void copyToClipboard(exam.code, { successMessage: 'Exam password copied.' })}
               >
-                Copy exam code
+                Copy exam password
               </DropdownMenuActionItem>
               {draft ? (
                 <DropdownMenuActionItem icon={Send} variant="success" onSelect={publish}>
@@ -678,67 +692,138 @@ export default function TeacherExamDetailPage() {
       <FadeIn className="acsis-exam-detail__panel">
         {tab === 'overview' ? (
           <>
-            <p className="acsis-exam-detail__desc">{overviewDescription(exam)}</p>
-            {overviewCta}
-            <hr className="acsis-exam-detail__divider" />
-            <dl className="acsis-exam-detail__facts">
-              <div>
-                <dt>Duration</dt>
-                <dd>{durationMins} {durationMins === 1 ? 'min' : 'mins'}</dd>
-              </div>
-              <div>
-                <dt>Types</dt>
-                <dd>{typeSummary}</dd>
-              </div>
-              <div>
-                <dt>Items</dt>
-                <dd>{questionCount}</dd>
-              </div>
-              {subjectLabel ? (
-                <div>
-                  <dt>Subject</dt>
-                  <dd>{subjectLabel}</dd>
+            <section className="acsis-exam-detail__panel-section">
+              <p
+                className={`acsis-exam-detail__desc${
+                  overviewDesc === 'No description added for this exam.'
+                    ? ' acsis-exam-detail__desc--empty'
+                    : ''
+                }`}
+              >
+                {overviewDesc}
+              </p>
+            </section>
+
+            {overviewCta ? (
+              <section className="acsis-exam-detail__panel-section">
+                <div className="acsis-exam-detail__cta-card">{overviewCta}</div>
+              </section>
+            ) : null}
+
+            <section className="acsis-exam-detail__panel-section">
+              <div
+                className={`acsis-summary-stats acsis-exam-detail__stats${
+                  (subjectLabel ? 1 : 0) + (waiting ? 1 : 0) + 2 >= 4
+                    ? ' acsis-summary-stats--4'
+                    : ''
+                }`}
+              >
+                {subjectLabel ? (
+                  <div className="acsis-summary-stat acsis-card-surface">
+                    <div className="acsis-summary-stat__body">
+                      <span className="acsis-summary-stat__label">Subject</span>
+                      <span className="acsis-exam-detail__stat-text">{subjectLabel}</span>
+                    </div>
+                  </div>
+                ) : null}
+                <div className="acsis-summary-stat acsis-card-surface">
+                  <div className="acsis-summary-stat__body">
+                    <span className="acsis-summary-stat__label">Items</span>
+                    <span className="acsis-summary-stat__value">{questionCount}</span>
+                  </div>
                 </div>
-              ) : null}
-              {waiting ? (
-                <div>
-                  <dt>In lobby</dt>
-                  <dd>
-                    {lobbyCount > 0 ? (
-                      <button
-                        type="button"
-                        className="acsis-exam-detail__lobby-link"
-                        onClick={() => setLobbyModalOpen(true)}
-                      >
-                        {lobbyCount} waiting
-                      </button>
-                    ) : (
-                      '0 waiting'
-                    )}
-                  </dd>
+                <div className="acsis-summary-stat acsis-card-surface">
+                  <div className="acsis-summary-stat__body">
+                    <span className="acsis-summary-stat__label">Duration</span>
+                    <span className="acsis-summary-stat__value">
+                      {durationMins}
+                      <span className="acsis-exam-detail__stat-unit">min</span>
+                    </span>
+                  </div>
                 </div>
-              ) : null}
-            </dl>
+                {waiting ? (
+                  <div className="acsis-summary-stat acsis-card-surface">
+                    <div className="acsis-summary-stat__body">
+                      <span className="acsis-summary-stat__label">In lobby</span>
+                      <span className="acsis-exam-detail__stat-text">
+                        {lobbyCount > 0 ? (
+                          <button
+                            type="button"
+                            className="acsis-exam-detail__lobby-link"
+                            onClick={() => setLobbyModalOpen(true)}
+                          >
+                            {lobbyCount} waiting
+                          </button>
+                        ) : (
+                          '0 waiting'
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </section>
+
+            <section className="acsis-exam-detail__panel-section acsis-exam-detail__panel-section--last">
+              <div className="acsis-exam-detail__types-card">
+                <span className="acsis-exam-detail__section-heading">Question types</span>
+                {typeLabels.length ? (
+                  <div className="acsis-exam-detail__type-badges">
+                    {typeLabels.map((label) => (
+                      <span key={label} className="acsis-exam-detail__type-badge">
+                        {label}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="acsis-exam-detail__types-empty">—</span>
+                )}
+              </div>
+            </section>
           </>
         ) : null}
 
         {tab === 'questions' ? (
           <>
-            <h2 className="acsis-exam-detail__section-title">Questions</h2>
-            <p className="acsis-mc-sub" style={{ marginBottom: 16 }}>
-              {questionCount} {questionCount === 1 ? 'item' : 'items'} · {typeSummary}
-            </p>
+            <div className="acsis-exam-detail__questions-head">
+              <div>
+                <h2 className="acsis-exam-detail__section-title">Questions</h2>
+                <p className="acsis-mc-sub acsis-exam-detail__questions-sub">
+                  {questionCount} {questionCount === 1 ? 'item' : 'items'}
+                  {typeSummary !== '—' ? ` · ${typeSummary}` : ''}
+                </p>
+              </div>
+              <Link
+                to={editHref}
+                className="acsis-btn-ghost acsis-exam-detail__questions-edit"
+                style={{ textDecoration: 'none' }}
+              >
+                <Pencil size={16} strokeWidth={2} aria-hidden />
+                Edit questions
+              </Link>
+            </div>
             {!exam.questions?.length ? (
-              <p className="acsis-mc-sub">No questions loaded for this exam.</p>
+              <div className="acsis-exam-detail__empty-questions">
+                <p className="acsis-mc-sub">No questions loaded for this exam.</p>
+                <Link to={editHref} className="acsis-mc-create-btn" style={{ border: 'none', textDecoration: 'none' }}>
+                  Add questions
+                </Link>
+              </div>
             ) : (
               <ol className="acsis-exam-detail__question-list">
                 {exam.questions.map((q, index) => (
                   <li key={q.id || index} className="acsis-exam-detail__question-item">
-                    <span className="acsis-exam-detail__question-num">{index + 1}</span>
+                    <span className="acsis-exam-detail__question-num" aria-hidden>
+                      {index + 1}
+                    </span>
                     <div className="acsis-exam-detail__question-body">
                       <div className="acsis-exam-detail__question-meta">
-                        <span>{QUESTION_TYPE_LABELS[q.type] || q.type || 'Question'}</span>
-                        <span>{Number(q.points || 0)} pts</span>
+                        <span className="acsis-exam-detail__type-badge">
+                          {labelForQuestionType(q.type)}
+                        </span>
+                        <span className="acsis-exam-detail__question-points">
+                          {Number(q.points || 0)} pts
+                        </span>
                       </div>
                       <p className="acsis-exam-detail__question-text">
                         {q.question || q.question_text || 'Untitled question'}
@@ -753,27 +838,67 @@ export default function TeacherExamDetailPage() {
 
         {tab === 'results' ? (
           <>
-            <h2 className="acsis-exam-detail__section-title">Student submissions</h2>
-            {results?.topStudent ? (
-              <p className="acsis-exam-detail__top-line">
-                Top 1: {results.topStudent.studentName}
-                {results.topStudent.percentage != null ? ` — ${results.topStudent.percentage}%` : ''}
-              </p>
-            ) : null}
+            <div className="acsis-exam-detail__results-head">
+              <h2 className="acsis-exam-detail__section-title">Student submissions</h2>
+              {waiting || active ? (
+                <p className="acsis-exam-detail__results-hint">
+                  Students join with the exam password. Submissions update automatically while the exam is live.
+                </p>
+              ) : closed ? (
+                <p className="acsis-exam-detail__results-hint">Exam closed — release scores when you are ready.</p>
+              ) : null}
+            </div>
+
             {stats ? (
-              <p className="acsis-mc-sub" style={{ marginBottom: 12 }}>
-                {stats.submitted} submitted · {stats.joined} joined · {stats.enrolled} enrolled
-                {closed ? ' · Exam closed — release scores when ready' : ''}
-              </p>
+              <div
+                className={`acsis-summary-stats acsis-exam-detail__results-stats${
+                  results?.topStudent ? ' acsis-summary-stats--4' : ''
+                }`}
+              >
+                <div className="acsis-summary-stat acsis-card-surface">
+                  <div className="acsis-summary-stat__body">
+                    <span className="acsis-summary-stat__label">Submitted</span>
+                    <span className="acsis-summary-stat__value">{stats.submitted}</span>
+                  </div>
+                </div>
+                <div className="acsis-summary-stat acsis-card-surface">
+                  <div className="acsis-summary-stat__body">
+                    <span className="acsis-summary-stat__label">Joined</span>
+                    <span className="acsis-summary-stat__value">{stats.joined}</span>
+                  </div>
+                </div>
+                <div className="acsis-summary-stat acsis-card-surface">
+                  <div className="acsis-summary-stat__body">
+                    <span className="acsis-summary-stat__label">Enrolled</span>
+                    <span className="acsis-summary-stat__value">{stats.enrolled}</span>
+                  </div>
+                </div>
+                {results?.topStudent ? (
+                  <div className="acsis-summary-stat acsis-card-surface">
+                    <div className="acsis-summary-stat__body">
+                      <span className="acsis-summary-stat__label">Top score</span>
+                      <span className="acsis-exam-detail__stat-text">
+                        {results.topStudent.studentName}
+                        {results.topStudent.percentage != null ? (
+                          <span className="acsis-exam-detail__top-score-pct">
+                            {' '}
+                            · {results.topStudent.percentage}%
+                          </span>
+                        ) : null}
+                      </span>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
             ) : null}
-            <p className="acsis-mc-sub" style={{ marginBottom: 16, fontSize: '0.8125rem' }}>
-              When this exam is on-going, students join with the exam code. Submissions update automatically.
-            </p>
+
             {resultsLoading && !results ? (
-              <p className="acsis-mc-sub">Loading submissions…</p>
+              <p className="acsis-mc-sub acsis-exam-detail__results-loading">Loading submissions…</p>
             ) : null}
             {!resultsLoading && (!results?.sessions || results.sessions.length === 0) ? (
-              <p className="acsis-mc-sub">No students have joined or submitted yet.</p>
+              <div className="acsis-exam-detail__results-empty">
+                <p className="acsis-mc-sub">No students have joined or submitted yet.</p>
+              </div>
             ) : (
               <div className="acsis-exam-detail__table-wrap">
                 <table className="acsis-exam-detail__table">
@@ -782,24 +907,32 @@ export default function TeacherExamDetailPage() {
                       <th>Student</th>
                       <th>Status</th>
                       <th>Review</th>
-                      <th>Score</th>
-                      <th>Rank</th>
+                      <th className="acsis-exam-detail__table-col-num">Score</th>
+                      <th className="acsis-exam-detail__table-col-num">Rank</th>
                       <th>Released</th>
-                      <th>Warnings</th>
-                      <th />
+                      <th className="acsis-exam-detail__table-col-num">Warnings</th>
+                      <th className="acsis-exam-detail__table-col-action" />
                     </tr>
                   </thead>
                   <tbody>
                     {(results?.sessions || []).map((s) => (
                       <tr key={s.sessionId}>
                         <td>
-                          {s.studentName}
+                          <span className="acsis-exam-detail__table-student-name">{s.studentName}</span>
                           {s.schoolId ? (
                             <span className="acsis-exam-detail__table-student-id">{s.schoolId}</span>
                           ) : null}
                         </td>
-                        <td>{s.status}</td>
                         <td>
+                          {s.status ? (
+                            <span className={`acsis-exam-detail__session-status ${sessionStatusClass(s.status)}`}>
+                              {formatSessionStatus(s.status)}
+                            </span>
+                          ) : (
+                            '—'
+                          )}
+                        </td>
+                        <td className="acsis-exam-detail__table-review">
                           {s.status === 'submitted'
                             ? s.reviewComplete
                               ? 'Reviewed'
@@ -808,20 +941,22 @@ export default function TeacherExamDetailPage() {
                                 : 'Auto-graded'
                             : '—'}
                         </td>
-                        <td>
+                        <td className="acsis-exam-detail__table-col-num acsis-exam-detail__table-score">
                           {s.status === 'submitted' && s.percentage != null
                             ? `${s.percentage}% (${s.rawScore}/${s.totalPoints})`
                             : '—'}
                         </td>
-                        <td>{s.rank != null ? `#${s.rank}` : '—'}</td>
+                        <td className="acsis-exam-detail__table-col-num">
+                          {s.rank != null ? `#${s.rank}` : '—'}
+                        </td>
                         <td>
                           {s.status === 'submitted' ? (
                             s.scoreReleased ? (
-                              'Yes'
+                              <span className="acsis-exam-detail__released-yes">Released</span>
                             ) : (
                               <button
                                 type="button"
-                                className="acsis-exam-detail__review-link"
+                                className="acsis-exam-detail__table-action"
                                 disabled={releasing}
                                 onClick={() => void handleReleaseOneStudent(s.sessionId)}
                               >
@@ -832,12 +967,14 @@ export default function TeacherExamDetailPage() {
                             '—'
                           )}
                         </td>
-                        <td>{s.warningCount}</td>
-                        <td>
+                        <td className="acsis-exam-detail__table-col-num acsis-exam-detail__table-warnings">
+                          {s.warningCount}
+                        </td>
+                        <td className="acsis-exam-detail__table-col-action">
                           {s.status === 'submitted' && s.sessionId ? (
                             <button
                               type="button"
-                              className="acsis-exam-detail__review-link"
+                              className="acsis-exam-detail__table-action"
                               onClick={() => {
                                 setReviewInitialSessionId(s.sessionId)
                                 setReviewOpen(true)
@@ -858,91 +995,119 @@ export default function TeacherExamDetailPage() {
 
         {tab === 'settings' ? (
           <>
-            <h2 className="acsis-exam-detail__section-title">Exam settings</h2>
-            <dl className="acsis-exam-detail__meta-grid">
-              <div>
-                <dt>Exam code</dt>
-                <dd className="acsis-exam-detail__code">{exam.code || '—'}</dd>
-              </div>
-              <div>
-                <dt>Status</dt>
-                <dd>{labelForPgExamStatus(exam.status)}</dd>
-              </div>
-              <div>
-                <dt>Questions</dt>
-                <dd>{questionCount}</dd>
-              </div>
-              <div>
-                <dt>Time limit</dt>
-                <dd>{durationMins} minutes</dd>
-              </div>
-              <div>
-                <dt>Subject</dt>
-                <dd>{subjectLabel || '—'}</dd>
-              </div>
-              <div>
-                <dt>Class group</dt>
-                <dd>{classGroupLabel || '—'}</dd>
-              </div>
-              <div>
-                <dt>Shuffle questions</dt>
-                <dd>{exam.shuffleQuestions ? 'Yes' : 'No'}</dd>
-              </div>
-              <div>
-                <dt>Shuffle choices</dt>
-                <dd>{exam.shuffleChoices ? 'Yes' : 'No'}</dd>
-              </div>
-            </dl>
-            <div className="acsis-exam-detail__actions" style={{ marginTop: 20 }}>
-              <button
-                type="button"
-                className="acsis-btn-primary"
-                onClick={() => void copyToClipboard(exam.code, { successMessage: 'Exam code copied.' })}
-              >
-                Copy exam code
-              </button>
-              {draft ? (
-                <button type="button" className="acsis-btn-primary" onClick={publish}>
-                  Publish exam
-                </button>
-              ) : null}
-              {waiting ? (
-                <button type="button" className="acsis-btn-primary" onClick={() => startExam({})}>
-                  Start session
-                </button>
-              ) : null}
-              {active ? (
-                <button type="button" className="acsis-btn-ghost" onClick={() => void endExam()}>
-                  End exam
-                </button>
-              ) : null}
-              {closed && !draft ? (
-                <button type="button" className="acsis-btn-ghost" onClick={() => setRestartDialogOpen(true)}>
-                  Restart exam
-                </button>
-              ) : null}
-              {(closed || hasSubmissions) && !draft ? (
+            <div className="acsis-exam-detail__settings-head">
+              <h2 className="acsis-exam-detail__section-title">Exam settings</h2>
+              <div className="acsis-exam-detail__settings-toolbar">
+                {draft ? (
+                  <button type="button" className="acsis-btn-primary" onClick={publish}>
+                    Publish exam
+                  </button>
+                ) : null}
+                {waiting ? (
+                  <button type="button" className="acsis-btn-primary" onClick={() => startExam({})}>
+                    Start session
+                  </button>
+                ) : null}
+                {(closed || hasSubmissions) && !draft ? (
+                  <button
+                    type="button"
+                    className="acsis-btn-primary"
+                    disabled={releasing}
+                    onClick={() => setReleaseDialogOpen(true)}
+                  >
+                    {releasing ? 'Releasing…' : 'Release scores'}
+                  </button>
+                ) : null}
+                {exam.code ? (
+                  <button
+                    type="button"
+                    className="acsis-btn-ghost"
+                    onClick={() => void copyToClipboard(exam.code, { successMessage: 'Exam password copied.' })}
+                  >
+                    Copy password
+                  </button>
+                ) : null}
+                <Link to={editHref} className="acsis-btn-ghost" style={{ textDecoration: 'none', display: 'inline-flex' }}>
+                  Edit questions
+                </Link>
+                {active ? (
+                  <button type="button" className="acsis-btn-ghost" onClick={() => void endExam()}>
+                    End exam
+                  </button>
+                ) : null}
+                {closed && !draft ? (
+                  <button type="button" className="acsis-btn-ghost" onClick={() => setRestartDialogOpen(true)}>
+                    Restart exam
+                  </button>
+                ) : null}
+                <Link to={createHref} className="acsis-btn-ghost" style={{ textDecoration: 'none', display: 'inline-flex' }}>
+                  New exam
+                </Link>
                 <button
                   type="button"
-                  className="acsis-btn-primary"
-                  disabled={releasing}
-                  onClick={() => setReleaseDialogOpen(true)}
+                  className="acsis-btn-ghost acsis-exam-detail__btn-danger"
+                  onClick={() => void remove()}
                 >
-                  {releasing ? 'Releasing…' : 'Release scores'}
+                  Delete
                 </button>
-              ) : null}
-              <Link to={createHref} className="acsis-btn-ghost" style={{ textDecoration: 'none', display: 'inline-block' }}>
-                New exam in this class
-              </Link>
-              <button
-                type="button"
-                className="acsis-btn-ghost"
-                style={{ color: '#b91c1c', borderColor: '#fecaca' }}
-                onClick={() => void remove()}
-              >
-                Delete exam
-              </button>
+              </div>
             </div>
+
+            <section className="acsis-exam-detail__panel-section">
+              <span className="acsis-exam-detail__section-heading">Access</span>
+              <dl className="acsis-exam-detail__meta-grid acsis-exam-detail__meta-grid--compact">
+                <div>
+                  <dt>Exam password</dt>
+                  <dd className="acsis-exam-detail__code">
+                    {exam.code ? (examCodeVisible ? exam.code : '••••••') : '—'}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Status</dt>
+                  <dd>
+                    <span className={`acsis-exam-detail__status-badge ${statusBadgeClass(exam.status)}`}>
+                      {displayStatusLabel(exam.status)}
+                    </span>
+                  </dd>
+                </div>
+              </dl>
+            </section>
+
+            <section className="acsis-exam-detail__panel-section">
+              <span className="acsis-exam-detail__section-heading">Exam setup</span>
+              <dl className="acsis-exam-detail__meta-grid acsis-exam-detail__meta-grid--compact">
+                <div>
+                  <dt>Questions</dt>
+                  <dd>{questionCount}</dd>
+                </div>
+                <div>
+                  <dt>Time limit</dt>
+                  <dd>{durationMins} {durationMins === 1 ? 'minute' : 'minutes'}</dd>
+                </div>
+                <div>
+                  <dt>Shuffle questions</dt>
+                  <dd>{exam.shuffleQuestions ? 'Yes' : 'No'}</dd>
+                </div>
+                <div>
+                  <dt>Shuffle choices</dt>
+                  <dd>{exam.shuffleChoices ? 'Yes' : 'No'}</dd>
+                </div>
+              </dl>
+            </section>
+
+            <section className="acsis-exam-detail__panel-section acsis-exam-detail__panel-section--last">
+              <span className="acsis-exam-detail__section-heading">Class</span>
+              <dl className="acsis-exam-detail__meta-grid acsis-exam-detail__meta-grid--compact">
+                <div>
+                  <dt>Subject</dt>
+                  <dd>{subjectLabel || '—'}</dd>
+                </div>
+                <div className="acsis-exam-detail__meta-grid__wide">
+                  <dt>Class group</dt>
+                  <dd>{classGroupLabel || '—'}</dd>
+                </div>
+              </dl>
+            </section>
           </>
         ) : null}
       </FadeIn>

@@ -3,11 +3,14 @@ import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { fetchTeacherExamSessionDetail } from '@/lib/teacherExamResultsApi.js'
 import { manualGradeAnswer } from '@/lib/teacherExamGradingApi.js'
 import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
+import { labelForQuestionType } from '@/lib/questionTypes.js'
 import '../../styles/exam-answer-review.css'
 
 function questionTypeShort(type) {
-  if (type === 'mcq') return 'MCQ'
-  if (type === 'true_false') return 'T/F'
+  const label = labelForQuestionType(type)
+  if (label === 'Multiple choice') return 'MCQ'
+  if (label === 'True / False') return 'T/F'
+  if (label === 'Coding') return 'Code'
   return 'ID'
 }
 

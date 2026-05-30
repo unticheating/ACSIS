@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams, useNavigate } from 'react-router-dom'
-import { Clock, Plus, Shuffle, Trash2, ArrowLeft, GripVertical, CheckCircle2, Layers, ImageIcon, X } from 'lucide-react'
+import { Clock, Plus, Shuffle, Trash2, ArrowLeft, GripVertical, CheckCircle2, Layers, ImageIcon, X, Pencil } from 'lucide-react'
 import { Label } from '@/components/ui/label.jsx'
 import { Button } from '@/components/ui/button.jsx'
 import { Input } from '@/components/ui/input.jsx'
 import { apiFetch } from '@/lib/apiFetch.js'
 import { COPY } from '@/lib/examFlowUi.js'
+import { mapExamToBuilderState } from '@/lib/mapExamToBuilder.js'
+import { labelForQuestionType } from '@/lib/questionTypes.js'
 import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
 import { useAcsisConfirm } from '@/hooks/useAcsisConfirm.jsx'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
@@ -37,6 +39,8 @@ export default function TeacherCreateExamPage() {
   const [classes, setClasses] = useState([])
   const [loadingClasses, setLoadingClasses] = useState(true)
   const classesQuery = searchParams.get('classes') || ''
+  const editExamIdParam = searchParams.get('examId') || ''
+  const isEditMode = Boolean(editExamIdParam)
   const [selectedClass, setSelectedClass] = useState(searchParams.get('classId') || (classesQuery ? classesQuery.split(',')[0] : ''))
   const [createForClasses, setCreateForClasses] = useState(classesQuery ? classesQuery.split(',') : [])
   const preselectedCourse = searchParams.get('course') || ''
@@ -56,6 +60,48 @@ export default function TeacherCreateExamPage() {
         setLoadingClasses(false)
       })
   }, [])
+
+  useEffect(() => {
+    if (!editExamIdParam || !selectedClass) {
+      setLoadingEditExam(false)
+      return undefined
+    }
+
+    let cancelled = false
+    async function loadExamForEdit() {
+      setLoadingEditExam(true)
+      try {
+        const res = await apiFetch(`/api/teacher/classes/${selectedClass}/exams/${editExamIdParam}`)
+        if (!res.ok) throw new Error('Failed to load exam for editing.')
+        const exam = await res.json()
+        if (cancelled) return
+
+        const { sections: loadedSections, description } = mapExamToBuilderState(exam)
+        setExamId(String(exam.id))
+        setExamTitle(exam.title || '')
+        setExamDescription(description)
+        setSections(loadedSections)
+        setActiveSectionId(loadedSections[0]?.id || INITIAL_EXAM_SECTION.id)
+        setShuffleQuestions(!!exam.shuffleQuestions)
+        setShuffleChoices(!!exam.shuffleChoices)
+        setScheduledStart(exam.scheduledStart || '')
+        setScheduledEnd(exam.scheduledEnd || '')
+        setIsAutoPublish(!!exam.isAutoPublish)
+        setLastSaved(new Date())
+      } catch (err) {
+        if (!cancelled) {
+          acsisToastError(err instanceof Error ? err.message : 'Failed to load exam.')
+        }
+      } finally {
+        if (!cancelled) setLoadingEditExam(false)
+      }
+    }
+
+    void loadExamForEdit()
+    return () => {
+      cancelled = true
+    }
+  }, [editExamIdParam, selectedClass])
 
   const [examTitle, setExamTitle] = useState('')
   const [examDescription, setExamDescription] = useState('')
@@ -96,26 +142,104 @@ export default function TeacherCreateExamPage() {
   const [shuffleChoices, setShuffleChoices] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const [examId, setExamId] = useState(null)
+  const [examId, setExamId] = useState(editExamIdParam || null)
+  const [loadingEditExam, setLoadingEditExam] = useState(Boolean(editExamIdParam))
   const [isSaving, setIsSaving] = useState(false)
   const [lastSaved, setLastSaved] = useState(null)
   const [showQuestionForm, setShowQuestionForm] = useState(true)
+  const [editingQuestion, setEditingQuestion] = useState(/** @type {{ sectionId: string, questionId: string } | null} */ (null))
+  const editPanelRef = useRef(null)
 
   const resetMc = useCallback(() => setMc(emptyMc()), [])
 
-  const resetQuestionForm = useCallback(() => {
-    setQuestionText('')
-    setQuestionType('multiple')
+  const resetAnswerFields = useCallback(() => {
     resetMc()
     setIdentAnswer('')
     setTfAnswer('')
     setCodingAnswer('')
     setCodingLanguage('javascript')
-    setQuestionImage(null)
-    if (imageInputRef.current) imageInputRef.current.value = ''
   }, [resetMc])
 
-  function addQuestion() {
+  const resetQuestionForm = useCallback(() => {
+    setQuestionText('')
+    setQuestionType('multiple')
+    resetAnswerFields()
+    setQuestionImage(null)
+    setEditingQuestion(null)
+    if (imageInputRef.current) imageInputRef.current.value = ''
+  }, [resetAnswerFields])
+
+  function formTypeFromQuestionType(type) {
+    if (type === 'multiple-choice' || type === 'multiple' || type === 'mcq') return 'multiple'
+    if (type === 'truefalse' || type === 'true_false') return 'truefalse'
+    if (type === 'coding') return 'coding'
+    return 'identification'
+  }
+
+  function beginEditQuestion(sectionId, q) {
+    const formType = formTypeFromQuestionType(q.type)
+    setActiveSectionId(sectionId)
+    setShowQuestionForm(false)
+    setEditingQuestion({ sectionId, questionId: String(q.id) })
+    setQuestionType(formType)
+    setQuestionText(q.question || '')
+
+    if (formType === 'multiple') {
+      const opts = q.options || []
+      const correctIdx = opts.findIndex((opt) => opt === q.correctAnswer)
+      setMc({
+        opt1: opts[0] || '',
+        opt2: opts[1] || '',
+        opt3: opts[2] || '',
+        opt4: opts[3] || '',
+        correct: correctIdx >= 0 ? String(correctIdx + 1) : '',
+      })
+      setIdentAnswer('')
+      setTfAnswer('')
+      setCodingAnswer('')
+      setCodingLanguage('javascript')
+    } else if (formType === 'identification') {
+      resetMc()
+      setIdentAnswer(q.correctAnswer || '')
+      setTfAnswer('')
+      setCodingAnswer('')
+      setCodingLanguage('javascript')
+    } else if (formType === 'truefalse') {
+      resetMc()
+      setIdentAnswer('')
+      setTfAnswer(q.correctAnswer === 'True' ? 'true' : q.correctAnswer === 'False' ? 'false' : '')
+      setCodingAnswer('')
+      setCodingLanguage('javascript')
+    } else if (formType === 'coding') {
+      resetMc()
+      setIdentAnswer('')
+      setTfAnswer('')
+      setCodingLanguage(q.options?.[0] || q.language || 'javascript')
+      setCodingAnswer(q.correctAnswer || '')
+    }
+
+    setQuestionImage(q.imageUrl || null)
+    if (imageInputRef.current) imageInputRef.current.value = ''
+
+    window.requestAnimationFrame(() => {
+      editPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    })
+  }
+
+  useEffect(() => {
+    if (!editingQuestion) return undefined
+    const timer = window.setTimeout(() => {
+      editPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }, 50)
+    return () => window.clearTimeout(timer)
+  }, [editingQuestion])
+
+  function cancelEditQuestion() {
+    resetQuestionForm()
+    setShowQuestionForm(false)
+  }
+
+  function saveQuestion() {
     const text = questionText.trim()
     if (!text) {
       acsisToastError('Please enter a question.')
@@ -161,27 +285,49 @@ export default function TeacherCreateExamPage() {
     }
 
     const typeLabel = questionType === 'multiple' ? 'multiple-choice' : questionType
+    const questionPayload = {
+      type: typeLabel,
+      question: text,
+      options,
+      correctAnswer,
+      imageUrl: questionImage || null,
+    }
 
-    setSections((prev) =>
-      prev.map((sec) =>
-        sec.id === activeSectionId
-          ? {
-              ...sec,
-              questions: [
-                ...sec.questions,
-                {
-                  id: String(Date.now()), // ensure string for draggable
-                  type: typeLabel,
-                  question: text,
-                  options,
-                  correctAnswer,
-                  imageUrl: questionImage || null,
-                },
-              ],
-            }
-          : sec,
-      ),
-    )
+    if (editingQuestion) {
+      setSections((prev) =>
+        prev.map((sec) =>
+          sec.id === editingQuestion.sectionId
+            ? {
+                ...sec,
+                questions: sec.questions.map((q) =>
+                  String(q.id) === String(editingQuestion.questionId)
+                    ? { ...q, ...questionPayload }
+                    : q,
+                ),
+              }
+            : sec,
+        ),
+      )
+      acsisToastSuccess('Question updated.')
+    } else {
+      setSections((prev) =>
+        prev.map((sec) =>
+          sec.id === activeSectionId
+            ? {
+                ...sec,
+                questions: [
+                  ...sec.questions,
+                  {
+                    id: String(Date.now()),
+                    ...questionPayload,
+                  },
+                ],
+              }
+            : sec,
+        ),
+      )
+    }
+
     resetQuestionForm()
     setShowQuestionForm(false)
   }
@@ -194,10 +340,14 @@ export default function TeacherCreateExamPage() {
       destructive: true,
     })
     if (!ok) return
+    if (editingQuestion && String(editingQuestion.questionId) === String(questionId)) {
+      resetQuestionForm()
+      setShowQuestionForm(false)
+    }
     setSections((prev) =>
       prev.map((sec) =>
         sec.id === sectionId
-          ? { ...sec, questions: sec.questions.filter((q) => q.id !== questionId) }
+          ? { ...sec, questions: sec.questions.filter((q) => String(q.id) !== String(questionId)) }
           : sec,
       ),
     )
@@ -252,9 +402,17 @@ export default function TeacherCreateExamPage() {
     [sections],
   )
 
-  useEffect(() => {
-    resetQuestionForm()
-  }, [activeSectionId, resetQuestionForm])
+  function activateSection(sectionId) {
+    if (sectionId !== activeSectionId) {
+      if (editingQuestion) {
+        cancelEditQuestion()
+      } else {
+        resetQuestionForm()
+      }
+    }
+    setActiveSectionId(sectionId)
+    setShowQuestionForm(true)
+  }
 
   // Autosave logic
   useEffect(() => {
@@ -384,7 +542,7 @@ export default function TeacherCreateExamPage() {
       
       const createdIds = [mainExamId]
 
-      const other = createForClasses.filter((id) => String(id) !== String(selectedClass))
+      const other = isEditMode ? [] : createForClasses.filter((id) => String(id) !== String(selectedClass))
       for (const clsId of other) {
         try {
           const r = await apiFetch(`/api/teacher/classes/${clsId}/exams`, {
@@ -399,11 +557,17 @@ export default function TeacherCreateExamPage() {
         }
       }
 
-      const codeMsg = examCode ? ` Exam code: ${examCode}.` : ''
+      const codeMsg = examCode ? ` Exam password: ${examCode}.` : ''
       acsisToastSuccess(
-        `Exam "${title}" saved for ${createdIds.length} class(es) (${totalQuestions} questions, ${sections.length} set(s)).${codeMsg} Publish from the class page when ready.`,
+        isEditMode
+          ? `Exam "${title}" updated (${totalQuestions} questions, ${sections.length} set(s)).${codeMsg}`
+          : `Exam "${title}" saved for ${createdIds.length} class(es) (${totalQuestions} questions, ${sections.length} set(s)).${codeMsg} Publish from the class page when ready.`,
       )
-      navigate(`/teacher/my-classes/${selectedClass}`)
+      if (isEditMode && mainExamId) {
+        navigate(`/teacher/my-classes/${selectedClass}/exams/${mainExamId}`)
+      } else {
+        navigate(`/teacher/my-classes/${selectedClass}`)
+      }
     } catch (err) {
       acsisToastError(err.message)
     } finally {
@@ -535,8 +699,8 @@ export default function TeacherCreateExamPage() {
     return null
   }, [identAnswer, mc, questionType, tfAnswer, codingAnswer, codingLanguage])
 
-  const addQuestionForm = (
-    <div className="exam-builder-panel__body space-y-6">
+  const renderQuestionForm = (isEditing) => (
+    <div className={`exam-builder-panel__body space-y-6${isEditing ? ' exam-builder-inline-editor__body' : ''}`}>
       <div className="grid md:grid-cols-3 gap-6">
         <div className="space-y-2 md:col-span-1">
           <Label>Question Type</Label>
@@ -545,8 +709,7 @@ export default function TeacherCreateExamPage() {
             value={questionType}
             onChange={(e) => {
               setQuestionType(e.target.value)
-              resetQuestionForm()
-              setQuestionType(e.target.value)
+              resetAnswerFields()
             }}
           >
             <option value="multiple">Multiple Choice</option>
@@ -614,12 +777,33 @@ export default function TeacherCreateExamPage() {
       </div>
 
       <div className="pt-4 exam-builder-options-divider">{optionsBlock}</div>
-      <Button onClick={addQuestion} className="w-full md:w-auto">
-        <Plus size={16} className="mr-2" />
-        Save question
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button onClick={saveQuestion} className="w-full md:w-auto">
+          {isEditing ? <Pencil size={16} className="mr-2" /> : <Plus size={16} className="mr-2" />}
+          {isEditing ? 'Update question' : 'Save question'}
+        </Button>
+        {isEditing ? (
+          <Button type="button" variant="outline" onClick={cancelEditQuestion} className="w-full md:w-auto">
+            Cancel edit
+          </Button>
+        ) : null}
+      </div>
     </div>
   )
+
+  const backHref = isEditMode && examId
+    ? `/teacher/my-classes/${selectedClass}/exams/${examId}`
+    : selectedClass
+      ? `/teacher/my-classes/${selectedClass}`
+      : '/teacher/my-classes'
+
+  if (loadingEditExam) {
+    return (
+      <div className="flex items-center justify-center h-full min-h-[320px] p-8 text-muted-foreground">
+        Loading exam…
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col md:flex-row h-full lg:h-[calc(100vh-64px)] bg-background">
@@ -627,11 +811,13 @@ export default function TeacherCreateExamPage() {
       <aside className="w-full md:w-[320px] lg:w-[380px] bg-card border-r border-border md:h-full overflow-y-auto flex flex-col shrink-0">
         <div className="p-6 border-b border-border flex items-center gap-3">
           <Button variant="ghost" size="icon" asChild className="rounded-full text-muted-foreground hover:text-foreground">
-            <Link to={selectedClass ? `/teacher/my-classes/${selectedClass}` : '/teacher/my-classes'}>
+            <Link to={backHref}>
               <ArrowLeft size={20} />
             </Link>
           </Button>
-          <h1 className="text-xl font-bold tracking-tight text-foreground">Create Exam</h1>
+          <h1 className="text-xl font-bold tracking-tight text-foreground">
+            {isEditMode ? 'Edit exam' : 'Create exam'}
+          </h1>
         </div>
         
         <div className="p-6 flex-1 space-y-8">
@@ -639,9 +825,10 @@ export default function TeacherCreateExamPage() {
             <div className="space-y-2">
               <Label className="text-sm font-semibold">Target Class</Label>
               <select
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-70"
                 value={selectedClass}
                 onChange={(e) => setSelectedClass(e.target.value)}
+                disabled={isEditMode || loadingClasses}
               >
                 {loadingClasses ? (
                   <option value="">Loading classes...</option>
@@ -686,13 +873,18 @@ export default function TeacherCreateExamPage() {
               </Label>
               <Input
                 id="exam-password"
-                type="text"
+                type="password"
                 maxLength={20}
-                autoComplete="off"
-                placeholder="Leave blank for open lobby"
+                autoComplete="new-password"
+                placeholder={isEditMode ? 'Leave blank to keep current password' : 'Leave blank for open lobby'}
                 value={examPassword}
                 onChange={(e) => setExamPassword(e.target.value)}
               />
+              {isEditMode ? (
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Change the exam password from the exam detail page after publishing.
+                </p>
+              ) : null}
               <p className="text-xs text-muted-foreground leading-relaxed">{COPY.examPassword}</p>
               <p className="text-xs text-muted-foreground leading-relaxed">{COPY.classAccessCode}</p>
             </div>
@@ -773,7 +965,7 @@ export default function TeacherCreateExamPage() {
             disabled={isSubmitting}
             className="w-full py-6 text-md shadow-md acsis-mc-create-btn border-none"
           >
-            {isSubmitting ? 'Saving Exam...' : 'Finish & Save Exam'}
+            {isSubmitting ? 'Saving…' : isEditMode ? 'Save changes' : 'Finish & save exam'}
           </Button>
         </div>
       </aside>
@@ -783,7 +975,9 @@ export default function TeacherCreateExamPage() {
           
           <div className="exam-builder-toolbar flex items-center justify-between pb-4">
             <div>
-              <h2 className="text-xl font-bold text-foreground">Exam Builder</h2>
+              <h2 className="text-xl font-bold text-foreground">
+                {isEditMode ? 'Edit questions' : 'Exam builder'}
+              </h2>
               <div className="flex items-center gap-2 mt-1">
                 <p className="text-sm text-muted-foreground">
                   {sections.length} {sections.length === 1 ? 'set' : 'sets'} · {totalQuestions}{' '}
@@ -792,7 +986,9 @@ export default function TeacherCreateExamPage() {
                 {isSaving ? (
                   <span className="text-xs font-medium text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded-full animate-pulse">Saving...</span>
                 ) : lastSaved ? (
-                  <span className="text-xs font-medium text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full">Draft saved</span>
+                  <span className="text-xs font-medium text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                    {isEditMode ? 'Changes saved' : 'Draft saved'}
+                  </span>
                 ) : null}
               </div>
             </div>
@@ -826,10 +1022,7 @@ export default function TeacherCreateExamPage() {
                           <Button
                             variant={isActiveSet ? 'default' : 'secondary'}
                             size="sm"
-                            onClick={() => {
-                              setActiveSectionId(sec.id)
-                              setShowQuestionForm(true)
-                            }}
+                            onClick={() => activateSection(sec.id)}
                           >
                             {isActiveSet ? 'Adding here' : 'Add questions here'}
                           </Button>
@@ -904,14 +1097,20 @@ export default function TeacherCreateExamPage() {
                                   above to build this set.
                                 </p>
                               )}
-                              {sec.questions.map((q, index) => (
-                                <Draggable key={q.id} draggableId={q.id} index={index}>
+                              {sec.questions.map((q, index) => {
+                                const isEditingThis =
+                                  editingQuestion?.sectionId === sec.id &&
+                                  editingQuestion?.questionId === String(q.id)
+                                return (
+                                <Draggable key={q.id} draggableId={String(q.id)} index={index}>
                                   {(provided, snapshot) => (
                                     <div
                                       ref={provided.innerRef}
                                       {...provided.draggableProps}
                                       style={provided.draggableProps.style}
-                                      className={`exam-builder-question group${snapshot.isDragging ? ' exam-builder-question--dragging' : ''}`}
+                                      className={`exam-builder-question group${
+                                        snapshot.isDragging ? ' exam-builder-question--dragging' : ''
+                                      }${isEditingThis ? ' exam-builder-question--editing' : ''}`}
                                     >
                                       <div
                                         {...provided.dragHandleProps}
@@ -925,14 +1124,31 @@ export default function TeacherCreateExamPage() {
                                           <h3 className="font-medium text-foreground leading-relaxed whitespace-pre-wrap">
                                             {q.question}
                                           </h3>
-                                          <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            onClick={() => void deleteQuestion(sec.id, q.id)}
-                                            className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
-                                          >
-                                            <Trash2 size={18} />
-                                          </Button>
+                                          <div className="flex items-center gap-1 shrink-0">
+                                            <Button
+                                              variant="ghost"
+                                              size="icon"
+                                              onClick={() => beginEditQuestion(sec.id, q)}
+                                              className={`text-muted-foreground hover:text-primary hover:bg-primary/10 transition-opacity ${
+                                                isEditingThis
+                                                  ? 'text-primary bg-primary/10 opacity-100'
+                                                  : 'opacity-100 md:opacity-0 md:group-hover:opacity-100'
+                                              }`}
+                                              aria-label="Edit question"
+                                              aria-pressed={isEditingThis}
+                                            >
+                                              <Pencil size={17} />
+                                            </Button>
+                                            <Button
+                                              variant="ghost"
+                                              size="icon"
+                                              onClick={() => void deleteQuestion(sec.id, q.id)}
+                                              className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                                              aria-label="Delete question"
+                                            >
+                                              <Trash2 size={18} />
+                                            </Button>
+                                          </div>
                                         </div>
                                         {q.imageUrl && (
                                           <div className="mt-3">
@@ -945,13 +1161,7 @@ export default function TeacherCreateExamPage() {
                                         )}
                                         <div className="mt-3">
                                           <span className="exam-builder-type-badge">
-                                            {q.type === 'multiple-choice'
-                                              ? 'Multiple Choice'
-                                              : q.type === 'truefalse'
-                                                ? 'True/False'
-                                                : q.type === 'coding'
-                                                  ? 'Coding'
-                                                  : 'Identification'}
+                                            {labelForQuestionType(q.type)}
                                           </span>
                                         </div>
                                         <div className="mt-3 flex items-start gap-2 text-sm text-muted-foreground">
@@ -970,11 +1180,24 @@ export default function TeacherCreateExamPage() {
                                             <span className="text-foreground font-semibold">{q.correctAnswer}</span>
                                           )}
                                         </div>
+                                        {isEditingThis ? (
+                                          <div
+                                            ref={editPanelRef}
+                                            className="exam-builder-inline-editor"
+                                          >
+                                            <div className="exam-builder-inline-editor__head">
+                                              <Pencil size={15} aria-hidden />
+                                              <span>Edit question {qOffset + index + 1}</span>
+                                            </div>
+                                            {renderQuestionForm(true)}
+                                          </div>
+                                        ) : null}
                                       </div>
                                     </div>
                                   )}
                                 </Draggable>
-                              ))}
+                              )
+                            })}
                               {provided.placeholder}
                             </div>
                           )}
@@ -982,16 +1205,18 @@ export default function TeacherCreateExamPage() {
                       </div>
                     </section>
 
-                    {isActiveSet && (
+                    {isActiveSet && !editingQuestion ? (
                       <section className="exam-builder-panel exam-builder-panel--composer exam-builder-panel--active">
                         <div className="exam-builder-panel__head">
                           <div>
                             <p className="exam-builder-panel__title">New question</p>
-                            <p className="exam-builder-panel__subtitle">Adds to {sec.title || `Set ${secIndex + 1}`}</p>
+                            <p className="exam-builder-panel__subtitle">
+                              Adds to {sec.title || `Set ${secIndex + 1}`}
+                            </p>
                           </div>
                         </div>
                         {showQuestionForm ? (
-                          addQuestionForm
+                          renderQuestionForm(false)
                         ) : (
                           <div className="exam-builder-panel__body">
                             <Button
@@ -1005,7 +1230,7 @@ export default function TeacherCreateExamPage() {
                           </div>
                         )}
                       </section>
-                    )}
+                    ) : null}
                   </div>
                 )
               })}

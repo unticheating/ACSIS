@@ -72,6 +72,7 @@ const createExamSchema = z
     scheduledStart: z.string().datetime().nullable().optional().default(null),
     scheduledEnd: z.string().datetime().nullable().optional().default(null),
     isAutoPublish: z.boolean().optional().default(false),
+    description: z.string().optional().default(''),
     sections: z.array(sectionSchema).optional(),
     questions: z.array(questionSchema).optional(),
   })

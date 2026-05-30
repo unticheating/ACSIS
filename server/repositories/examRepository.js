@@ -64,11 +64,13 @@ export async function insertExamTransaction(
   await ensureExamSectionsSchema();
   const client = pool;
 
+  const examDescription = payload?.description?.trim() || null;
+
   const examResult = await client.query(
-    `INSERT INTO exams (class_id, title, password, status, shuffle_questions, shuffle_choices, created_by, scheduled_start, scheduled_end, is_auto_publish)
-     VALUES ($1, $2, $3, 'draft', $4, $5, $6, $7, $8, $9)
+    `INSERT INTO exams (class_id, title, description, password, status, shuffle_questions, shuffle_choices, created_by, scheduled_start, scheduled_end, is_auto_publish)
+     VALUES ($1, $2, $3, $4, 'draft', $5, $6, $7, $8, $9, $10)
      RETURNING exam_id`,
-    [classId, title, password || null, Boolean(shuffleQuestions), Boolean(shuffleChoices), memberId, scheduledStart, scheduledEnd, Boolean(isAutoPublish)],
+    [classId, title, examDescription, password || null, Boolean(shuffleQuestions), Boolean(shuffleChoices), memberId, scheduledStart, scheduledEnd, Boolean(isAutoPublish)],
   );
   const examId = examResult.rows[0].exam_id;
 
@@ -130,18 +132,31 @@ export async function updateExamDraftTransaction(
     return false;
   }
 
-  let updateFields = [title, Boolean(shuffleQuestions), Boolean(shuffleChoices), scheduledStart, scheduledEnd, Boolean(isAutoPublish), examId];
+  const examDescription = payload?.description?.trim() || null;
+
+  let updateFields = [
+    title,
+    examDescription,
+    Boolean(shuffleQuestions),
+    Boolean(shuffleChoices),
+    scheduledStart,
+    scheduledEnd,
+    Boolean(isAutoPublish),
+  ];
   let updatePasswordStr = '';
+  let examIdParam = 8;
   if (password !== undefined) {
     updatePasswordStr = `, password = $8`;
     updateFields.push(password);
+    examIdParam = 9;
   }
+  updateFields.push(examId);
 
   await client.query(
     `UPDATE exams 
-     SET title = $1, shuffle_questions = $2, shuffle_choices = $3, scheduled_start = $4, scheduled_end = $5, is_auto_publish = $6${updatePasswordStr}
-     WHERE exam_id = $7`,
-    updateFields
+     SET title = $1, description = $2, shuffle_questions = $3, shuffle_choices = $4, scheduled_start = $5, scheduled_end = $6, is_auto_publish = $7${updatePasswordStr}
+     WHERE exam_id = $${examIdParam}`,
+    updateFields,
   );
 
   await client.query(
@@ -408,6 +423,7 @@ export async function getExamWithQuestionsQuery(classId, examId, requireActive =
     SELECT 
       exam_id as id,
       title,
+      description,
       password as code,
       status,
       scheduled_start as "scheduledStart",

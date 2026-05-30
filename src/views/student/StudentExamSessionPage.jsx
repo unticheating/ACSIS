@@ -50,11 +50,10 @@ function isExamScene(name) {
 }
 
 
+import { labelForQuestionType } from '@/lib/questionTypes.js'
+
 function questionTypeLabel(type) {
-  if (type === 'multiple-choice') return 'Multiple choice'
-  if (type === 'truefalse') return 'True / false'
-  if (type === 'coding') return 'Coding / scripting'
-  return 'Identification'
+  return labelForQuestionType(type)
 }
 
 function formatClock(totalSec) {

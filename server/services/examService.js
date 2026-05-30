@@ -53,6 +53,7 @@ export async function createExamService(memberId, classId, payload) {
       {
         sections: payload.sections,
         questions: payload.questions,
+        description: payload.description,
       },
       {
         shuffleQuestions: Boolean(payload.shuffleQuestions),
@@ -95,6 +96,7 @@ export async function updateExamDraftService(memberId, classId, examId, payload)
       {
         sections: payload.sections,
         questions: payload.questions,
+        description: payload.description,
       },
       {
         shuffleQuestions: Boolean(payload.shuffleQuestions),
@@ -174,7 +176,8 @@ export async function copyExamService(memberId, sourceClassId, targetClassId, ex
 
       const payload = {
         sections: sections.length > 0 ? sections : undefined,
-        questions: sections.length === 0 ? flatQuestions : undefined
+        questions: sections.length === 0 ? flatQuestions : undefined,
+        description: exam.description || '',
       };
 
       const newExamId = await insertExamTransaction(
