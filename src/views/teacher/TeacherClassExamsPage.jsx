@@ -29,8 +29,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog.jsx'
-import { Input } from '@/components/ui/input.jsx'
-import { Label } from '@/components/ui/label.jsx'
+import TeacherCourseFieldsWithSuggest, {
+  useTeacherCourseCatalogHint,
+} from '@/components/teacher/TeacherCourseFieldsWithSuggest.jsx'
 import FadeIn from '@/components/ui/fade-in.jsx'
 import { coerceDisplayString, coerceRouteParam } from '@/lib/coerceDisplay.js'
 import { formatCourseBreadcrumbLabel, formatCourseDisplayLabels } from '@/lib/sectionLabel.js'
@@ -68,11 +69,26 @@ export default function TeacherClassExamsPage() {
   const [editCode, setEditCode] = useState('')
   const [editName, setEditName] = useState('')
   const [savingCourse, setSavingCourse] = useState(false)
+  const [teacherCoursesCatalog, setTeacherCoursesCatalog] = useState([])
 
   const [appearanceOpen, setAppearanceOpen] = useState(false)
   const [patternDraft, setPatternDraft] = useState('grid')
   const [colorDraft, setColorDraft] = useState(null)
   const [savingAppearance, setSavingAppearance] = useState(false)
+
+  useEffect(() => {
+    if (!editOpen) return
+    let cancelled = false
+    apiFetch('/api/teacher/classes')
+      .then((res) => res.json().catch(() => []))
+      .then((data) => {
+        if (!cancelled && Array.isArray(data)) setTeacherCoursesCatalog(data)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [editOpen])
 
   useEffect(() => {
     async function loadData() {
@@ -127,6 +143,10 @@ export default function TeacherClassExamsPage() {
   }, [cls])
 
   useTeacherShellBreadcrumbTrail(breadcrumbTrail)
+
+  const editCatalogHint = useTeacherCourseCatalogHint(teacherCoursesCatalog, {
+    excludeClassId: cls?.id ?? null,
+  })
 
   const enrollmentCount = useMemo(() => {
     const fromApi = Number(cls?.enrollmentCount ?? 0)
@@ -563,21 +583,22 @@ export default function TeacherClassExamsPage() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Edit course</DialogTitle>
-            <DialogDescription>Update the subject code and course title shown to students.</DialogDescription>
+            <DialogDescription>
+              Update the subject code and course title shown to students.
+              {editOpen ? editCatalogHint : null}
+            </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-2">
-            <div className="grid gap-2">
-              <Label htmlFor="edit-course-code">Subject code</Label>
-              <Input
-                id="edit-course-code"
-                value={editCode}
-                onChange={(e) => setEditCode(e.target.value)}
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="edit-course-name">Course name</Label>
-              <Input id="edit-course-name" value={editName} onChange={(e) => setEditName(e.target.value)} />
-            </div>
+          <div className="py-2">
+            <TeacherCourseFieldsWithSuggest
+              idPrefix="edit"
+              active={editOpen}
+              existingCourses={teacherCoursesCatalog}
+              excludeClassId={cls?.id}
+              courseCode={editCode}
+              courseName={editName}
+              onCourseCodeChange={setEditCode}
+              onCourseNameChange={setEditName}
+            />
           </div>
           <DialogFooter>
             <button

@@ -2,7 +2,6 @@ import { useNavigate } from 'react-router-dom'
 import { coerceRouteParam } from '@/lib/coerceDisplay.js'
 import { formatCourseDisplayLabels } from '@/lib/sectionLabel.js'
 import ClassCourseHeader from '@/components/classes/ClassCourseHeader.jsx'
-import FadeIn from '@/components/ui/fade-in.jsx'
 
 /**
  * Compact list-row course card for section dropdowns (My Classes).
@@ -31,7 +30,7 @@ export default function TeacherCourseCard({ course, dimmed = false, delay = 0 })
   }
 
   return (
-    <FadeIn as="li" delay={delay}>
+    <li>
       <article
         className={`acsis-teacher-course-card acsis-teacher-course-card--row${dimmed ? ' acsis-teacher-course-card--dimmed' : ''}`}
         role="button"
@@ -57,6 +56,6 @@ export default function TeacherCourseCard({ course, dimmed = false, delay = 0 })
           <span className="acsis-teacher-course-card__cta">View exams</span>
         </div>
       </article>
-    </FadeIn>
+    </li>
   )
 }

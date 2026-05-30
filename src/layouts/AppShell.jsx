@@ -16,6 +16,7 @@ import '../styles/mobile-shell.css'
 import '../styles/summary-stat-cards.css'
 import '../styles/shell-dark.css'
 import '../styles/dark-mode-system.css'
+import '../styles/scrollbars.css'
 import '../styles/light-mode-system.css'
 import '../styles/route-fallback.css'
 

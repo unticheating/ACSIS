@@ -362,6 +362,7 @@
   pointer-events: auto;
   overflow-x: hidden;
   overflow-y: auto;
+  scrollbar-gutter: stable;
   max-height: min(440px, 65vh);
   border-color: color-mix(in srgb, var(--acsis-brand) 28%, var(--border-default));
   border-top-color: var(--border-default, #e5e7eb);
@@ -429,27 +430,27 @@
 }
 
 .acsis-section-card__drop--open .acsis-mc-course-grid--stack > li {
-  animation: acsis-course-row-in 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: acsis-course-row-in 0.24s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .acsis-section-card__drop--open .acsis-mc-course-grid--stack > li:nth-child(1) {
-  animation-delay: 0.04s;
+  animation-delay: 0.02s;
 }
 
 .acsis-section-card__drop--open .acsis-mc-course-grid--stack > li:nth-child(2) {
-  animation-delay: 0.08s;
+  animation-delay: 0.04s;
 }
 
 .acsis-section-card__drop--open .acsis-mc-course-grid--stack > li:nth-child(3) {
-  animation-delay: 0.12s;
+  animation-delay: 0.06s;
 }
 
 .acsis-section-card__drop--open .acsis-mc-course-grid--stack > li:nth-child(4) {
-  animation-delay: 0.16s;
+  animation-delay: 0.08s;
 }
 
 .acsis-section-card__drop--open .acsis-mc-course-grid--stack > li:nth-child(n + 5) {
-  animation-delay: 0.2s;
+  animation-delay: 0.1s;
 }
 
 @keyframes acsis-course-row-in {
@@ -590,6 +591,12 @@
 
 .acsis-class-header--strip .acsis-class-header__pattern {
   opacity: 0.92;
+  contain: strict;
+}
+
+.acsis-section-card__drop .acsis-teacher-course-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 56px;
 }
 
 .acsis-class-header--strip .acsis-class-header__vignette {
@@ -1647,12 +1654,9 @@
   flex: 1 1 auto;
   min-width: 0;
   overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-gutter: stable;
   -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-}
-
-.acsis-exam-detail__tabs-wrap::-webkit-scrollbar {
-  display: none;
 }
 
 .acsis-exam-detail__tabs-wrap .acsis-mc-tabs {
@@ -1705,6 +1709,7 @@
   padding: 0;
   max-height: 16rem;
   overflow-y: auto;
+  scrollbar-gutter: stable;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1958,6 +1963,71 @@
   color: var(--acsis-brand-muted-text, var(--fg-default));
 }
 
+/* Add course — autocomplete from teacher's existing courses */
+.acsis-course-suggest__hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  color: var(--fg-muted, #6b7280);
+}
+
+.acsis-course-suggest__wrap {
+  position: relative;
+}
+
+.acsis-course-suggest__list {
+  position: absolute;
+  z-index: 60;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  max-height: 220px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  border-radius: 10px;
+  border: 1px solid var(--border-default, #e5e7eb);
+  background: var(--bg-elevated, #fff);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+}
+
+.acsis-course-suggest__option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.acsis-course-suggest__option:hover,
+.acsis-course-suggest__option:focus-visible {
+  background: var(--acsis-brand-subtle, color-mix(in srgb, var(--acsis-brand, #16a34a) 12%, #fff));
+  outline: none;
+}
+
+.acsis-course-suggest__code {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--fg-default, #111827);
+}
+
+.acsis-course-suggest__name {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--fg-muted, #6b7280);
+  line-height: 1.35;
+}
+
 .acsis-empty-panel {
   background: var(--bg-surface, #fff);
   border: 1px dashed var(--border-default, #d1d5db);
@@ -2133,14 +2203,11 @@
   .acsis-mc-tabs {
     flex-wrap: nowrap;
     overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-gutter: stable;
     -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
     margin-bottom: 1rem;
     padding-bottom: 2px;
-  }
-
-  .acsis-mc-tabs::-webkit-scrollbar {
-    display: none;
   }
 
   .acsis-mc-tab {

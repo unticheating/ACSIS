@@ -225,7 +225,7 @@ function applyDarkNeutralSurfaces(root, primary) {
   root.style.setProperty('--acsis-shell-border-subtle', hexToRgba(primary, 0.12))
   root.style.setProperty('--acsis-nav-fg', n.fgSecondary)
   root.style.setProperty('--acsis-nav-icon', n.fgMuted)
-  root.style.setProperty('--acsis-content-header-bg', `color-mix(in srgb, ${n.sidebar} 92%, transparent)`)
+  root.style.setProperty('--acsis-content-header-bg', n.sidebar)
   root.style.setProperty('--brand-page', n.fgPrimary)
 }
 
@@ -258,7 +258,7 @@ function applyLightSurfaces(root, primary, secondary, baseColor) {
   root.style.setProperty('--acsis-shell-border-subtle', hexToRgba(primary, 0.1))
   root.style.setProperty('--acsis-nav-fg', '#4b5563')
   root.style.setProperty('--acsis-nav-icon', '#6b7280')
-  root.style.setProperty('--acsis-content-header-bg', 'transparent')
+  root.style.setProperty('--acsis-content-header-bg', sidebarBg)
   root.style.setProperty('--brand-page', '#111827')
 }
 

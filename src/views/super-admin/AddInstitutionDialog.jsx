@@ -118,9 +118,6 @@ export default function AddInstitutionDialog({ open, onOpenChange, onCreated }) 
     } else if (!/^[A-Z0-9][A-Z0-9-]{0,19}$/.test(acronym)) {
       errors.acronym = 'Use 1–20 letters, numbers, or hyphens only.'
     }
-    if (!form.logo) {
-      errors.logo = 'Institution logo is required.'
-    }
     const themeId = Number(form.themeId)
     if (!Number.isInteger(themeId) || themeId < 1) {
       errors.themeId = 'Please select a color theme.'
@@ -140,7 +137,7 @@ export default function AddInstitutionDialog({ open, onOpenChange, onCreated }) 
     return {
       institutionName: name,
       acronym,
-      logo: form.logo,
+      logo: form.logo || null,
       themeId,
       maxWarnings: warnings,
       admin: form.createAdmin
@@ -223,12 +220,9 @@ export default function AddInstitutionDialog({ open, onOpenChange, onCreated }) 
                     Remove
                   </button>
                 ) : null}
-                <p className="admin-settings-logo-hint">PNG, JPEG, or WebP · max 500 KB</p>
-                {fieldErrors.logo ? (
-                  <p className="super-admin-add-institution-dialog__error" role="alert">
-                    {fieldErrors.logo}
-                  </p>
-                ) : null}
+                <p className="admin-settings-logo-hint">
+                  Optional. PNG, JPEG, or WebP · max 500 KB. Leave empty to use the default ACSIS logo.
+                </p>
               </div>
             </div>
 

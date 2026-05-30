@@ -19,7 +19,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 12px 10px;
+  box-sizing: border-box;
+  min-height: var(--acsis-shell-header-size, 59px);
+  padding: var(--acsis-shell-header-pad-top, 12px) 12px var(--acsis-shell-header-pad-bottom, 10px);
   border-bottom: 1px solid var(--acsis-sidebar-border, #b8d4c4);
   gap: 8px;
   flex-shrink: 0;

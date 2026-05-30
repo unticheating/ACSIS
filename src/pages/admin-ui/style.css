@@ -25,6 +25,15 @@ html:not(.dark) {
     --acsis-canvas: #f1f5f9;
     --acsis-sidebar-bg: #f8fafc;
     --acsis-sidebar-border: #e2e8f0;
+    --acsis-content-header-bg: var(--acsis-sidebar-bg);
+    /* Sidebar logo row + breadcrumb bar (12 + 36 + 10 + 1px border) */
+    --acsis-shell-header-pad-top: 12px;
+    --acsis-shell-header-pad-bottom: 10px;
+    --acsis-shell-header-inner-min: 36px;
+    --acsis-shell-header-size: calc(
+        var(--acsis-shell-header-pad-top) + var(--acsis-shell-header-inner-min) +
+            var(--acsis-shell-header-pad-bottom) + 1px
+    );
     --acsis-main-pad-x: clamp(14px, 2.5vw, 28px);
     --acsis-main-pad-y: clamp(12px, 2vw, 22px);
 }
@@ -269,23 +278,20 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
     box-sizing: border-box;
 }
 
-/* Breadcrumb header — card on small screens; flat text on desktop */
+/* Breadcrumb bar — same surface + height as .acsis-sidebar-header */
 .content-header {
-    background: rgba(255, 255, 255, 0.88);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    padding: 14px 18px 12px;
+    background: var(--acsis-content-header-bg, var(--acsis-sidebar-bg, #f8fafc));
+    box-sizing: border-box;
+    min-height: var(--acsis-shell-header-size, 59px);
+    padding: var(--acsis-shell-header-pad-top, 12px) 18px var(--acsis-shell-header-pad-bottom, 10px);
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    border-radius: 14px;
-    border: 1px solid rgba(22, 101, 52, 0.1);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    border-bottom: 1px solid var(--acsis-sidebar-border, #e2e8f0);
     margin-bottom: 14px;
     width: 100%;
     min-width: 0;
-    box-sizing: border-box;
     position: sticky;
     top: 0;
     z-index: var(--z-sticky, 120);
@@ -294,18 +300,23 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
 .content-header .breadcrumb {
     flex: 1 1 auto;
     min-width: 0;
+    min-height: var(--acsis-shell-header-inner-min, 36px);
+    display: flex;
+    align-items: center;
 }
 
 @media (min-width: 768px) {
     .content-header {
-        background: transparent;
-        backdrop-filter: none;
-        -webkit-backdrop-filter: none;
-        padding: 0 0 14px;
-        border: none;
+        margin-left: calc(-1 * var(--acsis-main-pad-x));
+        margin-right: calc(-1 * var(--acsis-main-pad-x));
+        margin-top: calc(-1 * var(--acsis-main-pad-y));
+        margin-bottom: var(--size-4, 16px);
+        width: calc(100% + 2 * var(--acsis-main-pad-x));
+        padding: var(--acsis-shell-header-pad-top, 12px) var(--acsis-main-pad-x)
+            var(--acsis-shell-header-pad-bottom, 10px);
+        position: static;
         border-radius: 0;
         box-shadow: none;
-        position: static;
     }
 }
 

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Plus } from 'lucide-react'
+import TeacherPageHeader from '@/components/teacher/TeacherPageHeader.jsx'
 import InstitutionLogo from '@/components/brand/InstitutionLogo.jsx'
 import { Badge } from '@/components/ui/badge.jsx'
 import { cardNeuStyleVars } from '@/lib/cardNeuStyle.js'
@@ -103,8 +104,13 @@ export default function SuperAdminInstitutionsPage() {
     })
   }, [])
 
+  const headerMeta =
+    loading || error
+      ? undefined
+      : `${institutions.length} institution${institutions.length === 1 ? '' : 's'}`
+
   return (
-    <div className="acsis-stack">
+    <div className="acsis-stack super-admin-institutions-page">
       <div className="content-header">
         <div className="breadcrumb">
           <span className="brand-plp">PLP</span>
@@ -112,19 +118,20 @@ export default function SuperAdminInstitutionsPage() {
           <span className="sep">/</span>
           <span className="page-name">Institutions</span>
         </div>
-        <div className="content-header__actions">
+      </div>
+
+      <TeacherPageHeader
+        title="Institutions"
+        meta={headerMeta}
+        actions={
           <button type="button" className="btn" onClick={() => setAddOpen(true)} disabled={loading}>
             <Plus className="h-4 w-4" aria-hidden />
             Add Institution
           </button>
-        </div>
-      </div>
+        }
+      />
 
       <div className="content-body">
-        <p className="admin-placeholder-lead">
-          Schools on the platform. Each institution has its own branding theme applied for members.
-        </p>
-
         {loading ? <p className="admin-placeholder-lead">Loading institutions…</p> : null}
         {error ? (
           <p className="admin-placeholder-lead" role="alert">
@@ -133,7 +140,7 @@ export default function SuperAdminInstitutionsPage() {
         ) : null}
 
         {!loading && !error && institutions.length === 0 ? (
-          <p className="admin-placeholder-lead">No institutions yet. Use Add Institution to provision the first school.</p>
+          <p className="admin-placeholder-lead">No institutions yet. Use Add Institution to create the first one.</p>
         ) : null}
 
         {!loading && institutions.length > 0 ? (

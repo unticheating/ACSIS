@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { Archive, ArchiveRestore, ChevronDown, MoreVertical, Plus, Trash2 } from 'lucide-react'
 import AnimatedHoverIcon from '@/components/icons/AnimatedHoverIcon.jsx'
@@ -30,6 +30,7 @@ import { Label } from '@/components/ui/label.jsx'
 import FadeIn from '@/components/ui/fade-in.jsx'
 import '../../pages/teacher-ui/my_classes.css'
 import '../../styles/class-card-patterns.css'
+import '../../styles/scrollbars.css'
 import '../../pages/student-ui/enrolled_classes.css'
 
 /**
@@ -51,6 +52,11 @@ function SectionCardItem({ group, isOpen, onToggle, onAddCourse, onArchive, onRe
   const count = courses.length
   const panelId = `section-panel-${term.id}`
   const canManage = !isOrphan
+  const [dropMounted, setDropMounted] = useState(false)
+
+  useLayoutEffect(() => {
+    if (isOpen) setDropMounted(true)
+  }, [isOpen])
 
   return (
     <FadeIn as="article" delay={delay}
@@ -137,10 +143,11 @@ function SectionCardItem({ group, isOpen, onToggle, onAddCourse, onArchive, onRe
         aria-labelledby={`section-trigger-${term.id}`}
         aria-hidden={!isOpen}
         inert={!isOpen ? true : undefined}
-        className={`acsis-section-card__drop${isOpen ? ' acsis-section-card__drop--open' : ''}`}
+        className={`acsis-section-card__drop acsis-scroll-y${isOpen ? ' acsis-section-card__drop--open' : ''}`}
       >
         <div className="acsis-section-card__drop-inner">
-          {count === 0 ? (
+          {dropMounted ? (
+          count === 0 ? (
             <p className="acsis-section-card__empty">
               No courses yet.
               {canManage && !term.isArchived ? (
@@ -156,12 +163,13 @@ function SectionCardItem({ group, isOpen, onToggle, onAddCourse, onArchive, onRe
             <>
               <h3 className="acsis-section-card__courses-title">Courses</h3>
               <ul className="acsis-mc-course-grid acsis-mc-course-grid--stack">
-                {courses.map((c, index) => (
-                  <TeacherCourseCard key={c.id} course={c} dimmed={dimmed} delay={index * 0.05} />
+                {courses.map((c) => (
+                  <TeacherCourseCard key={c.id} course={c} dimmed={dimmed} />
                 ))}
               </ul>
             </>
-          )}
+          )
+          ) : null}
         </div>
       </div>
     </FadeIn>
@@ -535,6 +543,7 @@ export default function TeacherMyClassesPage() {
           if (!open) setAddCourseTerm(null)
         }}
         term={addCourseTerm}
+        existingCourses={courses}
         onCreated={() => fetchAll()}
       />
 

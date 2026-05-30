@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react'
 import { apiFetch } from '@/lib/apiFetch.js'
 import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
 import { formatSectionTitle } from '@/lib/sectionLabel.js'
+import TeacherCourseFieldsWithSuggest, {
+  useTeacherCourseCatalogHint,
+} from '@/components/teacher/TeacherCourseFieldsWithSuggest.jsx'
 import {
   Dialog,
   DialogContent,
@@ -10,13 +13,23 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog.jsx'
-import { Input } from '@/components/ui/input.jsx'
-import { Label } from '@/components/ui/label.jsx'
 
 /**
- * @param {{ open: boolean, onOpenChange: (open: boolean) => void, term: object|null, onCreated?: () => void }} props
+ * @param {{
+ *   open: boolean,
+ *   onOpenChange: (open: boolean) => void,
+ *   term: object|null,
+ *   onCreated?: () => void,
+ *   existingCourses?: Array<{ courseCode?: string, course_code?: string, name?: string }>,
+ * }} props
  */
-export default function TeacherAddCourseDialog({ open, onOpenChange, term, onCreated }) {
+export default function TeacherAddCourseDialog({
+  open,
+  onOpenChange,
+  term,
+  onCreated,
+  existingCourses = [],
+}) {
   const [courseCode, setCourseCode] = useState('')
   const [courseName, setCourseName] = useState('')
   const [creating, setCreating] = useState(false)
@@ -28,6 +41,8 @@ export default function TeacherAddCourseDialog({ open, onOpenChange, term, onCre
       setCreating(false)
     }
   }, [open])
+
+  const catalogHint = useTeacherCourseCatalogHint(existingCourses)
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -72,30 +87,20 @@ export default function TeacherAddCourseDialog({ open, onOpenChange, term, onCre
               {term
                 ? `Course will belong to ${sectionLabel} (${term.academicYear}, ${term.semester}).`
                 : 'Link a course to this section.'}
+              {open ? catalogHint : null}
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="dlg-course-code">Subject code</Label>
-              <Input
-                id="dlg-course-code"
-                value={courseCode}
-                onChange={(e) => setCourseCode(e.target.value)}
-                placeholder="IT 108"
-                required
-                autoFocus
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="dlg-course-name">Course name</Label>
-              <Input
-                id="dlg-course-name"
-                value={courseName}
-                onChange={(e) => setCourseName(e.target.value)}
-                placeholder="Integrative Programming"
-                required
-              />
-            </div>
+          <div className="py-4">
+            <TeacherCourseFieldsWithSuggest
+              idPrefix="dlg"
+              active={open}
+              existingCourses={existingCourses}
+              courseCode={courseCode}
+              courseName={courseName}
+              onCourseCodeChange={setCourseCode}
+              onCourseNameChange={setCourseName}
+              autoFocusCode
+            />
           </div>
           <DialogFooter>
             <button type="button" className="acsis-btn-ghost" onClick={() => onOpenChange(false)} disabled={creating}>

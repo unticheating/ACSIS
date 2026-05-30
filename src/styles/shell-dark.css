@@ -9,7 +9,7 @@ html.dark {
   --acsis-dark-surface-muted: #171717;
   --acsis-shell-border: #2a2a2a;
   --acsis-shell-border-subtle: #252525;
-  --acsis-content-header-bg: rgba(17, 17, 17, 0.92);
+  --acsis-content-header-bg: var(--acsis-sidebar-bg);
   --acsis-nav-fg: #a3a3a3;
   --acsis-nav-icon: #6b7280;
   --acsis-nav-hover-bg: color-mix(in srgb, var(--acsis-brand, #334155) 14%, transparent);
@@ -113,17 +113,9 @@ html.dark .acsis-page {
 }
 
 html.dark .content-header {
-  background: var(--acsis-content-header-bg, rgba(15, 31, 22, 0.92));
-  border-color: var(--acsis-shell-border-subtle, rgba(74, 222, 128, 0.12));
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
-}
-
-@media (min-width: 768px) {
-  html.dark .content-header {
-    background: transparent;
-    border: none;
-    box-shadow: none;
-  }
+  background: var(--acsis-content-header-bg, var(--acsis-sidebar-bg, #111111));
+  border-bottom-color: var(--acsis-shell-border-subtle, rgba(74, 222, 128, 0.12));
+  box-shadow: none;
 }
 
 html.dark .breadcrumb .brand-plp,

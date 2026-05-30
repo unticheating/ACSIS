@@ -25,7 +25,7 @@ export async function fetchSuperAdminThemes() {
  * @param {{
  *   institutionName: string
  *   acronym: string
- *   logo: string
+ *   logo?: string | null
  *   themeId: number
  *   maxWarnings?: number
  *   admin?: { firstName: string, lastName: string, email: string, password: string, schoolId?: string }

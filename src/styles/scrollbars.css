@@ -1,0 +1,102 @@
+/**
+ * Global scrollbars — thin by default, standard width on hover (Chromium/WebKit).
+ * Firefox: thin + scrollbar-color (no hover width change).
+ */
+
+:root {
+  --acsis-scrollbar-size: 6px;
+  --acsis-scrollbar-size-hover: 12px;
+  --acsis-scrollbar-track: transparent;
+  --acsis-scrollbar-thumb: color-mix(in srgb, var(--fg-muted, #6b7280) 48%, transparent);
+  --acsis-scrollbar-thumb-hover: color-mix(in srgb, var(--fg-muted, #4b5563) 78%, transparent);
+  --acsis-scrollbar-thumb-active: color-mix(
+    in srgb,
+    var(--acsis-brand, #16a34a) 40%,
+    var(--fg-muted, #6b7280) 60%
+  );
+}
+
+html.dark {
+  --acsis-scrollbar-thumb: color-mix(in srgb, var(--fg-muted, #9ca3af) 42%, transparent);
+  --acsis-scrollbar-thumb-hover: color-mix(in srgb, var(--fg-muted, #d1d5db) 72%, transparent);
+  --acsis-scrollbar-thumb-active: color-mix(
+    in srgb,
+    var(--acsis-brand, #86efac) 45%,
+    var(--fg-muted, #9ca3af) 55%
+  );
+}
+
+html,
+html * {
+  scrollbar-width: thin;
+  scrollbar-color: var(--acsis-scrollbar-thumb) var(--acsis-scrollbar-track);
+}
+
+html::-webkit-scrollbar,
+html *::-webkit-scrollbar {
+  width: var(--acsis-scrollbar-size);
+  height: var(--acsis-scrollbar-size);
+  transition:
+    width 0.18s ease,
+    height 0.18s ease;
+}
+
+html::-webkit-scrollbar:hover,
+html *::-webkit-scrollbar:hover {
+  width: var(--acsis-scrollbar-size-hover);
+  height: var(--acsis-scrollbar-size-hover);
+}
+
+html::-webkit-scrollbar-track,
+html *::-webkit-scrollbar-track {
+  background: var(--acsis-scrollbar-track);
+}
+
+html::-webkit-scrollbar-thumb,
+html *::-webkit-scrollbar-thumb {
+  background-color: var(--acsis-scrollbar-thumb);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  min-height: 48px;
+  min-width: 48px;
+}
+
+html::-webkit-scrollbar-thumb:hover,
+html *::-webkit-scrollbar-thumb:hover {
+  background-color: var(--acsis-scrollbar-thumb-hover);
+}
+
+html::-webkit-scrollbar-thumb:active,
+html *::-webkit-scrollbar-thumb:active {
+  background-color: var(--acsis-scrollbar-thumb-active);
+}
+
+html::-webkit-scrollbar-corner,
+html *::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Opt out of custom scrollbars (e.g. hidden horizontal tab strips) */
+.acsis-scrollbar-hidden {
+  scrollbar-width: none;
+}
+
+.acsis-scrollbar-hidden::-webkit-scrollbar {
+  display: none;
+}
+
+/* Scrollable regions that should always reserve gutter space */
+.acsis-scroll-y {
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+  -webkit-overflow-scrolling: touch;
+}
+
+.acsis-scroll-x {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-gutter: stable;
+  -webkit-overflow-scrolling: touch;
+}

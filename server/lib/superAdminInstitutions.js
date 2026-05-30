@@ -75,15 +75,13 @@ export async function createInstitutionForSuperAdmin(pool, createdByUid, body) {
     return { ok: false, status: 409, error: 'That acronym is already in use.' }
   }
 
-  if (body.logo === undefined || body.logo === null || body.logo === '') {
-    return { ok: false, status: 400, error: 'Institution logo is required.' }
-  }
-  const logoResult = normalizeLogo(body.logo)
-  if (!logoResult.ok) {
-    return { ok: false, status: 400, error: logoResult.error }
-  }
-  if (!logoResult.value) {
-    return { ok: false, status: 400, error: 'Institution logo is required.' }
+  let logoValue = null
+  if (body.logo !== undefined && body.logo !== null && body.logo !== '') {
+    const logoResult = normalizeLogo(body.logo)
+    if (!logoResult.ok) {
+      return { ok: false, status: 400, error: logoResult.error }
+    }
+    logoValue = logoResult.value
   }
 
   const themeId = Number(body.themeId)
@@ -116,7 +114,7 @@ export async function createInstitutionForSuperAdmin(pool, createdByUid, body) {
        institution_name, acronym, logo, theme_id, max_warnings, is_active, created_by
      ) VALUES ($1, $2, $3, $4, $5, TRUE, $6)
      RETURNING institution_id`,
-    [name, acronym, logoResult.value, themeId, maxWarnings, createdByUid],
+    [name, acronym, logoValue, themeId, maxWarnings, createdByUid],
   )
 
   const institutionId = insert.rows[0]?.institution_id
