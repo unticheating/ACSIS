@@ -624,9 +624,12 @@ html.dark .acsis-student-exam .exam-question-image {
   }
 
   html.dark.acsis-sidebar-collapsed .nav-item[data-tooltip]::after {
-    background: #ecfdf5;
-    color: #0f1f16;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+    background: var(--acsis-tooltip-bg, var(--acsis-brand-600, var(--acsis-brand, #334155)));
+    color: var(--acsis-tooltip-fg, var(--acsis-on-brand, #ffffff));
+    box-shadow: var(
+      --acsis-tooltip-shadow,
+      0 4px 16px color-mix(in srgb, var(--acsis-brand, #334155) 45%, rgba(0, 0, 0, 0.35))
+    );
   }
 }
 

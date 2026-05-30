@@ -56,6 +56,9 @@ const THEME_CSS_KEYS = [
   '--acsis-nav-hover-fg',
   '--acsis-nav-hover-bg',
   '--acsis-nav-active-shadow',
+  '--acsis-tooltip-bg',
+  '--acsis-tooltip-fg',
+  '--acsis-tooltip-shadow',
   '--acsis-canvas',
   '--acsis-canvas-light',
   '--acsis-sidebar-bg',
@@ -132,7 +135,33 @@ function applyBrandScale(root, primary) {
  * @param {string} primary
  * @param {boolean} isDark
  */
+function applyTooltipTokens(root, primary, isDark) {
+  if (isDark) {
+    root.style.setProperty('--acsis-tooltip-bg', shade(primary, 0.15))
+    root.style.setProperty('--acsis-tooltip-fg', '#ffffff')
+    root.style.setProperty(
+      '--acsis-tooltip-shadow',
+      `0 4px 16px ${hexToRgba(primary, 0.45)}, 0 2px 8px rgba(0, 0, 0, 0.35)`,
+    )
+    return
+  }
+
+  root.style.setProperty('--acsis-tooltip-bg', shade(primary, 0.22))
+  root.style.setProperty('--acsis-tooltip-fg', '#ffffff')
+  root.style.setProperty(
+    '--acsis-tooltip-shadow',
+    `0 4px 14px ${hexToRgba(primary, 0.38)}`,
+  )
+}
+
+/**
+ * @param {HTMLElement} root
+ * @param {string} primary
+ * @param {boolean} isDark
+ */
 function applyNavTokens(root, primary, isDark) {
+  applyTooltipTokens(root, primary, isDark)
+
   if (isDark) {
     root.style.setProperty('--acsis-on-brand', '#ffffff')
     root.style.setProperty('--acsis-brand-muted-bg', hexToRgba(primary, 0.14))

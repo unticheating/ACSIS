@@ -263,14 +263,17 @@ html.acsis-sidebar-collapsed .nav-item[data-tooltip]::after {
   z-index: 120;
   padding: 6px 10px;
   border-radius: 8px;
-  background: #1a2e22;
-  color: #ffffff;
+  background: var(--acsis-tooltip-bg, var(--acsis-brand-hover, var(--acsis-brand-700, #1e293b)));
+  color: var(--acsis-tooltip-fg, var(--acsis-on-brand, #ffffff));
   font-size: 0.75rem;
   font-weight: 500;
   line-height: 1.25;
   letter-spacing: -0.01em;
   white-space: nowrap;
-  box-shadow: 0 4px 14px rgba(15, 60, 35, 0.18);
+  box-shadow: var(
+    --acsis-tooltip-shadow,
+    0 4px 14px color-mix(in srgb, var(--acsis-brand, #334155) 38%, transparent)
+  );
   pointer-events: none;
   opacity: 0;
   visibility: hidden;
