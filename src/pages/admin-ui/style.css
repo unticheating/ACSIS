@@ -2301,8 +2301,28 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
     transition: background 0.12s;
 }
 
-.um-table tbody tr:hover td {
-    background: #f7fcf9;
+.um-table tbody tr.um-table-row--clickable {
+    cursor: pointer;
+}
+
+.um-table tbody tr.um-table-row--clickable:hover td,
+.um-table tbody tr.um-table-row--selected td {
+    background: var(
+        --um-row-hover-bg,
+        var(--acsis-brand-subtle, color-mix(in srgb, var(--acsis-brand, #16a34a) 10%, #f7fcf9))
+    );
+}
+
+.um-table tbody tr.um-table-row--clickable:focus-visible {
+    outline: 2px solid var(--acsis-brand, #16a34a);
+    outline-offset: -2px;
+}
+
+.um-table tbody tr.um-table-row--clickable:focus-visible td {
+    background: var(
+        --um-row-hover-bg,
+        var(--acsis-brand-subtle, color-mix(in srgb, var(--acsis-brand, #16a34a) 12%, #f7fcf9))
+    );
 }
 
 .um-name {
@@ -2475,6 +2495,80 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
 
 .btn--ghost:hover {
     background: #f9fafb;
+}
+
+.um-details-dialog {
+    max-width: min(480px, calc(100vw - 2rem));
+}
+
+.um-details-dialog__header {
+    text-align: left;
+}
+
+.um-details-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin: 0;
+}
+
+.um-details-row {
+    display: grid;
+    grid-template-columns: minmax(7.5rem, 38%) 1fr;
+    gap: 4px 16px;
+    align-items: baseline;
+}
+
+.um-details-row dt {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--fg-muted, #6b7280);
+    letter-spacing: 0.02em;
+}
+
+.um-details-row dd {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.45;
+    color: var(--fg-default, #1a2e22);
+    word-break: break-word;
+}
+
+.um-details-row--email dd {
+    color: var(--fg-muted, #4b5563);
+}
+
+.um-details-row--meta dd {
+    font-size: 13px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    color: var(--fg-muted, #6b7280);
+}
+
+.um-details-deactivate {
+    color: var(--fg-muted, #6b7280);
+}
+
+.um-details-deactivate:hover {
+    color: var(--destructive-fg, #991b1b);
+    border-color: color-mix(in srgb, var(--destructive-fg, #991b1b) 35%, var(--border-default, #e5e7eb));
+    background: color-mix(in srgb, var(--destructive-fg, #991b1b) 8%, var(--bg-elevated, #fff));
+}
+
+.um-details-dialog__footer {
+    flex-wrap: wrap;
+}
+
+.um-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
 }
 
 /* Teacher/student route roots use .acsis-view (no name clash with shell) */

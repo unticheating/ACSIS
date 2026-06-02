@@ -20,6 +20,7 @@ import { formatSchoolIdInput, validateSchoolIdClient } from '@/lib/userFormConst
 import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
 import { useAcsisConfirm } from '@/hooks/useAcsisConfirm.jsx'
 import FadeIn from '@/components/ui/fade-in.jsx'
+import UserDetailsModal from '@/views/admin/UserDetailsModal.jsx'
 import '../../pages/admin-ui/style.css'
 
 const TABS = [
@@ -52,6 +53,8 @@ export default function AdminUserManagementPage() {
 
   const [addOpen, setAddOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
+  const [detailsOpen, setDetailsOpen] = useState(false)
+  const [selectedUser, setSelectedUser] = useState(null)
   const [form, setForm] = useState(emptyForm)
   const [editingUid, setEditingUid] = useState(null)
 
@@ -94,7 +97,13 @@ export default function AdminUserManagementPage() {
     setAddOpen(true)
   }
 
+  function openDetails(user) {
+    setSelectedUser(user)
+    setDetailsOpen(true)
+  }
+
   function openEdit(user) {
+    setDetailsOpen(false)
     setEditingUid(user.uid)
     setForm({
       firstName: user.firstName || '',
@@ -378,7 +387,11 @@ export default function AdminUserManagementPage() {
             {loading ? (
               <p className="um-loading">Loading users…</p>
             ) : (
-              <table className="um-table">
+              <>
+                <p id="um-table-hint" className="um-sr-only">
+                  Select a user row to view account details. Tab to a row, then press Enter or Space.
+                </p>
+                <table className="um-table" aria-describedby="um-table-hint">
                 <thead>
                   <tr>
                     <th>Name</th>
@@ -399,7 +412,24 @@ export default function AdminUserManagementPage() {
                     </tr>
                   ) : (
                     filteredUsers.map((u, index) => (
-                      <FadeIn as="tr" key={u.uid} delay={0.15 + (index * 0.05)}>
+                      <FadeIn
+                        as="tr"
+                        key={u.uid}
+                        delay={0.15 + (index * 0.05)}
+                        className={`um-table-row um-table-row--clickable${
+                          detailsOpen && selectedUser?.uid === u.uid ? ' um-table-row--selected' : ''
+                        }`}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`View details for ${u.name}`}
+                        onClick={() => openDetails(u)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            openDetails(u)
+                          }
+                        }}
+                      >
                         <td className="um-name">{u.name}</td>
                         <td className="um-email">{u.email}</td>
                         <td>{u.schoolId || '—'}</td>
@@ -413,7 +443,12 @@ export default function AdminUserManagementPage() {
                         <td>{roleLabel(u.role)}</td>
                         <td>{formatDateCreated(u.dateCreated)}</td>
                         <td>
-                          <div className="um-actions">
+                          <div
+                            className="um-actions"
+                            role="presentation"
+                            onClick={(e) => e.stopPropagation()}
+                            onKeyDown={(e) => e.stopPropagation()}
+                          >
                             {u.status === 'pending' ? (
                               <button
                                 type="button"
@@ -446,6 +481,7 @@ export default function AdminUserManagementPage() {
                   )}
                 </tbody>
               </table>
+              </>
             )}
           </div>
         </FadeIn>
@@ -472,6 +508,15 @@ export default function AdminUserManagementPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <UserDetailsModal
+        open={detailsOpen}
+        onOpenChange={setDetailsOpen}
+        user={selectedUser}
+        onEdit={openEdit}
+        onApprove={onApprove}
+        onDeactivate={onDeactivate}
+      />
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="um-dialog">

@@ -577,8 +577,33 @@ html.dark .um-search svg {
   color: var(--fg-subtle, #6b7280);
 }
 
-html.dark .um-table tbody tr:hover td {
+html.dark .um-table tbody tr.um-table-row--clickable:hover td,
+html.dark .um-table tbody tr.um-table-row--selected td,
+html.dark .um-table tbody tr.um-table-row--clickable:focus-visible td {
   background: var(--acsis-brand-subtle, color-mix(in srgb, var(--acsis-brand) 8%, #1a1a1a)) !important;
+}
+
+html.dark .um-table tbody tr.um-table-row--clickable:focus-visible {
+  outline-color: var(--acsis-brand, #4ade80) !important;
+}
+
+html.dark .um-details-row dt {
+  color: var(--fg-muted, #a3a3a3) !important;
+}
+
+html.dark .um-details-row dd {
+  color: var(--fg-default, #f5f5f5) !important;
+}
+
+html.dark .um-details-row--email dd,
+html.dark .um-details-row--meta dd {
+  color: var(--fg-muted, #a3a3a3) !important;
+}
+
+html.dark .um-details-deactivate:hover {
+  color: #fca5a5 !important;
+  border-color: color-mix(in srgb, #f87171 40%, var(--border-default, #2a2a2a)) !important;
+  background: color-mix(in srgb, #f87171 12%, var(--bg-elevated, #212121)) !important;
 }
 
 html.dark .um-table td {
