@@ -189,7 +189,9 @@ export async function copyExamService(memberId, sourceClassId, targetClassId, ex
           points: q.points,
           imageUrl: q.imageUrl,
           options: q.options,
-          correctAnswer: q.correctAnswer
+          correctAnswer: q.correctAnswer,
+          presentationAnswer: q.presentationAnswer ?? null,
+          answerExplanation: q.answerExplanation ?? null,
         };
         if (q.sectionId && sectionsMap.has(q.sectionId)) {
           sectionsMap.get(q.sectionId).questions.push(qCopy);

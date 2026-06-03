@@ -57,6 +57,51 @@ export function normalizeIdentificationAnswer(text) {
 }
 
 /**
+ * Comma-separated acceptable identification answers (deduped, uppercase).
+ * @param {string | null | undefined} text
+ * @returns {string[]}
+ */
+export function parseIdentificationAnswersList(text) {
+  if (text == null || text === '') return []
+  const seen = new Set()
+  const out = []
+  for (const part of String(text).split(',')) {
+    const norm = normalizeIdentificationAnswer(part)
+    if (!norm || seen.has(norm)) continue
+    seen.add(norm)
+    out.push(norm)
+  }
+  return out
+}
+
+/**
+ * @param {string[] | null | undefined} answers
+ * @returns {string}
+ */
+export function joinIdentificationAnswersList(answers) {
+  if (!Array.isArray(answers) || answers.length === 0) return ''
+  return answers.map((a) => normalizeIdentificationAnswer(a)).filter(Boolean).join(', ')
+}
+
+/**
+ * @param {{
+ *   type?: string,
+ *   correctAnswer?: string | null,
+ *   acceptableAnswers?: string[] | null,
+ *   presentationAnswer?: string | null,
+ * }} q
+ */
+export function identificationDisplayFromQuestion(q) {
+  const acceptable =
+    Array.isArray(q?.acceptableAnswers) && q.acceptableAnswers.length
+      ? q.acceptableAnswers.map((a) => normalizeIdentificationAnswer(a)).filter(Boolean)
+      : parseIdentificationAnswersList(q?.correctAnswer)
+  const presentation =
+    normalizeIdentificationAnswer(q?.presentationAnswer) || acceptable[0] || ''
+  return { acceptable, presentation }
+}
+
+/**
  * @param {string | null | undefined} questionType
  * @param {string | null | undefined} text
  */

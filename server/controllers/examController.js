@@ -46,6 +46,8 @@ const questionSchema = z.object({
   question: z.string().min(1, 'Question text cannot be empty'),
   options: z.array(choiceSchema).optional(),
   correctAnswer: z.string().min(1, 'Correct answer is required'),
+  presentationAnswer: z.string().optional().nullable(),
+  answerExplanation: z.string().optional().nullable(),
   imageUrl: z.string().optional().nullable(),
 }).superRefine((val, ctx) => {
   if ((val.type === 'multiple' || val.type === 'multiple-choice') && (!val.options || val.options.length < 2)) {
@@ -54,6 +56,19 @@ const questionSchema = z.object({
       message: "Multiple choice questions must have at least 2 options",
       path: ['options']
     });
+  }
+  if (val.type === 'identification') {
+    const parts = String(val.correctAnswer || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (parts.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Enter at least one acceptable identification answer (comma-separated).',
+        path: ['correctAnswer'],
+      });
+    }
   }
 });
 

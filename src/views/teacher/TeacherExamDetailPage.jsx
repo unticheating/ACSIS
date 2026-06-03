@@ -23,6 +23,7 @@ import { formatCourseBreadcrumbLabel, formatSectionTitle, formatTermPeriod } fro
 import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
 import { copyToClipboard } from '@/lib/copyToClipboard.js'
 import { labelForQuestionType, summarizeQuestionTypes, uniqueQuestionTypeLabels } from '@/lib/questionTypes.js'
+import ExamQuestionAnswerPresentation from '@/components/teacher/ExamQuestionAnswerPresentation.jsx'
 import { useAcsisConfirm } from '@/hooks/useAcsisConfirm.jsx'
 import {
   DropdownMenu,
@@ -828,6 +829,7 @@ export default function TeacherExamDetailPage() {
                       <p className="acsis-exam-detail__question-text">
                         {q.question || q.question_text || 'Untitled question'}
                       </p>
+                      <ExamQuestionAnswerPresentation question={q} />
                     </div>
                   </li>
                 ))}

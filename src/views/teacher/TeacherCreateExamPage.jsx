@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams, useNavigate } from 'react-router-dom'
-import { Clock, Plus, Shuffle, Trash2, ArrowLeft, GripVertical, CheckCircle2, Layers, ImageIcon, X, Pencil, Copy, Calculator } from 'lucide-react'
+import { Clock, Plus, Shuffle, Trash2, ArrowLeft, GripVertical, Layers, ImageIcon, X, Pencil, Copy, Calculator } from 'lucide-react'
 import { Label } from '@/components/ui/label.jsx'
 import { Button } from '@/components/ui/button.jsx'
 import { Input } from '@/components/ui/input.jsx'
@@ -15,7 +15,14 @@ import {
 import { apiFetch } from '@/lib/apiFetch.js'
 import { COPY } from '@/lib/examFlowUi.js'
 import { mapExamToBuilderState } from '@/lib/mapExamToBuilder.js'
-import { labelForQuestionType, normalizeIdentificationAnswer } from '@/lib/questionTypes.js'
+import {
+  identificationDisplayFromQuestion,
+  joinIdentificationAnswersList,
+  labelForQuestionType,
+} from '@/lib/questionTypes.js'
+import ExamQuestionAnswerPresentation, {
+  buildIdentificationQuestionFields,
+} from '@/components/teacher/ExamQuestionAnswerPresentation.jsx'
 import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
 import { useAcsisConfirm } from '@/hooks/useAcsisConfirm.jsx'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
@@ -122,7 +129,9 @@ export default function TeacherCreateExamPage() {
   const [questionText, setQuestionText] = useState('')
   const [questionPoints, setQuestionPoints] = useState(1)
   const [mc, setMc] = useState(emptyMc)
-  const [identAnswer, setIdentAnswer] = useState('')
+  const [identAcceptableAnswers, setIdentAcceptableAnswers] = useState('')
+  const [identPresentationAnswer, setIdentPresentationAnswer] = useState('')
+  const [identAnswerExplanation, setIdentAnswerExplanation] = useState('')
   const [tfAnswer, setTfAnswer] = useState('')
   const [codingAnswer, setCodingAnswer] = useState('')
   const [codingLanguage, setCodingLanguage] = useState('javascript')
@@ -168,7 +177,9 @@ export default function TeacherCreateExamPage() {
 
   const resetAnswerFields = useCallback(() => {
     resetMc()
-    setIdentAnswer('')
+    setIdentAcceptableAnswers('')
+    setIdentPresentationAnswer('')
+    setIdentAnswerExplanation('')
     setTfAnswer('')
     setCodingAnswer('')
     setCodingLanguage('javascript')
@@ -210,28 +221,37 @@ export default function TeacherCreateExamPage() {
         correct: correctIdx >= 0 ? String(correctIdx + 1) : '',
       })
       setQuestionPoints(q.points || 1)
-      setIdentAnswer('')
+      setIdentAcceptableAnswers('')
+      setIdentPresentationAnswer('')
+      setIdentAnswerExplanation('')
       setTfAnswer('')
       setCodingAnswer('')
       setCodingLanguage('javascript')
     } else if (formType === 'identification') {
       setQuestionPoints(q.points || 1)
       resetMc()
-      setIdentAnswer(normalizeIdentificationAnswer(q.correctAnswer || ''))
+      const { acceptable, presentation } = identificationDisplayFromQuestion(q)
+      setIdentAcceptableAnswers(joinIdentificationAnswersList(acceptable))
+      setIdentPresentationAnswer(presentation)
+      setIdentAnswerExplanation(q.answerExplanation || '')
       setTfAnswer('')
       setCodingAnswer('')
       setCodingLanguage('javascript')
     } else if (formType === 'truefalse') {
       setQuestionPoints(q.points || 1)
       resetMc()
-      setIdentAnswer('')
+      setIdentAcceptableAnswers('')
+      setIdentPresentationAnswer('')
+      setIdentAnswerExplanation('')
       setTfAnswer(q.correctAnswer === 'True' ? 'true' : q.correctAnswer === 'False' ? 'false' : '')
       setCodingAnswer('')
       setCodingLanguage('javascript')
     } else if (formType === 'coding') {
       setQuestionPoints(q.points || 1)
       resetMc()
-      setIdentAnswer('')
+      setIdentAcceptableAnswers('')
+      setIdentPresentationAnswer('')
+      setIdentAnswerExplanation('')
       setTfAnswer('')
       setCodingLanguage(q.options?.[0] || q.language || 'javascript')
       setCodingAnswer(q.correctAnswer || '')
@@ -281,12 +301,16 @@ export default function TeacherCreateExamPage() {
       correctAnswer = opts[Number(mc.correct) - 1]
       options = opts
     } else if (questionType === 'identification') {
-      const ident = normalizeIdentificationAnswer(identAnswer)
-      if (!ident) {
-        acsisToastError('Please enter the identification answer.')
+      const identFields = buildIdentificationQuestionFields(
+        identAcceptableAnswers,
+        identPresentationAnswer,
+        identAnswerExplanation,
+      )
+      if (!identFields.correctAnswer) {
+        acsisToastError('Enter at least one acceptable answer (comma-separated).')
         return
       }
-      correctAnswer = ident
+      correctAnswer = identFields.correctAnswer
     } else if (questionType === 'truefalse') {
       if (!tfAnswer) {
         acsisToastError('Please select True or False.')
@@ -311,6 +335,13 @@ export default function TeacherCreateExamPage() {
       options,
       correctAnswer,
       imageUrl: questionImage || null,
+      ...(questionType === 'identification'
+        ? buildIdentificationQuestionFields(
+            identAcceptableAnswers,
+            identPresentationAnswer,
+            identAnswerExplanation,
+          )
+        : {}),
     }
 
     if (editingQuestion) {
@@ -512,14 +543,27 @@ export default function TeacherCreateExamPage() {
           sections: sections.map((sec) => ({
             title: sec.title.trim() || 'Set',
             description: sec.description.trim(),
-            questions: sec.questions.map(({ type, question, points, options, correctAnswer, imageUrl }) => ({
-              type,
-              question,
-              points: Number(points || 1),
-              options,
-              correctAnswer,
-              imageUrl: imageUrl || null,
-            })),
+            questions: sec.questions.map(
+              ({
+                type,
+                question,
+                points,
+                options,
+                correctAnswer,
+                imageUrl,
+                presentationAnswer,
+                answerExplanation,
+              }) => ({
+                type,
+                question,
+                points: Number(points || 1),
+                options,
+                correctAnswer,
+                imageUrl: imageUrl || null,
+                presentationAnswer: presentationAnswer ?? null,
+                answerExplanation: answerExplanation ?? null,
+              }),
+            ),
           })),
           shuffleQuestions,
           shuffleChoices,
@@ -587,14 +631,27 @@ export default function TeacherCreateExamPage() {
       sections: sections.map((sec) => ({
         title: sec.title.trim() || 'Set',
         description: sec.description.trim(),
-        questions: sec.questions.map(({ type, question, points, options, correctAnswer, imageUrl }) => ({
-          type,
-          question,
-          points: Number(points || 1),
-          options,
-          correctAnswer,
-          imageUrl: imageUrl || null,
-        })),
+        questions: sec.questions.map(
+          ({
+            type,
+            question,
+            points,
+            options,
+            correctAnswer,
+            imageUrl,
+            presentationAnswer,
+            answerExplanation,
+          }) => ({
+            type,
+            question,
+            points: Number(points || 1),
+            options,
+            correctAnswer,
+            imageUrl: imageUrl || null,
+            presentationAnswer: presentationAnswer ?? null,
+            answerExplanation: answerExplanation ?? null,
+          }),
+        ),
       })),
       shuffleQuestions,
       shuffleChoices,
@@ -733,17 +790,45 @@ export default function TeacherCreateExamPage() {
     }
     if (questionType === 'identification') {
       return (
-        <div className="space-y-2">
-          <Label>Correct Answer</Label>
-          <Input
-            type="text"
-            placeholder="Enter exact correct answer"
-            value={identAnswer}
-            onChange={(e) => setIdentAnswer(e.target.value.toUpperCase())}
-            autoCapitalize="characters"
-            spellCheck={false}
-            style={{ textTransform: 'uppercase' }}
-          />
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Acceptable answers (comma-separated)</Label>
+            <Input
+              type="text"
+              placeholder="e.g. PARIS, PARIS FRANCE, FRANCE"
+              value={identAcceptableAnswers}
+              onChange={(e) => setIdentAcceptableAnswers(e.target.value)}
+              spellCheck={false}
+            />
+            <p className="text-xs text-muted-foreground">
+              Separate each valid answer with a comma. All are counted correct when grading.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Label>Presentation answer</Label>
+            <Input
+              type="text"
+              placeholder="Answer shown in the answer key (ultimate answer)"
+              value={identPresentationAnswer}
+              onChange={(e) => setIdentPresentationAnswer(e.target.value.toUpperCase())}
+              autoCapitalize="characters"
+              spellCheck={false}
+              style={{ textTransform: 'uppercase' }}
+            />
+            <p className="text-xs text-muted-foreground">
+              Leave blank to use the first acceptable answer.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Label>Explain (optional)</Label>
+            <textarea
+              className="flex min-h-[88px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              placeholder="Why this is the correct answer — shown on the exam Questions tab"
+              value={identAnswerExplanation}
+              onChange={(e) => setIdentAnswerExplanation(e.target.value)}
+              rows={3}
+            />
+          </div>
         </div>
       )
     }
@@ -803,7 +888,16 @@ export default function TeacherCreateExamPage() {
       )
     }
     return null
-  }, [identAnswer, mc, questionType, tfAnswer, codingAnswer, codingLanguage])
+  }, [
+    identAcceptableAnswers,
+    identPresentationAnswer,
+    identAnswerExplanation,
+    mc,
+    questionType,
+    tfAnswer,
+    codingAnswer,
+    codingLanguage,
+  ])
 
   const renderQuestionForm = (isEditing) => (
     <div className={`exam-builder-panel__body space-y-6${isEditing ? ' exam-builder-inline-editor__body' : ''}`}>
@@ -1323,22 +1417,7 @@ export default function TeacherCreateExamPage() {
                                             {labelForQuestionType(q.type)}
                                           </span>
                                         </div>
-                                        <div className="mt-3 flex items-start gap-2 text-sm text-muted-foreground">
-                                          <CheckCircle2 size={16} className="text-emerald-500 shrink-0 mt-0.5" />
-                                          <span className="font-medium shrink-0">Answer:</span>
-                                          {q.type === 'coding' ? (
-                                            <div className="w-full min-w-0">
-                                              {q.options && q.options[0] && (
-                                                <span className="inline-block mb-1 text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 bg-primary/10 text-primary rounded">
-                                                  {q.options[0]}
-                                                </span>
-                                              )}
-                                              <div className="exam-builder-code-answer">{q.correctAnswer}</div>
-                                            </div>
-                                          ) : (
-                                            <span className="text-foreground font-semibold">{q.correctAnswer}</span>
-                                          )}
-                                        </div>
+                                        <ExamQuestionAnswerPresentation question={q} className="mt-3" />
                                         {isEditingThis ? (
                                           <div
                                             ref={editPanelRef}

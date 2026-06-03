@@ -23,5 +23,13 @@ export async function ensureExamSectionsSchema() {
     ALTER TABLE questions
       ADD COLUMN IF NOT EXISTS image_url TEXT DEFAULT NULL
   `)
+  await pool.query(`
+    ALTER TABLE questions
+      ADD COLUMN IF NOT EXISTS presentation_answer TEXT DEFAULT NULL
+  `)
+  await pool.query(`
+    ALTER TABLE questions
+      ADD COLUMN IF NOT EXISTS answer_explanation TEXT DEFAULT NULL
+  `)
   ensured = true
 }

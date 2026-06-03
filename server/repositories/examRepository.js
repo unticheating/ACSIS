@@ -1,6 +1,7 @@
 import { getPool } from '../db.js';
 import { STUDENT_VISIBLE_STATUS_SQL } from '../lib/examStatus.js';
 import { ensureExamSectionsSchema } from '../lib/ensureExamSectionsSchema.js';
+import { resolveIdentificationPayload } from '../lib/identificationAnswers.js';
 
 function mapQuestionTypeToDb(type) {
   if (type === 'multiple-choice' || type === 'multiple') return 'mcq';
@@ -9,14 +10,40 @@ function mapQuestionTypeToDb(type) {
   return 'identification';
 }
 
+async function insertIdentificationChoices(client, questionId, q) {
+  const { acceptable, presentation } = resolveIdentificationPayload(q);
+  for (let j = 0; j < acceptable.length; j++) {
+    await client.query(
+      `INSERT INTO choices (question_id, choice_text, is_correct, order_num)
+       VALUES ($1, $2, TRUE, $3)`,
+      [questionId, acceptable[j], j + 1],
+    );
+  }
+  return { acceptable, presentation };
+}
+
 async function insertQuestionWithChoices(client, examId, sectionId, q, orderNum) {
   const dbType = mapQuestionTypeToDb(q.type);
   const imageUrl = q.imageUrl || null;
+  const identMeta =
+    dbType === 'identification' ? resolveIdentificationPayload(q) : { presentation: null, explanation: null };
   const qResult = await client.query(
-    `INSERT INTO questions (exam_id, section_id, question_text, question_type, points, order_num, image_url)
-     VALUES ($1, $2, $3, $4, 1.00, $5, $6)
+    `INSERT INTO questions (
+       exam_id, section_id, question_text, question_type, points, order_num, image_url,
+       presentation_answer, answer_explanation
+     )
+     VALUES ($1, $2, $3, $4, 1.00, $5, $6, $7, $8)
      RETURNING question_id`,
-    [examId, sectionId, q.question, dbType, orderNum, imageUrl],
+    [
+      examId,
+      sectionId,
+      q.question,
+      dbType,
+      orderNum,
+      imageUrl,
+      dbType === 'identification' ? identMeta.presentation || null : null,
+      dbType === 'identification' ? identMeta.explanation : null,
+    ],
   );
   const questionId = qResult.rows[0].question_id;
 
@@ -44,11 +71,7 @@ async function insertQuestionWithChoices(client, examId, sectionId, q, orderNum)
       [questionId, q.correctAnswer],
     );
   } else {
-    await client.query(
-      `INSERT INTO choices (question_id, choice_text, is_correct, order_num)
-       VALUES ($1, $2, TRUE, 1)`,
-      [questionId, q.correctAnswer],
-    );
+    await insertIdentificationChoices(client, questionId, q);
   }
 }
 
@@ -77,11 +100,7 @@ async function insertChoicesForQuestion(client, questionId, q, dbType) {
       [questionId, q.correctAnswer],
     );
   } else {
-    await client.query(
-      `INSERT INTO choices (question_id, choice_text, is_correct, order_num)
-       VALUES ($1, $2, TRUE, 1)`,
-      [questionId, q.correctAnswer],
-    );
+    await insertIdentificationChoices(client, questionId, q);
   }
 }
 
@@ -114,11 +133,29 @@ async function replaceExamChoices(client, questionId, q, dbType) {
 async function updateQuestionInPlace(client, examId, sectionId, q, orderNum, questionId) {
   const dbType = mapQuestionTypeToDb(q.type);
   const imageUrl = q.imageUrl || null;
+  const identMeta =
+    dbType === 'identification' ? resolveIdentificationPayload(q) : { presentation: null, explanation: null };
   await client.query(
     `UPDATE questions
-     SET question_text = $1, question_type = $2, order_num = $3, section_id = $4, image_url = $5
-     WHERE question_id = $6 AND exam_id = $7`,
-    [q.question, dbType, orderNum, sectionId, imageUrl, questionId, examId],
+     SET question_text = $1,
+         question_type = $2,
+         order_num = $3,
+         section_id = $4,
+         image_url = $5,
+         presentation_answer = $6,
+         answer_explanation = $7
+     WHERE question_id = $8 AND exam_id = $9`,
+    [
+      q.question,
+      dbType,
+      orderNum,
+      sectionId,
+      imageUrl,
+      dbType === 'identification' ? identMeta.presentation || null : null,
+      dbType === 'identification' ? identMeta.explanation : null,
+      questionId,
+      examId,
+    ],
   );
 
   const hasAnswers = await questionHasStudentAnswers(client, questionId);
@@ -172,10 +209,22 @@ async function updateQuestionInPlace(client, examId, sectionId, q, orderNum, que
     return;
   }
 
-  await client.query(
-    `UPDATE choices SET choice_text = $1 WHERE question_id = $2 AND is_correct = TRUE`,
-    [q.correctAnswer, questionId],
+  const { acceptable } = resolveIdentificationPayload(q);
+  const { rows: existing } = await client.query(
+    `SELECT choice_id FROM choices WHERE question_id = $1 AND is_correct = TRUE ORDER BY order_num ASC`,
+    [questionId],
   );
+  if (existing.length !== acceptable.length) {
+    const err = new Error('Cannot change the number of acceptable answers after students have answered.');
+    err.code = 'QUESTION_LOCKED';
+    throw err;
+  }
+  for (let j = 0; j < acceptable.length; j++) {
+    await client.query(`UPDATE choices SET choice_text = $1 WHERE choice_id = $2`, [
+      acceptable[j],
+      existing[j].choice_id,
+    ]);
+  }
 }
 
 async function replaceAllExamContent(client, examId, payload) {
@@ -609,6 +658,17 @@ async function attachChoicesToQuestion(pool, row) {
       isCorrect: c.is_correct,
     }));
     qObj.correctAnswer = cResult.rows.find((c) => c.is_correct)?.choice_text || '';
+  } else if (qType === 'identification') {
+    const cResult = await pool.query(
+      `SELECT choice_text, is_correct FROM choices WHERE question_id = $1 ORDER BY order_num ASC`,
+      [row.id],
+    );
+    const acceptable = cResult.rows.filter((c) => c.is_correct).map((c) => c.choice_text);
+    qObj.acceptableAnswers = acceptable;
+    qObj.correctAnswer = acceptable.join(', ');
+    qObj.presentationAnswer =
+      row.presentationAnswer?.trim() || acceptable[0] || '';
+    qObj.answerExplanation = row.answerExplanation?.trim() || '';
   } else {
     const cResult = await pool.query(
       `SELECT choice_text, is_correct FROM choices WHERE question_id = $1 ORDER BY order_num ASC`,
@@ -675,6 +735,8 @@ export async function getExamWithQuestionsQuery(classId, examId, requireActive =
        q.order_num AS "orderNum",
        q.section_id AS "sectionId",
        q.image_url AS "imageUrl",
+       q.presentation_answer AS "presentationAnswer",
+       q.answer_explanation AS "answerExplanation",
        s.title AS "sectionTitle",
        s.description AS "sectionDescription",
        s.order_num AS "sectionOrder"
