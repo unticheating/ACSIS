@@ -1,9 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams, useNavigate } from 'react-router-dom'
-import { Clock, Plus, Shuffle, Trash2, ArrowLeft, GripVertical, CheckCircle2, Layers, ImageIcon, X, Pencil } from 'lucide-react'
+import { Clock, Plus, Shuffle, Trash2, ArrowLeft, GripVertical, CheckCircle2, Layers, ImageIcon, X, Pencil, Copy, Calculator } from 'lucide-react'
 import { Label } from '@/components/ui/label.jsx'
 import { Button } from '@/components/ui/button.jsx'
 import { Input } from '@/components/ui/input.jsx'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog.jsx'
 import { apiFetch } from '@/lib/apiFetch.js'
 import { COPY } from '@/lib/examFlowUi.js'
 import { mapExamToBuilderState } from '@/lib/mapExamToBuilder.js'
@@ -112,6 +120,7 @@ export default function TeacherCreateExamPage() {
 
   const [questionType, setQuestionType] = useState('multiple')
   const [questionText, setQuestionText] = useState('')
+  const [questionPoints, setQuestionPoints] = useState(1)
   const [mc, setMc] = useState(emptyMc)
   const [identAnswer, setIdentAnswer] = useState('')
   const [tfAnswer, setTfAnswer] = useState('')
@@ -150,6 +159,11 @@ export default function TeacherCreateExamPage() {
   const [editingQuestion, setEditingQuestion] = useState(/** @type {{ sectionId: string, questionId: string } | null} */ (null))
   const editPanelRef = useRef(null)
 
+  // Bulk Points Modal States
+  const [bulkPointsOpen, setBulkPointsOpen] = useState(false)
+  const [bulkSectionId, setBulkSectionId] = useState(null)
+  const [bulkPointsValue, setBulkPointsValue] = useState('')
+
   const resetMc = useCallback(() => setMc(emptyMc()), [])
 
   const resetAnswerFields = useCallback(() => {
@@ -163,6 +177,7 @@ export default function TeacherCreateExamPage() {
   const resetQuestionForm = useCallback(() => {
     setQuestionText('')
     setQuestionType('multiple')
+    setQuestionPoints(1)
     resetAnswerFields()
     setQuestionImage(null)
     setEditingQuestion(null)
@@ -194,23 +209,27 @@ export default function TeacherCreateExamPage() {
         opt4: opts[3] || '',
         correct: correctIdx >= 0 ? String(correctIdx + 1) : '',
       })
+      setQuestionPoints(q.points || 1)
       setIdentAnswer('')
       setTfAnswer('')
       setCodingAnswer('')
       setCodingLanguage('javascript')
     } else if (formType === 'identification') {
+      setQuestionPoints(q.points || 1)
       resetMc()
       setIdentAnswer(normalizeIdentificationAnswer(q.correctAnswer || ''))
       setTfAnswer('')
       setCodingAnswer('')
       setCodingLanguage('javascript')
     } else if (formType === 'truefalse') {
+      setQuestionPoints(q.points || 1)
       resetMc()
       setIdentAnswer('')
       setTfAnswer(q.correctAnswer === 'True' ? 'true' : q.correctAnswer === 'False' ? 'false' : '')
       setCodingAnswer('')
       setCodingLanguage('javascript')
     } else if (formType === 'coding') {
+      setQuestionPoints(q.points || 1)
       resetMc()
       setIdentAnswer('')
       setTfAnswer('')
@@ -288,6 +307,7 @@ export default function TeacherCreateExamPage() {
     const questionPayload = {
       type: typeLabel,
       question: text,
+      points: Number(questionPoints) || 1,
       options,
       correctAnswer,
       imageUrl: questionImage || null,
@@ -353,6 +373,26 @@ export default function TeacherCreateExamPage() {
     )
   }
 
+  function duplicateQuestion(sectionId, questionId) {
+    setSections((prev) =>
+      prev.map((sec) => {
+        if (sec.id !== sectionId) return sec
+        const source = sec.questions.find((q) => String(q.id) === String(questionId))
+        if (!source) return sec
+        const copy = {
+          ...source,
+          id: String(Date.now()),
+          options: Array.isArray(source.options) ? [...source.options] : source.options,
+        }
+        const nextQuestions = [...sec.questions]
+        const index = nextQuestions.findIndex((q) => String(q.id) === String(questionId))
+        nextQuestions.splice(index + 1, 0, copy)
+        return { ...sec, questions: nextQuestions }
+      }),
+    )
+    acsisToastSuccess('Question duplicated.')
+  }
+
   function shuffleSectionQuestions(sectionId) {
     setSections((prev) =>
       prev.map((sec) =>
@@ -361,6 +401,39 @@ export default function TeacherCreateExamPage() {
           : sec,
       ),
     )
+  }
+
+  function applySectionPoints(sectionId, value) {
+    setSections((prev) =>
+      prev.map((sec) =>
+        sec.id === sectionId
+          ? { ...sec, questions: sec.questions.map((q) => ({ ...q, points: value })) }
+          : sec,
+      ),
+    )
+  }
+
+  const handleBulkPointsClick = (sectionId) => {
+    setBulkSectionId(sectionId)
+    setBulkPointsValue('')
+    setBulkPointsOpen(true)
+  }
+
+  const confirmBulkPoints = () => {
+    const parsed = Number(bulkPointsValue)
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      acsisToastError('Please enter a valid number greater than 0.')
+      return
+    }
+    if (bulkSectionId == null) {
+      acsisToastError('No section selected for bulk point assignment.')
+      return
+    }
+    applySectionPoints(bulkSectionId, parsed)
+    setBulkPointsOpen(false)
+    setBulkSectionId(null)
+    setBulkPointsValue('')
+    acsisToastSuccess(`All questions in this set are now ${parsed} points.`)
   }
 
   function updateSection(sectionId, patch) {
@@ -402,6 +475,16 @@ export default function TeacherCreateExamPage() {
     [sections],
   )
 
+  const totalPoints = useMemo(
+    () =>
+      sections.reduce(
+        (sectionTotal, sec) =>
+          sectionTotal + sec.questions.reduce((questionTotal, q) => questionTotal + Number(q.points || 1), 0),
+        0,
+      ),
+    [sections],
+  )
+
   function activateSection(sectionId) {
     if (sectionId !== activeSectionId) {
       if (editingQuestion) {
@@ -429,9 +512,10 @@ export default function TeacherCreateExamPage() {
           sections: sections.map((sec) => ({
             title: sec.title.trim() || 'Set',
             description: sec.description.trim(),
-            questions: sec.questions.map(({ type, question, options, correctAnswer, imageUrl }) => ({
+            questions: sec.questions.map(({ type, question, points, options, correctAnswer, imageUrl }) => ({
               type,
               question,
+              points: Number(points || 1),
               options,
               correctAnswer,
               imageUrl: imageUrl || null,
@@ -503,9 +587,10 @@ export default function TeacherCreateExamPage() {
       sections: sections.map((sec) => ({
         title: sec.title.trim() || 'Set',
         description: sec.description.trim(),
-        questions: sec.questions.map(({ type, question, options, correctAnswer, imageUrl }) => ({
+        questions: sec.questions.map(({ type, question, points, options, correctAnswer, imageUrl }) => ({
           type,
           question,
+          points: Number(points || 1),
           options,
           correctAnswer,
           imageUrl: imageUrl || null,
@@ -516,6 +601,7 @@ export default function TeacherCreateExamPage() {
       scheduledStart: scheduledStart ? new Date(scheduledStart).toISOString() : null,
       scheduledEnd: scheduledEnd ? new Date(scheduledEnd).toISOString() : null,
       isAutoPublish,
+      status: 'draft',
     }
     const pw = examPassword.trim()
     if (pw) payload.password = pw
@@ -549,18 +635,29 @@ export default function TeacherCreateExamPage() {
       const createdIds = [mainExamId]
 
       const other = isEditMode ? [] : createForClasses.filter((id) => String(id) !== String(selectedClass))
-      for (const clsId of other) {
-        try {
+      const copyResults = await Promise.allSettled(
+        other.map(async (clsId) => {
           const r = await apiFetch(`/api/teacher/classes/${clsId}/exams`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
           })
-          const d = await r.json()
-          if (r.ok) createdIds.push(d.examId)
-        } catch (e) {
-          console.error('Failed to duplicate exam for class', clsId, e)
-        }
+          const d = await r.json().catch(() => ({}))
+          if (!r.ok) {
+            throw new Error(d.error || `Failed to duplicate exam for class ${clsId}`)
+          }
+          return d.examId
+        }),
+      )
+
+      const failedCopies = copyResults.filter((result) => result.status === 'rejected')
+      const successfulCopies = copyResults
+        .filter((result) => result.status === 'fulfilled')
+        .map((result) => result.value)
+
+      createdIds.push(...successfulCopies.filter(Boolean))
+      if (failedCopies.length > 0) {
+        console.error('Failed to duplicate exam for classes:', failedCopies)
       }
 
       const codeMsg = examCode ? ` Exam password: ${examCode}.` : ''
@@ -727,6 +824,15 @@ export default function TeacherCreateExamPage() {
             <option value="coding">Coding / Scripting</option>
           </select>
         </div>
+        <div className="space-y-2 md:col-span-1">
+          <Label>Points</Label>
+          <Input
+            type="number"
+            min="1"
+            value={questionPoints}
+            onChange={(e) => setQuestionPoints(Number(e.target.value) || 1)}
+          />
+        </div>
         <div className="space-y-2 md:col-span-2">
           <Label>Question Text</Label>
           <textarea
@@ -864,6 +970,25 @@ export default function TeacherCreateExamPage() {
                 value={examTitle} 
                 onChange={(e) => setExamTitle(e.target.value)} 
               />
+            </div>
+
+            <div className="exam-builder-card bg-primary/5 border-primary/20 p-4 rounded-xl">
+              <div className="flex items-center justify-between mb-3">
+                <div className="text-sm font-semibold text-primary flex items-center gap-2">
+                  <Calculator size={16} />
+                  Blueprint Summary
+                </div>
+              </div>
+              <div className="grid gap-3 text-sm text-foreground">
+                <div className="flex items-center justify-between rounded-md bg-background/80 p-3 border border-primary/10">
+                  <span>Total questions</span>
+                  <span className="font-semibold">{totalQuestions}</span>
+                </div>
+                <div className="flex items-center justify-between rounded-md bg-background/80 p-3 border border-primary/10">
+                  <span>Total points</span>
+                  <span className="font-semibold">{totalPoints}</span>
+                </div>
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -1081,16 +1206,27 @@ export default function TeacherCreateExamPage() {
                             {sec.questions.length === 1 ? 'question' : 'questions'} in this set
                           </p>
                         </div>
-                        {sec.questions.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => shuffleSectionQuestions(sec.id)}
-                            className="exam-builder-shuffle-btn"
-                          >
-                            <Shuffle size={14} />
-                            Shuffle
-                          </button>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {sec.questions.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => handleBulkPointsClick(sec.id)}
+                              className="exam-builder-shuffle-btn"
+                            >
+                              Set all points
+                            </button>
+                          )}
+                          {sec.questions.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => shuffleSectionQuestions(sec.id)}
+                              className="exam-builder-shuffle-btn"
+                            >
+                              <Shuffle size={14} />
+                              Shuffle
+                            </button>
+                          )}
+                        </div>
                       </div>
                       <div className="exam-builder-panel__body exam-builder-panel__body--questions">
                         <Droppable droppableId={sec.id}>
@@ -1130,10 +1266,24 @@ export default function TeacherCreateExamPage() {
                                       </div>
                                       <div className="exam-builder-question__content">
                                         <div className="flex justify-between items-start gap-4">
-                                          <h3 className="font-medium text-foreground leading-relaxed whitespace-pre-wrap">
-                                            {q.question}
-                                          </h3>
+                                          <div>
+                                            <h3 className="font-medium text-foreground leading-relaxed whitespace-pre-wrap">
+                                              {q.question}
+                                            </h3>
+                                            <p className="text-xs text-muted-foreground mt-1">
+                                              {q.points ?? 1} pts · {labelForQuestionType(q.type)}
+                                            </p>
+                                          </div>
                                           <div className="flex items-center gap-1 shrink-0">
+                                            <Button
+                                              variant="ghost"
+                                              size="icon"
+                                              onClick={() => duplicateQuestion(sec.id, q.id)}
+                                              className="text-muted-foreground hover:text-primary hover:bg-primary/10 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                                              aria-label="Duplicate question"
+                                            >
+                                              <Copy size={17} />
+                                            </Button>
                                             <Button
                                               variant="ghost"
                                               size="icon"
@@ -1250,6 +1400,45 @@ export default function TeacherCreateExamPage() {
       </main>
 
       {ConfirmDialog}
+
+      {/* Bulk Points Assignment Modal Dialog */}
+      <Dialog open={bulkPointsOpen} onOpenChange={setBulkPointsOpen}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Set Bulk Points for Set</DialogTitle>
+            <DialogDescription>
+              Assign uniform point weights to every item inside this question set. Individual overrides will be overwritten.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="bulk-points-input">Points per question</Label>
+              <Input
+                id="bulk-points-input"
+                type="number"
+                min="1"
+                placeholder="e.g. 2"
+                value={bulkPointsValue}
+                onChange={(e) => setBulkPointsValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    confirmBulkPoints()
+                  }
+                }}
+                autoFocus
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setBulkPointsOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={confirmBulkPoints}>
+              Apply Points
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

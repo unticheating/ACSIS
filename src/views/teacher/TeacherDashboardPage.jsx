@@ -179,13 +179,17 @@ export default function TeacherDashboardPage() {
 
   const multiSectionCourseOptions = selectedSectionCourses.length > 0
     ? Array.from(
-        selectedSectionCourses.slice(1).reduce((shared, courseList) => {
-          const currentKeys = new Set(courseList.map((course) => buildCourseKey(course.courseCode, course.courseName)))
-          return new Set([...shared].filter((key) => currentKeys.has(key)))
-        }, new Set(selectedSectionCourses[0].map((course) => buildCourseKey(course.courseCode, course.courseName)))),
+        selectedSectionCourses.reduce((shared, courseList) => {
+          courseList.forEach((course) => {
+            shared.add(buildCourseKey(course.courseCode, course.courseName))
+          })
+          return shared
+        }, new Set()),
       )
         .map((key) => {
-          const matchedCourse = selectedSectionCourses[0].find((course) => buildCourseKey(course.courseCode, course.courseName) === key)
+          const matchedCourse = selectedSectionCourses
+            .flat()
+            .find((course) => buildCourseKey(course.courseCode, course.courseName) === key)
           const courseCode = matchedCourse?.courseCode || ''
           const courseName = matchedCourse?.courseName || ''
           return {
@@ -219,7 +223,7 @@ export default function TeacherDashboardPage() {
     if (ids.join(',') !== selectedClassIds.join(',')) {
       setSelectedClassIds(ids)
     }
-  }, [selectedClassIds, classes, selectedSections])
+  }, [selectedClassIds, classes, selectedSections, selectedCourse, multiSectionCourseOptions])
 
   return (
     <div className="acsis-view">
@@ -452,6 +456,7 @@ export default function TeacherDashboardPage() {
               <Label htmlFor="create-exam-course">Course</Label>
               {(() => {
                 const available = selectedSections.flatMap((sid) => classesByTermId.get(String(sid)) || [])
+                
                 if (selectedSections.length === 0) {
                   return (
                     <select
@@ -464,33 +469,6 @@ export default function TeacherDashboardPage() {
                   )
                 }
 
-                if (selectedSections.length === 1) {
-                  return (
-                    <select
-                      id="create-exam-course"
-                      value={selectedClassIds[0] || ''}
-                      onChange={(e) => {
-                        const val = e.target.value
-                        const found = available.find((c) => String(c.id) === String(val))
-                        setSelectedClassIds(val ? [val] : [])
-                        setSelectedCourse(
-                          found ? (found.course_code || found.courseCode || found.name || String(found.id)) : '',
-                        )
-                      }}
-                      className="acsis-class-toolbar__select w-full"
-                    >
-                      <option value="" disabled hidden>
-                        Select course
-                      </option>
-                      {available.map((course) => (
-                        <option key={course.id} value={String(course.id)}>
-                          {course.name || 'Course'}
-                        </option>
-                      ))}
-                    </select>
-                  )
-                }
-
                 if (multiSectionCourseOptions.length === 0) {
                   return (
                     <select
@@ -498,7 +476,7 @@ export default function TeacherDashboardPage() {
                       disabled
                       className="acsis-class-toolbar__select w-full text-muted-foreground"
                     >
-                      <option>No common course across selected sections</option>
+                      <option>No courses available for selected section(s)</option>
                     </select>
                   )
                 }
