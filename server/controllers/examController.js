@@ -25,10 +25,13 @@ import {
 import {
   getStudentPerformanceService,
   getTeacherActiveMonitoringService,
+  getTeacherActivityLogsService,
+  getTeacherExamAssignmentRosterService,
   getTeacherExamResultsService,
   getTeacherExamSessionDetailService,
   getTeacherMonitoringSnapshotService,
   listTeacherReportExamsService,
+  updateTeacherExamAssignmentRosterService,
 } from '../services/examResultsService.js';
 import { manualGradeAnswerService } from '../services/examGradingService.js';
 import { exportExamReportService } from '../services/examReportService.js';
@@ -210,6 +213,42 @@ export async function publishTeacherExam(req, res) {
     return res.status(result.status || 500).json({ error: result.error });
   }
   return res.json({ ok: true, status: result.status, code: result.code });
+}
+
+const assignmentSchema = z.object({
+  studentIds: z.array(z.number().int().positive()).optional().default([]),
+});
+
+export async function getTeacherExamAssignments(req, res) {
+  const { classId, examId } = req.params
+  const result = await getTeacherExamAssignmentRosterService(classId, examId, req.memberId)
+  if (!result.ok) {
+    return res.status(result.status || 500).json({ error: result.error })
+  }
+  return res.json(result)
+}
+
+export async function updateTeacherExamAssignments(req, res) {
+  const { classId, examId } = req.params
+  try {
+    const payload = assignmentSchema.parse(req.body)
+    const result = await updateTeacherExamAssignmentRosterService(
+      classId,
+      examId,
+      req.memberId,
+      payload.studentIds,
+    )
+    if (!result.ok) {
+      return res.status(result.status || 500).json({ error: result.error })
+    }
+    return res.json({ ok: true, assignedCount: result.assignedCount, assignedStudentIds: result.assignedStudentIds })
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: err.issues?.[0]?.message || 'Validation error', details: err.issues })
+    }
+    console.error('[examController.updateTeacherExamAssignments]', err)
+    return res.status(500).json({ error: 'Failed to update exam assignments.' })
+  }
 }
 
 export async function deleteTeacherExam(req, res) {
@@ -480,6 +519,14 @@ export async function getTeacherActiveMonitoring(req, res) {
     return res.status(result.status || 500).json({ error: result.error });
   }
   return res.json(result);
+}
+
+export async function getTeacherActivityLogs(req, res) {
+  const result = await getTeacherActivityLogsService(req.memberId, req.query?.limit)
+  if (!result.ok) {
+    return res.status(result.status || 500).json({ error: result.error })
+  }
+  return res.json(result)
 }
 
 export async function getTeacherMonitoringSnapshot(req, res) {

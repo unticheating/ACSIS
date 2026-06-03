@@ -35,6 +35,7 @@ const StudentReportsPage = lazy(() => import('./views/student/StudentReportsPage
 const TeacherCreateExamPage = lazy(() => import('./views/teacher/TeacherCreateExamPage.jsx'))
 const TeacherDashboardPage = lazy(() => import('./views/teacher/TeacherDashboardPage.jsx'))
 const TeacherDetectionsPage = lazy(() => import('./views/teacher/TeacherDetectionsPage.jsx'))
+const TeacherActivityLogsPage = lazy(() => import('./views/teacher/TeacherActivityLogsPage.jsx'))
 const TeacherExamDetailPage = lazy(() => import('./views/teacher/TeacherExamDetailPage.jsx'))
 const TeacherMyClassesPage = lazy(() => import('./views/teacher/TeacherMyClassesPage.jsx'))
 const TeacherTermClassesPage = lazy(() => import('./views/teacher/TeacherTermClassesPage.jsx'))
@@ -92,6 +93,7 @@ export default function App() {
         <Route path="my-classes/:classId/exams/:examId" element={<TeacherExamDetailPage />} />
         <Route path="my-exams" element={<Navigate to="/teacher/my-classes" replace />} />
         <Route path="detections" element={<TeacherDetectionsPage />} />
+        <Route path="logs" element={<TeacherActivityLogsPage />} />
         <Route path="reports" element={<TeacherReportsPage />} />
         <Route path="live-monitoring" element={<Navigate to="/teacher/detections" replace />} />
       </Route>

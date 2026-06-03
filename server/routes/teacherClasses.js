@@ -21,8 +21,11 @@ import {
   restartTeacherExam,
   closeTeacherExam,
   getTeacherExamResults,
+  getTeacherExamAssignments,
+  updateTeacherExamAssignments,
   getTeacherExamSessionDetail,
   getTeacherActiveMonitoring,
+  getTeacherActivityLogs,
   getTeacherMonitoringSnapshot,
   streamTeacherMonitoringSnapshot,
   listTeacherReportExams,
@@ -45,6 +48,7 @@ router.use((req, res, next) => {
 router.get('/dashboard', getTeacherDashboard);
 router.get('/reports/exams', listTeacherReportExams);
 router.get('/monitoring/active', getTeacherActiveMonitoring);
+router.get('/activity-logs', getTeacherActivityLogs);
 router.get('/exams', getTeacherExamsCatalog);
 router.get('/', getTeacherClasses);
 router.post('/', createTeacherClass);
@@ -59,6 +63,8 @@ router.get('/:classId/exams', getTeacherClassStream);
 router.post('/:classId/exams', createTeacherExam);
 router.put('/:classId/exams/:examId/content', updateTeacherExam);
 router.get('/:classId/exams/:examId', getTeacherExamSession);
+router.get('/:classId/exams/:examId/assignments', getTeacherExamAssignments);
+router.put('/:classId/exams/:examId/assignments', updateTeacherExamAssignments);
 router.get('/:classId/exams/:examId/results', getTeacherExamResults);
 router.get('/:classId/exams/:examId/monitoring', getTeacherMonitoringSnapshot);
 router.get('/:classId/exams/:examId/monitoring/stream', streamTeacherMonitoringSnapshot);

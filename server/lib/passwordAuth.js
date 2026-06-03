@@ -75,6 +75,7 @@ export async function authenticateAdministrator(pool, email, password) {
       ok: true,
       session: {
         uid: user.uid,
+        memberId: portalInfo.memberId ?? null,
         email: user.email,
         googleSub: user.google_sub || '',
         displayName,
@@ -100,6 +101,7 @@ export async function authenticateAdministrator(pool, email, password) {
       ok: true,
       session: {
         uid: 1,
+        memberId: null,
         email: normalizedEmail,
         googleSub: '',
         displayName: 'PLP Admin',

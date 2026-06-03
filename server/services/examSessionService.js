@@ -43,6 +43,9 @@ import { checkEnrollment } from '../repositories/studentRepository.js'
 import { getInstitutionMaxWarnings } from '../repositories/adminRepository.js'
 import { percentageFromScores, shouldLockExam } from '../lib/examSessionRules.js'
 import { notifyMonitoringUpdate } from '../lib/monitoringBroadcast.js'
+import { getExamAssignmentAccessQuery } from '../repositories/examAssignmentRepository.js'
+import { recordTeacherActivityQuery } from '../repositories/teacherActivityRepository.js'
+import { getClassOwnerMemberIdQuery } from '../repositories/classRepository.js'
 
 function mapSavedAnswers(rows) {
   const out = {}
@@ -77,6 +80,18 @@ async function syncSessionLockState(session, examRow, institutionId) {
   return session
 }
 
+async function ensureStudentCanJoinExam(examId, studentMemberId) {
+  const access = await getExamAssignmentAccessQuery(examId, studentMemberId)
+  if (!access.allowed) {
+    return {
+      ok: false,
+      status: 403,
+      error: 'This exam is assigned to selected students only.',
+    }
+  }
+  return { ok: true, access }
+}
+
 function mapExamMeta(row) {
   const status = (row.status || '').toLowerCase()
   return {
@@ -95,6 +110,9 @@ export async function joinExamService(classId, examId, studentMemberId, password
   if (!enrolled) {
     return { ok: false, status: 403, error: 'NOT_ENROLLED' }
   }
+
+  const accessGate = await ensureStudentCanJoinExam(examId, studentMemberId)
+  if (!accessGate.ok) return accessGate
 
   const exam = await getExamForJoinQuery(classId, examId)
   if (!exam) {
@@ -149,6 +167,9 @@ export async function getStudentExamSessionService(classId, examId, studentMembe
   if (!enrolled) {
     return { ok: false, status: 403, error: 'NOT_ENROLLED' }
   }
+
+  const accessGate = await ensureStudentCanJoinExam(examId, studentMemberId)
+  if (!accessGate.ok) return accessGate
 
   const examRow = await getExamForJoinQuery(classId, examId)
   if (!examRow) {
@@ -290,6 +311,18 @@ export async function startExamService(classId, examId, teacherMemberId = null, 
     return { ok: false, status: 500, error: 'Failed to start exam.' }
   }
 
+  if (teacherMemberId) {
+    void recordTeacherActivityQuery({
+      teacherMemberId,
+      classId,
+      examId,
+      eventType: 'exam_started',
+      details: 'Exam moved from lobby to live',
+    }).catch((err) => {
+      console.error('[examSessionService.startExam] teacher activity log failed:', err)
+    })
+  }
+
   return { ok: true, status: next }
 }
 
@@ -328,6 +361,18 @@ export async function restartExamService(classId, examId, teacherMemberId = null
 
   await unlockExamSessionsQuery(examId)
 
+  if (teacherMemberId) {
+    void recordTeacherActivityQuery({
+      teacherMemberId,
+      classId,
+      examId,
+      eventType: 'exam_restarted',
+      details: 'Exam was restarted',
+    }).catch((err) => {
+      console.error('[examSessionService.restartExam] teacher activity log failed:', err)
+    })
+  }
+
   return { ok: true, status: next }
 }
 
@@ -336,6 +381,9 @@ async function requireOpenSession(classId, examId, studentMemberId) {
   if (!enrolled) {
     return { ok: false, status: 403, error: 'NOT_ENROLLED' }
   }
+
+  const accessGate = await ensureStudentCanJoinExam(examId, studentMemberId)
+  if (!accessGate.ok) return accessGate
 
   const exam = await getExamForJoinQuery(classId, examId)
   if (!exam) {
@@ -369,6 +417,20 @@ export async function logCheatingEventService(classId, examId, studentMemberId, 
   const priorWarnings = Number(gate.session.warning_count ?? 0)
 
   await insertCheatingLogQuery(gate.session.session_id, eventType, details || null)
+
+  const teacherMemberId = await getClassOwnerMemberIdQuery(classId)
+  if (teacherMemberId) {
+    void recordTeacherActivityQuery({
+      teacherMemberId,
+      classId,
+      examId,
+      studentMemberId,
+      eventType: 'student_detected',
+      details: `${eventType}${details ? ` — ${details}` : ''}`.slice(0, 500),
+    }).catch((err) => {
+      console.error('[examSessionService.logCheatingEvent] teacher activity log failed:', err)
+    })
+  }
 
   let warningCount = priorWarnings
   if (!shouldLockExam(priorWarnings, maxWarnings)) {

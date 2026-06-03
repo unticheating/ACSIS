@@ -210,6 +210,7 @@ export async function buildSessionFromUid(pool, uid, opts = {}) {
 
   return {
     uid: user.uid,
+    memberId: portalInfo.memberId ?? null,
     email: user.email,
     googleSub: opts.googleSub || user.google_sub || '',
     displayName,
@@ -232,6 +233,7 @@ export function buildSessionWithoutDatabase(profile) {
   const letter = (displayName || profile.email || '?').charAt(0).toUpperCase()
   return {
     uid: 0,
+    memberId: null,
     email: profile.email.toLowerCase(),
     googleSub: profile.sub,
     displayName,

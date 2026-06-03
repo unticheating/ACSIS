@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Copy, Eye, EyeOff, MoreVertical, Pencil, Play, Radio, Send, Trash2 } from 'lucide-react'
+import { Copy, Eye, EyeOff, MoreVertical, Pencil, Play, Radio, Send, Trash2, UsersRound } from 'lucide-react'
 import { useTeacherShellBreadcrumbTrail } from '@/context/TeacherShellBreadcrumbContext.jsx'
 import TeacherMcTabs from '@/components/teacher/TeacherMcTabs.jsx'
 import { apiFetch } from '@/lib/apiFetch.js'
@@ -8,6 +8,7 @@ import { fetchTeacherExamResults } from '@/lib/teacherExamResultsApi.js'
 import { releaseExamScores } from '@/lib/teacherExamGradingApi.js'
 import ExamAnswerReviewModal from '@/components/teacher/ExamAnswerReviewModal.jsx'
 import ReleaseScoresDialog from '@/components/teacher/ReleaseScoresDialog.jsx'
+import AssignExamStudentsDialog from '@/components/teacher/AssignExamStudentsDialog.jsx'
 import RestartExamDialog from '@/components/teacher/RestartExamDialog.jsx'
 import CopyExamDialog from '@/components/teacher/CopyExamDialog.jsx'
 import {
@@ -114,6 +115,7 @@ export default function TeacherExamDetailPage() {
   const [releaseDialogOpen, setReleaseDialogOpen] = useState(false)
   const [restartDialogOpen, setRestartDialogOpen] = useState(false)
   const [copyDialogOpen, setCopyDialogOpen] = useState(false)
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false)
   const [tab, setTab] = useState('overview')
   const [examCodeVisible, setExamCodeVisible] = useState(false)
   const [examCodeEditing, setExamCodeEditing] = useState(false)
@@ -646,6 +648,10 @@ export default function TeacherExamDetailPage() {
                   Start session
                 </DropdownMenuActionItem>
               ) : null}
+              <DropdownMenuSeparator />
+              <DropdownMenuActionItem icon={UsersRound} onSelect={() => setAssignDialogOpen(true)}>
+                Assign students
+              </DropdownMenuActionItem>
               {active ? (
                 <DropdownMenuActionItem variant="warning" onSelect={() => void endExam()}>
                   End exam
@@ -1184,6 +1190,13 @@ export default function TeacherExamDetailPage() {
           defaultEnd={exam.scheduledEnd}
         />
       ) : null}
+
+      <AssignExamStudentsDialog
+        open={assignDialogOpen}
+        onOpenChange={setAssignDialogOpen}
+        classId={classId}
+        examId={examId}
+      />
     </div>
   )
 }

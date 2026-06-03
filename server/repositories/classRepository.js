@@ -147,6 +147,18 @@ export async function getTeacherClassByIdQuery(classId, memberId) {
   return result.rows[0] || null;
 }
 
+export async function getClassOwnerMemberIdQuery(classId) {
+  const pool = getPool();
+  const result = await pool.query(
+    `SELECT member_id AS "memberId"
+     FROM classes
+     WHERE class_id = $1
+     LIMIT 1`,
+    [classId],
+  );
+  return result.rows[0]?.memberId ?? null;
+}
+
 export async function listClassEnrolledStudentsQuery(classId, memberId) {
   const pool = getPool();
   const { rows } = await pool.query(

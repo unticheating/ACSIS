@@ -10,6 +10,7 @@ import {
   updateTeacherClassQuery,
   deactivateTeacherClassQuery,
 } from '../repositories/classRepository.js';
+import { recordTeacherActivityQuery } from '../repositories/teacherActivityRepository.js'
 
 const CLASS_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
@@ -46,6 +47,13 @@ export async function createClassService(
       accessCode,
       termId,
     );
+    void recordTeacherActivityQuery({
+      teacherMemberId: memberId,
+      eventType: 'class_created',
+      details: `${courseCode} - ${className}`.slice(0, 500),
+    }).catch((err) => {
+      console.error('[classService.createClass] teacher activity log failed:', err)
+    })
     return { ok: true, classData: newClass };
   } catch (err) {
     console.error('[classService.createClass]', err);
@@ -115,6 +123,14 @@ export async function updateTeacherClassService(memberId, classId, body) {
     if (!updated) {
       return { ok: false, status: 404, error: 'Class not found.' };
     }
+    void recordTeacherActivityQuery({
+      teacherMemberId: memberId,
+      classId,
+      eventType: 'class_updated',
+      details: Object.keys(patch).join(', '),
+    }).catch((err) => {
+      console.error('[classService.updateTeacherClass] teacher activity log failed:', err)
+    })
     return { ok: true, classData: updated };
   } catch (err) {
     console.error('[classService.updateTeacherClass]', err);
@@ -128,6 +144,14 @@ export async function deleteTeacherClassService(memberId, classId) {
     if (!ok) {
       return { ok: false, status: 404, error: 'Class not found.' };
     }
+    void recordTeacherActivityQuery({
+      teacherMemberId: memberId,
+      classId,
+      eventType: 'class_deleted',
+      details: 'Class deactivated',
+    }).catch((err) => {
+      console.error('[classService.deleteTeacherClass] teacher activity log failed:', err)
+    })
     return { ok: true };
   } catch (err) {
     console.error('[classService.deleteTeacherClass]', err);

@@ -12,11 +12,13 @@ import {
 } from '../repositories/examRepository.js';
 import { closeOtherTeacherOngoingExamsQuery } from '../repositories/examResultsRepository.js';
 import { finalizeExamResultsService } from './examReleaseService.js';
-import { getClassByIdQuery, getTeacherClassByIdQuery } from '../repositories/classRepository.js';
+import { getClassByIdQuery, getTeacherClassByIdQuery, getClassOwnerMemberIdQuery } from '../repositories/classRepository.js';
+import { getExamAssignmentAccessQuery } from '../repositories/examAssignmentRepository.js'
 import { checkEnrollment } from '../repositories/studentRepository.js';
 import { nextStatusAfterClose, nextStatusAfterPublish } from '../lib/examStatus.js';
 import { getStudentSessionsForExamsQuery } from '../repositories/examSessionRepository.js';
 import { generateExamPassword } from '../lib/examCodes.js';
+import { recordTeacherActivityQuery } from '../repositories/teacherActivityRepository.js'
 
 function normalizeExamPassword(password) {
   if (password == null) return null;
@@ -65,6 +67,15 @@ export async function createExamService(memberId, classId, payload) {
     );
 
     await client.query('COMMIT');
+    void recordTeacherActivityQuery({
+      teacherMemberId: memberId,
+      classId,
+      examId,
+      eventType: 'exam_created',
+      details: String(payload.title || 'Untitled exam').slice(0, 500),
+    }).catch((err) => {
+      console.error('[examService.createExam] teacher activity log failed:', err)
+    })
     return { ok: true, examId, code: examPassword };
   } catch (err) {
     await client.query('ROLLBACK');
@@ -258,7 +269,29 @@ export async function getClassExamsService(classId, requireActive = false, stude
     }
     
     const exams = await getExamsByClassIdQuery(classId, requireActive)
-    const withSessions = await attachStudentSessionsToExams(exams, studentMemberId)
+
+    let filteredExams = exams
+    // If a student is requesting the exams, hide any exam which has assignment rows
+    // and the student is not included in that assignment list.
+    if (studentMemberId && Array.isArray(exams) && exams.length > 0) {
+      const out = []
+      for (const ex of exams) {
+        try {
+          const access = await getExamAssignmentAccessQuery(ex.id, studentMemberId)
+          if (access.hasAssignments && !access.allowed) {
+            // Skip this exam for this student
+            continue
+          }
+        } catch (err) {
+          console.error('[examService.getClassExams/assignment-check]', err)
+          // On error, be permissive and include the exam
+        }
+        out.push(ex)
+      }
+      filteredExams = out
+    }
+
+    const withSessions = await attachStudentSessionsToExams(filteredExams, studentMemberId)
     classData.exams = studentMemberId
       ? withSessions.map(sanitizeExamForStudent)
       : withSessions
@@ -323,6 +356,16 @@ export async function updateExamPasswordService(classId, examId, teacherMemberId
     if (!success) {
       return { ok: false, status: 404, error: 'Exam not found or you do not have permission.' };
     }
+
+    void recordTeacherActivityQuery({
+      teacherMemberId: teacherMemberId,
+      classId,
+      examId,
+      eventType: 'exam_code_updated',
+      details: 'Updated exam code',
+    }).catch((err) => {
+      console.error('[examService.updateExamPassword] teacher activity log failed:', err)
+    })
     return { ok: true, code: password };
   } catch (err) {
     console.error('[examService.updateExamPassword]', err);
@@ -337,6 +380,18 @@ export async function closeExamService(classId, examId) {
       return { ok: false, status: 404, error: 'Exam not found.' }
     }
 
+        const teacherMemberId = await getClassOwnerMemberIdQuery(classId)
+        if (teacherMemberId) {
+          void recordTeacherActivityQuery({
+            teacherMemberId,
+            classId,
+            examId,
+            eventType: 'exam_ended',
+            details: 'Exam closed',
+          }).catch((err) => {
+            console.error('[examService.closeExam] teacher activity log failed:', err)
+          })
+        }
     const nextStatus = nextStatusAfterClose(exam.status)
     if (!nextStatus) {
       return { ok: false, status: 400, error: 'Only live or lobby exams can be ended.' }
@@ -346,8 +401,28 @@ export async function closeExamService(classId, examId) {
     if (!success) {
       return { ok: false, status: 404, error: 'Exam not found.' }
     }
+    void recordTeacherActivityQuery({
+      teacherMemberId,
+      classId,
+      examId,
+      eventType: 'exam_published',
+      details: `Status changed to ${nextStatus}`,
+    }).catch((err) => {
+      console.error('[examService.publishExam] teacher activity log failed:', err)
+    })
 
     const { top } = await finalizeExamResultsService(examId)
+    if (top?.teacherMemberId) {
+      void recordTeacherActivityQuery({
+        teacherMemberId: top.teacherMemberId,
+        classId,
+        examId,
+        eventType: 'exam_ended',
+        details: `Top performer: ${top.studentName || 'student'}`,
+      }).catch((err) => {
+        console.error('[examService.closeExam] teacher activity log failed:', err)
+      })
+    }
     return { ok: true, status: nextStatus, topStudent: top }
   } catch (err) {
     console.error('[examService.closeExam]', err)
@@ -361,6 +436,15 @@ export async function deleteExamService(classId, examId, teacherMemberId = null)
     if (!success) {
       return { ok: false, status: 404, error: 'Exam not found or you do not have permission.' };
     }
+    void recordTeacherActivityQuery({
+      teacherMemberId,
+      classId,
+      examId,
+      eventType: 'exam_deleted',
+      details: 'Exam deleted',
+    }).catch((err) => {
+      console.error('[examService.deleteExam] teacher activity log failed:', err)
+    })
     return { ok: true };
   } catch (err) {
     console.error('[examService.deleteExam]', err);

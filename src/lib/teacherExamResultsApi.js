@@ -38,3 +38,22 @@ export async function fetchTeacherMonitoringSnapshot(classId, examId) {
   const res = await apiFetch(`/api/teacher/classes/${classId}/exams/${examId}/monitoring`)
   return parseJson(res)
 }
+
+export async function fetchTeacherExamAssignments(classId, examId) {
+  const res = await apiFetch(`/api/teacher/classes/${classId}/exams/${examId}/assignments`)
+  return parseJson(res)
+}
+
+export async function updateTeacherExamAssignments(classId, examId, studentIds) {
+  const res = await apiFetch(`/api/teacher/classes/${classId}/exams/${examId}/assignments`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ studentIds }),
+  })
+  return parseJson(res)
+}
+
+export async function fetchTeacherActivityLogs(limit = 50) {
+  const res = await apiFetch(`/api/teacher/classes/activity-logs?limit=${encodeURIComponent(limit)}`)
+  return parseJson(res)
+}

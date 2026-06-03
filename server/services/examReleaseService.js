@@ -9,6 +9,7 @@ import {
   validateExamSessionIdsQuery,
 } from '../repositories/examResultsRepository.js'
 import { sendExamResultEmail } from '../lib/sendEmail.js'
+import { recordTeacherActivityQuery } from '../repositories/teacherActivityRepository.js'
 
 export async function finalizeExamResultsService(examId) {
   await computeExamRanksQuery(examId)
@@ -78,6 +79,17 @@ export async function releaseExamScoresService(
     }
 
     const top = await getTopRankedSessionQuery(examId)
+
+    void recordTeacherActivityQuery({
+      teacherMemberId,
+      classId,
+      examId,
+      eventType: 'scores_released',
+      details: releaseIds?.length ? `Released ${releaseIds.length} score(s)` : 'Released all scores',
+    }).catch((err) => {
+      console.error('[examReleaseService.releaseExamScores] teacher activity log failed:', err)
+    })
+
     return {
       ok: true,
       emailsSent,

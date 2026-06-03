@@ -1,5 +1,7 @@
 import { getExamsByClassIdQuery } from '../repositories/examRepository.js'
+import { getClassOwnerMemberIdQuery } from '../repositories/classRepository.js'
 import { getStudentSessionsForExamsQuery } from '../repositories/examSessionRepository.js'
+import { recordTeacherActivityQuery } from '../repositories/teacherActivityRepository.js'
 import {
   checkEnrollment,
   enrollStudent,
@@ -35,6 +37,18 @@ export async function enrollByAccessCode(memberId, code) {
   }
 
   await enrollStudent(memberId, targetClass.class_id)
+  const teacherMemberId = await getClassOwnerMemberIdQuery(targetClass.class_id)
+  if (teacherMemberId) {
+    void recordTeacherActivityQuery({
+      teacherMemberId,
+      classId: targetClass.class_id,
+      studentMemberId: memberId,
+      eventType: 'student_enrolled',
+      details: 'A student joined the class',
+    }).catch((err) => {
+      console.error('[studentService.enrollByAccessCode] teacher activity log failed:', err)
+    })
+  }
   return { ok: true, already: false, className: targetClass.class_name }
 }
 

@@ -1,4 +1,5 @@
 import { getClassByIdQuery } from '../repositories/classRepository.js'
+import { getTeacherClassByIdQuery } from '../repositories/classRepository.js'
 import {
   closeOtherTeacherOngoingExamsQuery,
   computeExamRanksQuery,
@@ -13,6 +14,14 @@ import {
   listStudentAnswersForSessionQuery,
   listStudentPerformanceQuery,
 } from '../repositories/examResultsRepository.js'
+import {
+  listTeacherActivityLogsQuery,
+  recordTeacherActivityQuery,
+} from '../repositories/teacherActivityRepository.js'
+import {
+  listTeacherExamAssignmentRosterQuery,
+  replaceExamAssignmentsQuery,
+} from '../repositories/examAssignmentRepository.js'
 import { getExamForJoinQuery } from '../repositories/examSessionRepository.js'
 import { EXAM_STATUS } from '../lib/examStatus.js'
 
@@ -228,6 +237,57 @@ export async function listTeacherReportExamsService(teacherMemberId) {
   } catch (err) {
     console.error('[examResultsService.listTeacherReportExams]', err)
     return { ok: false, status: 500, error: 'Failed to load exams.' }
+  }
+}
+
+export async function getTeacherExamAssignmentRosterService(classId, examId, teacherMemberId) {
+  try {
+    const roster = await listTeacherExamAssignmentRosterQuery(classId, examId, teacherMemberId)
+    if (!roster) {
+      return { ok: false, status: 404, error: 'Exam not found.' }
+    }
+    return { ok: true, ...roster }
+  } catch (err) {
+    console.error('[examResultsService.getTeacherExamAssignmentRoster]', err)
+    return { ok: false, status: 500, error: 'Failed to load exam assignment roster.' }
+  }
+}
+
+export async function updateTeacherExamAssignmentRosterService(classId, examId, teacherMemberId, studentMemberIds) {
+  try {
+    const cls = await getTeacherClassByIdQuery(classId, teacherMemberId)
+    if (!cls) {
+      return { ok: false, status: 403, error: 'Access denied.' }
+    }
+    const exam = await getExamForJoinQuery(classId, examId)
+    if (!exam) {
+      return { ok: false, status: 404, error: 'Exam not found.' }
+    }
+    const updated = await replaceExamAssignmentsQuery(classId, examId, teacherMemberId, studentMemberIds)
+    if (!updated) {
+      return { ok: false, status: 403, error: 'Access denied.' }
+    }
+    await recordTeacherActivityQuery({
+      teacherMemberId,
+      classId,
+      examId,
+      eventType: 'exam_assigned',
+      details: `Assigned ${updated.assignedCount} student${updated.assignedCount === 1 ? '' : 's'}`,
+    })
+    return { ok: true, ...updated }
+  } catch (err) {
+    console.error('[examResultsService.updateTeacherExamAssignmentRoster]', err)
+    return { ok: false, status: 500, error: 'Failed to save exam assignments.' }
+  }
+}
+
+export async function getTeacherActivityLogsService(teacherMemberId, limit = 50) {
+  try {
+    const logs = await listTeacherActivityLogsQuery(teacherMemberId, limit)
+    return { ok: true, logs }
+  } catch (err) {
+    console.error('[examResultsService.getTeacherActivityLogs]', err)
+    return { ok: false, status: 500, error: 'Failed to load teacher activity logs.' }
   }
 }
 
