@@ -358,11 +358,13 @@ CREATE TABLE IF NOT EXISTS student_answers (
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS cheating_logs (
-    log_id      SERIAL PRIMARY KEY,
-    session_id  INT NOT NULL REFERENCES exam_sessions (session_id) ON DELETE CASCADE,
-    event_type  cheat_event NOT NULL,
-    occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    details     TEXT DEFAULT NULL
+    log_id                  SERIAL PRIMARY KEY,
+    session_id              INT NOT NULL REFERENCES exam_sessions (session_id) ON DELETE CASCADE,
+    event_type              cheat_event NOT NULL,
+    occurred_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    details                 TEXT DEFAULT NULL,
+    dismissed_at            TIMESTAMPTZ DEFAULT NULL,
+    dismissed_by_member_id  INT DEFAULT NULL REFERENCES institution_members (member_id) ON DELETE SET NULL
 );
 
 -- ============================================================

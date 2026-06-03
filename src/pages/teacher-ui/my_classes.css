@@ -1783,6 +1783,11 @@
   margin-bottom: 0;
 }
 
+.acsis-exam-detail__cta-row--inline {
+  margin-top: 1.25rem;
+  margin-bottom: 0;
+}
+
 .acsis-exam-detail__stats {
   margin-bottom: 0;
 }

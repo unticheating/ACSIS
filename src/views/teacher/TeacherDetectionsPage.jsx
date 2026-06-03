@@ -3,11 +3,12 @@ import { useSearchParams } from 'react-router-dom'
 import { Clock, AlertTriangle, Search, ShieldAlert, X } from 'lucide-react'
 import { useDetectionsToolbar } from '@/context/DetectionsToolbarContext.jsx'
 import {
+  dismissTeacherViolation,
   fetchTeacherActiveMonitoring,
   fetchTeacherExamSessionDetail,
   fetchTeacherMonitoringSnapshot,
 } from '@/lib/teacherExamResultsApi.js'
-import { MAX_EXAM_WARNINGS } from '@/lib/examAntiCheat.js'
+import { labelForCheatEvent, MAX_EXAM_WARNINGS } from '@/lib/examAntiCheat.js'
 import { computeExamTimeDisplay } from '@/lib/examCountdown.js'
 import {
   arrangeSeatsBySettings,
@@ -29,10 +30,20 @@ function splitName(fullName) {
   return { firstName: parts[0], lastName: parts.slice(1).join(' ') }
 }
 
-function formatViolationEntry(v) {
-  const when = v.occurredAt ? new Date(v.occurredAt).toLocaleTimeString() : ''
+function formatViolationLabel(v) {
+  if (v.label) return v.label
+  const base = labelForCheatEvent(v.eventType) || v.eventType || 'event'
   const detail = v.details ? ` — ${v.details}` : ''
-  return `${v.eventType || 'event'}${detail}${when ? ` (${when})` : ''}`
+  const when = v.occurredAt ? new Date(v.occurredAt).toLocaleTimeString() : ''
+  return `${base}${detail}${when ? ` (${when})` : ''}`
+}
+
+function normalizeViolationEntry(v) {
+  return {
+    id: v.id,
+    label: formatViolationLabel(v),
+    dismissedAt: v.dismissedAt || null,
+  }
 }
 
 function violationsBySession(violations) {
@@ -40,22 +51,20 @@ function violationsBySession(violations) {
   for (const v of violations || []) {
     const sid = v.sessionId
     if (!map.has(sid)) map.set(sid, [])
-    map.get(sid).push(formatViolationEntry(v))
+    map.get(sid).push(normalizeViolationEntry(v))
   }
   return map
 }
 
 /**
- * Seat color: absent | ongoing | warn1 | warn2 | warn3 | submitted | done-warn3
- * Auto-submit at 3 warnings → done-warn3 (red, still counts as Done).
+ * Seat color: absent | ongoing | warn1 | warn2 | warn3 | submitted
+ * Max warnings locks the exam for manual submit (no auto-submit).
  */
 function resolveSeatTone(entry) {
   if (!entry.joined) return 'absent'
-  const strikes = Number(entry.warningCount || 0)
-  if (strikes >= MAX_EXAM_WARNINGS) {
-    return entry.status === 'submitted' ? 'done-warn3' : 'warn3'
-  }
   if (entry.status === 'submitted') return 'submitted'
+  const strikes = Number(entry.warningCount || 0)
+  if (strikes >= MAX_EXAM_WARNINGS) return 'warn3'
   if (strikes === 2) return 'warn2'
   if (strikes === 1) return 'warn1'
   return 'ongoing'
@@ -67,26 +76,24 @@ function statusLabelForTone(tone) {
     ongoing: 'Active — no warnings',
     warn1: '1 warning',
     warn2: '2 warnings',
-    warn3: '3 warnings — auto-submit pending',
-    'done-warn3': 'Auto-submitted (3 warnings)',
+    warn3: 'Max warnings — locked for submit',
     submitted: 'Exam submitted',
   }
   return map[tone] || tone
 }
 
 function isDoneTone(tone) {
-  return tone === 'submitted' || tone === 'done-warn3'
+  return tone === 'submitted'
 }
 
 function isViolator(student) {
   const strikes = Number(student.strikes || 0)
   if (strikes > 0) return true
-  return student.tone === 'warn1' || student.tone === 'warn2' || student.tone === 'warn3' || student.tone === 'done-warn3'
+  return student.tone === 'warn1' || student.tone === 'warn2' || student.tone === 'warn3'
 }
 
 const VIOLATOR_TONE_RANK = {
   warn3: 0,
-  'done-warn3': 0,
   warn2: 1,
   warn1: 2,
 }
@@ -118,7 +125,9 @@ function studentMatchesListSearch(student, query) {
 }
 
 function rosterEntryToSeat(entry, violationLabels = []) {
-  const { firstName, lastName } = splitName(entry.studentName)
+  // Use separate fields if available; fall back to splitting the full name
+  const firstName = entry.firstName || splitName(entry.studentName).firstName
+  const lastName = entry.lastName || splitName(entry.studentName).lastName
   const strikes = Number(entry.warningCount || 0)
   const tone = resolveSeatTone(entry)
   return {
@@ -129,6 +138,7 @@ function rosterEntryToSeat(entry, violationLabels = []) {
     joined: entry.joined,
     firstName,
     lastName,
+    avatarUrl: entry.avatarUrl,
     schoolId: entry.schoolId || '',
     tone,
     strikes,
@@ -150,8 +160,36 @@ function seatModifier(tone) {
 function seatInitials(student) {
   const f = student.firstName?.[0] || ''
   const l = student.lastName?.[0] || ''
-  return (f + l).toUpperCase() || '?'
+  return (l && f ? l + f : l || f || '?').toUpperCase()
 }
+
+const ExamTimer = React.memo(function ExamTimer({ activeExam }) {
+  const [clockTick, setClockTick] = useState(0)
+
+  useEffect(() => {
+    if (!activeExam) return undefined
+    const interval = window.setInterval(() => setClockTick((t) => t + 1), 1000)
+    return () => window.clearInterval(interval)
+  }, [activeExam])
+
+  const examTime = useMemo(
+    () => (activeExam ? computeExamTimeDisplay(activeExam) : null),
+    [activeExam, clockTick],
+  )
+
+  return (
+    <FadeIn
+      delay={0.35}
+      className={`acsis-detections-stat acsis-detections-stat--timer${examTime?.isLow ? ' acsis-detections-stat--timer-low' : ''}`}
+    >
+      <span className="acsis-detections-stat__value acsis-detections-stat__timer">
+        <Clock className="acsis-detections-stat__clock" aria-hidden />
+        {examTime?.display ?? '--:--'}
+      </span>
+      <span className="acsis-detections-stat__label">{examTime?.label ?? 'Time'}</span>
+    </FadeIn>
+  )
+})
 
 export default function TeacherDetectionsPage() {
   const [searchParams] = useSearchParams()
@@ -159,9 +197,10 @@ export default function TeacherDetectionsPage() {
   const examIdParam = searchParams.get('examId')
 
   const [activeExam, setActiveExam] = useState(null)
-  const [clockTick, setClockTick] = useState(0)
   const [students, setStudents] = useState([])
   const [selectedStudent, setSelectedStudent] = useState(null)
+  const [dismissingLogId, setDismissingLogId] = useState(null)
+  const [dismissError, setDismissError] = useState('')
   const [dragSourceIdx, setDragSourceIdx] = useState(null)
   const [dragOverIdx, setDragOverIdx] = useState(null)
   const [seatSettings, setSeatSettings] = useState(() => ({ ...DEFAULT_SEAT_SETTINGS }))
@@ -279,6 +318,7 @@ export default function TeacherDetectionsPage() {
   )
 
   async function openStudentDetail(student) {
+    setDismissError('')
     if (!student?.sessionId || !activeExam?.classId || !activeExam?.id) {
       setSelectedStudent(student)
       return
@@ -290,16 +330,87 @@ export default function TeacherDetectionsPage() {
         activeExam.id,
         student.sessionId,
       )
-      const labels = (detail.violations || []).map((v) => v.label || formatViolationEntry(v))
+      const violations = (detail.violations || []).map(normalizeViolationEntry)
+      const strikes = Number(detail.session?.warningCount ?? student.strikes ?? 0)
       setSelectedStudent((prev) =>
         prev && prev.sessionId === student.sessionId
-          ? { ...prev, violations: labels.length ? labels : prev.violations }
+          ? {
+              ...prev,
+              strikes,
+              tone: resolveSeatTone({
+                joined: true,
+                warningCount: strikes,
+                status: detail.session?.status ?? prev.sessionStatus,
+              }),
+              sessionStatus: detail.session?.status ?? prev.sessionStatus,
+              violations: violations.length ? violations : prev.violations,
+            }
           : prev,
       )
     } catch (err) {
       console.error('[Detections] session detail:', err)
     }
   }
+
+  const handleDismissViolation = useCallback(
+    async (violation) => {
+      if (!violation?.id || !selectedStudent?.sessionId || !activeExam?.classId || !activeExam?.id) {
+        return
+      }
+      if (violation.dismissedAt) return
+      setDismissError('')
+      setDismissingLogId(violation.id)
+      try {
+        const result = await dismissTeacherViolation(
+          activeExam.classId,
+          activeExam.id,
+          selectedStudent.sessionId,
+          violation.id,
+        )
+        const strikes = Number(result.warningCount ?? 0)
+        const nextViolations = (selectedStudent.violations || []).map((v) =>
+          v.id === violation.id ? { ...v, dismissedAt: new Date().toISOString() } : v,
+        )
+        const nextTone = resolveSeatTone({
+          joined: true,
+          warningCount: strikes,
+          status: selectedStudent.sessionStatus,
+        })
+        setSelectedStudent((prev) =>
+          prev
+            ? {
+                ...prev,
+                strikes,
+                tone: nextTone,
+                violations: nextViolations,
+              }
+            : prev,
+        )
+        const snapshot = await fetchTeacherMonitoringSnapshot(activeExam.classId, activeExam.id)
+        applyMonitoringData(snapshot, activeExam)
+        const rosterEntry = (snapshot.roster || []).find(
+          (r) => r.sessionId === selectedStudent.sessionId,
+        )
+        if (rosterEntry) {
+          const vMap = violationsBySession(snapshot.violations)
+          setSelectedStudent((prev) =>
+            prev && prev.sessionId === selectedStudent.sessionId
+              ? {
+                  ...rosterEntryToSeat(rosterEntry, vMap.get(selectedStudent.sessionId) || []),
+                  sessionStatus: rosterEntry.status,
+                  violations: nextViolations,
+                }
+              : prev,
+          )
+        }
+      } catch (err) {
+        setDismissError(err?.message || 'Could not mark as false positive.')
+      } finally {
+        setDismissingLogId(null)
+      }
+    },
+    [activeExam, selectedStudent, applyMonitoringData],
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -390,17 +501,6 @@ export default function TeacherDetectionsPage() {
     }
   }, [activeExam, refreshSessions, applyMonitoringData])
 
-  useEffect(() => {
-    if (!activeExam) return undefined
-    const interval = window.setInterval(() => setClockTick((t) => t + 1), 1000)
-    return () => window.clearInterval(interval)
-  }, [activeExam])
-
-  const examTime = useMemo(
-    () => (activeExam ? computeExamTimeDisplay(activeExam) : null),
-    [activeExam, clockTick],
-  )
-
   const isLive = Boolean(monitoringReady && activeExam)
   const isClassroomView = (seatSettings.viewMode ?? VIEW_MODES.CLASSROOM) !== VIEW_MODES.LIST
   const presentStudents = students.filter((s) => s.tone !== 'empty')
@@ -471,16 +571,7 @@ export default function TeacherDetectionsPage() {
                 <span className="acsis-detections-stat__value">{statValue(countDone())}</span>
                 <span className="acsis-detections-stat__label">Done</span>
               </FadeIn>
-              <FadeIn
-                delay={0.35}
-                className={`acsis-detections-stat acsis-detections-stat--timer${examTime?.isLow ? ' acsis-detections-stat--timer-low' : ''}`}
-              >
-                <span className="acsis-detections-stat__value acsis-detections-stat__timer">
-                  <Clock className="acsis-detections-stat__clock" aria-hidden />
-                  {examTime?.display ?? '--:--'}
-                </span>
-                <span className="acsis-detections-stat__label">{examTime?.label ?? 'Time'}</span>
-              </FadeIn>
+              <ExamTimer activeExam={activeExam} />
             </div>
           </div>
         </div>
@@ -524,12 +615,12 @@ export default function TeacherDetectionsPage() {
             return (
               <React.Fragment key={`seat-${idx}-${student.id}`}>
                 {isWalkwayCol ? <div className="acsis-detections-walkway" aria-hidden /> : null}
-                <FadeIn
-                  delay={0.1 + idx * 0.02}
+                <div
                   role={isEmpty ? undefined : 'button'}
                   tabIndex={isEmpty ? undefined : 0}
                   draggable={!isEmpty}
-                  className={`acsis-detections-seat ${seatModifier(tone)}${isDragging ? ' acsis-detections-seat--dragging' : ''}${isDropTarget ? ' acsis-detections-seat--drop-target' : ''}${!isEmpty ? ' acsis-detections-seat--draggable' : ''}`}
+                  style={{ animationDelay: `${0.1 + idx * 0.02}s` }}
+                  className={`acsis-animate-seat acsis-detections-seat ${seatModifier(tone)}${isDragging ? ' acsis-detections-seat--dragging' : ''}${isDropTarget ? ' acsis-detections-seat--drop-target' : ''}${!isEmpty ? ' acsis-detections-seat--draggable' : ''}`}
                   title={
                     isEmpty
                       ? 'Drop student here'
@@ -576,7 +667,11 @@ export default function TeacherDetectionsPage() {
                     <>
                       <div className="acsis-detections-seat__top">
                         <div className={`acsis-detections-seat__avatar acsis-detections-seat__avatar--${tone}`}>
-                          {initials}
+                          {student.avatarUrl ? (
+                            <img src={student.avatarUrl} alt={initials} className="w-full h-full object-cover rounded-full" />
+                          ) : (
+                            initials
+                          )}
                         </div>
                         {student.strikes > 0 ? (
                           <span
@@ -587,20 +682,27 @@ export default function TeacherDetectionsPage() {
                           </span>
                         ) : null}
                       </div>
-                      <div className="min-w-0">
-                        <div className="acsis-detections-seat__name">{student.firstName}</div>
-                        <div className="acsis-detections-seat__last">{student.lastName}</div>
+                      <div className="acsis-detections-seat__identity min-w-0">
+                        {student.lastName ? (
+                          <div className="acsis-detections-seat__last">{student.lastName}</div>
+                        ) : null}
+                        <div className="acsis-detections-seat__name">
+                          {student.firstName || 'Student'}
+                        </div>
                       </div>
-                      {tone === 'done-warn3' ? (
-                        <span className="acsis-detections-seat__badge acsis-detections-seat__badge--auto">
-                          Auto-submitted
+                      {tone === 'submitted' && student.strikes > 0 ? (
+                        <span
+                          className="acsis-detections-seat__badge acsis-detections-seat__badge--submitted-warn"
+                          title="Submitted with warnings"
+                        >
+                          {student.strikes} warn{student.strikes === 1 ? '' : 's'}
                         </span>
                       ) : null}
                     </>
                   ) : (
                     <span className="acsis-detections-seat__empty-label">Empty</span>
                   )}
-                </FadeIn>
+                </div>
               </React.Fragment>
             )
           })}
@@ -672,11 +774,28 @@ export default function TeacherDetectionsPage() {
                             <span
                               className={`acsis-detections-list-card__avatar acsis-detections-list-card__avatar--${student.tone}`}
                             >
-                              {seatInitials(student)}
+                              {student.avatarUrl ? (
+                                <img src={student.avatarUrl} alt={seatInitials(student)} className="w-full h-full object-cover rounded-full" />
+                              ) : (
+                                seatInitials(student)
+                              )}
                             </span>
                             <span className="acsis-detections-list-card__meta">
                               <span className="acsis-detections-list-card__name">
-                                {student.firstName} {student.lastName}
+                                {student.lastName ? (
+                                  <>
+                                    <span className="acsis-detections-list-card__name-last">
+                                      {student.lastName}
+                                    </span>
+                                    {student.firstName ? (
+                                      <span className="acsis-detections-list-card__name-first">
+                                        , {student.firstName}
+                                      </span>
+                                    ) : null}
+                                  </>
+                                ) : (
+                                  student.firstName || 'Student'
+                                )}
                               </span>
                               <span className="acsis-detections-list-card__sub">
                                 {student.schoolId ? (
@@ -720,7 +839,9 @@ export default function TeacherDetectionsPage() {
             >
               <div className="min-w-0">
                 <h3 id="detections-student-title" className="text-lg sm:text-2xl font-bold truncate">
-                  {selectedStudent.firstName} {selectedStudent.lastName}
+                  {selectedStudent.lastName
+                    ? `${selectedStudent.lastName}, ${selectedStudent.firstName}`
+                    : selectedStudent.firstName}
                 </h3>
                 <p className="opacity-90 text-sm sm:text-base">{selectedStudent.schoolId}</p>
               </div>
@@ -734,50 +855,78 @@ export default function TeacherDetectionsPage() {
               </button>
             </div>
 
-            <div className="p-4 sm:p-6">
-              <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-gray-100">
+            <div className="acsis-detections-modal__body">
+              <div className="acsis-detections-modal__summary">
                 <div>
-                  <div className="text-sm text-gray-500 font-medium mb-1">Current Status</div>
-                  <div className={`font-bold text-base sm:text-lg acsis-detections-modal__status acsis-detections-modal__status--${selectedStudent.tone}`}>
+                  <div className="acsis-detections-modal__label">Current status</div>
+                  <div className={`acsis-detections-modal__status acsis-detections-modal__status--${selectedStudent.tone}`}>
                     {statusLabelForTone(selectedStudent.tone)}
                   </div>
                 </div>
-                <div className="sm:text-right">
-                  <div className="text-sm text-gray-500 font-medium mb-1">Strikes</div>
-                  <div className="font-bold text-xl text-gray-900">{selectedStudent.strikes} / 3</div>
+                <div className="acsis-detections-modal__strikes-block">
+                  <div className="acsis-detections-modal__label">Strikes</div>
+                  <div className="acsis-detections-modal__strikes-value">
+                    {selectedStudent.strikes} / {MAX_EXAM_WARNINGS}
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <h4 className="font-semibold text-gray-900 mb-3">Violation Log</h4>
+              <div className="acsis-detections-modal__violations">
+                <h4 className="acsis-detections-modal__violations-title">Violation log</h4>
+                <p className="acsis-detections-modal__violations-hint">
+                  Mark a detection as false positive to remove one strike and unlock the student if they
+                  were locked for max warnings.
+                </p>
+                {dismissError ? (
+                  <p className="acsis-detections-modal__error" role="alert">
+                    {dismissError}
+                  </p>
+                ) : null}
                 {selectedStudent.violations?.length > 0 ? (
                   <ul className="space-y-3">
-                    {selectedStudent.violations.map((v, i) => (
-                      <li
-                        key={i}
-                        className="flex items-start gap-3 text-sm text-gray-700 bg-gray-50 p-3 rounded-lg border border-gray-100"
-                      >
-                        <AlertTriangle
-                          className={`w-4 h-4 mt-0.5 shrink-0 acsis-detections-modal__violation-icon acsis-detections-modal__violation-icon--${selectedStudent.tone}`}
-                          aria-hidden
-                        />
-                        <span>{v}</span>
-                      </li>
-                    ))}
+                    {selectedStudent.violations.map((v) => {
+                      const dismissed = Boolean(v.dismissedAt)
+                      const label = typeof v === 'string' ? v : v.label
+                      const logId = typeof v === 'object' && v.id != null ? v.id : null
+                      return (
+                        <li
+                          key={logId ?? label}
+                          className={`acsis-detections-violation${dismissed ? ' acsis-detections-violation--dismissed' : ''}`}
+                        >
+                          <div className="acsis-detections-violation__main">
+                            <AlertTriangle
+                              className={`w-4 h-4 mt-0.5 shrink-0 acsis-detections-modal__violation-icon acsis-detections-modal__violation-icon--${selectedStudent.tone}`}
+                              aria-hidden
+                            />
+                            <span className="acsis-detections-violation__text">{label}</span>
+                          </div>
+                          {dismissed ? (
+                            <span className="acsis-detections-violation__badge">False positive</span>
+                          ) : logId ? (
+                            <button
+                              type="button"
+                              className="acsis-detections-violation__dismiss"
+                              disabled={dismissingLogId === logId}
+                              onClick={() => handleDismissViolation(v)}
+                            >
+                              {dismissingLogId === logId ? 'Saving…' : 'Mark false positive'}
+                            </button>
+                          ) : null}
+                        </li>
+                      )
+                    })}
                   </ul>
                 ) : (
-                  <p className="text-sm text-gray-500 italic bg-gray-50 p-4 rounded-lg text-center border border-gray-100">
-                    No suspicious activity detected.
-                  </p>
+                  <p className="acsis-detections-modal__empty">No suspicious activity detected.</p>
                 )}
               </div>
             </div>
 
-            <div className="p-4 bg-gray-50 border-t border-gray-100 flex justify-end">
+            <div className="acsis-detections-modal__footer">
               <button
                 type="button"
                 onClick={() => setSelectedStudent(null)}
-                className="px-5 py-2 text-gray-700 font-medium hover:bg-gray-200 rounded-lg transition-colors min-h-[44px]"
+                className="acsis-detections-modal__close-btn"
               >
                 Close
               </button>

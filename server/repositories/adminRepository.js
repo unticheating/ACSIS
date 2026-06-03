@@ -154,6 +154,7 @@ export async function getViolationSessionDetailQuery(institutionId, sessionId) {
        e.status AS "examStatus",
        c.class_id AS "classId",
        c.class_name AS "className",
+       TRIM(tu.first_name || ' ' || COALESCE(tu.middle_name || ' ', '') || tu.last_name) AS "professorName",
        er.raw_score AS "rawScore",
        er.total_points AS "totalPoints",
        er.percentage
@@ -164,6 +165,8 @@ export async function getViolationSessionDetailQuery(institutionId, sessionId) {
      ${SQL_JOIN_STUDENTS}
      JOIN users su ON im.uid = su.uid
      LEFT JOIN exam_results er ON er.session_id = es.session_id
+     LEFT JOIN institution_members tim ON c.member_id = tim.member_id
+     LEFT JOIN users tu ON tim.uid = tu.uid
      WHERE es.session_id = $1 AND c.institution_id = $2 AND c.is_active = TRUE`,
     [sessionId, institutionId],
   )
@@ -197,6 +200,7 @@ export async function getViolationSessionDetailQuery(institutionId, sessionId) {
     examStatus: row.examStatus,
     classId: row.classId,
     className: row.className,
+    professorName: row.professorName?.trim() || 'Unknown Instructor',
     rawScore: row.rawScore != null ? Number(row.rawScore) : null,
     totalPoints: row.totalPoints != null ? Number(row.totalPoints) : null,
     percentage: row.percentage != null ? Number(row.percentage) : null,
@@ -289,15 +293,22 @@ export async function listMonitoringActivityQuery(institutionId, limit = 20) {
        cl.event_type::text AS event,
        cl.occurred_at AS "occurredAt",
        TRIM(su.first_name || ' ' || COALESCE(su.middle_name || ' ', '') || su.last_name) AS name,
+       su.avatar_url AS "avatarUrl",
        e.title AS exam,
+       c.class_name AS "className",
+       TRIM(pu.first_name || ' ' || COALESCE(pu.middle_name || ' ', '') || pu.last_name) AS "professorName",
        es.status AS "sessionStatus",
-       es.warning_count AS "warningCount"
+       es.warning_count AS "warningCount",
+       cl.dismissed_at AS "dismissedAt",
+       ROW_NUMBER() OVER (PARTITION BY cl.session_id ORDER BY cl.occurred_at ASC) AS "warningOrdinal"
      FROM cheating_logs cl
      JOIN exam_sessions es ON cl.session_id = es.session_id
      JOIN exams e ON es.exam_id = e.exam_id
      JOIN classes c ON e.class_id = c.class_id
      JOIN institution_members im ON ${memberJoin}
      JOIN users su ON im.uid = su.uid
+     LEFT JOIN institution_members pm ON c.member_id = pm.member_id
+     LEFT JOIN users pu ON pm.uid = pu.uid
      WHERE c.institution_id = $1 AND c.is_active = TRUE
      ORDER BY cl.occurred_at DESC
      LIMIT $2`,
@@ -315,11 +326,16 @@ export async function listMonitoringActivityQuery(institutionId, limit = 20) {
     return {
       id: r.id,
       name: r.name?.trim() || 'Unknown student',
+      avatarUrl: r.avatarUrl,
       exam: r.exam,
+      className: r.className,
+      professorName: r.professorName?.trim() || null,
       event: formatCheatEventLabel(r.event),
       time: r.occurredAt,
       status,
       warningCount: Number(r.warningCount || 0),
+      warningOrdinal: Number(r.warningOrdinal || 0),
+      dismissed: Boolean(r.dismissedAt),
     }
   })
 }
@@ -330,7 +346,8 @@ export async function listActiveMonitoringSessionsQuery(institutionId) {
   const { rows } = await pool.query(
     `SELECT
        es.session_id AS id,
-       TRIM(su.first_name || ' ' || COALESCE(su.middle_name || ' ', '') || su.last_name) AS name,
+       su.last_name AS name,
+       su.avatar_url AS "avatarUrl",
        e.title AS exam,
        es.started_at AS "startedAt",
        es.warning_count AS "warningCount"
@@ -347,6 +364,7 @@ export async function listActiveMonitoringSessionsQuery(institutionId) {
   return rows.map((r) => ({
     id: r.id,
     name: r.name?.trim() || 'Unknown student',
+    avatarUrl: r.avatarUrl,
     exam: r.exam,
     event: 'Active session',
     time: r.startedAt,

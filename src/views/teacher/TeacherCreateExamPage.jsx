@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input.jsx'
 import { apiFetch } from '@/lib/apiFetch.js'
 import { COPY } from '@/lib/examFlowUi.js'
 import { mapExamToBuilderState } from '@/lib/mapExamToBuilder.js'
-import { labelForQuestionType } from '@/lib/questionTypes.js'
+import { labelForQuestionType, normalizeIdentificationAnswer } from '@/lib/questionTypes.js'
 import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
 import { useAcsisConfirm } from '@/hooks/useAcsisConfirm.jsx'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
@@ -200,7 +200,7 @@ export default function TeacherCreateExamPage() {
       setCodingLanguage('javascript')
     } else if (formType === 'identification') {
       resetMc()
-      setIdentAnswer(q.correctAnswer || '')
+      setIdentAnswer(normalizeIdentificationAnswer(q.correctAnswer || ''))
       setTfAnswer('')
       setCodingAnswer('')
       setCodingLanguage('javascript')
@@ -262,7 +262,7 @@ export default function TeacherCreateExamPage() {
       correctAnswer = opts[Number(mc.correct) - 1]
       options = opts
     } else if (questionType === 'identification') {
-      const ident = identAnswer.trim()
+      const ident = normalizeIdentificationAnswer(identAnswer)
       if (!ident) {
         acsisToastError('Please enter the identification answer.')
         return
@@ -467,6 +467,9 @@ export default function TeacherCreateExamPage() {
           })
           if (res.ok) {
             setLastSaved(new Date())
+          } else {
+            const data = await res.json().catch(() => ({}))
+            console.error('Autosave failed:', data.error || res.status)
           }
         }
       } catch (err) {
@@ -537,7 +540,10 @@ export default function TeacherCreateExamPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         })
-        if (!res.ok) throw new Error('Failed to update exam draft.')
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          throw new Error(data.error || 'Failed to update exam.')
+        }
       }
       
       const createdIds = [mainExamId]
@@ -636,7 +642,10 @@ export default function TeacherCreateExamPage() {
             type="text"
             placeholder="Enter exact correct answer"
             value={identAnswer}
-            onChange={(e) => setIdentAnswer(e.target.value)}
+            onChange={(e) => setIdentAnswer(e.target.value.toUpperCase())}
+            autoCapitalize="characters"
+            spellCheck={false}
+            style={{ textTransform: 'uppercase' }}
           />
         </div>
       )

@@ -98,8 +98,11 @@ export default function StudentExamSessionPage() {
       const loadedMax = resolveMaxWarnings(data.maxWarnings, institutionMaxWarnings)
       setMaxWarnings(loadedMax)
       setWarningCount(displayStrikeCount(data.warningCount, loadedMax))
-      setExamLocked(Boolean(data.sessionLocked))
-      setLockReason(data.lockReason || null)
+      const examSt = normalizeExamStatus(data.exam?.status)
+      const locked =
+        examSt === PG_EXAM_STATUS.OPEN ? Boolean(data.sessionLocked) : false
+      setExamLocked(locked)
+      setLockReason(locked ? data.lockReason || null : null)
       if (data.savedAnswers && typeof data.savedAnswers === 'object') {
         setAnswers((prev) => ({ ...prev, ...data.savedAnswers }))
       }
@@ -142,6 +145,30 @@ export default function StudentExamSessionPage() {
     }, 2500)
     return () => window.clearInterval(interval)
   }, [hit?.exam?.status, needsPassword, loadSession])
+
+  /** Sync lock/strike state when professor dismisses a false positive during the exam. */
+  useEffect(() => {
+    if (scene !== 'question' || !classId || !examId) return undefined
+    const interval = window.setInterval(async () => {
+      try {
+        const data = await fetchStudentExamSession(classId, examId)
+        if (data.sessionStatus === 'submitted') return
+        const examSt = normalizeExamStatus(data.exam?.status)
+        if (examSt !== PG_EXAM_STATUS.OPEN) return
+        const loadedMax = resolveMaxWarnings(data.maxWarnings, institutionMaxWarnings)
+        setMaxWarnings(loadedMax)
+        setWarningCount(displayStrikeCount(data.warningCount, loadedMax))
+        const locked = Boolean(data.sessionLocked)
+        setExamLocked(locked)
+        setLockReason(locked ? data.lockReason || null : null)
+        examLockedRef.current = locked
+        warningCountRef.current = displayStrikeCount(data.warningCount, loadedMax)
+      } catch {
+        /* ignore transient poll errors */
+      }
+    }, 4000)
+    return () => window.clearInterval(interval)
+  }, [scene, classId, examId, institutionMaxWarnings])
 
   async function submitExamPassword(e) {
     e.preventDefault()
@@ -316,13 +343,17 @@ export default function StudentExamSessionPage() {
   useEffect(() => {
     if (scene !== 'question' || !hit?.exam) return undefined
     const tick = () => {
+      if (normalizeExamStatus(hit.exam.status) !== PG_EXAM_STATUS.OPEN) return
       const { seconds } = computeExamTimeDisplay({
         status: hit.exam.status,
         scheduledEnd: hit.exam.scheduledEnd,
       })
-      const left = seconds ?? 0
-      setSecondsLeft(left)
-      if (left <= 0 && !examLocked && !lockingRef.current) {
+      if (seconds == null) {
+        setSecondsLeft(null)
+        return
+      }
+      setSecondsLeft(seconds)
+      if (seconds <= 0 && !examLocked && !lockingRef.current) {
         void applyExamLock('time_up')
       }
     }
@@ -763,6 +794,9 @@ export default function StudentExamSessionPage() {
       questions[currentQuestionIndex - 1]?.sectionId !== currentQ.sectionId) &&
     (currentQ.sectionTitle || currentQ.sectionDescription)
 
+  const strikesDisplay = displayStrikeCount(warningCount, maxWarnings)
+  const maxStrikesReached = strikesDisplay >= maxWarnings
+
   // Lobby Scene
   if (scene === 'lobby') {
     const examSt = normalizeExamStatus(hit.exam.status)
@@ -782,7 +816,8 @@ export default function StudentExamSessionPage() {
             </p>
             <p>
               You are allowed up to <strong>{maxWarnings} strikes</strong> only. If this limit is exceeded, your
-              exam will be automatically submitted.
+              exam will be <strong>locked</strong> — you cannot change or move between answers; use{' '}
+              <strong>Send exam</strong> when you are ready to submit.
             </p>
             <p>Please remain on this page and complete the exam honestly.</p>
           </div>
@@ -899,7 +934,7 @@ export default function StudentExamSessionPage() {
               {overlayIsFinalStrike ? (
                 <>
                   You have reached <strong>{maxWarnings} of {maxWarnings}</strong> integrity warnings.
-                  Your exam is now <strong>locked</strong> — you may review answers but cannot change them.
+                  Your exam is now <strong>locked</strong> — you cannot change answers or switch questions.
                   Click <strong>Send exam</strong> when you are ready to submit.
                 </>
               ) : (
@@ -947,7 +982,7 @@ export default function StudentExamSessionPage() {
           </div>
           <div className="exam-timer flex items-center gap-2 lg:hidden">
             <Clock className="w-4 h-4 shrink-0 opacity-80" aria-hidden />
-            {secondsLeft > 0 ? formatClock(secondsLeft) : '--:--'}
+            {secondsLeft != null && secondsLeft > 0 ? formatClock(secondsLeft) : '--:--'}
           </div>
         </div>
       </ExamSessionHeader>
@@ -962,41 +997,45 @@ export default function StudentExamSessionPage() {
                   role="status"
                 >
                   {lockReason === 'max_warnings'
-                    ? 'Maximum warnings reached. You can review your answers but cannot change them. Click Send exam when ready.'
-                    : 'Time is up. You can review your answers but cannot change them. Click Send exam when ready.'}
+                    ? 'Maximum warnings reached. You cannot change answers or switch questions. Click Send exam when ready.'
+                    : 'Time is up. You cannot change answers or switch questions. Click Send exam when ready.'}
                 </div>
               ) : null}
-              {showSectionIntro && currentQ.sectionDescription ? (
-                <div className="question-box question-box--section mb-6">
-                  <p className="question-box--section__desc whitespace-pre-wrap">
-                    {currentQ.sectionDescription}
-                  </p>
-                </div>
-              ) : null}
-
-              <div className="mb-8">
-                <div className="exam-question-meta-row">
-                  <span className="exam-set-name">
-                    {currentQ.sectionTitle || 'General'}
-                  </span>
-                  <span className="exam-type-badge">{questionTypeLabel(currentQ.type)}</span>
-                </div>
-                <div className="question-box question-box--prompt whitespace-pre-wrap">
-                  {currentQ.question}
-                </div>
-                {currentQ.imageUrl && (
-                  <div className="mt-6">
-                    <img
-                      src={currentQ.imageUrl}
-                      alt="Question illustration"
-                      className="exam-question-image max-h-80 max-w-full rounded-xl object-contain"
-                    />
+              <div
+                className={maxStrikesReached ? 'exam-strike-lock-blur' : undefined}
+                aria-hidden={maxStrikesReached ? true : undefined}
+              >
+                {showSectionIntro && currentQ.sectionDescription ? (
+                  <div className="question-box question-box--section mb-6">
+                    <p className="question-box--section__desc whitespace-pre-wrap">
+                      {currentQ.sectionDescription}
+                    </p>
                   </div>
-                )}
-              </div>
+                ) : null}
 
-              {/* Question Inputs */}
-              <div className="flex-1">
+                <div className="mb-8">
+                  <div className="exam-question-meta-row">
+                    <span className="exam-set-name">
+                      {currentQ.sectionTitle || 'General'}
+                    </span>
+                    <span className="exam-type-badge">{questionTypeLabel(currentQ.type)}</span>
+                  </div>
+                  <div className="question-box question-box--prompt whitespace-pre-wrap">
+                    {currentQ.question}
+                  </div>
+                  {currentQ.imageUrl && (
+                    <div className="mt-6">
+                      <img
+                        src={currentQ.imageUrl}
+                        alt="Question illustration"
+                        className="exam-question-image max-h-80 max-w-full rounded-xl object-contain"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Question Inputs */}
+                <div className="flex-1">
                 {currentQ.type === 'multiple-choice' && (
                   <div className="options-list">
                     {(currentQ.options || []).map((opt, i) => {
@@ -1084,22 +1123,27 @@ export default function StudentExamSessionPage() {
                     />
                   </div>
                 )}
+                </div>
               </div>
 
               <div className="exam-footer-bar" style={{ marginTop: 'auto' }}>
-                <button
-                  type="button"
-                  onClick={() => setCurrentQuestionIndex((i) => Math.max(0, i - 1))}
-                  disabled={currentQuestionIndex === 0}
-                  className="btn-next"
-                  style={
-                    currentQuestionIndex === 0
-                      ? { opacity: 0.45, cursor: 'not-allowed' }
-                      : undefined
-                  }
-                >
-                  ← Previous
-                </button>
+                {!examLocked ? (
+                  <button
+                    type="button"
+                    onClick={() => setCurrentQuestionIndex((i) => Math.max(0, i - 1))}
+                    disabled={currentQuestionIndex === 0}
+                    className="btn-next"
+                    style={
+                      currentQuestionIndex === 0
+                        ? { opacity: 0.45, cursor: 'not-allowed' }
+                        : undefined
+                    }
+                  >
+                    ← Previous
+                  </button>
+                ) : (
+                  <span className="text-xs text-white/50" aria-hidden />
+                )}
                 <div className="exam-footer-right">
                   {examLocked ? (
                     <button type="button" onClick={() => submitToServer()} className="btn-next">
@@ -1136,7 +1180,9 @@ export default function StudentExamSessionPage() {
             </h3>
             <div className="flex items-center gap-3 px-5 py-4 rounded-xl border border-white/15 bg-black/25">
               <Clock className="w-6 h-6 opacity-70" aria-hidden />
-              <span className="exam-timer">{formatClock(secondsLeft)}</span>
+              <span className="exam-timer">
+                {secondsLeft != null && secondsLeft > 0 ? formatClock(secondsLeft) : '--:--'}
+              </span>
             </div>
           </div>
 
@@ -1155,7 +1201,10 @@ export default function StudentExamSessionPage() {
                 <div className="w-3 h-3 bg-emerald-500 rounded-full" /> Answered
               </div>
             </div>
-            <div className="grid grid-cols-5 gap-2.5">
+            <div
+              className={`grid grid-cols-5 gap-2.5${examLocked ? ' pointer-events-none opacity-60' : ''}`}
+              aria-disabled={examLocked || undefined}
+            >
               {questions.map((q, idx) => {
                 const isActive = idx === currentQuestionIndex
                 const isAnswered = !!answers[q.id] && answers[q.id].trim() !== ''
@@ -1172,9 +1221,13 @@ export default function StudentExamSessionPage() {
                   <button
                     key={q.id || idx}
                     type="button"
-                    onClick={() => setCurrentQuestionIndex(idx)}
+                    disabled={examLocked}
+                    onClick={() => {
+                      if (!examLocked) setCurrentQuestionIndex(idx)
+                    }}
                     className={btnClass}
                     aria-label={`Go to question ${idx + 1}`}
+                    aria-disabled={examLocked || undefined}
                   >
                     {idx + 1}
                     {isAnswered && !isActive ? (

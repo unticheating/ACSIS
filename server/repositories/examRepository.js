@@ -52,6 +52,253 @@ async function insertQuestionWithChoices(client, examId, sectionId, q, orderNum)
   }
 }
 
+async function insertChoicesForQuestion(client, questionId, q, dbType) {
+  if (dbType === 'mcq') {
+    for (let j = 0; j < q.options.length; j++) {
+      const choiceText = q.options[j];
+      const isCorrect = choiceText === q.correctAnswer;
+      await client.query(
+        `INSERT INTO choices (question_id, choice_text, is_correct, order_num)
+         VALUES ($1, $2, $3, $4)`,
+        [questionId, choiceText, isCorrect, j + 1],
+      );
+    }
+  } else if (dbType === 'coding') {
+    const language =
+      Array.isArray(q.options) && q.options[0] ? String(q.options[0]).trim() : 'javascript';
+    await client.query(
+      `INSERT INTO choices (question_id, choice_text, is_correct, order_num)
+       VALUES ($1, $2, FALSE, 1)`,
+      [questionId, language],
+    );
+    await client.query(
+      `INSERT INTO choices (question_id, choice_text, is_correct, order_num)
+       VALUES ($1, $2, TRUE, 2)`,
+      [questionId, q.correctAnswer],
+    );
+  } else {
+    await client.query(
+      `INSERT INTO choices (question_id, choice_text, is_correct, order_num)
+       VALUES ($1, $2, TRUE, 1)`,
+      [questionId, q.correctAnswer],
+    );
+  }
+}
+
+function parsePositiveInt(value) {
+  const n = Number(value);
+  return Number.isInteger(n) && n > 0 ? n : null;
+}
+
+async function questionHasStudentAnswers(client, questionId) {
+  const { rows } = await client.query(
+    `SELECT 1 FROM student_answers WHERE question_id = $1 LIMIT 1`,
+    [questionId],
+  );
+  return rows.length > 0;
+}
+
+async function examHasStudentSessions(client, examId) {
+  const { rows } = await client.query(
+    `SELECT 1 FROM exam_sessions WHERE exam_id = $1 LIMIT 1`,
+    [examId],
+  );
+  return rows.length > 0;
+}
+
+async function replaceExamChoices(client, questionId, q, dbType) {
+  await client.query(`DELETE FROM choices WHERE question_id = $1`, [questionId]);
+  await insertChoicesForQuestion(client, questionId, q, dbType);
+}
+
+async function updateQuestionInPlace(client, examId, sectionId, q, orderNum, questionId) {
+  const dbType = mapQuestionTypeToDb(q.type);
+  const imageUrl = q.imageUrl || null;
+  await client.query(
+    `UPDATE questions
+     SET question_text = $1, question_type = $2, order_num = $3, section_id = $4, image_url = $5
+     WHERE question_id = $6 AND exam_id = $7`,
+    [q.question, dbType, orderNum, sectionId, imageUrl, questionId, examId],
+  );
+
+  const hasAnswers = await questionHasStudentAnswers(client, questionId);
+  if (!hasAnswers) {
+    await replaceExamChoices(client, questionId, q, dbType);
+    return;
+  }
+
+  if (dbType === 'mcq') {
+    const { rows: existing } = await client.query(
+      `SELECT choice_id, order_num FROM choices WHERE question_id = $1 ORDER BY order_num ASC`,
+      [questionId],
+    );
+    if (existing.length !== (q.options?.length || 0)) {
+      const err = new Error('Cannot change the number of choices after students have answered.');
+      err.code = 'QUESTION_LOCKED';
+      throw err;
+    }
+    for (let j = 0; j < q.options.length; j++) {
+      const choiceText = q.options[j];
+      const isCorrect = choiceText === q.correctAnswer;
+      await client.query(
+        `UPDATE choices SET choice_text = $1, is_correct = $2 WHERE choice_id = $3`,
+        [choiceText, isCorrect, existing[j].choice_id],
+      );
+    }
+    return;
+  }
+
+  if (dbType === 'coding') {
+    const language =
+      Array.isArray(q.options) && q.options[0] ? String(q.options[0]).trim() : 'javascript';
+    const { rows: existing } = await client.query(
+      `SELECT choice_id, is_correct, order_num FROM choices WHERE question_id = $1 ORDER BY order_num ASC`,
+      [questionId],
+    );
+    if (existing.length < 2) {
+      await replaceExamChoices(client, questionId, q, dbType);
+      return;
+    }
+    const langRow = existing.find((r) => !r.is_correct) || existing[0];
+    const ansRow = existing.find((r) => r.is_correct) || existing[existing.length - 1];
+    await client.query(`UPDATE choices SET choice_text = $1 WHERE choice_id = $2`, [
+      language,
+      langRow.choice_id,
+    ]);
+    await client.query(`UPDATE choices SET choice_text = $1 WHERE choice_id = $2`, [
+      q.correctAnswer,
+      ansRow.choice_id,
+    ]);
+    return;
+  }
+
+  await client.query(
+    `UPDATE choices SET choice_text = $1 WHERE question_id = $2 AND is_correct = TRUE`,
+    [q.correctAnswer, questionId],
+  );
+}
+
+async function replaceAllExamContent(client, examId, payload) {
+  await client.query(
+    `DELETE FROM choices
+     WHERE question_id IN (SELECT question_id FROM questions WHERE exam_id = $1)`,
+    [examId],
+  );
+  await client.query(`DELETE FROM questions WHERE exam_id = $1`, [examId]);
+  await client.query(`DELETE FROM exam_sections WHERE exam_id = $1`, [examId]);
+
+  const sections = Array.isArray(payload?.sections) ? payload.sections : null;
+  const flatQuestions = Array.isArray(payload?.questions) ? payload.questions : null;
+
+  let orderNum = 0;
+
+  if (sections?.length) {
+    for (let sIdx = 0; sIdx < sections.length; sIdx++) {
+      const sec = sections[sIdx];
+      const secResult = await client.query(
+        `INSERT INTO exam_sections (exam_id, title, description, order_num)
+         VALUES ($1, $2, $3, $4)
+         RETURNING section_id`,
+        [examId, String(sec.title || '').trim() || `Set ${sIdx + 1}`, sec.description?.trim() || null, sIdx + 1],
+      );
+      const sectionId = secResult.rows[0].section_id;
+      for (const q of sec.questions || []) {
+        orderNum += 1;
+        await insertQuestionWithChoices(client, examId, sectionId, q, orderNum);
+      }
+    }
+  } else if (flatQuestions?.length) {
+    const secResult = await client.query(
+      `INSERT INTO exam_sections (exam_id, title, description, order_num)
+       VALUES ($1, $2, NULL, 1)
+       RETURNING section_id`,
+      [examId, 'Set 1'],
+    );
+    const sectionId = secResult.rows[0].section_id;
+    for (const q of flatQuestions) {
+      orderNum += 1;
+      await insertQuestionWithChoices(client, examId, sectionId, q, orderNum);
+    }
+  }
+}
+
+async function syncExamContentWithSessions(client, examId, payload) {
+  const sections = Array.isArray(payload?.sections) ? payload.sections : [];
+  if (!sections.length) {
+    const err = new Error('At least one question set is required.');
+    err.code = 'VALIDATION';
+    throw err;
+  }
+
+  const { rows: existingSections } = await client.query(
+    `SELECT section_id FROM exam_sections WHERE exam_id = $1`,
+    [examId],
+  );
+  const { rows: existingQuestions } = await client.query(
+    `SELECT question_id FROM questions WHERE exam_id = $1`,
+    [examId],
+  );
+  const existingSectionIds = new Set(existingSections.map((r) => r.section_id));
+  const existingQuestionIds = new Set(existingQuestions.map((r) => r.question_id));
+  const keptQuestionIds = new Set();
+
+  let orderNum = 0;
+
+  for (let sIdx = 0; sIdx < sections.length; sIdx++) {
+    const sec = sections[sIdx];
+    const parsedSectionId = parsePositiveInt(sec.id);
+    let sectionId = parsedSectionId && existingSectionIds.has(parsedSectionId)
+      ? parsedSectionId
+      : null;
+
+    if (sectionId) {
+      await client.query(
+        `UPDATE exam_sections
+         SET title = $1, description = $2, order_num = $3
+         WHERE section_id = $4 AND exam_id = $5`,
+        [
+          String(sec.title || '').trim() || `Set ${sIdx + 1}`,
+          sec.description?.trim() || null,
+          sIdx + 1,
+          sectionId,
+          examId,
+        ],
+      );
+    } else {
+      const secResult = await client.query(
+        `INSERT INTO exam_sections (exam_id, title, description, order_num)
+         VALUES ($1, $2, $3, $4)
+         RETURNING section_id`,
+        [examId, String(sec.title || '').trim() || `Set ${sIdx + 1}`, sec.description?.trim() || null, sIdx + 1],
+      );
+      sectionId = secResult.rows[0].section_id;
+      existingSectionIds.add(sectionId);
+    }
+
+    for (const q of sec.questions || []) {
+      orderNum += 1;
+      const parsedQuestionId = parsePositiveInt(q.id);
+      if (parsedQuestionId && existingQuestionIds.has(parsedQuestionId)) {
+        keptQuestionIds.add(parsedQuestionId);
+        await updateQuestionInPlace(client, examId, sectionId, q, orderNum, parsedQuestionId);
+      } else {
+        await insertQuestionWithChoices(client, examId, sectionId, q, orderNum);
+      }
+    }
+  }
+
+  for (const questionId of existingQuestionIds) {
+    if (keptQuestionIds.has(questionId)) continue;
+    if (await questionHasStudentAnswers(client, questionId)) {
+      const err = new Error('Cannot delete a question that already has student answers.');
+      err.code = 'QUESTION_LOCKED';
+      throw err;
+    }
+    await client.query(`DELETE FROM choices WHERE question_id = $1`, [questionId]);
+    await client.query(`DELETE FROM questions WHERE question_id = $1`, [questionId]);
+  }
+}
+
 export async function insertExamTransaction(
   pool,
   memberId,
@@ -124,12 +371,14 @@ export async function updateExamDraftTransaction(
 ) {
   await ensureExamSectionsSchema();
 
-  let ownerSql = `SELECT e.exam_id FROM exams e
+  const owner = await client.query(
+    `SELECT e.exam_id FROM exams e
      JOIN classes c ON e.class_id = c.class_id
-     WHERE e.exam_id = $1 AND e.class_id = $2 AND c.member_id = $3 AND e.status = 'draft'`;
-  const owner = await client.query(ownerSql, [examId, classId, memberId]);
+     WHERE e.exam_id = $1 AND e.class_id = $2 AND c.member_id = $3 AND e.is_archived = FALSE`,
+    [examId, classId, memberId],
+  );
   if (owner.rowCount === 0) {
-    return false;
+    return { ok: false, code: 'NOT_FOUND' };
   }
 
   const examDescription = payload?.description?.trim() || null;
@@ -159,50 +408,14 @@ export async function updateExamDraftTransaction(
     updateFields,
   );
 
-  await client.query(
-    `DELETE FROM choices
-     WHERE question_id IN (SELECT question_id FROM questions WHERE exam_id = $1)`,
-    [examId],
-  );
-  await client.query(`DELETE FROM questions WHERE exam_id = $1`, [examId]);
-  await client.query(`DELETE FROM exam_sections WHERE exam_id = $1`, [examId]);
-
-  const sections = Array.isArray(payload?.sections) ? payload.sections : null;
-  const flatQuestions = Array.isArray(payload?.questions) ? payload.questions : null;
-
-  let orderNum = 0;
-
-  if (sections?.length) {
-    for (let sIdx = 0; sIdx < sections.length; sIdx++) {
-      const sec = sections[sIdx];
-      const secResult = await client.query(
-        `INSERT INTO exam_sections (exam_id, title, description, order_num)
-         VALUES ($1, $2, $3, $4)
-         RETURNING section_id`,
-        [examId, String(sec.title || '').trim() || `Set ${sIdx + 1}`, sec.description?.trim() || null, sIdx + 1],
-      );
-      const sectionId = secResult.rows[0].section_id;
-      const secQuestions = sec.questions || [];
-      for (const q of secQuestions) {
-        orderNum += 1;
-        await insertQuestionWithChoices(client, examId, sectionId, q, orderNum);
-      }
-    }
-  } else if (flatQuestions?.length) {
-    const secResult = await client.query(
-      `INSERT INTO exam_sections (exam_id, title, description, order_num)
-       VALUES ($1, $2, NULL, 1)
-       RETURNING section_id`,
-      [examId, 'Set 1'],
-    );
-    const sectionId = secResult.rows[0].section_id;
-    for (const q of flatQuestions) {
-      orderNum += 1;
-      await insertQuestionWithChoices(client, examId, sectionId, q, orderNum);
-    }
+  const hasSessions = await examHasStudentSessions(client, examId);
+  if (hasSessions) {
+    await syncExamContentWithSessions(client, examId, payload);
+  } else {
+    await replaceAllExamContent(client, examId, payload);
   }
 
-  return true;
+  return { ok: true };
 }
 
 export async function listTeacherExamsWithClassMetaQuery(memberId) {

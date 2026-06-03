@@ -9,6 +9,7 @@ import {
 import { fetchAdminClasses } from '@/lib/adminClassesApi.js'
 import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
 import FadeIn from '@/components/ui/fade-in.jsx'
+import { useInstitutionTheme } from '@/context/InstitutionThemeContext.jsx'
 import '../../pages/admin-ui/style.css'
 
 const ARCHIVE_KEY = 'acsis_admin_archived_classes'
@@ -86,6 +87,7 @@ function SubjectFormFields({ form, onChange, idPrefix = 'sub' }) {
 }
 
 export default function AdminSubjectsPage() {
+  const { acronym } = useInstitutionTheme()
   const [subjects, setSubjects] = useState([])
   const [archivedIds, setArchivedIds] = useState(() => readArchivedIds())
   const [filterYear, setFilterYear] = useState('')
@@ -216,7 +218,7 @@ export default function AdminSubjectsPage() {
     <div className="acsis-stack">
       <div className="content-header">
         <div className="breadcrumb">
-          <span className="brand-plp">PLP</span>
+          <span className="brand-plp">{acronym || 'PLP'}</span>
           <span className="brand-acsis"> ACSIS</span>
           <span className="sep">/</span>
           <span className="page-name">Subjects</span>

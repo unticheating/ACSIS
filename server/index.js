@@ -20,6 +20,7 @@ import { ensurePasswordResetSchema } from './lib/ensurePasswordResetSchema.js'
 import { ensureCheatEventSchema } from './lib/ensureCheatEventSchema.js'
 import { ensureExamAssignmentSchema } from './lib/ensureExamAssignmentSchema.js'
 import { ensureTeacherActivitySchema } from './lib/ensureTeacherActivitySchema.js'
+import { ensureCheatingLogDismissedColumns } from './lib/ensureCheatingLogDismissedSchema.js'
 
 try {
   if (config.google.clientId && config.google.clientSecret) {
@@ -65,6 +66,7 @@ app.listen(config.port, async () => {
       await ensureCheatEventSchema()
       await ensureExamAssignmentSchema()
       await ensureTeacherActivitySchema()
+      await ensureCheatingLogDismissedColumns()
     } catch (err) {
       console.warn('  Password reset schema check failed:', err.message)
     }

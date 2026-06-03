@@ -57,3 +57,12 @@ export async function fetchTeacherActivityLogs(limit = 50) {
   const res = await apiFetch(`/api/teacher/classes/activity-logs?limit=${encodeURIComponent(limit)}`)
   return parseJson(res)
 }
+
+/** Mark a cheating detection as false positive; reduces student strike count. */
+export async function dismissTeacherViolation(classId, examId, sessionId, logId) {
+  const res = await apiFetch(
+    `/api/teacher/classes/${classId}/exams/${examId}/results/${sessionId}/violations/${logId}/dismiss`,
+    { method: 'POST' },
+  )
+  return parseJson(res)
+}

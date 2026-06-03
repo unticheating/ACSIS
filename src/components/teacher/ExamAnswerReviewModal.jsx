@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { fetchTeacherExamSessionDetail } from '@/lib/teacherExamResultsApi.js'
 import { manualGradeAnswer } from '@/lib/teacherExamGradingApi.js'
 import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
-import { labelForQuestionType } from '@/lib/questionTypes.js'
+import { formatReviewAnswerText, labelForQuestionType } from '@/lib/questionTypes.js'
 import '../../styles/exam-answer-review.css'
 
 function questionTypeShort(type) {
@@ -171,7 +171,13 @@ export default function ExamAnswerReviewModal({
                   : null}
               </p>
               <ul className="exam-review-answer-list">
-                {answers.map((a, idx) => (
+                {answers.map((a, idx) => {
+                  const isIdent = String(a.questionType || '').toLowerCase() === 'identification'
+                  const answerDisplay = formatReviewAnswerText(a.questionType, a.answer)
+                  const keyDisplay = a.expectedAnswer
+                    ? formatReviewAnswerText(a.questionType, a.expectedAnswer)
+                    : null
+                  return (
                   <li key={a.id} className="exam-review-answer-item">
                     <div className="exam-review-answer-head">
                       <span className="exam-review-num">{idx + 1}</span>
@@ -187,12 +193,16 @@ export default function ExamAnswerReviewModal({
                     <p className="exam-review-q-text">{a.questionText}</p>
                     <div className="exam-review-row">
                       <span className="exam-review-k">Answer:</span>
-                      <span className="exam-review-v">{a.answer || '—'}</span>
+                      <span className={`exam-review-v${isIdent ? ' exam-review-v--ident' : ''}`}>
+                        {answerDisplay}
+                      </span>
                     </div>
-                    {a.expectedAnswer ? (
+                    {keyDisplay ? (
                       <div className="exam-review-row muted">
                         <span className="exam-review-k">Key:</span>
-                        <span className="exam-review-v">{a.expectedAnswer}</span>
+                        <span className={`exam-review-v${isIdent ? ' exam-review-v--ident' : ''}`}>
+                          {keyDisplay}
+                        </span>
                       </div>
                     ) : null}
                     <div className="exam-review-actions">
@@ -214,7 +224,8 @@ export default function ExamAnswerReviewModal({
                       </button>
                     </div>
                   </li>
-                ))}
+                  )
+                })}
               </ul>
             </>
           )}

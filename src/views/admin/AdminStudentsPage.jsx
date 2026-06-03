@@ -2,9 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
 import { fetchAdminUsers, formatDateCreated, statusLabel } from '@/lib/adminUsersApi.js'
 import { acsisToastError } from '@/lib/acsisToast.js'
+import { useInstitutionTheme } from '@/context/InstitutionThemeContext.jsx'
 import '../../pages/admin-ui/style.css'
 
 export default function AdminStudentsPage() {
+  const { acronym } = useInstitutionTheme()
   const [students, setStudents] = useState([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
@@ -45,7 +47,7 @@ export default function AdminStudentsPage() {
     <div className="acsis-stack">
       <div className="content-header">
         <div className="breadcrumb">
-          <span className="brand-plp">PLP</span>
+          <span className="brand-plp">{acronym || 'PLP'}</span>
           <span className="brand-acsis"> ACSIS</span>
           <span className="sep">/</span>
           <span className="page-name">Students</span>

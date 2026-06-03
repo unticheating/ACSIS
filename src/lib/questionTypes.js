@@ -49,3 +49,22 @@ export function summarizeQuestionTypes(questions) {
   const labels = uniqueQuestionTypeLabels(questions)
   return labels.length ? labels.join(', ') : '—'
 }
+
+/** Identification answers are stored/compared in uppercase — normalize for display and teacher entry. */
+export function normalizeIdentificationAnswer(text) {
+  if (text == null || text === '') return ''
+  return String(text).trim().toUpperCase()
+}
+
+/**
+ * @param {string | null | undefined} questionType
+ * @param {string | null | undefined} text
+ */
+export function formatReviewAnswerText(questionType, text) {
+  if (text == null || text === '' || text === '—') return '—'
+  const t = String(text)
+  if (String(questionType || '').toLowerCase() === 'identification') {
+    return normalizeIdentificationAnswer(t)
+  }
+  return t
+}

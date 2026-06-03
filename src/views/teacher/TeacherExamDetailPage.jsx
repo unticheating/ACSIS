@@ -477,7 +477,7 @@ export default function TeacherExamDetailPage() {
   const overviewCta = (() => {
     if (draft) {
       return (
-        <div className="acsis-exam-detail__cta-row">
+        <div className="acsis-exam-detail__cta-row acsis-exam-detail__cta-row--inline">
           <button type="button" className="acsis-mc-create-btn" style={{ border: 'none' }} onClick={publish}>
             Publish exam
           </button>
@@ -487,7 +487,7 @@ export default function TeacherExamDetailPage() {
     }
     if (waiting) {
       return (
-        <div className="acsis-exam-detail__cta-row">
+        <div className="acsis-exam-detail__cta-row acsis-exam-detail__cta-row--inline">
           <button
             type="button"
             className="acsis-mc-create-btn"
@@ -515,7 +515,7 @@ export default function TeacherExamDetailPage() {
     }
     if (active) {
       return (
-        <div className="acsis-exam-detail__cta-row">
+        <div className="acsis-exam-detail__cta-row acsis-exam-detail__cta-row--inline">
           <button type="button" className="acsis-btn-ghost" onClick={() => void endExam()}>
             End exam (close for students)
           </button>
@@ -529,7 +529,7 @@ export default function TeacherExamDetailPage() {
     }
     if (closed) {
       return (
-        <div className="acsis-exam-detail__cta-row">
+        <div className="acsis-exam-detail__cta-row acsis-exam-detail__cta-row--inline">
           <button
             type="button"
             className="acsis-mc-create-btn"
@@ -538,7 +538,6 @@ export default function TeacherExamDetailPage() {
           >
             Restart exam
           </button>
-          <p className="acsis-exam-detail__cta-hint">Exam is closed — review results or release scores when ready.</p>
         </div>
       )
     }
@@ -708,13 +707,8 @@ export default function TeacherExamDetailPage() {
               >
                 {overviewDesc}
               </p>
+              {overviewCta ? overviewCta : null}
             </section>
-
-            {overviewCta ? (
-              <section className="acsis-exam-detail__panel-section">
-                <div className="acsis-exam-detail__cta-card">{overviewCta}</div>
-              </section>
-            ) : null}
 
             <section className="acsis-exam-detail__panel-section">
               <div

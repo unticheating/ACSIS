@@ -63,6 +63,11 @@ async function syncSessionLockState(session, examRow, institutionId) {
   if (!session || session.status === 'submitted' || session.locked_at) {
     return session
   }
+  const examStatus = (examRow.status || '').toLowerCase()
+  if (examStatus !== EXAM_STATUS.OPEN) {
+    return session
+  }
+
   const maxWarnings = await getInstitutionMaxWarnings(institutionId)
   if (shouldLockExam(Number(session.warning_count ?? 0), maxWarnings)) {
     const locked = await lockExamSessionQuery(session.session_id, 'max_warnings')

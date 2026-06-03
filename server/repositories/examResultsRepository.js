@@ -1,4 +1,5 @@
 import { getPool } from '../db.js'
+import { ensureCheatingLogDismissedColumns } from '../lib/ensureCheatingLogDismissedSchema.js'
 import { getExamSessionUserColumn } from '../lib/schemaCompat.js'
 import { SQL_JOIN_STUDENTS, SQL_MEMBER_SCHOOL_ID } from '../lib/memberSql.js'
 
@@ -36,6 +37,7 @@ export async function listExamSessionsForExamQuery(classId, examId) {
        u.first_name,
        u.middle_name,
        u.last_name,
+       u.avatar_url,
        (SELECT COUNT(*)::int FROM student_answers sa WHERE sa.session_id = es.session_id) AS "answerCount",
        (SELECT COUNT(*)::int FROM student_answers sa
         WHERE sa.session_id = es.session_id AND sa.manually_checked = FALSE) AS "uncheckedCount",
@@ -65,6 +67,9 @@ export async function listExamSessionsForExamQuery(classId, examId) {
     scoreReleased: Boolean(r.scoreReleased),
     schoolId: r.schoolId || '',
     studentName: formatStudentName(r) || 'Unknown student',
+    firstName: r.first_name || '',
+    lastName: r.last_name || '',
+    avatarUrl: r.avatar_url || null,
     answerCount: Number(r.answerCount || 0),
     uncheckedCount: Number(r.uncheckedCount || 0),
     reviewComplete:
@@ -366,7 +371,8 @@ export async function listClassEnrolledStudentsQuery(classId) {
        ${SQL_MEMBER_SCHOOL_ID} AS "schoolId",
        u.first_name,
        u.middle_name,
-       u.last_name
+       u.last_name,
+       u.avatar_url
      FROM class_enrollments ce
      JOIN institution_members im ON ce.member_id = im.member_id
      ${SQL_JOIN_STUDENTS}
@@ -379,6 +385,9 @@ export async function listClassEnrolledStudentsQuery(classId) {
     memberId: r.memberId,
     schoolId: r.schoolId || '',
     studentName: formatStudentName(r) || 'Unknown student',
+    firstName: r.first_name || '',
+    lastName: r.last_name || '',
+    avatarUrl: r.avatar_url || null,
   }))
 }
 
@@ -404,6 +413,7 @@ export async function listExamsForTeacherReportsQuery(memberId) {
 }
 
 export async function listCheatingLogsForExamQuery(examId) {
+  await ensureCheatingLogDismissedColumns()
   const pool = getPool()
   const memberJoin = await sessionMemberJoin('es', 'im')
   const { rows } = await pool.query(
@@ -413,6 +423,7 @@ export async function listCheatingLogsForExamQuery(examId) {
        cl.event_type::text AS "eventType",
        cl.details,
        cl.occurred_at AS "occurredAt",
+       cl.dismissed_at AS "dismissedAt",
        TRIM(u.first_name || ' ' || COALESCE(u.middle_name || ' ', '') || u.last_name) AS "studentName",
        ${SQL_MEMBER_SCHOOL_ID} AS "schoolId"
      FROM cheating_logs cl
@@ -428,13 +439,15 @@ export async function listCheatingLogsForExamQuery(examId) {
 }
 
 export async function listCheatingLogsForSessionQuery(sessionId) {
+  await ensureCheatingLogDismissedColumns()
   const pool = getPool()
   const { rows } = await pool.query(
     `SELECT
        cl.log_id AS id,
        cl.event_type::text AS "eventType",
        cl.details,
-       cl.occurred_at AS "occurredAt"
+       cl.occurred_at AS "occurredAt",
+       cl.dismissed_at AS "dismissedAt"
      FROM cheating_logs cl
      WHERE cl.session_id = $1
      ORDER BY cl.occurred_at ASC`,
@@ -445,8 +458,85 @@ export async function listCheatingLogsForSessionQuery(sessionId) {
     eventType: r.eventType,
     details: r.details,
     occurredAt: r.occurredAt,
+    dismissedAt: r.dismissedAt,
     label: [r.eventType, r.details].filter(Boolean).join(' — '),
   }))
+}
+
+/** Mark a cheating log as false positive and reduce session warning count by one. */
+export async function dismissCheatingLogQuery(logId, sessionId, teacherMemberId) {
+  await ensureCheatingLogDismissedColumns()
+  const pool = getPool()
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    const { rows: logRows } = await client.query(
+      `SELECT cl.log_id, cl.dismissed_at, es.warning_count, es.locked_at, es.lock_reason, es.status
+       FROM cheating_logs cl
+       JOIN exam_sessions es ON es.session_id = cl.session_id
+       WHERE cl.log_id = $1 AND cl.session_id = $2
+       FOR UPDATE OF es`,
+      [logId, sessionId],
+    )
+    const log = logRows[0]
+    if (!log) {
+      await client.query('ROLLBACK')
+      return { ok: false, code: 'NOT_FOUND' }
+    }
+    if (log.dismissed_at) {
+      await client.query('COMMIT')
+      return {
+        ok: true,
+        alreadyDismissed: true,
+        warningCount: Number(log.warning_count ?? 0),
+        sessionUnlocked: false,
+      }
+    }
+
+    await client.query(
+      `UPDATE cheating_logs
+       SET dismissed_at = NOW(), dismissed_by_member_id = $2
+       WHERE log_id = $1`,
+      [logId, teacherMemberId],
+    )
+
+    const { rows: sessionRows } = await client.query(
+      `UPDATE exam_sessions
+       SET warning_count = GREATEST(0, warning_count - 1)
+       WHERE session_id = $1
+       RETURNING warning_count, locked_at, lock_reason, status`,
+      [sessionId],
+    )
+    const session = sessionRows[0]
+
+    await client.query('COMMIT')
+    return {
+      ok: true,
+      warningCount: Number(session?.warning_count ?? 0),
+      lockedAt: session?.locked_at ?? null,
+      lockReason: session?.lock_reason ?? null,
+      sessionStatus: session?.status ?? null,
+    }
+  } catch (err) {
+    await client.query('ROLLBACK')
+    throw err
+  } finally {
+    client.release()
+  }
+}
+
+export async function getCheatingLogForTeacherDismissQuery(logId, classId, examId) {
+  await ensureCheatingLogDismissedColumns()
+  const pool = getPool()
+  const { rows } = await pool.query(
+    `SELECT cl.log_id AS id, cl.session_id AS "sessionId", cl.dismissed_at AS "dismissedAt"
+     FROM cheating_logs cl
+     JOIN exam_sessions es ON es.session_id = cl.session_id
+     JOIN exams e ON e.exam_id = es.exam_id
+     WHERE cl.log_id = $1 AND e.exam_id = $2 AND e.class_id = $3`,
+    [logId, examId, classId],
+  )
+  return rows[0] || null
 }
 
 export async function getExamSubmissionStatsQuery(examId) {

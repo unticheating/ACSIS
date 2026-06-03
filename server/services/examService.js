@@ -97,7 +97,7 @@ export async function updateExamDraftService(memberId, classId, examId, payload)
       ? String(payload.password).trim().toUpperCase()
       : undefined;
 
-    const success = await updateExamDraftTransaction(
+    const result = await updateExamDraftTransaction(
       client,
       memberId,
       classId,
@@ -118,9 +118,16 @@ export async function updateExamDraftService(memberId, classId, examId, payload)
       },
     );
 
-    if (!success) {
+    if (!result.ok) {
       await client.query('ROLLBACK');
-      return { ok: false, status: 404, error: 'Exam not found, not a draft, or permission denied.' };
+      const messages = {
+        NOT_FOUND: 'Exam not found or you do not have permission to edit it.',
+      };
+      return {
+        ok: false,
+        status: 404,
+        error: messages[result.code] || 'Could not update exam.',
+      };
     }
 
     await client.query('COMMIT');
@@ -128,6 +135,12 @@ export async function updateExamDraftService(memberId, classId, examId, payload)
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('[examService.updateExamDraft]', err);
+    if (err?.code === 'QUESTION_LOCKED') {
+      return { ok: false, status: 409, error: err.message };
+    }
+    if (err?.code === 'VALIDATION') {
+      return { ok: false, status: 400, error: err.message };
+    }
     return { ok: false, status: 500, error: 'Database transaction failed.' };
   } finally {
     client.release();

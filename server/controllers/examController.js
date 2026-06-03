@@ -28,6 +28,7 @@ import {
   getTeacherActivityLogsService,
   getTeacherExamAssignmentRosterService,
   getTeacherExamResultsService,
+  dismissTeacherViolationService,
   getTeacherExamSessionDetailService,
   getTeacherMonitoringSnapshotService,
   listTeacherReportExamsService,
@@ -507,6 +508,21 @@ export async function getTeacherExamResults(req, res) {
 export async function getTeacherExamSessionDetail(req, res) {
   const { classId, examId, sessionId } = req.params;
   const result = await getTeacherExamSessionDetailService(classId, examId, sessionId);
+  if (!result.ok) {
+    return res.status(result.status || 500).json({ error: result.error });
+  }
+  return res.json(result);
+}
+
+export async function dismissTeacherViolation(req, res) {
+  const { classId, examId, sessionId, logId } = req.params;
+  const result = await dismissTeacherViolationService(
+    classId,
+    examId,
+    sessionId,
+    logId,
+    req.memberId,
+  );
   if (!result.ok) {
     return res.status(result.status || 500).json({ error: result.error });
   }

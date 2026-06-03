@@ -3,9 +3,11 @@ import { fetchAdminReports, reportTypeLabel } from '@/lib/adminReportsApi.js'
 import { formatDateCreated } from '@/lib/adminUsersApi.js'
 import { acsisToastError } from '@/lib/acsisToast.js'
 import FadeIn from '@/components/ui/fade-in.jsx'
+import { useInstitutionTheme } from '@/context/InstitutionThemeContext.jsx'
 import '../../pages/admin-ui/style.css'
 
 export default function AdminReportsPage() {
+  const { acronym } = useInstitutionTheme()
   const [reports, setReports] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -34,7 +36,7 @@ export default function AdminReportsPage() {
     <div className="acsis-stack">
       <div className="content-header">
         <div className="breadcrumb">
-          <span className="brand-plp">PLP</span>
+          <span className="brand-plp">{acronym || 'PLP'}</span>
           <span className="brand-acsis"> ACSIS</span>
           <span className="sep">/</span>
           <span className="page-name">Reports</span>

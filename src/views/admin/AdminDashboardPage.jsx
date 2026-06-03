@@ -6,9 +6,11 @@ import { issueViolationTicket } from '@/lib/adminViolationsApi.js'
 import FadeIn from '@/components/ui/fade-in.jsx'
 import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
 import { useAcsisConfirm } from '@/hooks/useAcsisConfirm.jsx'
+import { useInstitutionTheme } from '@/context/InstitutionThemeContext.jsx'
 import '../../pages/admin-ui/style.css'
 
 export default function AdminDashboardPage({ basePath = '/admin' }) {
+  const { acronym } = useInstitutionTheme()
   const { confirm, ConfirmDialog } = useAcsisConfirm()
   const [stats, setStats] = useState({ ongoingExams: 0, totalExams: 0, detectedStudents: 0 })
   const [ongoingExams, setOngoingExams] = useState([])
@@ -69,7 +71,7 @@ export default function AdminDashboardPage({ basePath = '/admin' }) {
     <div className="acsis-stack">
       <div className="content-header">
         <div className="breadcrumb">
-          <span className="brand-plp">PLP</span>
+          <span className="brand-plp">{acronym || 'PLP'}</span>
           <span className="brand-acsis"> ACSIS</span>
           <span className="sep">/</span>
           <span className="page-name">Dashboard</span>

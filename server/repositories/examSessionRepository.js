@@ -418,7 +418,7 @@ export async function unlockExamSessionsQuery(examId) {
   await pool.query(
     `UPDATE exam_sessions
      SET locked_at = NULL, lock_reason = NULL
-     WHERE exam_id = $1 AND status = 'in_progress'`,
+     WHERE exam_id = $1 AND status <> 'submitted'`,
     [examId]
   )
 }

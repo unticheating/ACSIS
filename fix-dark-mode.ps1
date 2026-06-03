@@ -1,0 +1,18 @@
+$f = 'c:\xampp\htdocs\ACSIS\src\pages\admin-ui\style.css'
+$c = [System.IO.File]::ReadAllText($f)
+$c = $c.Replace('background: #ffffff;', 'background: var(--bg-surface, #ffffff);')
+$c = $c.Replace('background: #fff;', 'background: var(--bg-surface, #fff);')
+$c = $c.Replace('color: #374151;', 'color: var(--fg-muted, #374151);')
+$c = $c.Replace('color: #7a9585;', 'color: var(--fg-muted, #7a9585);')
+$c = $c.Replace('color: #6b7280;', 'color: var(--fg-muted, #6b7280);')
+$c = $c.Replace('color: #111827;', 'color: var(--fg-default, #111827);')
+$c = $c.Replace('border: 1px solid #e4ede8;', 'border: 1px solid var(--border-default, #e4ede8);')
+$c = $c.Replace('border-bottom: 1px solid #e4ede8;', 'border-bottom: 1px solid var(--border-default, #e4ede8);')
+$c = $c.Replace('border-top: 1px solid #e4ede8;', 'border-top: 1px solid var(--border-default, #e4ede8);')
+$c = $c.Replace('border-color: #e4ede8;', 'border-color: var(--border-default, #e4ede8);')
+$c = $c.Replace('background: #f8faf9;', 'background: var(--bg-muted, #f8faf9);')
+$c = $c.Replace('background: #f5f8f6;', 'background: var(--bg-muted, #f5f8f6);')
+$c = $c.Replace('background: #f0f6f2;', 'background: var(--bg-muted, #f0f6f2);')
+$c = $c.Replace('border: 1px solid #f0f6f2;', 'border: 1px solid var(--border-subtle, #f0f6f2);')
+[System.IO.File]::WriteAllText($f, $c)
+Write-Host "Done"

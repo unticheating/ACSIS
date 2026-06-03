@@ -23,6 +23,7 @@ import {
   getTeacherExamResults,
   getTeacherExamAssignments,
   updateTeacherExamAssignments,
+  dismissTeacherViolation,
   getTeacherExamSessionDetail,
   getTeacherActiveMonitoring,
   getTeacherActivityLogs,
@@ -69,6 +70,10 @@ router.get('/:classId/exams/:examId/results', getTeacherExamResults);
 router.get('/:classId/exams/:examId/monitoring', getTeacherMonitoringSnapshot);
 router.get('/:classId/exams/:examId/monitoring/stream', streamTeacherMonitoringSnapshot);
 router.get('/:classId/exams/:examId/results/:sessionId', getTeacherExamSessionDetail);
+router.post(
+  '/:classId/exams/:examId/results/:sessionId/violations/:logId/dismiss',
+  dismissTeacherViolation,
+);
 router.patch(
   '/:classId/exams/:examId/results/:sessionId/answers/:answerId/grade',
   patchManualGrade,

@@ -1102,3 +1102,34 @@ html.dark [data-state='open'].bg-popover {
   border-color: var(--border-default, #2a2a2a) !important;
   color: var(--fg-default, #f5f5f5);
 }
+
+/* ── Ticket Slip (ViolationDetailModal) ── */
+html.dark .ticket-note {
+  background: var(--ticket-note-bg, rgba(251, 191, 36, 0.1)) !important;
+  border-color: var(--border-default, #422006) !important;
+}
+
+html.dark .ticket-note__title {
+  color: var(--ticket-note-title, #fcd34d) !important;
+}
+
+html.dark .ticket-note__text {
+  color: var(--ticket-note-text, #fef3c7) !important;
+}
+
+html.dark .ticket-header {
+  border-bottom-color: var(--border-muted, #374151) !important;
+}
+
+html.dark .ticket-footer {
+  border-top-color: var(--border-muted, #374151) !important;
+}
+
+html.dark .ticket-attempt {
+  background: var(--bg-elevated, #212121) !important;
+  border-color: var(--border-default, #374151) !important;
+}
+
+html.dark .ticket-field {
+  border-bottom-color: var(--border-muted, #374151) !important;
+}

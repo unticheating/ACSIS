@@ -295,6 +295,15 @@
   margin-bottom: 22px;
 }
 
+/* Max warnings: blur question body; student uses Send exam in footer */
+.acsis-student-exam .exam-strike-lock-blur {
+  filter: blur(7px);
+  opacity: 0.45;
+  pointer-events: none;
+  user-select: none;
+  transition: filter 0.25s ease, opacity 0.25s ease;
+}
+
 .acsis-student-exam .question-box {
   width: 100%;
   background: var(--exam-question-box);

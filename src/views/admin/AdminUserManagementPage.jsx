@@ -21,6 +21,7 @@ import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
 import { useAcsisConfirm } from '@/hooks/useAcsisConfirm.jsx'
 import FadeIn from '@/components/ui/fade-in.jsx'
 import UserDetailsModal from '@/views/admin/UserDetailsModal.jsx'
+import { useInstitutionTheme } from '@/context/InstitutionThemeContext.jsx'
 import '../../pages/admin-ui/style.css'
 
 const TABS = [
@@ -42,6 +43,7 @@ const emptyForm = {
 }
 
 export default function AdminUserManagementPage() {
+  const { acronym } = useInstitutionTheme()
   const { confirm, ConfirmDialog } = useAcsisConfirm()
   const [activeTab, setActiveTab] = useState('all')
   const [search, setSearch] = useState('')
@@ -327,7 +329,7 @@ export default function AdminUserManagementPage() {
     <div className="acsis-stack">
       <div className="content-header">
         <div className="breadcrumb">
-          <span className="brand-plp">PLP</span>
+          <span className="brand-plp">{acronym || 'PLP'}</span>
           <span className="brand-acsis"> ACSIS</span>
           <span className="sep">/</span>
           <span className="page-name">User management</span>

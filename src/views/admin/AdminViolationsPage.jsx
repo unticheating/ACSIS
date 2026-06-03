@@ -8,9 +8,32 @@ import {
 } from '@/lib/adminViolationsApi.js'
 import { acsisToastError } from '@/lib/acsisToast.js'
 import FadeIn from '@/components/ui/fade-in.jsx'
+import { Download } from 'lucide-react'
+import { useInstitutionTheme } from '@/context/InstitutionThemeContext.jsx'
+import ViolationDetailModal from '@/views/admin/ViolationDetailModal.jsx'
 import '../../pages/admin-ui/style.css'
 
+function exportViolationsCsv(violations) {
+  const headers = ['Student', 'Exam', 'Date', 'Strikes', 'Status']
+  const rows = violations.map(v => [
+    `"${v.student}"`,
+    `"${v.exam}"`,
+    `"${formatViolationDate(v.date)}"`,
+    v.strikes,
+    `"${v.status}"`
+  ])
+  const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
+  const encodedUri = encodeURI(csvContent)
+  const link = document.createElement('a')
+  link.setAttribute('href', encodedUri)
+  link.setAttribute('download', `ticketed-violations-${new Date().toISOString().split('T')[0]}.csv`)
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+}
+
 export default function AdminViolationsPage() {
+  const { acronym } = useInstitutionTheme()
   const [violations, setViolations] = useState([])
   const [count, setCount] = useState(0)
   const [maxWarnings, setMaxWarnings] = useState(3)
@@ -27,8 +50,10 @@ export default function AdminViolationsPage() {
     setError(null)
     try {
       const data = await fetchAdminViolations()
-      setViolations(data.violations || [])
-      setCount(data.count ?? data.violations?.length ?? 0)
+      // Filter for ticketed violations
+      const ticketedViolations = (data.violations || []).filter(v => v.status && v.status.toLowerCase() === 'ticketed')
+      setViolations(ticketedViolations)
+      setCount(ticketedViolations.length)
       setMaxWarnings(data.maxWarnings ?? 3)
     } catch (err) {
       setViolations([])
@@ -72,10 +97,10 @@ export default function AdminViolationsPage() {
     <div className="acsis-stack">
       <div className="content-header">
         <div className="breadcrumb">
-          <span className="brand-plp">PLP</span>
+          <span className="brand-plp">{acronym || 'PLP'}</span>
           <span className="brand-acsis"> ACSIS</span>
           <span className="sep">/</span>
-          <span className="page-name">Violation records</span>
+          <span className="page-name">Ticketed records</span>
         </div>
       </div>
 
@@ -87,144 +112,74 @@ export default function AdminViolationsPage() {
         ) : null}
 
         <FadeIn delay={0.1} className="panel">
-          <div className="panel-header">
+          <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span className="panel-title">
-              All violations
+              Ticketed violations
               <span className="violation-count">({loading ? '…' : count})</span>
             </span>
+            <button 
+              type="button" 
+              className="btn btn--outline" 
+              onClick={() => exportViolationsCsv(violations)}
+              disabled={loading || violations.length === 0}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', padding: '6px 12px' }}
+            >
+              <Download size={14} />
+              Export CSV
+            </button>
           </div>
 
           {loading ? (
             <p className="um-loading">Loading violation records…</p>
           ) : violations.length === 0 ? (
-            <p className="admin-placeholder-lead">No proctoring violations recorded yet.</p>
+            <p className="admin-placeholder-lead">No ticketed violations recorded yet.</p>
           ) : (
-            <div className="violation-list">
-              {violations.map((v, index) => (
-                <FadeIn key={v.id} delay={0.15 + (index * 0.05)} className="violation-item">
-                  <div className="violation-left">
-                    <div className="strikes-badge">
-                      <span className="strikes-count">{v.strikes}</span>
-                      <span className="strikes-label">strikes</span>
-                    </div>
-                    <div className="violation-info">
-                      <div className="violation-name">{v.student}</div>
-                      <div className="violation-sub">
-                        {v.exam} · {formatViolationDate(v.date)}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="violation-right">
-                    <span className={`violation-status-badge vstatus-${violationStatusClass(v.status)}`}>
-                      {v.status}
-                    </span>
-                    <button type="button" className="view-btn" onClick={() => viewViolation(v.id)}>
-                      View
-                    </button>
-                  </div>
-                </FadeIn>
-              ))}
+            <div className="admin-table-container">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Strikes</th>
+                    <th>Student</th>
+                    <th>Exam</th>
+                    <th>Date</th>
+                    <th>Status</th>
+                    <th style={{ textAlign: 'right' }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {violations.map((v, index) => (
+                    <FadeIn key={v.id} as="tr" delay={0.15 + (index * 0.05)}>
+                      <td style={{ fontWeight: 600, color: 'var(--acsis-alert, #ef4444)' }}>{v.strikes}</td>
+                      <td style={{ fontWeight: 500 }}>{v.student}</td>
+                      <td>{v.exam}</td>
+                      <td>{formatViolationDate(v.date)}</td>
+                      <td>
+                        <span className={`violation-status-badge vstatus-${violationStatusClass(v.status)}`}>
+                          {v.status}
+                        </span>
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        <button type="button" className="view-btn" onClick={() => viewViolation(v.id)}>
+                          View Receipt
+                        </button>
+                      </td>
+                    </FadeIn>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </FadeIn>
       </div>
 
-      {detailOpen ? (
-        <div
-          className="admin-violation-modal-backdrop"
-          role="presentation"
-          onClick={closeDetail}
-          onKeyDown={(e) => e.key === 'Escape' && closeDetail()}
-        >
-          <div
-            className="admin-violation-modal panel"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="violation-detail-title"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span id="violation-detail-title" className="panel-title">
-                Proctoring detail
-              </span>
-              <button type="button" className="view-btn" onClick={closeDetail}>
-                Close
-              </button>
-            </div>
-
-            {detailLoading ? (
-              <p className="um-loading">Loading session…</p>
-            ) : detailError ? (
-              <p className="um-banner-error" role="alert">
-                {detailError}
-              </p>
-            ) : detail ? (
-              <div className="admin-violation-detail">
-                <dl className="admin-violation-detail__grid">
-                  <div>
-                    <dt>Student</dt>
-                    <dd>
-                      {detail.student}
-                      {detail.schoolId ? (
-                        <span className="admin-violation-detail__muted"> · ID {detail.schoolId}</span>
-                      ) : null}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Exam</dt>
-                    <dd>
-                      {detail.exam} ({detail.examStatus})
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Class</dt>
-                    <dd>{detail.className}</dd>
-                  </div>
-                  <div>
-                    <dt>Session</dt>
-                    <dd>
-                      {detail.sessionStatus} · {detail.strikes} / {maxWarnings} strikes
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Started</dt>
-                    <dd>{formatViolationDateTime(detail.startedAt)}</dd>
-                  </div>
-                  <div>
-                    <dt>Submitted</dt>
-                    <dd>{formatViolationDateTime(detail.submittedAt)}</dd>
-                  </div>
-                  {detail.percentage != null ? (
-                    <div>
-                      <dt>Score</dt>
-                      <dd>
-                        {detail.percentage}% ({detail.rawScore}/{detail.totalPoints})
-                      </dd>
-                    </div>
-                  ) : null}
-                </dl>
-
-                <h3 className="admin-violation-detail__logs-title">Activity log</h3>
-                {detail.logs?.length === 0 ? (
-                  <p className="admin-placeholder-lead">No individual cheat events logged (warnings may be from session count only).</p>
-                ) : (
-                  <ul className="admin-violation-log-list">
-                    {detail.logs.map((log) => (
-                      <li key={log.id} className="admin-violation-log-item">
-                        <span className="admin-violation-log-item__event">{log.label || log.eventType}</span>
-                        {log.details ? (
-                          <span className="admin-violation-log-item__details">{log.details}</span>
-                        ) : null}
-                        <span className="admin-violation-log-item__time">{formatViolationDateTime(log.occurredAt)}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
+      <ViolationDetailModal
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        loading={detailLoading}
+        error={detailError}
+        detail={detail}
+        maxWarnings={maxWarnings}
+      />
     </div>
   )
 }

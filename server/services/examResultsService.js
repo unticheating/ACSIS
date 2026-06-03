@@ -1,8 +1,9 @@
-import { getClassByIdQuery } from '../repositories/classRepository.js'
-import { getTeacherClassByIdQuery } from '../repositories/classRepository.js'
+import { getClassByIdQuery, getTeacherClassByIdQuery } from '../repositories/classRepository.js'
 import {
   closeOtherTeacherOngoingExamsQuery,
   computeExamRanksQuery,
+  dismissCheatingLogQuery,
+  getCheatingLogForTeacherDismissQuery,
   getExamSubmissionStatsQuery,
   getTeacherActiveMonitoringExamQuery,
   getTopRankedSessionQuery,
@@ -22,7 +23,12 @@ import {
   listTeacherExamAssignmentRosterQuery,
   replaceExamAssignmentsQuery,
 } from '../repositories/examAssignmentRepository.js'
+import { getPool } from '../db.js'
 import { getExamForJoinQuery } from '../repositories/examSessionRepository.js'
+import { ensureExamSessionLockedColumns } from '../lib/ensureExamSessionLockedSchema.js'
+import { getInstitutionMaxWarnings } from '../repositories/adminRepository.js'
+import { shouldLockExam } from '../lib/examSessionRules.js'
+import { notifyMonitoringUpdate } from '../lib/monitoringBroadcast.js'
 import { EXAM_STATUS } from '../lib/examStatus.js'
 
 function mapMonitoringExamMeta(examRow) {
@@ -50,6 +56,9 @@ function buildMonitoringRoster(enrolled, sessions) {
       return {
         memberId: student.memberId,
         studentName: student.studentName,
+        firstName: student.firstName || '',
+        lastName: student.lastName || '',
+        avatarUrl: student.avatarUrl || null,
         schoolId: student.schoolId,
         sessionId: null,
         status: null,
@@ -60,6 +69,9 @@ function buildMonitoringRoster(enrolled, sessions) {
     return {
       memberId: student.memberId,
       studentName: sess.studentName || student.studentName,
+      firstName: sess.firstName || student.firstName || '',
+      lastName: sess.lastName || student.lastName || '',
+      avatarUrl: sess.avatarUrl || student.avatarUrl || null,
       schoolId: sess.schoolId || student.schoolId,
       sessionId: sess.sessionId,
       status: sess.status,
@@ -147,6 +159,7 @@ export async function getTeacherMonitoringSnapshotService(classId, examId, _teac
         eventType: v.eventType,
         details: v.details,
         occurredAt: v.occurredAt,
+        dismissedAt: v.dismissedAt,
         studentName: v.studentName,
         schoolId: v.schoolId,
       })),
@@ -202,6 +215,7 @@ export async function getTeacherExamResultsService(classId, examId, teacherMembe
         eventType: v.eventType,
         details: v.details,
         occurredAt: v.occurredAt,
+        dismissedAt: v.dismissedAt,
         studentName: v.studentName,
         schoolId: v.schoolId,
       })),
@@ -209,6 +223,69 @@ export async function getTeacherExamResultsService(classId, examId, teacherMembe
   } catch (err) {
     console.error('[examResultsService.getTeacherExamResults]', err)
     return { ok: false, status: 500, error: 'Failed to load exam results.' }
+  }
+}
+
+export async function dismissTeacherViolationService(
+  classId,
+  examId,
+  sessionId,
+  logId,
+  teacherMemberId,
+) {
+  try {
+    const cls = await getTeacherClassByIdQuery(classId, teacherMemberId)
+    if (!cls) {
+      return { ok: false, status: 404, error: 'Class not found.' }
+    }
+
+    const exam = await getExamForJoinQuery(classId, examId)
+    if (!exam) {
+      return { ok: false, status: 404, error: 'Exam not found.' }
+    }
+
+    const log = await getCheatingLogForTeacherDismissQuery(logId, classId, examId)
+    if (!log || Number(log.sessionId) !== Number(sessionId)) {
+      return { ok: false, status: 404, error: 'Violation not found.' }
+    }
+
+    const result = await dismissCheatingLogQuery(logId, sessionId, teacherMemberId)
+    if (!result.ok) {
+      return { ok: false, status: 404, error: 'Violation not found.' }
+    }
+
+    const maxWarnings = await getInstitutionMaxWarnings(exam.institution_id)
+    let sessionUnlocked = false
+    if (
+      result.lockReason === 'max_warnings' &&
+      result.lockedAt &&
+      result.sessionStatus === 'in_progress' &&
+      !shouldLockExam(result.warningCount, maxWarnings)
+    ) {
+      await ensureExamSessionLockedColumns()
+      const pool = getPool()
+      const { rows } = await pool.query(
+        `UPDATE exam_sessions
+         SET locked_at = NULL, lock_reason = NULL
+         WHERE session_id = $1 AND status = 'in_progress'
+         RETURNING session_id`,
+        [sessionId],
+      )
+      sessionUnlocked = rows.length > 0
+    }
+
+    notifyMonitoringUpdate(classId, examId)
+
+    return {
+      ok: true,
+      warningCount: result.warningCount,
+      maxWarnings,
+      sessionUnlocked,
+      alreadyDismissed: Boolean(result.alreadyDismissed),
+    }
+  } catch (err) {
+    console.error('[examResultsService.dismissTeacherViolation]', err)
+    return { ok: false, status: 500, error: 'Failed to dismiss violation.' }
   }
 }
 
