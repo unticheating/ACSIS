@@ -7,6 +7,7 @@ import LoginPage from './views/LoginPage.jsx'
 import ChangePasswordPage from './views/ChangePasswordPage.jsx'
 import VerifyEmailPage from './views/VerifyEmailPage.jsx'
 import PostOnboardingModal from './components/auth/PostOnboardingModal.jsx'
+import AuthRedirectToastListener from './components/auth/AuthRedirectToastListener.jsx'
 import { useSession } from './context/SessionContext.jsx'
 
 const AdminLayout = lazy(() => import('./layouts/AdminLayout.jsx'))
@@ -15,14 +16,12 @@ const SuperAdminLayout = lazy(() => import('./layouts/SuperAdminLayout.jsx'))
 const TeacherLayout = lazy(() => import('./layouts/TeacherLayout.jsx'))
 
 const AdminDashboardPage = lazy(() => import('./views/admin/AdminDashboardPage.jsx'))
-const AdminExaminationsPage = lazy(() => import('./views/admin/AdminExaminationsPage.jsx'))
 const AdminPlaceholderPage = lazy(() => import('./views/admin/AdminPlaceholderPage.jsx'))
 const AdminUserManagementPage = lazy(() => import('./views/admin/AdminUserManagementPage.jsx'))
 const AdminSettingsPage = lazy(() => import('./views/admin/AdminSettingsPage.jsx'))
 const AdminViolationsPage = lazy(() => import('./views/admin/AdminViolationsPage.jsx'))
 const AdminMonitoringPage = lazy(() => import('./views/admin/AdminMonitoringPage.jsx'))
 const AdminReportsPage = lazy(() => import('./views/admin/AdminReportsPage.jsx'))
-const AdminSubjectsPage = lazy(() => import('./views/admin/AdminSubjectsPage.jsx'))
 const DevPortalsPage = lazy(() => import('./views/DevPortalsPage.jsx'))
 
 const StudentClassStreamPage = lazy(() => import('./views/student/StudentClassStreamPage.jsx'))
@@ -56,6 +55,7 @@ export default function App() {
 
   return (
     <>
+    <AuthRedirectToastListener />
     {showOnboarding && (
       <PostOnboardingModal
         authUser={authUser}
@@ -141,9 +141,9 @@ export default function App() {
       >
         <Route index element={<AdminDashboardPage />} />
         <Route path="students" element={<AdminPlaceholderPage title="Students" />} />
-        <Route path="subjects" element={<AdminSubjectsPage />} />
-        <Route path="classes" element={<AdminExaminationsPage />} />
-        <Route path="examinations" element={<Navigate to="/admin/classes" replace />} />
+        <Route path="subjects" element={<Navigate to="/admin/monitoring" replace />} />
+        <Route path="classes" element={<Navigate to="/admin/monitoring" replace />} />
+        <Route path="examinations" element={<Navigate to="/admin/monitoring" replace />} />
         <Route path="monitoring" element={<AdminMonitoringPage />} />
         <Route path="violations" element={<AdminViolationsPage />} />
         <Route path="users" element={<AdminUserManagementPage basePath="/admin" />} />

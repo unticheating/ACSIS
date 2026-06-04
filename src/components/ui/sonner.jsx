@@ -5,13 +5,14 @@ export function Toaster() {
   return (
     <Sonner
       position="bottom-center"
+      expand
+      visibleToasts={3}
       offset={24}
       mobileOffset={{ bottom: 16, left: 16, right: 16 }}
       gap={10}
       closeButton
       richColors={false}
       toastOptions={{
-        unstyled: true,
         classNames: {
           toast: 'acsis-toast',
           error: 'acsis-toast acsis-toast--error',

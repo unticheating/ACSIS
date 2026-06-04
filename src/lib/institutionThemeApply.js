@@ -76,6 +76,9 @@ const THEME_CSS_KEYS = [
   '--fg-subtle',
   '--border-default',
   '--border-muted',
+  '--border-subtle',
+  '--bg-muted',
+  '--acsis-alert',
   '--acsis-shell-border',
   '--acsis-shell-border-subtle',
   '--acsis-nav-fg',
@@ -221,6 +224,9 @@ function applyDarkNeutralSurfaces(root, primary) {
   root.style.setProperty('--fg-subtle', n.fgMuted)
   root.style.setProperty('--border-default', n.border)
   root.style.setProperty('--border-muted', n.borderSubtle)
+  root.style.setProperty('--border-subtle', n.borderSubtle)
+  root.style.setProperty('--bg-muted', n.surfaceMuted)
+  root.style.setProperty('--acsis-alert', '#f87171')
   root.style.setProperty('--acsis-shell-border', hexToRgba(primary, 0.22))
   root.style.setProperty('--acsis-shell-border-subtle', hexToRgba(primary, 0.12))
   root.style.setProperty('--acsis-nav-fg', n.fgSecondary)
@@ -254,6 +260,9 @@ function applyLightSurfaces(root, primary, secondary, baseColor) {
   root.style.setProperty('--fg-subtle', '#9ca3af')
   root.style.setProperty('--border-default', '#e5e7eb')
   root.style.setProperty('--border-muted', hexToRgba(primary, 0.14))
+  root.style.setProperty('--border-subtle', '#f1f5f9')
+  root.style.setProperty('--bg-muted', tint(secondary, 0.5))
+  root.style.setProperty('--acsis-alert', '#dc2626')
   root.style.setProperty('--acsis-shell-border', hexToRgba(primary, 0.2))
   root.style.setProperty('--acsis-shell-border-subtle', hexToRgba(primary, 0.1))
   root.style.setProperty('--acsis-nav-fg', '#4b5563')

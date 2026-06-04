@@ -5,6 +5,8 @@ import dotenv from 'dotenv'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 dotenv.config({ path: path.resolve(__dirname, '../.env') })
 
+console.log('DATABASE_URL:', process.env.DATABASE_URL)
+
 function required(name, fallback = undefined) {
   const value = process.env[name] ?? fallback
   if (value === undefined || value === '') {

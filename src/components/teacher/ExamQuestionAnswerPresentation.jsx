@@ -103,4 +103,68 @@ export function buildIdentificationQuestionFields(acceptableRaw, presentationRaw
   }
 }
 
+/** Primary answer text for teacher presentation / flashcard back face. */
+export function presentAnswerTextFromQuestion(question) {
+  const q = question || {}
+  const type = String(q.type || '').toLowerCase()
+
+  if (type === 'identification') {
+    const { presentation } = identificationDisplayFromQuestion(q)
+    return presentation || '—'
+  }
+
+  if (type === 'multiple-choice' || type === 'multiple' || type === 'mcq') {
+    const opts = Array.isArray(q.options) ? q.options : []
+    const correct = q.correctAnswer || opts.find((_, i) => q._choicesMeta?.[i]?.isCorrect) || ''
+    return correct || '—'
+  }
+
+  if (type === 'coding') {
+    return q.correctAnswer || '—'
+  }
+
+  return q.correctAnswer || '—'
+}
+
+/** Optional explanation shown under the answer in presentation mode. */
+export function presentExplanationFromQuestion(question) {
+  return String(question?.answerExplanation || '').trim()
+}
+
+export function isCodingQuestionType(type) {
+  return String(type || '').toLowerCase() === 'coding'
+}
+
+export function isMultipleChoiceQuestionType(type) {
+  const t = String(type || '').toLowerCase()
+  return t === 'multiple-choice' || t === 'multiple' || t === 'mcq'
+}
+
+export function isTrueFalseQuestionType(type) {
+  const t = String(type || '').toLowerCase()
+  return t === 'truefalse' || t === 'true_false'
+}
+
+/** Choices shown on the presentation card front (MCQ grid or True/False). */
+export function presentChoicesForQuestion(question) {
+  const q = question || {}
+  const type = String(q.type || '').toLowerCase()
+
+  if (isMultipleChoiceQuestionType(type)) {
+    return (Array.isArray(q.options) ? q.options : [])
+      .map((o) => String(o ?? '').trim())
+      .filter(Boolean)
+  }
+
+  if (isTrueFalseQuestionType(type)) {
+    const fromApi = (Array.isArray(q.options) ? q.options : [])
+      .map((o) => String(o ?? '').trim())
+      .filter(Boolean)
+    if (fromApi.length >= 2) return fromApi.slice(0, 2)
+    return ['True', 'False']
+  }
+
+  return []
+}
+
 export { labelForQuestionType, parseIdentificationAnswersList }

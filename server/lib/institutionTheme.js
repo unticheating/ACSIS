@@ -26,8 +26,8 @@ export async function listThemes(pool) {
  */
 export async function getInstitutionSettings(pool, institutionId) {
   const { rows } = await pool.query(
-    `SELECT i.institution_id, i.institution_name, i.acronym, i.logo, i.max_warnings, i.theme_id,
-            t.theme_name, t.primary_color, t.secondary_color, t.base_color
+    `SELECT i.institution_id, i.institution_name, i.acronym, i.logo, i.max_warnings, i.email_domain,
+            i.theme_id, t.theme_name, t.primary_color, t.secondary_color, t.base_color
      FROM institutions i
      JOIN themes t ON t.theme_id = i.theme_id
      WHERE i.institution_id = $1 AND i.is_active = TRUE`,
@@ -41,6 +41,7 @@ export async function getInstitutionSettings(pool, institutionId) {
     acronym: r.acronym,
     logo: r.logo || null,
     maxWarnings: r.max_warnings,
+    emailDomain: r.email_domain || null,
     theme: {
       themeId: r.theme_id,
       themeName: r.theme_name,
@@ -62,7 +63,7 @@ export async function getBrandingForUser(pool, uid, isSuperAdmin) {
   }
 
   const { rows } = await pool.query(
-    `SELECT i.institution_id, i.institution_name, i.acronym, i.logo, i.max_warnings,
+    `SELECT i.institution_id, i.institution_name, i.acronym, i.logo, i.max_warnings, i.email_domain,
             t.theme_id, t.theme_name, t.primary_color, t.secondary_color, t.base_color
      FROM institution_members im
      JOIN institutions i ON i.institution_id = im.institution_id
@@ -84,6 +85,7 @@ function mapBrandingRow(r) {
     acronym: r.acronym,
     logo: r.logo || null,
     maxWarnings: r.max_warnings,
+    emailDomain: r.email_domain || null,
     theme: {
       themeId: r.theme_id,
       themeName: r.theme_name,

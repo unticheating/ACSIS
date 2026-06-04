@@ -1,7 +1,12 @@
 import { Router } from 'express'
 import { config } from '../config.js'
 import { getPool, isDatabaseEnabled } from '../db.js'
-import { isAllowedInstitutionalEmail } from '../lib/emailDomain.js'
+import {
+  formatAllowedDomainsHint,
+  formatGoogleSignInHint,
+  isGoogleSignInEmailAllowed,
+  listRegisteredEmailDomains,
+} from '../lib/institutionEmailDomain.js'
 import {
   canResendVerification,
   createAndSendVerificationCode,
@@ -108,13 +113,29 @@ function recordTeacherLogin(session, details) {
   })
 }
 
-router.get('/google', (_req, res) => {
+router.get('/google', async (_req, res) => {
   if (!config.google.clientId || !config.google.clientSecret) {
     return res.status(503).json({
       error: 'Google OAuth is not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env',
     })
   }
-  res.redirect(getGoogleAuthUrl())
+
+  let hostedDomain = config.allowedEmailDomain
+  const pool = getPool()
+  if (pool) {
+    try {
+      const domains = await listRegisteredEmailDomains(pool)
+      if (domains.length === 1) {
+        hostedDomain = domains[0]
+      } else if (domains.length > 1) {
+        hostedDomain = undefined
+      }
+    } catch (err) {
+      console.error('[auth/google] domain list failed:', err)
+    }
+  }
+
+  res.redirect(getGoogleAuthUrl(hostedDomain))
 })
 
 router.get('/google/callback', async (req, res) => {
@@ -134,11 +155,14 @@ router.get('/google/callback', async (req, res) => {
       return redirectWithError(res, 'email_not_verified')
     }
 
-    if (!isAllowedInstitutionalEmail(profile.email, config.allowedEmailDomain)) {
-      return redirectWithError(res, 'invalid_domain')
+    const pool = getPool()
+    if (pool) {
+      const domainAllowed = await isGoogleSignInEmailAllowed(pool, profile.email)
+      if (!domainAllowed) {
+        return redirectWithError(res, 'invalid_domain')
+      }
     }
 
-    const pool = getPool()
     if (!pool) {
       const session = buildSessionWithoutDatabase(profile)
       setSessionCookie(res, session)
@@ -457,10 +481,22 @@ router.post('/logout', (req, res) => {
   res.json({ ok: true })
 })
 
-router.get('/config', (_req, res) => {
+router.get('/config', async (_req, res) => {
+  let allowedEmailDomains = [config.allowedEmailDomain]
+  const pool = getPool()
+  if (pool) {
+    try {
+      allowedEmailDomains = await listRegisteredEmailDomains(pool)
+    } catch (err) {
+      console.error('[auth/config] domain list failed:', err)
+    }
+  }
   res.json({
     googleEnabled: Boolean(config.google.clientId && config.google.clientSecret),
     allowedEmailDomain: config.allowedEmailDomain,
+    allowedEmailDomains,
+    allowedDomainsHint: formatAllowedDomainsHint(allowedEmailDomains),
+    googleSignInHint: formatGoogleSignInHint(allowedEmailDomains),
     databaseConnected: isDatabaseEnabled(),
     emailVerificationEnabled: isDatabaseEnabled() && config.emailVerificationEnabled,
     smtpConfigured: isSmtpConfigured(),

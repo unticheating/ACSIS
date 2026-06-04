@@ -74,6 +74,10 @@ export async function listDetectedStudentsQuery(institutionId, maxWarnings, limi
     `SELECT
        es.session_id AS "sessionId",
        es.warning_count AS strikes,
+       su.first_name AS "firstName",
+       su.last_name AS "lastName",
+       su.avatar_url AS "avatarUrl",
+       ${SQL_MEMBER_SCHOOL_ID} AS "schoolId",
        TRIM(su.first_name || ' ' || COALESCE(su.middle_name || ' ', '') || su.last_name) AS "studentName",
        e.title AS "examTitle",
        e.exam_id AS "examId",
@@ -97,6 +101,7 @@ export async function listDetectedStudentsQuery(institutionId, maxWarnings, limi
      JOIN exams e ON es.exam_id = e.exam_id
      JOIN classes c ON e.class_id = c.class_id
      JOIN institution_members im ON ${memberJoin}
+     ${SQL_JOIN_STUDENTS}
      JOIN users su ON im.uid = su.uid
      WHERE c.institution_id = $1 AND c.is_active = TRUE AND es.warning_count > 0
      ORDER BY es.warning_count DESC, es.started_at DESC

@@ -1,0 +1,445 @@
+.exam-present-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--acsis-canvas, #0f172a) 55%, transparent);
+  padding: 16px;
+}
+
+.exam-present-overlay:has(.exam-present-shell.is-fullscreen) {
+  padding: 0;
+  background: var(--acsis-canvas, #0f172a);
+}
+
+.exam-present-shell {
+  display: flex;
+  flex-direction: column;
+  width: min(100%, 92vmin);
+  max-height: min(96dvh, 96vmin);
+  background: var(--bg-surface, #fff);
+  border: 1px solid var(--border-default, #e5e7eb);
+  border-radius: 16px;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+  color: var(--fg-default, #111827);
+}
+
+.exam-present-shell.is-fullscreen,
+.exam-present-shell:fullscreen {
+  width: 100%;
+  max-width: none;
+  max-height: none;
+  height: 100%;
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
+}
+
+.exam-present-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border-default, #f3f4f6);
+  flex-shrink: 0;
+}
+
+.exam-present-shell:fullscreen .exam-present-header,
+.exam-present-shell.is-fullscreen .exam-present-header {
+  padding: 14px 24px;
+}
+
+.exam-present-header-text {
+  min-width: 0;
+  flex: 1;
+}
+
+.exam-present-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.exam-present-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--fg-default, #111827);
+}
+
+.exam-present-subtitle {
+  margin: 4px 0 0;
+  font-size: 0.8125rem;
+  color: var(--fg-muted, #6b7280);
+}
+
+.exam-present-close {
+  padding: 8px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--fg-muted, #6b7280);
+  flex-shrink: 0;
+}
+
+.exam-present-close:hover {
+  background: var(--bg-surface-muted, #f3f4f6);
+  color: var(--fg-default, #111827);
+}
+
+.exam-present-stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(16px, 3vmin, 32px);
+  overflow: hidden;
+  background: var(--bg-elevated, #f9fafb);
+}
+
+.exam-present-shell:fullscreen .exam-present-stage,
+.exam-present-shell.is-fullscreen .exam-present-stage {
+  padding: clamp(20px, 4vmin, 48px);
+}
+
+/* Square 1:1 flashcard */
+.exam-present-card {
+  width: min(100%, 72vmin, 720px);
+  aspect-ratio: 1 / 1;
+  max-height: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  perspective: 1400px;
+  font: inherit;
+  color: inherit;
+}
+
+.exam-present-card:focus-visible {
+  outline: 2px solid var(--acsis-brand, #16a34a);
+  outline-offset: 4px;
+  border-radius: 14px;
+}
+
+.exam-present-card-inner {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 1 / 1;
+  transform-style: preserve-3d;
+  transition: transform 0.55s cubic-bezier(0.4, 0.2, 0.2, 1);
+}
+
+.exam-present-card.is-flipped .exam-present-card-inner {
+  transform: rotateY(180deg);
+}
+
+.exam-present-face {
+  grid-area: 1 / 1;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  min-height: 0;
+  height: 100%;
+  padding: clamp(16px, 2.5vmin, 28px);
+  border-radius: 14px;
+  border: 1px solid var(--border-default, #e5e7eb);
+  background: var(--bg-surface, #fff);
+  box-shadow: 0 8px 32px rgba(15, 23, 42, 0.1);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.exam-present-face--front {
+  overflow-y: hidden;
+}
+
+.exam-present-face--back {
+  transform: rotateY(180deg);
+}
+
+.exam-present-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 10px;
+  flex-shrink: 0;
+}
+
+.exam-present-meta__num {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--fg-muted, #6b7280);
+}
+
+.exam-present-meta__type {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--acsis-brand-muted-text, var(--acsis-brand, #334155));
+  background: color-mix(in srgb, var(--acsis-brand, #16a34a) 10%, var(--bg-surface, #fff));
+  border: 1px solid color-mix(in srgb, var(--acsis-brand, #16a34a) 18%, var(--border-default, #e5e7eb));
+}
+
+.exam-present-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  padding: clamp(8px, 2vmin, 20px) clamp(12px, 2vmin, 24px);
+  text-align: center;
+  overflow-y: auto;
+}
+
+.exam-present-body--answer {
+  gap: 8px;
+}
+
+.exam-present-question {
+  margin: 0;
+  width: 100%;
+  max-width: 42ch;
+  font-size: clamp(1.125rem, 3.2vmin, 1.75rem);
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--fg-default, #111827);
+  white-space: pre-wrap;
+  text-align: center;
+}
+
+.exam-present-image {
+  display: block;
+  max-width: min(100%, 280px);
+  max-height: min(28vh, 180px);
+  margin: 12px auto 0;
+  border-radius: 10px;
+  object-fit: contain;
+}
+
+/* MCQ choices in 2×2 grid */
+.exam-present-options {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(6px, 1.2vmin, 10px);
+  flex-shrink: 0;
+  width: 100%;
+}
+
+.exam-present-option {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border-default, #e5e7eb);
+  background: var(--bg-elevated, #f9fafb);
+  font-size: clamp(0.8125rem, 2vmin, 0.9375rem);
+  line-height: 1.35;
+  text-align: center;
+  color: var(--fg-default, #374151);
+  word-break: break-word;
+}
+
+.exam-present-answer-label {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-muted, #6b7280);
+  text-align: center;
+}
+
+.exam-present-answer {
+  margin: 0;
+  width: 100%;
+  max-width: 36ch;
+  font-size: clamp(2rem, 6.5vmin, 3.25rem);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: var(--acsis-brand-muted-text, var(--acsis-brand, #15803d));
+  word-break: break-word;
+  text-align: center;
+}
+
+.exam-present-answer--code {
+  max-width: min(100%, 480px);
+  margin: 0 auto;
+  padding: clamp(12px, 2vmin, 18px);
+  border-radius: 10px;
+  border: 1px solid var(--border-default, #e5e7eb);
+  background: var(--bg-elevated, #0f172a);
+  color: #e2e8f0;
+  font-size: clamp(0.8125rem, 2vmin, 0.9375rem);
+  font-weight: 500;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  text-align: left;
+  overflow-x: auto;
+}
+
+.exam-present-back-scroll {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(12px, 2vmin, 20px);
+  min-height: 0;
+  overflow-y: auto;
+  padding: clamp(4px, 1vmin, 12px) 0;
+  text-align: center;
+}
+
+.exam-present-explanation {
+  flex-shrink: 0;
+  width: 100%;
+  max-width: 40ch;
+  padding-top: clamp(10px, 1.5vmin, 16px);
+  border-top: 1px solid var(--border-default, #e5e7eb);
+  text-align: center;
+}
+
+.exam-present-explanation-label {
+  margin: 0 0 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-muted, #6b7280);
+}
+
+.exam-present-explanation-text {
+  margin: 0 auto;
+  max-width: 48ch;
+  font-size: clamp(0.8125rem, 2vmin, 0.9375rem);
+  line-height: 1.55;
+  color: var(--fg-default, #374151);
+  white-space: pre-wrap;
+}
+
+.exam-present-hint {
+  margin: 0;
+  padding-top: 8px;
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  color: var(--fg-muted, #9ca3af);
+  text-align: center;
+}
+
+.exam-present-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border-default, #f3f4f6);
+  background: var(--bg-surface-muted, #fafafa);
+  flex-shrink: 0;
+}
+
+.exam-present-shell:fullscreen .exam-present-toolbar,
+.exam-present-shell.is-fullscreen .exam-present-toolbar {
+  padding: 14px 24px;
+}
+
+.exam-present-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--border-default, #e5e7eb);
+  border-radius: 999px;
+  background: var(--bg-surface, #fff);
+  color: var(--fg-default, #374151);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.exam-present-icon-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--acsis-brand, #16a34a) 8%, var(--bg-surface, #fff));
+  border-color: color-mix(in srgb, var(--acsis-brand, #16a34a) 24%, var(--border-default, #e5e7eb));
+}
+
+.exam-present-icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.exam-present-counter {
+  min-width: 4.5rem;
+  text-align: center;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--fg-default, #374151);
+}
+
+.exam-present-flip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  padding: 10px 16px;
+  border: 1px solid var(--border-default, #e5e7eb);
+  border-radius: 999px;
+  background: var(--bg-surface, #fff);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--fg-default, #374151);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.exam-present-flip-btn:hover {
+  background: color-mix(in srgb, var(--acsis-brand, #16a34a) 8%, var(--bg-surface, #fff));
+  border-color: color-mix(in srgb, var(--acsis-brand, #16a34a) 24%, var(--border-default, #e5e7eb));
+}
+
+@media (max-width: 520px) {
+  .exam-present-overlay:not(:has(.is-fullscreen)) {
+    padding: 0;
+  }
+
+  .exam-present-shell:not(.is-fullscreen):not(:fullscreen) {
+    width: 100%;
+    max-height: 100dvh;
+    border-radius: 0;
+  }
+
+  .exam-present-options {
+    grid-template-columns: 1fr;
+  }
+
+  .exam-present-flip-btn {
+    margin-left: 0;
+  }
+
+  .exam-present-toolbar {
+    flex-wrap: wrap;
+  }
+}

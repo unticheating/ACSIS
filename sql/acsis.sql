@@ -140,6 +140,7 @@ CREATE TABLE IF NOT EXISTS institutions (
     logo             TEXT         DEFAULT NULL, -- base64 data URI
     theme_id         INT          NOT NULL DEFAULT 1 REFERENCES themes (theme_id),
     max_warnings     SMALLINT     NOT NULL DEFAULT 3,
+    email_domain     VARCHAR(255) DEFAULT NULL,
     is_active        BOOLEAN      NOT NULL DEFAULT TRUE,
     created_by       INT          NOT NULL REFERENCES users (uid),
     created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),

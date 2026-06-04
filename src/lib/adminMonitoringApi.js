@@ -10,8 +10,16 @@ async function parseJson(res) {
   return data
 }
 
-export async function fetchAdminMonitoring() {
-  const res = await apiFetch('/api/admin/monitoring')
+/**
+ * @param {{ activityLimit?: number }} [options]
+ */
+export async function fetchAdminMonitoring(options = {}) {
+  const params = new URLSearchParams()
+  if (options.activityLimit != null) {
+    params.set('activityLimit', String(options.activityLimit))
+  }
+  const qs = params.toString()
+  const res = await apiFetch(`/api/admin/monitoring${qs ? `?${qs}` : ''}`)
   return parseJson(res)
 }
 

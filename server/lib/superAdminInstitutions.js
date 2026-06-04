@@ -2,6 +2,7 @@
  * Platform-wide institution listing for super administrators.
  */
 
+import { normalizeInstitutionEmailDomain } from './institutionEmailDomain.js'
 import { normalizeLogo } from './institutionSettings.js'
 import { createInstitutionUser } from './institutionUsers.js'
 
@@ -9,7 +10,7 @@ const NAME_MAX = 100
 const WARNINGS_MIN = 1
 const WARNINGS_MAX = 20
 
-const INSTITUTION_SELECT = `SELECT i.institution_id, i.institution_name, i.acronym, i.logo, i.is_active,
+const INSTITUTION_SELECT = `SELECT i.institution_id, i.institution_name, i.acronym, i.logo, i.email_domain, i.is_active,
             t.theme_id, t.theme_name, t.primary_color, t.secondary_color, t.base_color
      FROM institutions i
      JOIN themes t ON t.theme_id = i.theme_id`
@@ -21,6 +22,7 @@ function mapInstitutionRow(r) {
     institutionName: r.institution_name,
     acronym: r.acronym,
     logo: r.logo || null,
+    emailDomain: r.email_domain || null,
     isActive: r.is_active,
     theme: {
       themeId: r.theme_id,
@@ -109,12 +111,21 @@ export async function createInstitutionForSuperAdmin(pool, createdByUid, body) {
     return { ok: false, status: 401, error: 'Not authenticated.' }
   }
 
+  let emailDomainValue = null
+  if (body.emailDomain !== undefined && body.emailDomain !== null && body.emailDomain !== '') {
+    const domainResult = normalizeInstitutionEmailDomain(body.emailDomain)
+    if (!domainResult.ok) {
+      return { ok: false, status: 400, error: domainResult.error }
+    }
+    emailDomainValue = domainResult.value
+  }
+
   const insert = await pool.query(
     `INSERT INTO institutions (
-       institution_name, acronym, logo, theme_id, max_warnings, is_active, created_by
-     ) VALUES ($1, $2, $3, $4, $5, TRUE, $6)
+       institution_name, acronym, logo, theme_id, max_warnings, email_domain, is_active, created_by
+     ) VALUES ($1, $2, $3, $4, $5, $6, TRUE, $7)
      RETURNING institution_id`,
-    [name, acronym, logoValue, themeId, maxWarnings, createdByUid],
+    [name, acronym, logoValue, themeId, maxWarnings, emailDomainValue, createdByUid],
   )
 
   const institutionId = insert.rows[0]?.institution_id

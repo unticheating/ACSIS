@@ -13,7 +13,7 @@ html.dark {
   --acsis-nav-fg: #a3a3a3;
   --acsis-nav-icon: #6b7280;
   --acsis-nav-hover-bg: color-mix(in srgb, var(--acsis-brand, #334155) 14%, transparent);
-  --acsis-nav-active-shadow: 0 0 0 1px color-mix(in srgb, var(--acsis-brand, #334155) 38%, transparent);
+  --acsis-nav-active-shadow: 0 0 0 1px color-mix(in srgb, var(--acsis-brand, #334155) 22%, transparent);
 }
 
 html.dark body,
@@ -233,25 +233,7 @@ html.dark .content-body {
   background: transparent;
 }
 
-html.dark .panel {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: var(--acsis-shell-border-subtle, rgba(74, 222, 128, 0.12));
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
-}
-
-html.dark .panel-title,
-html.dark .exam-name,
-html.dark .detected-name {
-  color: #ecfdf5 !important;
-}
-
-html.dark .panel-view-all {
-  color: #9cbcaa;
-}
-
-html.dark .panel-view-all:hover {
-  color: var(--brand-mark, var(--acsis-brand-ring, #86efac));
-}
+/* Panel/list colors — see dark-mode-system.css (neutral charcoal + institution accent) */
 
 html.dark .exam-item {
   border-top-color: rgba(255, 255, 255, 0.08);
@@ -679,19 +661,7 @@ html.dark .stat-card.red {
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
 }
 
-/* Monitoring stat rows */
-html.dark .monitor-stat-card {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: var(--acsis-shell-border-subtle, rgba(74, 222, 128, 0.12));
-}
-
-html.dark .monitor-stat-label {
-  color: #9cbcaa;
-}
-
-html.dark .monitor-stat-value {
-  color: #ecfdf5;
-}
+/* Monitoring stat rows — see dark-mode-system.css */
 
 /* Teacher — my classes */
 html.dark .acsis-mc-title {

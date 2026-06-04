@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import AdminDetectedStudentList from '@/components/admin/AdminDetectedStudentList.jsx'
 import { SummaryStatCard, SummaryStatGrid } from '@/components/dashboard/SummaryStatCard.jsx'
 import { fetchAdminDashboard, formatRelativeTime } from '@/lib/adminDashboardApi.js'
 import { issueViolationTicket } from '@/lib/adminViolationsApi.js'
@@ -15,6 +16,7 @@ export default function AdminDashboardPage({ basePath = '/admin' }) {
   const [stats, setStats] = useState({ ongoingExams: 0, totalExams: 0, detectedStudents: 0 })
   const [ongoingExams, setOngoingExams] = useState([])
   const [detectedStudents, setDetectedStudents] = useState([])
+  const [maxWarnings, setMaxWarnings] = useState(3)
   const [hasMoreOngoing, setHasMoreOngoing] = useState(false)
   const [hasMoreDetected, setHasMoreDetected] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -29,6 +31,7 @@ export default function AdminDashboardPage({ basePath = '/admin' }) {
     try {
       const data = await fetchAdminDashboard()
       setStats(data.stats || {})
+      setMaxWarnings(data.maxWarnings ?? 3)
       setOngoingExams((data.ongoingExams || []).slice(0, previewLimit))
       setDetectedStudents((data.detectedStudents || []).slice(0, previewLimit))
       setHasMoreOngoing(Boolean(data.hasMoreOngoingExams))
@@ -109,7 +112,7 @@ export default function AdminDashboardPage({ basePath = '/admin' }) {
         <FadeIn className="panel" delay={0.4}>
           <div className="panel-header">
             <span className="panel-title">On-Going Examinations</span>
-            <Link to={`${basePath}/classes?view=active`} className="panel-view-all">
+            <Link to={`${basePath}/monitoring`} className="panel-view-all">
               {hasMoreOngoing && stats.ongoingExams > ongoingExams.length
                 ? `View All (${stats.ongoingExams})`
                 : 'View All'}
@@ -147,46 +150,26 @@ export default function AdminDashboardPage({ basePath = '/admin' }) {
         <FadeIn className="panel" delay={0.5}>
           <div className="panel-header">
             <span className="panel-title">Detected Students</span>
-            <Link to={`${basePath}/violations`} className="panel-view-all">
+            <Link to={`${basePath}/monitoring#admin-all-violations`} className="panel-view-all">
               {hasMoreDetected && stats.detectedStudents > detectedStudents.length
                 ? `View All (${stats.detectedStudents})`
                 : 'View All'}
             </Link>
           </div>
-          <div className="detected-list">
-            {loading ? (
-              <p className="um-loading">Loading…</p>
-            ) : detectedStudents.length === 0 ? (
-              <p className="admin-placeholder-lead" style={{ padding: '1rem' }}>
-                No students with proctoring warnings.
-              </p>
-            ) : (
-              detectedStudents.map((student) => (
-                <div key={student.sessionId} className="detected-item">
-                  <div className="detected-info">
-                    <div className="detected-name" title={`${student.strikes} — ${student.studentName}`}>
-                      {student.strikes} — {student.studentName}
-                    </div>
-                    <div className="detected-sub" title={`${student.examTitle} · ${student.subtitle}`}>
-                      {student.examTitle} · {student.subtitle}
-                    </div>
-                  </div>
-                  {student.ticketIssued || student.status === 'ticketed' ? (
-                    <span className="violation-status-badge vstatus-ticketed">Ticketed</span>
-                  ) : (
-                    <button
-                      type="button"
-                      className="view-info-link ticket-btn"
-                      disabled={ticketingId === student.sessionId}
-                      onClick={() => ticketViolation(student.sessionId, false)}
-                    >
-                      {ticketingId === student.sessionId ? 'Issuing…' : 'Issue ticket'}
-                    </button>
-                  )}
-                </div>
-              ))
-            )}
-          </div>
+          {loading ? (
+            <p className="um-loading">Loading…</p>
+          ) : detectedStudents.length === 0 ? (
+            <p className="admin-placeholder-lead" style={{ padding: '1rem' }}>
+              No students with proctoring warnings.
+            </p>
+          ) : (
+            <AdminDetectedStudentList
+              students={detectedStudents}
+              maxWarnings={maxWarnings}
+              ticketingId={ticketingId}
+              onIssueTicket={ticketViolation}
+            />
+          )}
         </FadeIn>
       </div>
       {ConfirmDialog}

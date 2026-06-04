@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Copy, Eye, EyeOff, MoreVertical, Pencil, Play, Radio, Send, Trash2, UsersRound } from 'lucide-react'
+import { Copy, Eye, EyeOff, MoreVertical, Pencil, Play, Presentation, Radio, Send, Trash2, UsersRound } from 'lucide-react'
 import { useTeacherShellBreadcrumbTrail } from '@/context/TeacherShellBreadcrumbContext.jsx'
 import TeacherMcTabs from '@/components/teacher/TeacherMcTabs.jsx'
 import { apiFetch } from '@/lib/apiFetch.js'
@@ -24,6 +24,7 @@ import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
 import { copyToClipboard } from '@/lib/copyToClipboard.js'
 import { labelForQuestionType, summarizeQuestionTypes, uniqueQuestionTypeLabels } from '@/lib/questionTypes.js'
 import ExamQuestionAnswerPresentation from '@/components/teacher/ExamQuestionAnswerPresentation.jsx'
+import ExamQuestionsPresentDialog from '@/components/teacher/ExamQuestionsPresentDialog.jsx'
 import { useAcsisConfirm } from '@/hooks/useAcsisConfirm.jsx'
 import {
   DropdownMenu,
@@ -123,6 +124,7 @@ export default function TeacherExamDetailPage() {
   const [examCodeDraft, setExamCodeDraft] = useState('')
   const [examCodeSaving, setExamCodeSaving] = useState(false)
   const [lobbyModalOpen, setLobbyModalOpen] = useState(false)
+  const [presentOpen, setPresentOpen] = useState(false)
   const { confirm, ConfirmDialog } = useAcsisConfirm()
 
   useEffect(() => {
@@ -794,14 +796,26 @@ export default function TeacherExamDetailPage() {
                   {typeSummary !== '—' ? ` · ${typeSummary}` : ''}
                 </p>
               </div>
-              <Link
-                to={editHref}
-                className="acsis-btn-ghost acsis-exam-detail__questions-edit"
-                style={{ textDecoration: 'none' }}
-              >
-                <Pencil size={16} strokeWidth={2} aria-hidden />
-                Edit questions
-              </Link>
+              <div className="acsis-exam-detail__questions-actions">
+                {exam.questions?.length ? (
+                  <button
+                    type="button"
+                    className="acsis-exam-detail__present-btn"
+                    onClick={() => setPresentOpen(true)}
+                  >
+                    <Presentation size={16} strokeWidth={2} aria-hidden />
+                    Present
+                  </button>
+                ) : null}
+                <Link
+                  to={editHref}
+                  className="acsis-btn-ghost acsis-exam-detail__questions-edit"
+                  style={{ textDecoration: 'none' }}
+                >
+                  <Pencil size={16} strokeWidth={2} aria-hidden />
+                  Edit questions
+                </Link>
+              </div>
             </div>
             {!exam.questions?.length ? (
               <div className="acsis-exam-detail__empty-questions">
@@ -1113,6 +1127,15 @@ export default function TeacherExamDetailPage() {
           </>
         ) : null}
       </FadeIn>
+
+      {presentOpen && exam.questions?.length ? (
+        <ExamQuestionsPresentDialog
+          open={presentOpen}
+          onClose={() => setPresentOpen(false)}
+          examTitle={hit?.title || 'Exam'}
+          questions={exam.questions}
+        />
+      ) : null}
 
       {reviewOpen && results?.sessions ? (
         <ExamAnswerReviewModal

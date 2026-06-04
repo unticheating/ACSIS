@@ -12,9 +12,12 @@ function mapQuestion(q) {
     id: String(q.id),
     type: q.type,
     question: q.question,
+    points: q.points ?? 1,
     options: q.options || [],
     correctAnswer: q.correctAnswer || '',
     imageUrl: q.imageUrl || null,
+    presentationAnswer: q.presentationAnswer ?? null,
+    answerExplanation: q.answerExplanation ?? null,
   }
 }
 

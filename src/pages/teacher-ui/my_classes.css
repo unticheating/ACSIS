@@ -1878,6 +1878,37 @@
   margin: 4px 0 0;
 }
 
+.acsis-exam-detail__questions-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.acsis-exam-detail__present-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border: none;
+  border-radius: 9999px;
+  background: var(--acsis-brand, #16a34a);
+  color: #fff;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.acsis-exam-detail__present-btn:hover {
+  background: color-mix(in srgb, var(--acsis-brand, #16a34a) 88%, #000);
+}
+
+.acsis-exam-detail__present-btn:focus-visible {
+  outline: 2px solid var(--acsis-brand, #16a34a);
+  outline-offset: 2px;
+}
+
 .acsis-exam-detail__questions-edit {
   display: inline-flex;
   align-items: center;

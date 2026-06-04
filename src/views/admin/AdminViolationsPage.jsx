@@ -112,17 +112,16 @@ export default function AdminViolationsPage() {
         ) : null}
 
         <FadeIn delay={0.1} className="panel">
-          <div className="panel-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="panel-header panel-header--split">
             <span className="panel-title">
               Ticketed violations
               <span className="violation-count">({loading ? '…' : count})</span>
             </span>
-            <button 
-              type="button" 
-              className="btn btn--outline" 
+            <button
+              type="button"
+              className="btn btn--outline btn--compact"
               onClick={() => exportViolationsCsv(violations)}
               disabled={loading || violations.length === 0}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px', padding: '6px 12px' }}
             >
               <Download size={14} />
               Export CSV
@@ -143,14 +142,14 @@ export default function AdminViolationsPage() {
                     <th>Exam</th>
                     <th>Date</th>
                     <th>Status</th>
-                    <th style={{ textAlign: 'right' }}>Action</th>
+                    <th className="admin-table__actions">Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {violations.map((v, index) => (
                     <FadeIn key={v.id} as="tr" delay={0.15 + (index * 0.05)}>
-                      <td style={{ fontWeight: 600, color: 'var(--acsis-alert, #ef4444)' }}>{v.strikes}</td>
-                      <td style={{ fontWeight: 500 }}>{v.student}</td>
+                      <td className="admin-table__strikes">{v.strikes}</td>
+                      <td className="admin-table__student">{v.student}</td>
                       <td>{v.exam}</td>
                       <td>{formatViolationDate(v.date)}</td>
                       <td>
@@ -158,7 +157,7 @@ export default function AdminViolationsPage() {
                           {v.status}
                         </span>
                       </td>
-                      <td style={{ textAlign: 'right' }}>
+                      <td className="admin-table__actions">
                         <button type="button" className="view-btn" onClick={() => viewViolation(v.id)}>
                           View Receipt
                         </button>

@@ -721,6 +721,11 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
     margin-bottom: 18px;
 }
 
+.panel-header--split {
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
 .panel-title {
     font-size: 15px;
     font-weight: 600;
@@ -907,6 +912,58 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
     }
 }
 
+/* Admin dashboard — detection-style student rows with issue ticket */
+.acsis-admin-detected-list {
+    max-height: none;
+    padding: 0 0 0.25rem;
+}
+
+.acsis-admin-detected-list__row {
+    list-style: none;
+}
+
+.acsis-admin-detected-list__card {
+    width: 100%;
+    cursor: default;
+}
+
+.acsis-admin-detected-list__card-action {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.65rem 1rem;
+    border-left: 1px solid #e2e8f0;
+    background: #f8fafc;
+    min-width: 6.75rem;
+}
+
+.acsis-detections-list-card--ticketed {
+    border-color: #c4b5fd;
+    background: #f5f3ff;
+}
+
+.acsis-detections-list-card--ticketed:hover {
+    border-color: #a78bfa;
+    box-shadow: 0 4px 14px rgba(91, 33, 182, 0.12);
+}
+
+.acsis-admin-detected-list__card.acsis-detections-list-card--ticketed .acsis-admin-detected-list__card-action {
+    border-left-color: #ddd6fe;
+    background: #ede9fe;
+}
+
+.panel-footer-link {
+    display: flex;
+    justify-content: center;
+    padding: 0.75rem 1rem 1rem;
+    border-top: 1px solid var(--border-subtle, #f0f4f2);
+}
+
+.panel-view-all--footer {
+    font-size: 0.875rem;
+}
+
 /* ========================
    DETECTED STUDENTS LIST
 ======================== */
@@ -1075,6 +1132,35 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
     background: var(--acsis-brand-500, var(--acsis-brand, #16a34a));
     transform: translateY(-1px);
     box-shadow: 0 4px 14px color-mix(in srgb, var(--acsis-brand, #16a34a) 40%, transparent);
+}
+
+.btn--outline {
+    background: transparent;
+    color: var(--fg-default, #1e293b);
+    border: 1px solid var(--border-default, #d1d5db);
+    box-shadow: none;
+}
+
+.btn--outline:hover {
+    background: var(--bg-muted, #f8fafc);
+    border-color: var(--acsis-brand-ring, color-mix(in srgb, var(--acsis-brand) 35%, #d1d5db));
+    color: var(--acsis-brand-muted-text, var(--acsis-brand, #16a34a));
+    transform: none;
+    box-shadow: none;
+}
+
+.btn--outline:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn--compact {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    padding: 6px 12px;
 }
 
 /* ========================
@@ -1861,7 +1947,7 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
 
 .view-btn {
     background: transparent;
-    color: var(--fg-default, #3d5a47);
+    color: var(--fg-default, #1e293b);
     border: 1px solid var(--border-default, #d1d5db);
     border-radius: 7px;
     padding: 6px 16px;
@@ -1874,9 +1960,9 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
 }
 
 .view-btn:hover {
-    background: var(--bg-muted, #f0faf4);
-    border-color: var(--acsis-brand, #16a34a);
-    color: var(--acsis-brand, #16a34a);
+    background: var(--bg-muted, #f8fafc);
+    border-color: var(--acsis-brand-ring, var(--acsis-brand, #16a34a));
+    color: var(--acsis-brand-muted-text, var(--acsis-brand, #16a34a));
 }
 
 /* ========================
@@ -2014,6 +2100,23 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
 
 .admin-table tbody tr:last-child td {
     border-bottom: none;
+}
+
+.admin-table__strikes {
+    font-weight: 600;
+    color: var(--acsis-alert, #dc2626);
+}
+
+.admin-table__student {
+    font-weight: 500;
+}
+
+.admin-table__actions {
+    text-align: right;
+}
+
+.admin-table th.admin-table__actions {
+    text-align: right;
 }
 
 /* ========================

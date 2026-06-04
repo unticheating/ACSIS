@@ -42,6 +42,7 @@ import { releaseExamScoresService } from '../services/examReleaseService.js';
 const choiceSchema = z.string().min(1, 'Option text cannot be empty');
 
 const questionSchema = z.object({
+  id: z.union([z.number().int().positive(), z.string()]).optional(),
   type: z.enum(['multiple', 'multiple-choice', 'identification', 'truefalse', 'coding']),
   question: z.string().min(1, 'Question text cannot be empty'),
   options: z.array(choiceSchema).optional(),
@@ -73,6 +74,7 @@ const questionSchema = z.object({
 });
 
 const sectionSchema = z.object({
+  id: z.union([z.number().int().positive(), z.string()]).optional(),
   title: z.string().optional().default(''),
   description: z.string().optional().default(''),
   questions: z.array(questionSchema).default([]),

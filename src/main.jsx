@@ -17,20 +17,23 @@ import App from './App.jsx'
 import { DOCUMENT_LOGO_SRC } from './config/brandAssets.js'
 import { setDocumentFavicon } from './lib/setDocumentFavicon.js'
 import { Toaster } from './components/ui/sonner.jsx'
+import AuthRedirectToastListener from './components/auth/AuthRedirectToastListener.jsx'
+import { captureAuthRedirectErrorFromUrl } from './lib/authRedirectError.js'
 import { InstitutionThemeProvider } from './context/InstitutionThemeContext.jsx'
 import { SessionProvider } from './context/SessionContext.jsx'
 import { ThemeProvider } from './context/ThemeContext.jsx'
 
 setDocumentFavicon(DOCUMENT_LOGO_SRC)
+captureAuthRedirectErrorFromUrl()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter>
+      <Toaster />
       <ThemeProvider>
         <SessionProvider>
           <InstitutionThemeProvider>
             <App />
-            <Toaster />
           </InstitutionThemeProvider>
         </SessionProvider>
       </ThemeProvider>

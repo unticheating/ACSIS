@@ -43,7 +43,8 @@ const emptyForm = {
 }
 
 export default function AdminUserManagementPage() {
-  const { acronym } = useInstitutionTheme()
+  const { acronym, institution } = useInstitutionTheme()
+  const studentEmailDomain = institution.emailDomain || 'plpasig.edu.ph'
   const { confirm, ConfirmDialog } = useAcsisConfirm()
   const [activeTab, setActiveTab] = useState('all')
   const [search, setSearch] = useState('')
@@ -271,10 +272,27 @@ export default function AdminUserManagementPage() {
         <input
           type="email"
           required
-          placeholder="name@plpasig.edu.ph"
+          placeholder={
+            form.role === 'student'
+              ? `name@${studentEmailDomain}`
+              : 'name@gmail.com or name@school.edu'
+          }
           value={form.email}
           onChange={(e) => patchForm('email', e.target.value)}
         />
+        {form.role === 'student' ? (
+          <span className="um-field-hint">Must use @{studentEmailDomain}</span>
+        ) : form.role === 'admin' ? (
+          <span className="um-field-hint">
+            Institution admins may use school or personal email. They sign in with the address and
+            password you set here (or Google if that same email is on their Google account).
+          </span>
+        ) : (
+          <span className="um-field-hint">
+            Part-time faculty may use personal or school email. They must sign in with the same
+            address you enter here.
+          </span>
+        )}
       </label>
       {!editOpen ? (
         <label>

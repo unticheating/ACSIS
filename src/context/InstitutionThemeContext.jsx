@@ -24,6 +24,7 @@ const defaultInstitution = {
   acronym: '',
   logo: null,
   maxWarnings: 3,
+  emailDomain: null,
 }
 
 /** @param {{ themeId: number, themeName: string, primaryColor: string, secondaryColor: string, baseColor: string }} theme @param {boolean} isDark */
@@ -39,6 +40,7 @@ function institutionFromBranding(branding) {
     acronym: branding.acronym || defaultInstitution.acronym,
     logo: branding.logo ?? null,
     maxWarnings: branding.maxWarnings ?? defaultInstitution.maxWarnings,
+    emailDomain: branding.emailDomain ?? defaultInstitution.emailDomain,
     theme: branding.theme || defaultPalette(),
   }
 }

@@ -1,3 +1,5 @@
+import { normalizeInstitutionEmailDomain } from './institutionEmailDomain.js'
+
 const MAX_LOGO_LENGTH = 900_000
 const NAME_MAX = 100
 const ACRONYM_MAX = 20
@@ -82,6 +84,15 @@ export async function updateInstitutionSettings(pool, institutionId, body) {
     }
     updates.push(`logo = $${paramIdx++}`)
     params.push(logoResult.value)
+  }
+
+  if (body.emailDomain !== undefined) {
+    const domainResult = normalizeInstitutionEmailDomain(body.emailDomain)
+    if (!domainResult.ok) {
+      return { ok: false, status: 400, error: domainResult.error }
+    }
+    updates.push(`email_domain = $${paramIdx++}`)
+    params.push(domainResult.value)
   }
 
   if (updates.length === 0) {

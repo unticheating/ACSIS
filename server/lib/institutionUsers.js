@@ -1,6 +1,8 @@
 import bcrypt from 'bcrypt'
-import { isAllowedInstitutionalEmail } from './emailDomain.js'
-import { config } from '../config.js'
+import {
+  getInstitutionEmailDomain,
+  validateUserEmailForRole,
+} from './institutionEmailDomain.js'
 import { SQL_JOIN_STUDENTS, SQL_MEMBER_SCHOOL_ID } from './memberSql.js'
 import { ensureStudentRow, upsertStudentNumber } from './studentProfile.js'
 
@@ -106,8 +108,10 @@ export async function createInstitutionUser(pool, institutionId, body) {
   if (!['student', 'faculty', 'admin'].includes(role)) {
     return { ok: false, status: 400, error: 'Invalid role.' }
   }
-  if (!isAllowedInstitutionalEmail(email, config.allowedEmailDomain)) {
-    return { ok: false, status: 400, error: `Email must be @${config.allowedEmailDomain}.` }
+  const institutionDomain = await getInstitutionEmailDomain(pool, institutionId)
+  const emailCheck = validateUserEmailForRole(email, role, institutionDomain)
+  if (!emailCheck.ok) {
+    return { ok: false, status: 400, error: emailCheck.error }
   }
   const schoolIdError = validateSchoolId(schoolId, role)
   if (schoolIdError) {
@@ -192,11 +196,15 @@ export async function updateInstitutionUser(pool, institutionId, uid, body) {
     return { ok: false, status: 404, error: 'User not found in this institution.' }
   }
 
-  if (email && !isAllowedInstitutionalEmail(email, config.allowedEmailDomain)) {
-    return { ok: false, status: 400, error: `Email must be @${config.allowedEmailDomain}.` }
+  const role = member.rows[0].role
+  if (email) {
+    const institutionDomain = await getInstitutionEmailDomain(pool, institutionId)
+    const emailCheck = validateUserEmailForRole(email, role, institutionDomain)
+    if (!emailCheck.ok) {
+      return { ok: false, status: 400, error: emailCheck.error }
+    }
   }
 
-  const role = member.rows[0].role
   const nextSchoolId = schoolId !== undefined ? schoolId : member.rows[0].school_id
   const schoolIdError = validateSchoolId(nextSchoolId, role)
   if (schoolIdError) {

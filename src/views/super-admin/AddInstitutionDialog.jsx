@@ -18,6 +18,7 @@ const LOGO_MAX_BYTES = 500 * 1024
 const emptyForm = {
   institutionName: '',
   acronym: '',
+  emailDomain: '',
   logo: null,
   themeId: '',
   maxWarnings: '3',
@@ -134,9 +135,12 @@ export default function AddInstitutionDialog({ open, onOpenChange, onCreated }) 
       return null
     }
 
+    const emailDomain = form.emailDomain.trim().toLowerCase().replace(/^@+/, '')
+
     return {
       institutionName: name,
       acronym,
+      emailDomain: emailDomain || undefined,
       logo: form.logo || null,
       themeId,
       maxWarnings: warnings,
@@ -279,6 +283,24 @@ export default function AddInstitutionDialog({ open, onOpenChange, onCreated }) 
                   ) : null}
                 </label>
               </div>
+
+              <label className="super-admin-add-institution-dialog__field super-admin-add-institution-dialog__field--full">
+                <span className="super-admin-add-institution-dialog__label">Sign-in email domain</span>
+                <input
+                  type="text"
+                  className="super-admin-add-institution-dialog__input"
+                  value={form.emailDomain}
+                  onChange={(e) => setField('emailDomain', e.target.value)}
+                  maxLength={255}
+                  placeholder="plpasig.edu.ph"
+                  autoCapitalize="none"
+                  disabled={submitting}
+                />
+                <span className="super-admin-add-institution-dialog__hint">
+                  For Google sign-in, this domain must be registered in the institution&apos;s Google
+                  Workspace.
+                </span>
+              </label>
 
               <label className="super-admin-add-institution-dialog__field super-admin-add-institution-dialog__field--full">
                 <span className="super-admin-add-institution-dialog__label">Max warnings (per exam)</span>

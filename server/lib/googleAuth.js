@@ -14,15 +14,24 @@ export function getOAuthClient() {
   return client
 }
 
-export function getGoogleAuthUrl() {
+/**
+ * @param {string | undefined} hostedDomain
+ * When set (single institution domain from DB), Google limits the account picker to that
+ * Workspace domain instead of personal Gmail accounts.
+ */
+export function getGoogleAuthUrl(hostedDomain) {
   const oauth2 = getOAuthClient()
-  return oauth2.generateAuthUrl({
+  const options = {
     access_type: 'online',
     scope: ['openid', 'email', 'profile'],
-    hd: config.allowedEmailDomain,
     prompt: 'select_account',
     include_granted_scopes: true,
-  })
+  }
+  const domain = typeof hostedDomain === 'string' ? hostedDomain.trim().toLowerCase() : ''
+  if (domain) {
+    options.hd = domain
+  }
+  return oauth2.generateAuthUrl(options)
 }
 
 /**

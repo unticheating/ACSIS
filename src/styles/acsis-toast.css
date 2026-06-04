@@ -1,7 +1,18 @@
 /* Sonner toasts — bottom center, matches .acsis-immersive__error on login */
 
 [data-sonner-toaster] {
-  z-index: 9999 !important;
+  z-index: 2147483646 !important;
+  pointer-events: none;
+}
+
+[data-sonner-toaster] [data-sonner-toast] {
+  pointer-events: auto;
+}
+
+[data-sonner-toast].acsis-toast,
+[data-sonner-toast].acsis-toast--error {
+  display: flex !important;
+  min-height: 44px;
 }
 
 /* Desktop: cap width; Sonner handles left: 50% + translateX(-50%) for center */
@@ -71,6 +82,12 @@
   text-align: left;
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+.acsis-toast [data-title] {
+  color: inherit;
+  font-weight: 600;
+  line-height: 1.45;
 }
 
 .acsis-toast__title {

@@ -105,7 +105,8 @@ export async function resendVerificationCode() {
 }
 
 export const AUTH_ERROR_MESSAGES = {
-  invalid_domain: 'Only @plpasig.edu.ph Google accounts can sign in.',
+  invalid_domain:
+    'Only registered school domains are allowed to sign in using Google Auth.',
   email_not_verified: 'Your Google email is not verified. Use a verified school account.',
   google_denied: 'Google sign-in was cancelled.',
   missing_code: 'Google sign-in did not complete. Please try again.',

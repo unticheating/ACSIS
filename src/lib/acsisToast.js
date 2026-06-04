@@ -1,9 +1,9 @@
 import { toast } from 'sonner'
 
 /** Error / validation — matches immersive login alert (red) */
-export function acsisToastError(message) {
+export function acsisToastError(message, options) {
   if (!message) return
-  toast.error(String(message))
+  toast.error(String(message), { duration: 8000, ...options })
 }
 
 /** Neutral message */

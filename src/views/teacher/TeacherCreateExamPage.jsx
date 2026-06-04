@@ -14,6 +14,11 @@ import {
 } from '@/components/ui/dialog.jsx'
 import { apiFetch } from '@/lib/apiFetch.js'
 import { COPY } from '@/lib/examFlowUi.js'
+import {
+  buildExamSectionsPayload,
+  isPersistedEntityId,
+  newLocalQuestionId,
+} from '@/lib/examContentPayload.js'
 import { mapExamToBuilderState } from '@/lib/mapExamToBuilder.js'
 import {
   identificationDisplayFromQuestion,
@@ -369,7 +374,7 @@ export default function TeacherCreateExamPage() {
                 questions: [
                   ...sec.questions,
                   {
-                    id: String(Date.now()),
+                    id: newLocalQuestionId(),
                     ...questionPayload,
                   },
                 ],
@@ -386,7 +391,10 @@ export default function TeacherCreateExamPage() {
   async function deleteQuestion(sectionId, questionId) {
     const ok = await confirm({
       title: 'Delete question?',
-      description: 'This question will be removed from the set.',
+      description:
+        isEditMode && isPersistedEntityId(questionId)
+          ? 'If students already answered this question, the server will not remove it when you save. Edit the question instead, or remove only unanswered questions.'
+          : 'This question will be removed from the set.',
       confirmLabel: 'Delete',
       destructive: true,
     })
@@ -412,7 +420,7 @@ export default function TeacherCreateExamPage() {
         if (!source) return sec
         const copy = {
           ...source,
-          id: String(Date.now()),
+          id: newLocalQuestionId(),
           options: Array.isArray(source.options) ? [...source.options] : source.options,
         }
         const nextQuestions = [...sec.questions]
@@ -540,38 +548,14 @@ export default function TeacherCreateExamPage() {
         const payload = {
           title,
           description: examDescription.trim(),
-          sections: sections.map((sec) => ({
-            title: sec.title.trim() || 'Set',
-            description: sec.description.trim(),
-            questions: sec.questions.map(
-              ({
-                type,
-                question,
-                points,
-                options,
-                correctAnswer,
-                imageUrl,
-                presentationAnswer,
-                answerExplanation,
-              }) => ({
-                type,
-                question,
-                points: Number(points || 1),
-                options,
-                correctAnswer,
-                imageUrl: imageUrl || null,
-                presentationAnswer: presentationAnswer ?? null,
-                answerExplanation: answerExplanation ?? null,
-              }),
-            ),
-          })),
+          sections: buildExamSectionsPayload(sections),
           shuffleQuestions,
           shuffleChoices,
           scheduledStart: scheduledStart ? new Date(scheduledStart).toISOString() : null,
           scheduledEnd: scheduledEnd ? new Date(scheduledEnd).toISOString() : null,
           isAutoPublish,
         }
-        
+
         if (examPassword.trim()) {
           payload.password = examPassword.trim()
         }
@@ -595,9 +579,19 @@ export default function TeacherCreateExamPage() {
           })
           if (res.ok) {
             setLastSaved(new Date())
+            const refresh = await apiFetch(`/api/teacher/classes/${selectedClass}/exams/${examId}`)
+            if (refresh.ok) {
+              const exam = await refresh.json()
+              const { sections: synced } = mapExamToBuilderState(exam)
+              setSections(synced)
+              setActiveSectionId((prev) => {
+                const still = synced.find((s) => String(s.id) === String(prev))
+                return still ? prev : synced[0]?.id || prev
+              })
+            }
           } else {
             const data = await res.json().catch(() => ({}))
-            console.error('Autosave failed:', data.error || res.status)
+            acsisToastError(data.error || 'Could not save exam changes.')
           }
         }
       } catch (err) {
@@ -628,31 +622,7 @@ export default function TeacherCreateExamPage() {
     const payload = {
       title,
       description: examDescription.trim(),
-      sections: sections.map((sec) => ({
-        title: sec.title.trim() || 'Set',
-        description: sec.description.trim(),
-        questions: sec.questions.map(
-          ({
-            type,
-            question,
-            points,
-            options,
-            correctAnswer,
-            imageUrl,
-            presentationAnswer,
-            answerExplanation,
-          }) => ({
-            type,
-            question,
-            points: Number(points || 1),
-            options,
-            correctAnswer,
-            imageUrl: imageUrl || null,
-            presentationAnswer: presentationAnswer ?? null,
-            answerExplanation: answerExplanation ?? null,
-          }),
-        ),
-      })),
+      sections: buildExamSectionsPayload(sections),
       shuffleQuestions,
       shuffleChoices,
       scheduledStart: scheduledStart ? new Date(scheduledStart).toISOString() : null,

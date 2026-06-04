@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { useEffect, useLayoutEffect, useState } from 'react'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import AuthImmersiveShell from '@/components/auth/AuthImmersiveShell.jsx'
 import { useSession } from '@/context/SessionContext.jsx'
 import {
@@ -9,6 +9,13 @@ import {
   requestPasswordReset,
   startEmailVerification,
 } from '@/lib/authApi.js'
+import {
+  clearAuthRedirectPendingError,
+  GOOGLE_DOMAIN_BANNER_MESSAGE,
+  isAuthRedirectBannerError,
+  resolveAuthRedirectErrorCode,
+  stripAuthRedirectParams,
+} from '@/lib/authRedirectError.js'
 import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle.js'
 import '../styles/acsis-immersive.css'
@@ -23,14 +30,17 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [forgotPasswordSubmitting, setForgotPasswordSubmitting] = useState(false)
+  const [googleDomainBanner, setGoogleDomainBanner] = useState(false)
 
-  useEffect(() => {
-    const errorCode = searchParams.get('error')
-    if (errorCode) {
-      acsisToastError(AUTH_ERROR_MESSAGES[errorCode] || 'Sign-in could not be completed.')
-      searchParams.delete('error')
-      searchParams.delete('auth')
-      setSearchParams(searchParams, { replace: true })
+  useLayoutEffect(() => {
+    const errorCode = resolveAuthRedirectErrorCode(searchParams)
+    if (!isAuthRedirectBannerError(errorCode)) return
+
+    setGoogleDomainBanner(true)
+    clearAuthRedirectPendingError()
+
+    if (searchParams.get('error')) {
+      setSearchParams(stripAuthRedirectParams(searchParams), { replace: true })
     }
   }, [searchParams, setSearchParams])
 
@@ -149,9 +159,17 @@ export default function LoginPage() {
   }
 
   return (
-    <AuthImmersiveShell>
+    <AuthImmersiveShell showInstitutionHeader={false}>
       <div className="acsis-immersive__auth-stack">
-        <p className="acsis-immersive__hint">Sign in with your @plpasig.edu.ph Google account</p>
+        <div className="acsis-immersive__auth-card">
+        {googleDomainBanner ? (
+          <div className="acsis-immersive__banner" role="alert">
+            <p className="acsis-immersive__banner-title">{GOOGLE_DOMAIN_BANNER_MESSAGE}</p>
+          </div>
+        ) : null}
+        <p className="acsis-immersive__hint acsis-immersive__hint--center">
+          Sign in with your school account.
+        </p>
         <button type="button" className="acsis-immersive__btn-google" onClick={onGoogle}>
           <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden>
             <path
@@ -181,8 +199,11 @@ export default function LoginPage() {
           className="acsis-immersive__credential-form"
           noValidate
         >
+          <p className="acsis-immersive__email-intro">
+            Login with your ACSIS registered email.
+          </p>
           <div className="acsis-immersive__field">
-            <label htmlFor="acsis-email">Login with your ACSIS registered email.</label>
+            <label htmlFor="acsis-email">Email</label>
             <input
               id="acsis-email"
               className="acsis-immersive__input"
@@ -190,7 +211,7 @@ export default function LoginPage() {
               autoComplete="username"
               value={email}
               onChange={(ev) => setEmail(ev.target.value)}
-              placeholder="you@plpasig.edu.ph"
+              placeholder="you@school.edu.ph"
               aria-required="true"
             />
           </div>
@@ -248,13 +269,7 @@ export default function LoginPage() {
             Continue
           </button>
         </form>
-
-        <p className="acsis-immersive__footer">
-          Production: use Google with <code>@plpasig.edu.ph</code>. Demo:{' '}
-          <code>superadmin@acsis.dev</code> → Super admin · <code>acsisadmin@gmail.com</code> →
-          Institution admin · faculty-style email → Faculty · other → Student.{' '}
-          <Link to="/dev/portals">Portal picker</Link>
-        </p>
+        </div>
       </div>
     </AuthImmersiveShell>
   )

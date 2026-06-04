@@ -44,6 +44,7 @@ export default function AdminSettingsPage({ basePath = '/admin' }) {
   const [institutionName, setInstitutionName] = useState(institution.institutionName)
   const [acronym, setAcronym] = useState(institution.acronym)
   const [maxWarnings, setMaxWarnings] = useState(String(institution.maxWarnings))
+  const [emailDomain, setEmailDomain] = useState(institution.emailDomain || '')
   const [logo, setLogo] = useState(institution.logo)
   const [selectedId, setSelectedId] = useState(institution.theme.themeId)
 
@@ -51,12 +52,14 @@ export default function AdminSettingsPage({ basePath = '/admin' }) {
     setInstitutionName(institution.institutionName)
     setAcronym(institution.acronym)
     setMaxWarnings(String(institution.maxWarnings))
+    setEmailDomain(institution.emailDomain || '')
     setLogo(institution.logo)
     setSelectedId(institution.theme.themeId)
   }, [
     institution.institutionName,
     institution.acronym,
     institution.maxWarnings,
+    institution.emailDomain,
     institution.logo,
     institution.theme.themeId,
   ])
@@ -81,6 +84,7 @@ export default function AdminSettingsPage({ basePath = '/admin' }) {
           setInstitutionName(inst.institutionName || '')
           setAcronym(inst.acronym || '')
           setMaxWarnings(String(inst.maxWarnings ?? 3))
+          setEmailDomain(inst.emailDomain || '')
           setLogo(inst.logo ?? null)
           if (inst.theme?.themeId) setSelectedId(inst.theme.themeId)
         }
@@ -135,10 +139,17 @@ export default function AdminSettingsPage({ basePath = '/admin' }) {
 
     setSavingProfile(true)
     try {
+      const domainTrimmed = emailDomain.trim().toLowerCase().replace(/^@+/, '')
+      if (domainTrimmed && !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(domainTrimmed)) {
+        toast.error('Enter a valid email domain (example: school.edu.ph), without @.')
+        return
+      }
+
       const payload = {
         institutionName: institutionName.trim(),
         acronym: acronym.trim().toUpperCase(),
         maxWarnings: warnings,
+        emailDomain: domainTrimmed || null,
         logo,
       }
 
@@ -148,6 +159,7 @@ export default function AdminSettingsPage({ basePath = '/admin' }) {
             institutionName: payload.institutionName,
             acronym: payload.acronym,
             maxWarnings: payload.maxWarnings,
+            emailDomain: payload.emailDomain,
             logo: payload.logo,
           },
           { persistDemo: true },
@@ -161,6 +173,7 @@ export default function AdminSettingsPage({ basePath = '/admin' }) {
             institutionName: inst.institutionName,
             acronym: inst.acronym,
             maxWarnings: inst.maxWarnings,
+            emailDomain: inst.emailDomain ?? null,
             logo: inst.logo ?? null,
           })
           if (inst.theme?.themeId) {
@@ -179,6 +192,7 @@ export default function AdminSettingsPage({ basePath = '/admin' }) {
   }, [
     acronym,
     applyInstitution,
+    emailDomain,
     institutionName,
     logo,
     maxWarnings,
@@ -315,6 +329,24 @@ export default function AdminSettingsPage({ basePath = '/admin' }) {
                     autoCapitalize="characters"
                   />
                   <span className="admin-settings-hint">Shown as “{acronym.trim() || 'PLP'} ACSIS” in the app</span>
+                </label>
+                <label className="admin-settings-field">
+                  <span className="admin-settings-label">Sign-in email domain</span>
+                  <input
+                    type="text"
+                    value={emailDomain}
+                    onChange={(e) => setEmailDomain(e.target.value)}
+                    maxLength={255}
+                    placeholder="plpasig.edu.ph"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                  />
+                  <span className="admin-settings-hint">
+                    Used for student sign-in (example: @plpasig.edu.ph). Sign in with Google only
+                    works for accounts whose domain is registered in your organization&apos;s Google
+                    Workspace.
+                  </span>
                 </label>
                 <label className="admin-settings-field">
                   <span className="admin-settings-label">Max warnings (per exam)</span>
