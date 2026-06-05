@@ -168,6 +168,7 @@ export async function listClassEnrolledStudentsQuery(classId, memberId) {
        u.first_name,
        u.middle_name,
        u.last_name,
+       u.avatar_url AS "avatarUrl",
        ce.enrolled_at AS "enrolledAt"
      FROM class_enrollments ce
      JOIN classes c ON c.class_id = ce.class_id
@@ -184,6 +185,7 @@ export async function listClassEnrolledStudentsQuery(classId, memberId) {
       memberId: r.memberId,
       schoolId: r.schoolId || '',
       studentName: parts.join(' ').trim() || 'Unknown student',
+      avatarUrl: r.avatarUrl,
       enrolledAt: r.enrolledAt,
     };
   });

@@ -1,17 +1,17 @@
 /* Scoped student exam session (ported from exam_session.css; ACSIS greens, Google Sans via parent). */
 
 .acsis-student-exam {
-  --exam-bg-deep: #051a0d;
-  --exam-text: #ffffff;
-  --exam-warning-red: #f87171;
-  --exam-accent: #22c55e;
-  --exam-accent-dim: rgba(34, 197, 94, 0.35);
-  --exam-question-box: #e8f5ec;
-  --exam-question-text: #0f1f14;
-  --exam-option-border: rgba(34, 197, 94, 0.35);
-  --exam-option-border-active: #4ade80;
-  --exam-next-bg: #166534;
-  --exam-next-bg-hover: #15803d;
+  --exam-bg-deep: var(--acsis-canvas);
+  --exam-text: var(--fg-default);
+  --exam-warning-red: #ef4444;
+  --exam-accent: var(--acsis-brand);
+  --exam-accent-dim: color-mix(in srgb, var(--acsis-brand) 35%, transparent);
+  --exam-question-box: var(--bg-surface);
+  --exam-question-text: var(--fg-default);
+  --exam-option-border: var(--border-default);
+  --exam-option-border-active: var(--acsis-brand);
+  --exam-next-bg: var(--acsis-brand);
+  --exam-next-bg-hover: color-mix(in srgb, var(--acsis-brand) 80%, black);
   --detection-red: #dc2626;
   --header-pad-x: clamp(16px, 4vw, 40px);
   --header-pad-y: clamp(14px, 2.5vh, 22px);
@@ -25,7 +25,7 @@
   margin: 0;
   font-family: var(--font-app, 'Google Sans', 'Google Sans Text', system-ui, sans-serif);
   color: var(--exam-text);
-  background: linear-gradient(180deg, #030f08 0%, #051a0d 38%, #020806 100%);
+  background: var(--acsis-canvas);
   -webkit-font-smoothing: antialiased;
   -webkit-user-select: none;
   user-select: none;
@@ -63,8 +63,8 @@
   z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(ellipse 120% 85% at 50% 100%, rgba(22, 101, 52, 0.45) 0%, transparent 55%),
-    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(15, 60, 35, 0.3) 0%, transparent 45%);
+    radial-gradient(ellipse 120% 85% at 50% 100%, color-mix(in srgb, var(--acsis-brand) 12%, transparent) 0%, transparent 55%),
+    radial-gradient(ellipse 80% 50% at 50% 0%, color-mix(in srgb, var(--acsis-brand) 6%, transparent) 0%, transparent 45%);
 }
 
 .acsis-student-exam > * {
@@ -259,7 +259,7 @@
   font-size: 0.875rem;
   line-height: 1.25rem;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--exam-text);
   min-width: 0;
 }
 
@@ -273,9 +273,9 @@
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #bbf7d0;
-  background: rgba(34, 197, 94, 0.2);
-  border: 1px solid rgba(34, 197, 94, 0.35);
+  color: var(--acsis-brand);
+  background: color-mix(in srgb, var(--acsis-brand) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--acsis-brand) 30%, transparent);
 }
 
 .acsis-student-exam .exam-type-label {
@@ -290,7 +290,7 @@
 .acsis-student-exam .exam-type-hint {
   font-size: clamp(12px, 1.6vw, 14px);
   font-weight: 400;
-  color: rgba(255, 255, 255, 0.85);
+  color: color-mix(in srgb, var(--exam-text) 85%, transparent);
   text-align: center;
   margin-bottom: 22px;
 }
@@ -318,9 +318,9 @@
 }
 
 .acsis-student-exam .question-box--section {
-  background: var(--exam-section-box-bg, rgba(232, 245, 236, 0.92));
-  color: var(--exam-section-box-text, #0f1f14);
-  border-color: var(--exam-section-box-border, rgba(22, 101, 52, 0.2));
+  background: color-mix(in srgb, var(--acsis-brand) 8%, var(--bg-surface));
+  color: var(--fg-default);
+  border-color: color-mix(in srgb, var(--acsis-brand) 20%, transparent);
 }
 
 .acsis-student-exam .question-box--section__title {
@@ -365,7 +365,7 @@
   padding: 16px 18px;
   border-radius: 16px;
   border: 2px solid var(--exam-option-border);
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--bg-elevated, rgba(0,0,0,0.05));
   cursor: pointer;
   text-align: left;
   color: var(--exam-text);
@@ -380,7 +380,7 @@
 
 .acsis-student-exam .option-row.is-selected {
   border-color: var(--exam-option-border-active);
-  background: rgba(34, 197, 94, 0.12);
+  background: color-mix(in srgb, var(--exam-accent) 12%, transparent);
 }
 
 .acsis-student-exam .option-radio {
@@ -411,7 +411,7 @@
   padding: 16px 18px;
   border-radius: 16px;
   border: 2px solid var(--exam-accent);
-  background: rgba(0, 0, 0, 0.25);
+  background: var(--bg-elevated, rgba(0,0,0,0.05));
   color: var(--exam-text);
   font-family: inherit;
   font-size: clamp(14px, 2vw, 16px);
@@ -419,7 +419,7 @@
 }
 
 .acsis-student-exam .id-input::placeholder {
-  color: rgba(255, 255, 255, 0.45);
+  color: color-mix(in srgb, var(--exam-text) 45%, transparent);
 }
 
 .acsis-student-exam .question-box code {
@@ -634,6 +634,33 @@
 @media (prefers-reduced-motion: reduce) {
   .acsis-student-exam .lobby-spinner {
     animation: none;
-    border-top-color: rgba(255, 255, 255, 0.5);
+    border-top-color: color-mix(in srgb, var(--exam-text) 50%, transparent);
   }
+}
+
+/* Keyboard Theme */
+.acsis-hg-theme {
+  background-color: var(--bg-surface) !important;
+  color: var(--fg-default) !important;
+  border-radius: 8px;
+}
+.acsis-hg-theme .hg-button {
+  background: var(--bg-elevated) !important;
+  color: var(--fg-default) !important;
+  border-bottom: 1px solid var(--border-default) !important;
+}
+.acsis-hg-theme .hg-button:active {
+  background: var(--acsis-brand) !important;
+  color: white !important;
+}
+.acsis-hg-theme .hg-arrow-key {
+  max-width: 64px !important;
+  font-size: 1.1rem !important;
+  font-weight: 700 !important;
+  background: color-mix(in srgb, var(--acsis-brand) 18%, var(--bg-elevated)) !important;
+  border: 1px solid color-mix(in srgb, var(--acsis-brand) 35%, transparent) !important;
+}
+.acsis-hg-theme .hg-arrow-key:active {
+  background: var(--acsis-brand) !important;
+  color: white !important;
 }

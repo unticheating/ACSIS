@@ -9,7 +9,7 @@ import {
   PG_EXAM_STATUS,
   normalizeExamStatus,
 } from '@/lib/examFlowUi.js'
-import { Copy, MoreVertical, Palette, Pencil, Play, Send, Trash2 } from 'lucide-react'
+import { Copy, MoreVertical, Palette, Pencil, Play, Send, Trash2, UserMinus, Search } from 'lucide-react'
 import ClassCourseHeader from '@/components/classes/ClassCourseHeader.jsx'
 import ClassHeaderAppearancePicker from '@/components/classes/ClassHeaderAppearancePicker.jsx'
 import { normalizeHeaderPattern } from '@/lib/classCardPatterns.js'
@@ -64,6 +64,7 @@ export default function TeacherClassExamsPage() {
 
   const [enrolled, setEnrolled] = useState([])
   const [enrolledLoading, setEnrolledLoading] = useState(false)
+  const [studentSearch, setStudentSearch] = useState('')
 
   const [editOpen, setEditOpen] = useState(false)
   const [editCode, setEditCode] = useState('')
@@ -155,6 +156,36 @@ export default function TeacherClassExamsPage() {
     }
     return fromApi
   }, [cls?.enrollmentCount, pageView, enrolledLoading, enrolled.length])
+
+  const filteredEnrolled = useMemo(() => {
+    if (!studentSearch.trim()) return enrolled
+    const q = studentSearch.toLowerCase()
+    return enrolled.filter(s => 
+      (s.studentName || '').toLowerCase().includes(q) || 
+      (s.schoolId || '').toLowerCase().includes(q)
+    )
+  }, [enrolled, studentSearch])
+
+  async function kickStudent(memberId, studentName) {
+    const ok = await confirm({
+      title: `Remove ${studentName}?`,
+      description: 'This student will be removed from the class.',
+      confirmLabel: 'Remove student',
+      destructive: true,
+    })
+    if (!ok) return
+    try {
+      const res = await apiFetch(`/api/teacher/classes/${cls.id}/enrollments/${memberId}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'Failed to remove student.')
+      }
+      acsisToastSuccess(`${studentName} removed from class.`)
+      refresh()
+    } catch (err) {
+      acsisToastError(err.message)
+    }
+  }
 
   if (loading) {
     return (
@@ -427,7 +458,19 @@ export default function TeacherClassExamsPage() {
           <Link to={createHref} className="acsis-mc-create-btn acsis-class-toolbar__create">
             Create exam
           </Link>
-        ) : null}
+        ) : (
+          <div className="relative ml-auto w-full sm:w-auto mt-2 sm:mt-0 flex-shrink-0">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" aria-hidden />
+            <input
+              type="text"
+              placeholder="Search students..."
+              value={studentSearch}
+              onChange={(e) => setStudentSearch(e.target.value)}
+              className="flex h-9 w-full sm:w-[200px] rounded-md border border-input bg-transparent pl-8 pr-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              aria-label="Search enrolled students"
+            />
+          </div>
+        )}
       </div>
 
       <div className="acsis-mc-content">
@@ -442,19 +485,31 @@ export default function TeacherClassExamsPage() {
                 Enrolled classes.
               </p>
             </div>
+          ) : filteredEnrolled.length === 0 ? (
+            <div className="acsis-mc-empty">
+              <h2 className="acsis-mc-empty__title">No matches found</h2>
+              <p className="acsis-mc-empty__text">No students match your search.</p>
+            </div>
           ) : (
             <ul className="acsis-enrolled-list">
-              {enrolled.map((s, index) => (
+              {filteredEnrolled.map((s, index) => (
                 <FadeIn
                   as="li"
                   key={coerceDisplayString(s.memberId, `enrolled-${index}`)}
                   delay={index * 0.05}
-                  className="acsis-enrolled-list__item"
+                  className="acsis-enrolled-list__item flex items-center"
                 >
-                  <div className="acsis-enrolled-list__main">
-                    <span className="acsis-enrolled-list__name">{s.studentName}</span>
+                  <div className="flex h-10 w-10 shrink-0 overflow-hidden items-center justify-center rounded-full bg-muted text-muted-foreground font-medium select-none">
+                    {s.avatarUrl || s.avatar ? (
+                      <img src={s.avatarUrl || s.avatar} alt={s.studentName} className="h-full w-full object-cover" />
+                    ) : (
+                      s.studentName ? s.studentName[0].toUpperCase() : '?'
+                    )}
+                  </div>
+                  <div className="acsis-enrolled-list__main flex-1 flex flex-col justify-center gap-0.5">
+                    <span className="acsis-enrolled-list__name font-medium">{s.studentName}</span>
                     {s.schoolId ? (
-                      <span className="acsis-enrolled-list__meta">ID {s.schoolId}</span>
+                      <span className="acsis-enrolled-list__meta text-muted-foreground text-sm">ID {s.schoolId}</span>
                     ) : null}
                   </div>
                   {s.enrolledAt ? (
@@ -462,6 +517,15 @@ export default function TeacherClassExamsPage() {
                       Joined {new Date(s.enrolledAt).toLocaleDateString()}
                     </time>
                   ) : null}
+                  <button
+                    type="button"
+                    className="ml-2 rounded-md p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                    title="Remove from class"
+                    onClick={() => kickStudent(s.memberId, s.studentName)}
+                  >
+                    <UserMinus size={18} strokeWidth={2} />
+                    <span className="sr-only">Remove student</span>
+                  </button>
                 </FadeIn>
               ))}
             </ul>

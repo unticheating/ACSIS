@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
+  ChevronDown,
+  ChevronUp,
   Copy,
   Eye,
   EyeOff,
@@ -10,6 +12,7 @@ import {
   Presentation,
   Radio,
   RotateCcw,
+  Search,
   Send,
   StopCircle,
   Trash2,
@@ -55,6 +58,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog.jsx'
+import confetti from 'canvas-confetti'
 import '../../pages/teacher-ui/my_classes.css'
 
 const EXAM_TABS = [
@@ -139,6 +143,13 @@ export default function TeacherExamDetailPage() {
   const [examCodeSaving, setExamCodeSaving] = useState(false)
   const [lobbyModalOpen, setLobbyModalOpen] = useState(false)
   const [presentOpen, setPresentOpen] = useState(false)
+  const [questionsExpanded, setQuestionsExpanded] = useState(false)
+  
+  // Results Tab States
+  const [topScoreVisible, setTopScoreVisible] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [filterMode, setFilterMode] = useState('Surname A-Z')
+  
   const { confirm, ConfirmDialog } = useAcsisConfirm()
 
   useEffect(() => {
@@ -206,6 +217,37 @@ export default function TeacherExamDetailPage() {
       window.clearInterval(interval)
     }
   }, [classId, examId, refreshTick])
+
+  const filteredSessions = useMemo(() => {
+    let list = [...(results?.sessions || [])]
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase()
+      list = list.filter(
+        (s) =>
+          (s.studentName || '').toLowerCase().includes(q) ||
+          (s.schoolId || '').toLowerCase().includes(q)
+      )
+    }
+    
+    if (filterMode === 'Surname A-Z') {
+      list.sort((a, b) => (a.studentName || '').localeCompare(b.studentName || ''))
+    } else if (filterMode === 'Score rank') {
+      list.sort((a, b) => {
+        const rankA = a.rank != null ? a.rank : 999999
+        const rankB = b.rank != null ? b.rank : 999999
+        return rankA - rankB
+      })
+    } else if (filterMode === 'Violations (highest to lowest)') {
+      list.sort((a, b) => (b.warningCount || 0) - (a.warningCount || 0))
+    } else if (filterMode === 'Submission time (Oldest to Newest)') {
+      list.sort((a, b) => {
+        const timeA = a.endTime ? new Date(a.endTime).getTime() : a.updatedAt ? new Date(a.updatedAt).getTime() : 9999999999999
+        const timeB = b.endTime ? new Date(b.endTime).getTime() : b.updatedAt ? new Date(b.updatedAt).getTime() : 9999999999999
+        return timeA - timeB
+      })
+    }
+    return list
+  }, [results?.sessions, searchQuery, filterMode])
 
   if (loading) {
     return (
@@ -346,6 +388,7 @@ export default function TeacherExamDetailPage() {
     try {
       const res = await apiFetch(`/api/teacher/classes/${classId}/exams/${examId}/start`, {
         method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
       if (!res.ok) {
@@ -418,6 +461,7 @@ export default function TeacherExamDetailPage() {
     try {
       const res = await apiFetch(`/api/teacher/classes/${classId}/exams/${examId}/restart`, {
         method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
       if (!res.ok) {
@@ -511,7 +555,7 @@ export default function TeacherExamDetailPage() {
             style={{ border: 'none', display: 'inline-flex', alignItems: 'center', gap: 8 }}
             onClick={() => startExam({})}
           >
-            <Play size={18} strokeWidth={2.5} aria-hidden />
+            <Play size={18} strokeWidth={2} fill="currentColor" aria-hidden />
             Start session
           </button>
           <p className="acsis-exam-detail__cta-hint">
@@ -544,7 +588,7 @@ export default function TeacherExamDetailPage() {
           </button>
           <p className="acsis-exam-detail__cta-hint">
             {stats
-              ? `${stats.joined} joined · ${stats.submitted} submitted · ${stats.enrolled} enrolled`
+              ? `${stats.joined} joined · ${stats.submitted} submitted`
               : 'Submissions update automatically while the exam is live.'}
           </p>
         </div>
@@ -712,6 +756,7 @@ export default function TeacherExamDetailPage() {
         </div>
         {(waiting || active) && (
           <Link to={monitoringHref} className="acsis-exam-detail__monitoring-btn">
+            <span className="acsis-live-pulse-dot" aria-hidden />
             <Radio size={16} strokeWidth={2} aria-hidden />
             Live monitoring
           </Link>
@@ -845,30 +890,55 @@ export default function TeacherExamDetailPage() {
                   Add questions
                 </Link>
               </div>
+            ) : !questionsExpanded ? (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '2rem 0' }}>
+                <button
+                  type="button"
+                  className="acsis-btn-ghost"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                  onClick={() => setQuestionsExpanded(true)}
+                >
+                  <ChevronDown size={16} strokeWidth={2} />
+                  View questions
+                </button>
+              </div>
             ) : (
-              <ol className="acsis-exam-detail__question-list">
-                {exam.questions.map((q, index) => (
-                  <li key={q.id || index} className="acsis-exam-detail__question-item">
-                    <span className="acsis-exam-detail__question-num" aria-hidden>
-                      {index + 1}
-                    </span>
-                    <div className="acsis-exam-detail__question-body">
-                      <div className="acsis-exam-detail__question-meta">
-                        <span className="acsis-exam-detail__type-badge">
-                          {labelForQuestionType(q.type)}
-                        </span>
-                        <span className="acsis-exam-detail__question-points">
-                          {Number(q.points || 0)} pts
-                        </span>
+              <>
+                <ol className="acsis-exam-detail__question-list">
+                  {exam.questions.map((q, index) => (
+                    <li key={q.id || index} className="acsis-exam-detail__question-item">
+                      <span className="acsis-exam-detail__question-num" aria-hidden>
+                        {index + 1}
+                      </span>
+                      <div className="acsis-exam-detail__question-body">
+                        <div className="acsis-exam-detail__question-meta">
+                          <span className="acsis-exam-detail__type-badge">
+                            {labelForQuestionType(q.type)}
+                          </span>
+                          <span className="acsis-exam-detail__question-points">
+                            {Number(q.points || 0)} pts
+                          </span>
+                        </div>
+                        <p className="acsis-exam-detail__question-text">
+                          {q.question || q.question_text || 'Untitled question'}
+                        </p>
+                        <ExamQuestionAnswerPresentation question={q} />
                       </div>
-                      <p className="acsis-exam-detail__question-text">
-                        {q.question || q.question_text || 'Untitled question'}
-                      </p>
-                      <ExamQuestionAnswerPresentation question={q} />
-                    </div>
-                  </li>
-                ))}
-              </ol>
+                    </li>
+                  ))}
+                </ol>
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '1rem 0 2rem 0' }}>
+                  <button
+                    type="button"
+                    className="acsis-btn-ghost"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                    onClick={() => setQuestionsExpanded(false)}
+                  >
+                    <ChevronUp size={16} strokeWidth={2} />
+                    Hide questions
+                  </button>
+                </div>
+              </>
             )}
           </>
         ) : null}
@@ -876,22 +946,14 @@ export default function TeacherExamDetailPage() {
         {tab === 'results' ? (
           <>
             <div className="acsis-exam-detail__results-head">
-              <h2 className="acsis-exam-detail__section-title">Student submissions</h2>
-              {waiting || active ? (
-                <p className="acsis-exam-detail__results-hint">
-                  Students join with the exam password. Submissions update automatically while the exam is live.
-                </p>
-              ) : closed ? (
+              <h2 className="acsis-exam-detail__section-title">Results</h2>
+              {closed ? (
                 <p className="acsis-exam-detail__results-hint">Exam closed. Release scores when you are ready.</p>
               ) : null}
             </div>
 
             {stats ? (
-              <div
-                className={`acsis-summary-stats acsis-exam-detail__results-stats${
-                  results?.topStudent ? ' acsis-summary-stats--4' : ''
-                }`}
-              >
+              <div className="acsis-summary-stats acsis-exam-detail__results-stats">
                 <div className="acsis-summary-stat acsis-card-surface">
                   <div className="acsis-summary-stat__body">
                     <span className="acsis-summary-stat__label">Submitted</span>
@@ -900,28 +962,58 @@ export default function TeacherExamDetailPage() {
                 </div>
                 <div className="acsis-summary-stat acsis-card-surface">
                   <div className="acsis-summary-stat__body">
-                    <span className="acsis-summary-stat__label">Joined</span>
+                    <span className="acsis-summary-stat__label">Joined and still answering</span>
                     <span className="acsis-summary-stat__value">{stats.joined}</span>
-                  </div>
-                </div>
-                <div className="acsis-summary-stat acsis-card-surface">
-                  <div className="acsis-summary-stat__body">
-                    <span className="acsis-summary-stat__label">Enrolled</span>
-                    <span className="acsis-summary-stat__value">{stats.enrolled}</span>
                   </div>
                 </div>
                 {results?.topStudent ? (
                   <div className="acsis-summary-stat acsis-card-surface">
                     <div className="acsis-summary-stat__body">
-                      <span className="acsis-summary-stat__label">Top score</span>
+                      <span className="acsis-summary-stat__label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        Top score
+                        <button
+                          type="button"
+                          style={{ padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', display: 'inline-flex', color: 'inherit' }}
+                          onClick={(e) => {
+                            const rect = e.currentTarget.getBoundingClientRect()
+                            const x = (rect.left + rect.width / 2) / window.innerWidth
+                            const y = (rect.top + rect.height / 2) / window.innerHeight
+                            setTopScoreVisible((v) => {
+                              const next = !v
+                              if (next) {
+                                confetti({ particleCount: 100, spread: 70, origin: { x, y }, zIndex: 9999 })
+                              }
+                              return next
+                            })
+                          }}
+                          aria-label={topScoreVisible ? 'Hide top score' : 'Show top score'}
+                        >
+                          {topScoreVisible ? (
+                            <EyeOff size={14} strokeWidth={2} aria-hidden />
+                          ) : (
+                            <Eye size={14} strokeWidth={2} aria-hidden />
+                          )}
+                        </button>
+                      </span>
                       <span className="acsis-exam-detail__stat-text">
-                        {results.topStudent.studentName}
-                        {results.topStudent.percentage != null ? (
-                          <span className="acsis-exam-detail__top-score-pct">
-                            {' '}
-                            · {results.topStudent.percentage}%
-                          </span>
-                        ) : null}
+                        {topScoreVisible ? (
+                          <>
+                            {results.topStudent.studentName}
+                            {results.topStudent.rawScore != null && results.topStudent.totalPoints != null ? (
+                              <span className="acsis-exam-detail__top-score-pct">
+                                {' '}
+                                · {results.topStudent.rawScore}/{results.topStudent.totalPoints}
+                              </span>
+                            ) : results.topStudent.percentage != null ? (
+                              <span className="acsis-exam-detail__top-score-pct">
+                                {' '}
+                                · {results.topStudent.percentage}%
+                              </span>
+                            ) : null}
+                          </>
+                        ) : (
+                          '?'
+                        )}
                       </span>
                     </div>
                   </div>
@@ -937,25 +1029,54 @@ export default function TeacherExamDetailPage() {
                 <p className="acsis-mc-sub">No students have joined or submitted yet.</p>
               </div>
             ) : (
-              <div className="acsis-exam-detail__table-wrap">
-                <table className="acsis-exam-detail__table">
-                  <thead>
+              <>
+                <div className="acsis-exam-detail__filter-row">
+                  <div className="acsis-exam-detail__search-wrap">
+                    <Search size={16} className="acsis-exam-detail__search-icon" />
+                    <input
+                      type="search"
+                      placeholder="Search students..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="acsis-mc-input acsis-exam-detail__search-input"
+                    />
+                  </div>
+                  <select
+                    value={filterMode}
+                    onChange={(e) => setFilterMode(e.target.value)}
+                    className="acsis-mc-input acsis-exam-detail__filter-select"
+                  >
+                    <option value="Surname A-Z">Surname A-Z</option>
+                    <option value="Score rank">Score rank</option>
+                    <option value="Violations (highest to lowest)">Violations (highest to lowest)</option>
+                    <option value="Submission time (Oldest to Newest)">Submission time (Oldest to Newest)</option>
+                  </select>
+                </div>
+                <div className="acsis-exam-detail__table-wrap">
+                  <table className="acsis-exam-detail__table">
+                    <thead>
                     <tr>
                       <th>Student</th>
                       <th>Status</th>
                       <th>Review</th>
-                      <th className="acsis-exam-detail__table-col-num">Score</th>
-                      <th className="acsis-exam-detail__table-col-num">Rank</th>
+                      {filterMode !== 'Surname A-Z' ? (
+                        <th className="acsis-exam-detail__table-col-num">Score</th>
+                      ) : null}
+                      {filterMode === 'Score rank' ? (
+                        <th className="acsis-exam-detail__table-col-num">Score rank</th>
+                      ) : null}
                       <th>Released</th>
                       <th className="acsis-exam-detail__table-col-num">Warnings</th>
                       <th className="acsis-exam-detail__table-col-action" />
                     </tr>
                   </thead>
                   <tbody>
-                    {(results?.sessions || []).map((s) => (
+                    {filteredSessions.map((s) => (
                       <tr key={s.sessionId}>
                         <td>
-                          <span className="acsis-exam-detail__table-student-name">{s.studentName}</span>
+                          <span className="acsis-exam-detail__table-student-name">
+                            {[s.lastName, s.firstName].filter(Boolean).join('. ') || s.studentName}
+                          </span>
                           {s.schoolId ? (
                             <span className="acsis-exam-detail__table-student-id">{s.schoolId}</span>
                           ) : null}
@@ -978,14 +1099,18 @@ export default function TeacherExamDetailPage() {
                                 : 'Auto-graded'
                             : '—'}
                         </td>
-                        <td className="acsis-exam-detail__table-col-num acsis-exam-detail__table-score">
-                          {s.status === 'submitted' && s.percentage != null
-                            ? `${s.percentage}% (${s.rawScore}/${s.totalPoints})`
-                            : '—'}
-                        </td>
-                        <td className="acsis-exam-detail__table-col-num">
-                          {s.rank != null ? `#${s.rank}` : '—'}
-                        </td>
+                        {filterMode !== 'Surname A-Z' ? (
+                          <td className="acsis-exam-detail__table-col-num acsis-exam-detail__table-score">
+                            {s.status === 'submitted' && s.percentage != null
+                              ? `${s.percentage}% (${s.rawScore}/${s.totalPoints})`
+                              : '—'}
+                          </td>
+                        ) : null}
+                        {filterMode === 'Score rank' ? (
+                          <td className="acsis-exam-detail__table-col-num">
+                            {s.rank != null ? `#${s.rank}` : '—'}
+                          </td>
+                        ) : null}
                         <td>
                           {s.status === 'submitted' ? (
                             s.scoreReleased ? (
@@ -1026,6 +1151,7 @@ export default function TeacherExamDetailPage() {
                   </tbody>
                 </table>
               </div>
+              </>
             )}
           </>
         ) : null}

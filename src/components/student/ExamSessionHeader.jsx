@@ -6,12 +6,16 @@ import { cn } from '@/lib/utils'
  */
 export function ExamSessionHeader({ title, className, titleClassName, children }) {
   return (
-    <header className={cn('exam-chrome', className)}>
-      <div className="exam-logo" aria-hidden>
+    <header className={cn('exam-chrome relative', className)}>
+      <div className="exam-logo relative z-10" aria-hidden>
         <PlpLogo className="exam-logo-img" width={28} height={28} />
       </div>
-      <h1 className={cn('exam-title-bar truncate', titleClassName)}>{title}</h1>
-      {children}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-16">
+        <h1 className={cn('exam-title-bar truncate', titleClassName)}>{title}</h1>
+      </div>
+      <div className="relative z-10 ml-auto flex items-center">
+        {children}
+      </div>
     </header>
   )
 }

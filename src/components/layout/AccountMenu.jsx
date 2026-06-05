@@ -43,7 +43,13 @@ export default function AccountMenu({
           aria-label="Account menu"
           onClick={onTriggerClick}
         >
-          <div className="acsis-profile-avatar">{activeAccount.avatarLetter}</div>
+          <div className="acsis-profile-avatar overflow-hidden">
+            {activeAccount.avatarUrl ? (
+              <img src={activeAccount.avatarUrl} alt={activeAccount.displayName} className="h-full w-full object-cover" />
+            ) : (
+              activeAccount.avatarLetter
+            )}
+          </div>
           {showText ? (
             <>
               <div className="acsis-profile-text">

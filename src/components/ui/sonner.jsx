@@ -13,6 +13,7 @@ export function Toaster() {
       closeButton
       richColors={false}
       toastOptions={{
+        unstyled: true,
         classNames: {
           toast: 'acsis-toast',
           error: 'acsis-toast acsis-toast--error',

@@ -99,6 +99,7 @@ function accountFromAuthUser(user) {
     portal: user.portal,
     entryPath: user.entryPath,
     avatarLetter: user.avatarLetter,
+    avatarUrl: user.avatarUrl,
     isSuperAdmin: user.isSuperAdmin,
   }
 }

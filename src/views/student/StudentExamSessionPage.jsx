@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Clock, LayoutGrid, CheckCircle2, Circle, AlertTriangle } from 'lucide-react'
+import { Clock, LayoutGrid, CheckCircle2, Circle, AlertTriangle, Keyboard as KeyboardIcon } from 'lucide-react'
 import Editor from '@monaco-editor/react'
 import { ExamSessionHeader } from '@/components/student/ExamSessionHeader.jsx'
+import { ExamKeyboard } from '@/components/student/ExamKeyboard.jsx'
 import { Button } from '@/components/ui/button.jsx'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx'
 import { Input } from '@/components/ui/input.jsx'
@@ -79,6 +80,8 @@ export default function StudentExamSessionPage() {
   const [examPassword, setExamPassword] = useState('')
   const [joining, setJoining] = useState(false)
   const [scene, setScene] = useState('lobby')
+  const [showKeyboard, setShowKeyboard] = useState(false)
+  const monacoEditorRef = useRef(null)
   const sceneRef = useRef(scene)
 
   const loadSession = useCallback(async () => {
@@ -332,24 +335,6 @@ export default function StudentExamSessionPage() {
   useEffect(() => {
     if (!examGuardActive) return undefined
     window.history.pushState({ examGuard: true }, '')
-    const onPopState = () => {
-      const ok = window.confirm(
-        'Leave the exam? Your progress is saved, but you should stay on this page until you submit.',
-      )
-      if (!ok) {
-        window.history.pushState({ examGuard: true }, '')
-      }
-    }
-    const onBeforeUnload = (e) => {
-      e.preventDefault()
-      e.returnValue = ''
-    }
-    window.addEventListener('popstate', onPopState)
-    window.addEventListener('beforeunload', onBeforeUnload)
-    return () => {
-      window.removeEventListener('popstate', onPopState)
-      window.removeEventListener('beforeunload', onBeforeUnload)
-    }
   }, [examGuardActive])
 
   useEffect(() => {
@@ -542,12 +527,14 @@ export default function StudentExamSessionPage() {
       window.clearTimeout(visibilityTimerRef.current)
       visibilityTimerRef.current = null
     }
-    if (!document.hidden) return
+    const isHiddenOrBlurred = document.hidden || !document.hasFocus()
+    if (!isHiddenOrBlurred) return
     if (!isExamScene(sceneRef.current) || detectionRunningRef.current) return
 
     visibilityTimerRef.current = window.setTimeout(() => {
       visibilityTimerRef.current = null
-      if (!document.hidden || !isExamScene(sceneRef.current) || detectionRunningRef.current) return
+      const stillHiddenOrBlurred = document.hidden || !document.hasFocus()
+      if (!stillHiddenOrBlurred || !isExamScene(sceneRef.current) || detectionRunningRef.current) return
       recordViolation('alt_tab', 'Left exam tab or window')
     }, TAB_LEAVE_DEBOUNCE_MS)
   }, [recordViolation])
@@ -561,12 +548,38 @@ export default function StudentExamSessionPage() {
 
   useEffect(() => {
     function onVis() {
-      if (document.hidden) scheduleTabLeave()
+      const isHiddenOrBlurred = document.hidden || !document.hasFocus()
+      if (isHiddenOrBlurred) scheduleTabLeave()
       else cancelTabLeave()
     }
     function onWindowBlur() {
       if (!isExamScene(sceneRef.current) || detectionRunningRef.current) return
       scheduleTabLeave()
+    }
+    function onWindowFocus() {
+      if (!document.hidden && document.hasFocus()) {
+        cancelTabLeave()
+      }
+    }
+    function onPopState() {
+      if (!isExamScene(sceneRef.current)) return
+      recordViolation('other', 'Attempted to navigate back or leave page')
+      const ok = window.confirm(
+        'Leave the exam? Your progress is saved, but you should stay on this page until you submit.',
+      )
+      if (!ok) {
+        window.history.pushState({ examGuard: true }, '')
+      }
+    }
+    function onBeforeUnload(e) {
+      if (!isExamScene(sceneRef.current)) return
+      window.setTimeout(() => {
+        if (isExamScene(sceneRef.current)) {
+          recordViolation('other', 'Attempted to close or reload tab')
+        }
+      }, 100)
+      e.preventDefault()
+      e.returnValue = ''
     }
     let lastFullscreenExitLogAt = 0
     function onFullscreenChange() {
@@ -657,6 +670,9 @@ export default function StudentExamSessionPage() {
       recordViolation('paste_attempt', 'Paste')
     }
     window.addEventListener('blur', onWindowBlur)
+    window.addEventListener('focus', onWindowFocus)
+    window.addEventListener('popstate', onPopState)
+    window.addEventListener('beforeunload', onBeforeUnload)
     document.addEventListener('visibilitychange', onVis)
     document.addEventListener('fullscreenchange', onFullscreenChange)
     document.addEventListener('webkitfullscreenchange', onFullscreenChange)
@@ -667,6 +683,9 @@ export default function StudentExamSessionPage() {
     document.addEventListener('paste', onPaste, true)
     return () => {
       window.removeEventListener('blur', onWindowBlur)
+      window.removeEventListener('focus', onWindowFocus)
+      window.removeEventListener('popstate', onPopState)
+      window.removeEventListener('beforeunload', onBeforeUnload)
       document.removeEventListener('visibilitychange', onVis)
       document.removeEventListener('fullscreenchange', onFullscreenChange)
       document.removeEventListener('webkitfullscreenchange', onFullscreenChange)
@@ -755,7 +774,7 @@ export default function StudentExamSessionPage() {
             </CardTitle>
             <CardDescription className="text-white/70">
               Type the code your instructor shared after publishing the exam. After you join once, use
-              Continue exam from your class — the code step will not appear again.
+              Continue exam from your class - the code step will not appear again.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -799,19 +818,19 @@ export default function StudentExamSessionPage() {
   if (error || !classId || !examId || !hit) {
     return (
       <div className="acsis-student-exam min-h-screen flex items-center justify-center p-6">
-        <Card className="w-full max-w-md border-white/15 bg-black/40 text-center shadow-lg backdrop-blur-sm">
+        <Card className="w-full max-w-md border-border bg-card text-center shadow-lg">
           <CardHeader className="items-center space-y-3">
             <AlertTriangle className="h-10 w-10 text-red-400" aria-hidden />
-            <CardTitle className="text-lg font-semibold tracking-tight text-white">
+            <CardTitle className="text-lg font-semibold tracking-tight text-foreground">
               Cannot open exam
             </CardTitle>
-            <CardDescription className="text-white/70">
+            <CardDescription className="text-muted-foreground">
               {error ||
                 'Open an exam from a class you are enrolled in, or check the class code and exam link.'}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button variant="outline" className="w-full border-white/20 bg-transparent text-white hover:bg-white/10" asChild>
+            <Button variant="outline" className="w-full" asChild>
               <Link to="/student/my-classes">← Enrolled classes</Link>
             </Button>
           </CardContent>
@@ -840,7 +859,7 @@ export default function StudentExamSessionPage() {
         <ExamSessionHeader title={examTitle} />
         <main className="lobby-main">
           <h2 className="lobby-warning-title">Warning:</h2>
-          <div className="lobby-copy text-sm leading-relaxed text-white/90">
+          <div className="lobby-copy text-sm leading-relaxed text-foreground opacity-90">
             <p>This examination system monitors your activity to ensure academic fairness.</p>
             <p>
               Actions like <strong>tab switching</strong>, <strong>leaving the exam page</strong>,{' '}
@@ -850,20 +869,20 @@ export default function StudentExamSessionPage() {
             </p>
             <p>
               You are allowed up to <strong>{maxWarnings} strikes</strong> only. If this limit is exceeded, your
-              exam will be <strong>locked</strong> — you cannot change or move between answers; use{' '}
+              exam will be <strong>locked</strong>: you cannot change or move between answers; use{' '}
               <strong>Send exam</strong> when you are ready to submit.
             </p>
             <p>Please remain on this page and complete the exam honestly.</p>
           </div>
           <div className="lobby-footer">
             <div className="lobby-spinner" aria-hidden />
-            <p className="lobby-waiting text-sm font-medium text-white/80">
+            <p className="lobby-waiting text-sm font-medium text-foreground opacity-80">
               {inLobby
                 ? `Waiting for ${instructorWait} to start the exam…`
-                : 'Exam in progress — starting shortly…'}
+                : 'Exam in progress - starting shortly…'}
             </p>
           </div>
-          <p className="exam-type-hint mt-6 text-xs text-white/60">
+          <p className="exam-type-hint mt-6 text-xs text-muted-foreground">
             {inLobby
               ? 'You are in the lobby. The timer starts when your instructor goes live.'
               : 'Your session is ongoing. Do not re-enter the exam code from the class page.'}
@@ -881,7 +900,7 @@ export default function StudentExamSessionPage() {
     return (
       <div className="acsis-student-exam min-h-screen flex flex-col">
         <main className="countdown-main">
-          <p className="countdown-label text-sm font-medium uppercase tracking-wide text-white/70">
+          <p className="countdown-label text-sm font-medium uppercase tracking-wide text-muted-foreground">
             Starting in
           </p>
           <p className="countdown-number">{countdownNum}</p>
@@ -894,15 +913,15 @@ export default function StudentExamSessionPage() {
   if (scene === 'submitted') {
     return (
       <div className="acsis-student-exam min-h-screen flex items-center justify-center p-6">
-        <Card className="w-full max-w-lg border-white/15 bg-black/40 text-center shadow-lg backdrop-blur-sm">
+        <Card className="w-full max-w-lg border-border bg-card text-center shadow-lg">
           <CardHeader className="items-center space-y-4 pb-2">
             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/20">
               <CheckCircle2 className="h-9 w-9 text-emerald-400" aria-hidden />
             </div>
-            <CardTitle className="text-xl font-semibold tracking-tight text-white">
+            <CardTitle className="text-xl font-semibold tracking-tight text-foreground">
               Exam submitted
             </CardTitle>
-            <CardDescription className="text-white/70">
+            <CardDescription className="text-muted-foreground">
               Thank you for completing the exam. Your responses have been recorded and submitted to
               your instructor.
             </CardDescription>
@@ -910,20 +929,20 @@ export default function StudentExamSessionPage() {
           <CardContent className="space-y-4">
             {submitError ? (
               <p className="text-sm font-medium text-red-400" role="alert">
-                {submitError} — contact your instructor if this persists.
+                {submitError} - contact your instructor if this persists.
               </p>
             ) : null}
             {submitResult?.scoreReleased && submitResult?.percentage != null ? (
-              <p className="text-base font-semibold text-white">
+              <p className="text-base font-semibold text-foreground">
                 Score: {submitResult.percentage}% ({submitResult.rawScore}/{submitResult.totalPoints}{' '}
                 points)
               </p>
             ) : submitResult?.scoreReleased && submitResult?.rawScore != null ? (
-              <p className="text-base font-semibold text-white">
+              <p className="text-base font-semibold text-foreground">
                 Score: {submitResult.rawScore}/{submitResult.totalPoints} points
               </p>
             ) : submitResult?.scorePending || (submitResult && !submitResult.scoreReleased) ? (
-              <p className="text-sm font-medium text-white/80">
+              <p className="text-sm font-medium text-muted-foreground">
                 Your score will appear after your instructor releases results.
               </p>
             ) : null}
@@ -961,14 +980,14 @@ export default function StudentExamSessionPage() {
             <AlertTriangle className="detection-overlay__icon" aria-hidden />
             <h2 className="detection-title">
               {overlayIsFinalStrike
-                ? 'Final Warning — Maximum Strikes Reached'
-                : 'Warning — Suspicious Activity!'}
+                ? 'Final Warning: Maximum Strikes Reached'
+                : 'Warning: Suspicious Activity!'}
             </h2>
             <p className="detection-sub">
               {overlayIsFinalStrike ? (
                 <>
                   You have reached <strong>{maxWarnings} of {maxWarnings}</strong> integrity warnings.
-                  Your exam is now <strong>locked</strong> — you cannot change answers or switch questions.
+                  Your exam is now <strong>locked</strong>: you cannot change answers or switch questions.
                   Click <strong>Send exam</strong> when you are ready to submit.
                 </>
               ) : (
@@ -981,9 +1000,9 @@ export default function StudentExamSessionPage() {
             <p className="detection-strikes">
               Strike {overlayStrikes} of {maxWarnings}
               {overlayIsFinalStrike
-                ? ' — no further warnings remain'
+                ? ' - no further warnings remain'
                 : overlayStrikes >= maxWarnings - 1 && overlayStrikes < maxWarnings
-                  ? ' — one more locks your exam'
+                  ? ' - one more locks your exam'
                   : ''}
             </p>
             <p className="detection-countdown">
@@ -1009,7 +1028,7 @@ export default function StudentExamSessionPage() {
               displayStrikeCount(warningCount, maxWarnings),
               maxWarnings,
             )}`}
-            title={`Integrity warnings — ${maxWarnings} strikes locks your exam for manual submit`}
+            title={`Integrity warnings - ${maxWarnings} strikes locks your exam for manual submit`}
           >
             <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden />
             {displayStrikeCount(warningCount, maxWarnings)} / {maxWarnings} warnings
@@ -1117,9 +1136,19 @@ export default function StudentExamSessionPage() {
 
                 {currentQ.type === 'identification' && (
                   <div className="max-w-xl">
-                    <p className="exam-type-hint" style={{ textAlign: 'left' }}>
-                      Type your answer below
-                    </p>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="exam-type-hint m-0 text-left">
+                        Type your answer below
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setShowKeyboard(!showKeyboard)}
+                        className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        <KeyboardIcon className="w-4 h-4" />
+                        On-screen keyboard
+                      </button>
+                    </div>
                     <input
                       id="id-answer"
                       type="text"
@@ -1139,9 +1168,19 @@ export default function StudentExamSessionPage() {
 
                 {currentQ.type === 'coding' && (
                   <div className="code-editor-wrap max-w-3xl w-full">
-                    <p className="exam-type-hint" style={{ textAlign: 'left', marginBottom: 8 }}>
-                      Language: {normalizeCodingLanguage(currentQ.language || currentQ.options?.[0])}
-                    </p>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="exam-type-hint m-0 text-left">
+                        Language: {normalizeCodingLanguage(currentQ.language || currentQ.options?.[0])}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setShowKeyboard(!showKeyboard)}
+                        className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        <KeyboardIcon className="w-4 h-4" />
+                        On-screen keyboard
+                      </button>
+                    </div>
                     <Editor
                       height="min(42vh, 360px)"
                       language={normalizeCodingLanguage(currentQ.language || currentQ.options?.[0])}
@@ -1150,6 +1189,7 @@ export default function StudentExamSessionPage() {
                       onChange={(val) =>
                         !examLocked && setAnswers((prev) => ({ ...prev, [currentQ.id]: val ?? '' }))
                       }
+                      onMount={(editor) => { monacoEditorRef.current = editor }}
                       options={{
                         ...MONACO_EXAM_EDITOR_OPTIONS,
                         readOnly: examLocked,
@@ -1176,7 +1216,7 @@ export default function StudentExamSessionPage() {
                     ← Previous
                   </button>
                 ) : (
-                  <span className="text-xs text-white/50" aria-hidden />
+                  <span className="text-xs text-muted-foreground" aria-hidden />
                 )}
                 <div className="exam-footer-right">
                   {examLocked ? (
@@ -1205,14 +1245,13 @@ export default function StudentExamSessionPage() {
         </main>
 
         <aside
-          className="w-full lg:w-80 lg:border-l border-white/10 shrink-0 p-6 lg:p-8 flex flex-col lg:sticky lg:top-16 lg:h-[calc(100vh-4rem)]"
-          style={{ background: 'rgba(0, 0, 0, 0.28)' }}
+          className="w-full lg:w-80 lg:border-l border-border shrink-0 p-6 lg:p-8 flex flex-col lg:sticky lg:top-16 lg:h-[calc(100vh-4rem)] bg-muted/40"
         >
           <div className="hidden lg:block mb-8">
             <h3 className="exam-type-label" style={{ textAlign: 'left', marginBottom: 12 }}>
               Time remaining
             </h3>
-            <div className="flex items-center gap-3 px-5 py-4 rounded-xl border border-white/15 bg-black/25">
+            <div className="flex items-center gap-3 px-5 py-4 rounded-xl border border-border bg-muted">
               <Clock className="w-6 h-6 opacity-70" aria-hidden />
               <span className="exam-timer">
                 {secondsLeft != null && secondsLeft > 0 ? formatClock(secondsLeft) : '--:--'}
@@ -1227,7 +1266,7 @@ export default function StudentExamSessionPage() {
                 Question navigator
               </h3>
             </div>
-            <div className="flex items-center gap-4 mb-6 text-xs text-white/65">
+            <div className="flex items-center gap-4 mb-6 text-xs text-muted-foreground">
               <div className="flex items-center gap-1.5">
                 <Circle className="w-3 h-3 opacity-40" /> Unanswered
               </div>
@@ -1249,7 +1288,7 @@ export default function StudentExamSessionPage() {
                 } else if (isAnswered) {
                   btnClass += 'border-transparent bg-emerald-800/60 text-emerald-100 hover:bg-emerald-800/80'
                 } else {
-                  btnClass += 'border-white/20 bg-black/20 text-white/70 hover:border-white/35'
+                  btnClass += 'border-border bg-muted text-muted-foreground hover:border-muted-foreground'
                 }
                 return (
                   <button
@@ -1273,7 +1312,7 @@ export default function StudentExamSessionPage() {
             </div>
           </div>
 
-          <div className="mt-8 pt-6 border-t border-white/10">
+          <div className="mt-8 pt-6 border-t border-border">
             <div className="progress-row mb-4">
               <span className="progress-label">Completion</span>
               <span className="progress-label">
@@ -1288,6 +1327,22 @@ export default function StudentExamSessionPage() {
         </aside>
 
       </div>
+
+      {showKeyboard && currentQ && (currentQ.type === 'identification' || currentQ.type === 'coding') && (
+        <ExamKeyboard
+          value={answers[currentQ.id] || ''}
+          onChange={(val) =>
+            !examLocked &&
+            setAnswers((prev) => ({
+              ...prev,
+              [currentQ.id]: currentQ.type === 'coding' ? val : val.toUpperCase(),
+            }))
+          }
+          onClose={() => setShowKeyboard(false)}
+          questionType={currentQ.type}
+          editorRef={monacoEditorRef}
+        />
+      )}
 
       {detectionOverlay}
     </div>

@@ -119,12 +119,14 @@
       clearTimeout(visibilityLeaveTimer);
       visibilityLeaveTimer = null;
     }
-    if (!document.hidden) return;
+    var isHiddenOrBlurred = document.hidden || !document.hasFocus();
+    if (!isHiddenOrBlurred) return;
     if (!isExamScene(activeScene) || detectionRunning) return;
 
     visibilityLeaveTimer = setTimeout(function () {
       visibilityLeaveTimer = null;
-      if (!document.hidden || !isExamScene(activeScene) || detectionRunning) return;
+      var stillHiddenOrBlurred = document.hidden || !document.hasFocus();
+      if (!stillHiddenOrBlurred || !isExamScene(activeScene) || detectionRunning) return;
       showDetectionThenResume(activeScene);
     }, TAB_LEAVE_DEBOUNCE_MS);
   }
@@ -145,11 +147,37 @@
 
   function bindDetectionTriggers() {
     document.addEventListener("visibilitychange", function () {
-      if (document.hidden) {
+      var isHiddenOrBlurred = document.hidden || !document.hasFocus();
+      if (isHiddenOrBlurred) {
         scheduleDetectionFromTabLeave();
       } else {
         cancelTabLeaveDetectionSchedule();
       }
+    });
+
+    window.addEventListener("blur", function () {
+      if (!isExamScene(activeScene) || detectionRunning) return;
+      scheduleDetectionFromTabLeave();
+    });
+
+    window.addEventListener("focus", function () {
+      if (!document.hidden && document.hasFocus()) {
+        cancelTabLeaveDetectionSchedule();
+      }
+    });
+
+    window.addEventListener("popstate", function () {
+      if (!isExamScene(activeScene)) return;
+      showDetectionThenResume(activeScene, { skipCooldown: true });
+    });
+
+    window.addEventListener("beforeunload", function (e) {
+      if (!isExamScene(activeScene)) return;
+      setTimeout(function () {
+        if (isExamScene(activeScene)) {
+          showDetectionThenResume(activeScene, { skipCooldown: true });
+        }
+      }, 100);
     });
 
     document.addEventListener("keydown", function (ev) {

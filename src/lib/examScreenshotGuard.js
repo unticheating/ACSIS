@@ -91,9 +91,6 @@ export function getFocusViolationFromKey(ev) {
     return { eventType: 'devtools_open', details: 'F12' }
   }
 
-  if (isAltKey(ev)) {
-    return { eventType: 'alt_tab', details: ev.code || 'Alt key' }
-  }
   if (ev.altKey && ev.key === 'Tab') {
     return { eventType: 'alt_tab', details: 'Alt+Tab' }
   }

@@ -167,6 +167,7 @@ export async function getTopRankedSessionQuery(examId) {
        er.rank,
        er.percentage,
        er.raw_score AS "rawScore",
+       er.total_points AS "totalPoints",
        TRIM(u.first_name || ' ' || COALESCE(u.middle_name || ' ', '') || u.last_name) AS "studentName",
        ${SQL_MEMBER_SCHOOL_ID} AS "schoolId"
      FROM exam_results er

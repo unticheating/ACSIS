@@ -579,16 +579,9 @@ export default function TeacherCreateExamPage() {
           })
           if (res.ok) {
             setLastSaved(new Date())
-            const refresh = await apiFetch(`/api/teacher/classes/${selectedClass}/exams/${examId}`)
-            if (refresh.ok) {
-              const exam = await refresh.json()
-              const { sections: synced } = mapExamToBuilderState(exam)
-              setSections(synced)
-              setActiveSectionId((prev) => {
-                const still = synced.find((s) => String(s.id) === String(prev))
-                return still ? prev : synced[0]?.id || prev
-              })
-            }
+            // Removed refresh from server: fetching and setting sections here
+            // caused infinite autosave loops and unmounted the inline editor
+            // for newly added questions because local IDs were replaced.
           } else {
             const data = await res.json().catch(() => ({}))
             acsisToastError(data.error || 'Could not save exam changes.')

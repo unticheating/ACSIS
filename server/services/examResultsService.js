@@ -206,6 +206,7 @@ export async function getTeacherExamResultsService(classId, examId, teacherMembe
             schoolId: topStudent.schoolId,
             percentage: topStudent.percentage != null ? Number(topStudent.percentage) : null,
             rawScore: topStudent.rawScore != null ? Number(topStudent.rawScore) : null,
+            totalPoints: topStudent.totalPoints != null ? Number(topStudent.totalPoints) : null,
           }
         : null,
       sessions,
