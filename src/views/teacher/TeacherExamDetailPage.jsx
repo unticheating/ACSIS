@@ -1,6 +1,20 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Copy, Eye, EyeOff, MoreVertical, Pencil, Play, Presentation, Radio, Send, Trash2, UsersRound } from 'lucide-react'
+import {
+  Copy,
+  Eye,
+  EyeOff,
+  MoreVertical,
+  Pencil,
+  Play,
+  Presentation,
+  Radio,
+  RotateCcw,
+  Send,
+  StopCircle,
+  Trash2,
+  UsersRound,
+} from 'lucide-react'
 import { useTeacherShellBreadcrumbTrail } from '@/context/TeacherShellBreadcrumbContext.jsx'
 import TeacherMcTabs from '@/components/teacher/TeacherMcTabs.jsx'
 import { apiFetch } from '@/lib/apiFetch.js'
@@ -265,7 +279,7 @@ export default function TeacherExamDetailPage() {
     const ok = await confirm({
       title: 'End this exam?',
       description: 'Students will no longer be able to enter or submit.',
-      confirmLabel: 'End exam',
+      confirmLabel: 'Close exam',
       destructive: true,
     })
     if (!ok) return
@@ -507,7 +521,7 @@ export default function TeacherExamDetailPage() {
                 className="acsis-exam-detail__lobby-link"
                 onClick={() => setLobbyModalOpen(true)}
               >
-                {lobbyCount} student{lobbyCount === 1 ? '' : 's'} in lobby — view names
+                {lobbyCount} student{lobbyCount === 1 ? '' : 's'} in lobby · view names
               </button>
             ) : (
               'Students can join with the exam code'
@@ -519,8 +533,14 @@ export default function TeacherExamDetailPage() {
     if (active) {
       return (
         <div className="acsis-exam-detail__cta-row acsis-exam-detail__cta-row--inline">
-          <button type="button" className="acsis-btn-ghost" onClick={() => void endExam()}>
-            End exam (close for students)
+          <button
+            type="button"
+            className="acsis-btn-ghost"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
+            onClick={() => void endExam()}
+          >
+            <StopCircle size={18} strokeWidth={2.5} aria-hidden />
+            Close exam
           </button>
           <p className="acsis-exam-detail__cta-hint">
             {stats
@@ -536,9 +556,10 @@ export default function TeacherExamDetailPage() {
           <button
             type="button"
             className="acsis-mc-create-btn"
-            style={{ border: 'none' }}
+            style={{ border: 'none', display: 'inline-flex', alignItems: 'center', gap: 8 }}
             onClick={() => setRestartDialogOpen(true)}
           >
+            <RotateCcw size={18} strokeWidth={2.5} aria-hidden />
             Restart exam
           </button>
         </div>
@@ -655,12 +676,12 @@ export default function TeacherExamDetailPage() {
                 Assign students
               </DropdownMenuActionItem>
               {active ? (
-                <DropdownMenuActionItem variant="warning" onSelect={() => void endExam()}>
-                  End exam
+                <DropdownMenuActionItem icon={StopCircle} variant="warning" onSelect={() => void endExam()}>
+                  Close exam
                 </DropdownMenuActionItem>
               ) : null}
               {closed && !draft ? (
-                <DropdownMenuActionItem onSelect={() => setRestartDialogOpen(true)}>
+                <DropdownMenuActionItem icon={RotateCcw} onSelect={() => setRestartDialogOpen(true)}>
                   Restart exam
                 </DropdownMenuActionItem>
               ) : null}
@@ -861,7 +882,7 @@ export default function TeacherExamDetailPage() {
                   Students join with the exam password. Submissions update automatically while the exam is live.
                 </p>
               ) : closed ? (
-                <p className="acsis-exam-detail__results-hint">Exam closed — release scores when you are ready.</p>
+                <p className="acsis-exam-detail__results-hint">Exam closed. Release scores when you are ready.</p>
               ) : null}
             </div>
 
@@ -1047,12 +1068,24 @@ export default function TeacherExamDetailPage() {
                   Edit questions
                 </Link>
                 {active ? (
-                  <button type="button" className="acsis-btn-ghost" onClick={() => void endExam()}>
-                    End exam
+                  <button
+                    type="button"
+                    className="acsis-btn-ghost"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
+                    onClick={() => void endExam()}
+                  >
+                    <StopCircle size={16} strokeWidth={2.5} aria-hidden />
+                    Close exam
                   </button>
                 ) : null}
                 {closed && !draft ? (
-                  <button type="button" className="acsis-btn-ghost" onClick={() => setRestartDialogOpen(true)}>
+                  <button
+                    type="button"
+                    className="acsis-btn-ghost"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
+                    onClick={() => setRestartDialogOpen(true)}
+                  >
+                    <RotateCcw size={16} strokeWidth={2.5} aria-hidden />
                     Restart exam
                   </button>
                 ) : null}

@@ -17,7 +17,6 @@ import {
   markSessionSubmittedQuery,
   updateExamStatusByIdQuery,
   deleteExamSessionsQuery,
-  unlockExamSessionsQuery,
   upsertStudentAnswerQuery,
 } from '../repositories/examSessionRepository.js'
 
@@ -331,8 +330,40 @@ export async function startExamService(classId, examId, teacherMemberId = null, 
   return { ok: true, status: next }
 }
 
+function buildRestartSchedulePatch(exam, { newScheduledStart, newScheduledEnd } = {}) {
+  const now = new Date()
+  const patch = {}
+
+  if (newScheduledStart !== undefined) {
+    patch.scheduledStart = newScheduledStart ? new Date(newScheduledStart) : now
+  } else {
+    patch.scheduledStart = now
+  }
+
+  if (newScheduledEnd !== undefined) {
+    patch.scheduledEnd = newScheduledEnd ? new Date(newScheduledEnd) : null
+  } else {
+    const oldStartMs = exam.scheduled_start ? new Date(exam.scheduled_start).getTime() : NaN
+    const oldEndMs = exam.scheduled_end ? new Date(exam.scheduled_end).getTime() : NaN
+    if (Number.isFinite(oldStartMs) && Number.isFinite(oldEndMs) && oldEndMs > oldStartMs) {
+      patch.scheduledEnd = new Date(patch.scheduledStart.getTime() + (oldEndMs - oldStartMs))
+    } else {
+      patch.scheduledEnd = null
+    }
+  }
+
+  if (
+    patch.scheduledEnd instanceof Date &&
+    Number.isFinite(patch.scheduledEnd.getTime()) &&
+    patch.scheduledEnd <= patch.scheduledStart
+  ) {
+    patch.scheduledEnd = null
+  }
+
+  return patch
+}
+
 export async function restartExamService(classId, examId, teacherMemberId = null, opts = {}) {
-  const { newScheduledEnd, newScheduledStart } = opts
   const exam = await getExamForJoinQuery(classId, examId)
   if (!exam) {
     return { ok: false, status: 404, error: 'Exam not found.' }
@@ -351,20 +382,14 @@ export async function restartExamService(classId, examId, teacherMemberId = null
     await closeOtherTeacherOngoingExamsQuery(teacherMemberId, classId, examId)
   }
 
-  const schedulePatch = {}
-  if (newScheduledStart !== undefined) {
-    schedulePatch.scheduledStart = newScheduledStart ? new Date(newScheduledStart) : null
-  }
-  if (newScheduledEnd !== undefined) {
-    schedulePatch.scheduledEnd = newScheduledEnd ? new Date(newScheduledEnd) : null
-  }
+  const schedulePatch = buildRestartSchedulePatch(exam, opts)
 
   const updated = await updateExamStatusByIdQuery(classId, examId, next, schedulePatch)
   if (!updated) {
     return { ok: false, status: 500, error: 'Failed to restart exam.' }
   }
 
-  await unlockExamSessionsQuery(examId)
+  await deleteExamSessionsQuery(examId)
 
   if (teacherMemberId) {
     void recordTeacherActivityQuery({

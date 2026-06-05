@@ -7,6 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog.jsx'
+import { RotateCcw } from 'lucide-react'
 import { DateTimePicker } from '@/components/ui/date-time-picker.jsx'
 
 export default function RestartExamDialog({ open, onOpenChange, onRestart, defaultStart, defaultEnd }) {
@@ -20,7 +21,18 @@ export default function RestartExamDialog({ open, onOpenChange, onRestart, defau
     let start = defaultStart ? new Date(defaultStart) : new Date()
     if (Number.isNaN(start.getTime()) || start < now) start = now
     let end = defaultEnd ? new Date(defaultEnd) : null
-    if (end && (Number.isNaN(end.getTime()) || end < start)) end = null
+    if (defaultStart && defaultEnd) {
+      const oldStart = new Date(defaultStart)
+      const oldEnd = new Date(defaultEnd)
+      if (
+        !Number.isNaN(oldStart.getTime()) &&
+        !Number.isNaN(oldEnd.getTime()) &&
+        oldEnd > oldStart
+      ) {
+        end = new Date(start.getTime() + (oldEnd.getTime() - oldStart.getTime()))
+      }
+    }
+    if (end && (Number.isNaN(end.getTime()) || end <= start)) end = null
     setNewStart(start)
     setNewEnd(end)
   }, [open, defaultStart, defaultEnd])
@@ -85,10 +97,12 @@ export default function RestartExamDialog({ open, onOpenChange, onRestart, defau
             <button
               type="button"
               className="acsis-mc-create-btn"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
               disabled={restarting}
               onClick={handleConfirm}
             >
-              {restarting ? 'Restarting…' : 'Restart Exam'}
+              <RotateCcw size={16} strokeWidth={2.5} aria-hidden />
+              {restarting ? 'Restarting…' : 'Restart exam'}
             </button>
           </DialogFooter>
         </div>

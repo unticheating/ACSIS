@@ -152,9 +152,31 @@ export default function StudentExamSessionPage() {
     const interval = window.setInterval(async () => {
       try {
         const data = await fetchStudentExamSession(classId, examId)
+        if (!data.joined) {
+          setNeedsPassword(true)
+          setExamLocked(false)
+          setLockReason(null)
+          lockingRef.current = false
+          setScene('lobby')
+          setHit(data.exam ? { exam: data.exam } : null)
+          return
+        }
         if (data.sessionStatus === 'submitted') return
         const examSt = normalizeExamStatus(data.exam?.status)
-        if (examSt !== PG_EXAM_STATUS.OPEN) return
+        if (examSt !== PG_EXAM_STATUS.OPEN) {
+          setExamLocked(false)
+          setLockReason(null)
+          lockingRef.current = false
+          setScene('lobby')
+          setHit((prev) => ({
+            exam: {
+              ...(prev?.exam || {}),
+              ...data.exam,
+              questions: prev?.exam?.questions || data.questions || [],
+            },
+          }))
+          return
+        }
         const loadedMax = resolveMaxWarnings(data.maxWarnings, institutionMaxWarnings)
         setMaxWarnings(loadedMax)
         setWarningCount(displayStrikeCount(data.warningCount, loadedMax))
@@ -163,6 +185,18 @@ export default function StudentExamSessionPage() {
         setLockReason(locked ? data.lockReason || null : null)
         examLockedRef.current = locked
         warningCountRef.current = displayStrikeCount(data.warningCount, loadedMax)
+        lockingRef.current = false
+        setHit((prev) =>
+          prev
+            ? {
+                exam: {
+                  ...prev.exam,
+                  ...data.exam,
+                  questions: data.questions?.length ? data.questions : prev.exam?.questions || [],
+                },
+              }
+            : { exam: { ...data.exam, questions: data.questions || [] } },
+        )
       } catch {
         /* ignore transient poll errors */
       }
