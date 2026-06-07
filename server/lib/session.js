@@ -31,7 +31,16 @@ export function verifySession(token) {
 
 /** @param {import('express').Response} res @param {SessionPayload} payload */
 export function setSessionCookie(res, payload) {
-  res.cookie(SESSION_COOKIE, signSession(payload), {
+  // Never embed base64 data URLs in the JWT cookie — they cause HTTP header overflow.
+  // Only keep short external URLs (e.g. Google profile pictures).
+  const safeAvatarUrl =
+    typeof payload.avatarUrl === 'string' && payload.avatarUrl.startsWith('data:')
+      ? null
+      : payload.avatarUrl ?? null
+
+  const cookiePayload = { ...payload, avatarUrl: safeAvatarUrl }
+
+  res.cookie(SESSION_COOKIE, signSession(cookiePayload), {
     httpOnly: true,
     secure: config.nodeEnv === 'production',
     sameSite: 'lax',

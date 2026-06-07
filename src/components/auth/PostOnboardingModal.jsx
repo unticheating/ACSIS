@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { initialJoinClassByCode, joinClassByCode, saveStudentNumber } from '@/lib/authApi.js'
+import { formatSchoolIdInput, validateSchoolIdClient } from '@/lib/userFormConstants.js'
 import './PostOnboardingModal.css'
 
 const STEP_STUDENT_NUMBER = 'student_number'
@@ -58,8 +59,9 @@ export default function PostOnboardingModal({ authUser, onComplete }) {
     try {
       if (currentStep === STEP_STUDENT_NUMBER) {
         const num = studentNumber.trim()
-        if (!num) {
-          setError('Student number is required.')
+        const validationError = validateSchoolIdClient(num, true, 'student')
+        if (validationError) {
+          setError(validationError)
           setLoading(false)
           return
         }
@@ -101,7 +103,7 @@ export default function PostOnboardingModal({ authUser, onComplete }) {
       label: 'Student Number',
       placeholder: 'e.g. 22-00001',
       value: studentNumber,
-      onChange: setStudentNumber,
+      onChange: (val) => setStudentNumber(formatSchoolIdInput(val)),
       inputType: 'text',
       inputId: 'onboarding-student-number',
     },

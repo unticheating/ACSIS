@@ -87,7 +87,7 @@ export function isExamEnterableByStudent(status, sessionStatus, scheduledStart) 
 /** Badge label on student class stream — prefers personal session state. */
 export function labelForStudentExam(exam) {
   if ((exam?.sessionStatus || '').toLowerCase() === 'submitted') {
-    return exam.percentage != null ? `Submitted · ${exam.percentage}%` : 'Submitted'
+    return 'Submitted'
   }
   if ((exam?.sessionStatus || '').toLowerCase() === 'in_progress') {
     const examSt = normalizeExamStatus(exam?.status)

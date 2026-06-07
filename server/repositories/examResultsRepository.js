@@ -282,13 +282,17 @@ export async function markResultEmailSentQuery(sessionId) {
 export async function getMemberDisplayNameQuery(memberId) {
   const pool = getPool()
   const { rows } = await pool.query(
-    `SELECT TRIM(u.first_name || ' ' || COALESCE(u.middle_name || ' ', '') || u.last_name) AS name
+    `SELECT TRIM(u.first_name || ' ' || COALESCE(u.middle_name || ' ', '') || u.last_name) AS name,
+            u.avatar_url
      FROM institution_members im
      JOIN users u ON u.uid = im.uid
      WHERE im.member_id = $1`,
     [memberId],
   )
-  return rows[0]?.name || 'Faculty'
+  return {
+    name: rows[0]?.name || 'Faculty',
+    avatarUrl: rows[0]?.avatar_url || null,
+  }
 }
 
 export async function listStudentPerformanceQuery(studentMemberId) {

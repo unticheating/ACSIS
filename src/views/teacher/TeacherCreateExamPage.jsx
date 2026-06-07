@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams, useNavigate } from 'react-router-dom'
-import { Clock, Plus, Shuffle, Trash2, ArrowLeft, GripVertical, Layers, ImageIcon, X, Pencil, Copy, Calculator } from 'lucide-react'
+import { Clock, Plus, Shuffle, Trash2, ArrowLeft, GripVertical, Layers, ImageIcon, X, Pencil, Copy, Calculator, Settings } from 'lucide-react'
 import { Label } from '@/components/ui/label.jsx'
 import { Button } from '@/components/ui/button.jsx'
 import { Input } from '@/components/ui/input.jsx'
@@ -169,9 +169,10 @@ export default function TeacherCreateExamPage() {
   const [loadingEditExam, setLoadingEditExam] = useState(Boolean(editExamIdParam))
   const [isSaving, setIsSaving] = useState(false)
   const [lastSaved, setLastSaved] = useState(null)
-  const [showQuestionForm, setShowQuestionForm] = useState(true)
+  const [showQuestionForm, setShowQuestionForm] = useState(false)
   const [editingQuestion, setEditingQuestion] = useState(/** @type {{ sectionId: string, questionId: string } | null} */ (null))
   const editPanelRef = useRef(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   // Bulk Points Modal States
   const [bulkPointsOpen, setBulkPointsOpen] = useState(false)
@@ -483,7 +484,7 @@ export default function TeacherCreateExamPage() {
     setSections((prev) => {
       const next = newSection(prev.length + 1)
       setActiveSectionId(next.id)
-      setShowQuestionForm(true)
+      setShowQuestionForm(false)
       return [...prev, next]
     })
   }
@@ -533,7 +534,7 @@ export default function TeacherCreateExamPage() {
       }
     }
     setActiveSectionId(sectionId)
-    setShowQuestionForm(true)
+    setShowQuestionForm(false)
   }
 
   // Autosave logic
@@ -702,18 +703,39 @@ export default function TeacherCreateExamPage() {
     if (!result.destination) return
     const sourceIndex = result.source.index
     const destinationIndex = result.destination.index
-    if (sourceIndex === destinationIndex) return
 
-    const sectionId = result.source.droppableId
-    setSections((prev) =>
-      prev.map((sec) => {
-        if (sec.id !== sectionId) return sec
-        const newQuestions = Array.from(sec.questions)
-        const [moved] = newQuestions.splice(sourceIndex, 1)
-        newQuestions.splice(destinationIndex, 0, moved)
-        return { ...sec, questions: newQuestions }
+    const sourceSectionId = result.source.droppableId
+    const destSectionId = result.destination.droppableId
+
+    if (sourceSectionId === destSectionId) {
+      if (sourceIndex === destinationIndex) return
+      setSections((prev) =>
+        prev.map((sec) => {
+          if (sec.id !== sourceSectionId) return sec
+          const newQuestions = Array.from(sec.questions)
+          const [moved] = newQuestions.splice(sourceIndex, 1)
+          newQuestions.splice(destinationIndex, 0, moved)
+          return { ...sec, questions: newQuestions }
+        })
+      )
+    } else {
+      setSections((prev) => {
+        const next = [...prev]
+        const sourceSecIndex = next.findIndex(s => s.id === sourceSectionId)
+        const destSecIndex = next.findIndex(s => s.id === destSectionId)
+        if (sourceSecIndex === -1 || destSecIndex === -1) return prev
+
+        const sourceSec = { ...next[sourceSecIndex], questions: [...next[sourceSecIndex].questions] }
+        const destSec = { ...next[destSecIndex], questions: [...next[destSecIndex].questions] }
+
+        const [moved] = sourceSec.questions.splice(sourceIndex, 1)
+        destSec.questions.splice(destinationIndex, 0, moved)
+
+        next[sourceSecIndex] = sourceSec
+        next[destSecIndex] = destSec
+        return next
       })
-    )
+    }
   }
 
   const hourLabel = (h) => (h === 0 ? '00' : String(h))
@@ -865,87 +887,122 @@ export default function TeacherCreateExamPage() {
   const renderQuestionForm = (isEditing) => (
     <div className={`exam-builder-panel__body space-y-6${isEditing ? ' exam-builder-inline-editor__body' : ''}`}>
       <div className="grid md:grid-cols-3 gap-6">
-        <div className="space-y-2 md:col-span-1">
-          <Label>Question Type</Label>
-          <select
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            value={questionType}
-            onChange={(e) => {
-              setQuestionType(e.target.value)
-              resetAnswerFields()
-            }}
-          >
-            <option value="multiple">Multiple Choice</option>
-            <option value="identification">Identification</option>
-            <option value="truefalse">True / False</option>
-            <option value="coding">Coding / Scripting</option>
-          </select>
-        </div>
-        <div className="space-y-2 md:col-span-1">
-          <Label>Points</Label>
-          <Input
-            type="number"
-            min="1"
-            value={questionPoints}
-            onChange={(e) => setQuestionPoints(Number(e.target.value) || 1)}
-          />
-        </div>
-        <div className="space-y-2 md:col-span-2">
-          <Label>Question Text</Label>
-          <textarea
-            rows={3}
-            className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[80px]"
-            placeholder="Enter your question here..."
-            value={questionText}
-            onChange={(e) => setQuestionText(e.target.value)}
-          />
-        </div>
-      </div>
-
-      {/* Image Attachment */}
-      <div className="space-y-2">
-        <Label className="flex items-center gap-1.5">
-          <ImageIcon size={14} className="text-muted-foreground" />
-          Attach Image <span className="font-normal text-muted-foreground">(optional, max 2 MB)</span>
-        </Label>
-        {questionImage ? (
-          <div className="relative inline-block">
-            <img
-              src={questionImage}
-              alt="Question attachment"
-              className="max-h-48 max-w-full rounded-lg border border-border object-contain bg-muted"
-            />
-            <button
-              type="button"
-              onClick={() => {
-                setQuestionImage(null)
-                if (imageInputRef.current) imageInputRef.current.value = ''
-              }}
-              className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center shadow-sm hover:bg-destructive/80 transition-colors"
-              aria-label="Remove image"
-            >
-              <X size={12} />
-            </button>
-          </div>
-        ) : (
-          <div
-            className="flex items-center justify-center border-2 border-dashed border-border rounded-lg p-6 cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all"
-            onClick={() => imageInputRef.current?.click()}
-          >
-            <div className="text-center">
-              <ImageIcon size={24} className="mx-auto text-muted-foreground mb-2" />
-              <p className="text-sm text-muted-foreground">Click to upload an image</p>
-              <p className="text-xs text-muted-foreground/60 mt-1">PNG, JPG, GIF up to 2MB</p>
+        <div className="space-y-6 md:col-span-2">
+          <div className="grid grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <Label>Question Type</Label>
+              <select
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                value={questionType}
+                onChange={(e) => {
+                  setQuestionType(e.target.value)
+                  resetAnswerFields()
+                }}
+              >
+                <option value="multiple">Multiple Choice</option>
+                <option value="identification">Identification</option>
+                <option value="truefalse">True / False</option>
+                <option value="coding">Coding / Scripting</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label>Points</Label>
+              <Input
+                type="number"
+                min="1"
+                value={questionPoints}
+                onChange={(e) => setQuestionPoints(Number(e.target.value) || 1)}
+              />
             </div>
           </div>
-        )}
-        <input
-          ref={imageInputRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={handleImageUpload}
-        />
+          <div className="space-y-2">
+            <Label>Question Text</Label>
+            <textarea
+              rows={5}
+              className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[120px]"
+              placeholder="Enter your question here..."
+              value={questionText}
+              onChange={(e) => setQuestionText(e.target.value)}
+              onPaste={(e) => {
+                const items = e.clipboardData?.items;
+                if (!items) return;
+                for (let i = 0; i < items.length; i++) {
+                  if (items[i].type.indexOf('image') !== -1) {
+                    const file = items[i].getAsFile();
+                    if (file) {
+                      const reader = new FileReader()
+                      reader.onload = (ev) => setQuestionImage(ev.target.result)
+                      reader.readAsDataURL(file)
+                      break;
+                    }
+                  }
+                }
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Image Attachment */}
+        <div className="space-y-2 md:col-span-1">
+          <Label className="flex items-center gap-1.5">
+            <ImageIcon size={14} className="text-muted-foreground" />
+            Attach Image <span className="font-normal text-muted-foreground">(max 2 MB)</span>
+          </Label>
+          {questionImage ? (
+            <div className="relative inline-block w-full">
+              <img
+                src={questionImage}
+                alt="Question attachment"
+                className="max-h-48 max-w-full w-full rounded-lg border border-border object-contain bg-muted"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setQuestionImage(null)
+                  if (imageInputRef.current) imageInputRef.current.value = ''
+                }}
+                className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center shadow-sm hover:bg-destructive/80 transition-colors"
+                aria-label="Remove image"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          ) : (
+            <div
+              className="flex items-center justify-center border-2 border-dashed border-border rounded-lg p-6 cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all h-[calc(100%-1.5rem)] min-h-[140px]"
+              onClick={() => imageInputRef.current?.click()}
+              onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const file = e.dataTransfer.files?.[0];
+                if (file && file.type.startsWith('image/')) {
+                  if (file.size > 2 * 1024 * 1024) {
+                    acsisToastError('Image must be smaller than 2 MB.')
+                    return
+                  }
+                  const reader = new FileReader()
+                  reader.onload = (ev) => setQuestionImage(ev.target.result)
+                  reader.readAsDataURL(file)
+                }
+              }}
+            >
+              <div className="text-center">
+                <ImageIcon size={24} className="mx-auto text-muted-foreground mb-2" />
+                <p className="text-sm text-muted-foreground font-medium">Drop image here</p>
+                <p className="text-xs text-muted-foreground/80 mt-1">or click to browse</p>
+                <p className="text-xs text-muted-foreground/60 mt-1">PNG, JPG, GIF up to 2MB</p>
+              </div>
+            </div>
+          )}
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleImageUpload}
+          />
+        </div>
       </div>
 
       <div className="pt-4 exam-builder-options-divider">{optionsBlock}</div>
@@ -958,7 +1015,11 @@ export default function TeacherCreateExamPage() {
           <Button type="button" variant="outline" onClick={cancelEditQuestion} className="w-full md:w-auto">
             Cancel edit
           </Button>
-        ) : null}
+        ) : (
+          <Button type="button" variant="outline" onClick={() => setShowQuestionForm(false)} className="w-full md:w-auto">
+            Cancel
+          </Button>
+        )}
       </div>
     </div>
   )
@@ -978,21 +1039,48 @@ export default function TeacherCreateExamPage() {
   }
 
   return (
-    <div className="flex flex-col md:flex-row h-full lg:h-[calc(100vh-64px)] bg-background">
-      {/* LEFT SIDEBAR - EXAM DETAILS */}
-      <aside className="w-full md:w-[320px] lg:w-[380px] bg-card border-r border-border md:h-full overflow-y-auto flex flex-col shrink-0">
-        <div className="p-6 border-b border-border flex items-center gap-3">
+    <div className="flex flex-col bg-background min-h-[calc(100vh-64px)]">
+      {/* TOP HEADER */}
+      <header className="border-b border-border bg-card px-6 py-4 flex items-center justify-between shrink-0 z-10 shadow-sm">
+        <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" asChild className="rounded-full text-muted-foreground hover:text-foreground">
             <Link to={backHref}>
               <ArrowLeft size={20} />
             </Link>
           </Button>
-          <h1 className="text-xl font-bold tracking-tight text-foreground">
-            {isEditMode ? 'Edit exam' : 'Create exam'}
-          </h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-xl font-bold tracking-tight text-foreground line-clamp-1 max-w-[400px]">
+              {examTitle || (isEditMode ? 'Edit exam' : 'Create exam')}
+            </h1>
+            <Button variant="ghost" size="icon" onClick={() => setSettingsOpen(true)} className="rounded-full text-muted-foreground hover:text-foreground h-8 w-8">
+              <Settings size={18} />
+            </Button>
+          </div>
+        </div>
+        <div>
+          {isSaving ? (
+            <span className="text-xs font-medium text-amber-600 bg-amber-500/10 px-3 py-1.5 rounded-full animate-pulse">Saving...</span>
+          ) : lastSaved ? (
+            <span className="text-xs font-medium text-emerald-600 bg-emerald-500/10 px-3 py-1.5 rounded-full">
+              {isEditMode ? 'Changes saved' : 'Draft saved'}
+            </span>
+          ) : null}
+        </div>
+      </header>
+
+      {/* SETTINGS OVERLAY */}
+      <div className={`fixed inset-y-0 right-0 w-full sm:w-[400px] bg-card border-l border-border shadow-2xl transform transition-transform duration-300 z-[9999] flex flex-col ${settingsOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+        <div className="p-4 border-b border-border flex items-center justify-between bg-muted/30 shrink-0">
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <Settings size={18} />
+            Exam Settings
+          </h2>
+          <Button variant="ghost" size="icon" onClick={() => setSettingsOpen(false)} className="rounded-full">
+            <X size={20} />
+          </Button>
         </div>
         
-        <div className="p-6 flex-1 space-y-8">
+        <div className="p-6 flex-1 space-y-8 overflow-y-auto">
           <div className="space-y-4">
             <div className="space-y-2">
               <Label className="text-sm font-semibold">Target Class</Label>
@@ -1086,14 +1174,14 @@ export default function TeacherCreateExamPage() {
                 <p className="text-xs text-muted-foreground mt-1">If set, the exam will strictly start and end at these times.</p>
               </div>
               
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                 <div className="space-y-2">
                   <Label className="text-sm font-semibold flex items-center gap-2">
                     <Clock size={14} className="text-muted-foreground" />
                     Start Time
                   </Label>
                   <DateTimePicker
-                    value={scheduledStart}
+                    value={scheduledStart ? new Date(scheduledStart) : undefined}
                     onChange={(date) => setScheduledStart(date ? date.toISOString() : '')}
                     placeholder="Select start date & time"
                     className="w-full"
@@ -1106,12 +1194,12 @@ export default function TeacherCreateExamPage() {
                     End Time
                   </Label>
                   <DateTimePicker
-                    value={scheduledEnd}
+                    value={scheduledEnd ? new Date(scheduledEnd) : undefined}
                     onChange={(date) => setScheduledEnd(date ? date.toISOString() : '')}
                     placeholder="Select end date & time"
                     className="w-full"
                     disablePast
-                    minDateTime={scheduledStart || null}
+                    minDateTime={scheduledStart ? new Date(scheduledStart) : undefined}
                   />
                 </div>
               </div>
@@ -1150,19 +1238,45 @@ export default function TeacherCreateExamPage() {
           </div>
         </div>
 
-        <div className="p-6 border-t border-border bg-muted/10">
-          <Button 
-            onClick={createExam}
-            disabled={isSubmitting}
-            className="w-full py-6 text-md shadow-md acsis-mc-create-btn border-none"
-          >
-            {isSubmitting ? 'Saving…' : isEditMode ? 'Save changes' : 'Finish & save exam'}
-          </Button>
-        </div>
-      </aside>
+      </div>
+      {settingsOpen && <div className="fixed inset-0 bg-black/20 z-[9998] backdrop-blur-sm transition-opacity" onClick={() => setSettingsOpen(false)} />}
+
       {/* MAIN CONTENT - QUESTIONS BUILDER */}
-      <main className="exam-builder flex-1 p-6 md:p-8 lg:p-12 overflow-y-auto relative">
-        <div className="max-w-3xl mx-auto space-y-8">
+      <div className="flex flex-1 items-start">
+        {/* SIDEBAR OUTLINE */}
+        <aside className="w-56 lg:w-64 border-r border-border bg-background hidden md:block shrink-0 sticky top-0 h-[calc(100vh-100px)] overflow-y-auto">
+          <div className="p-6">
+            <h3 className="font-semibold text-xs mb-3 text-muted-foreground uppercase tracking-wider">Exam Outline</h3>
+            <ul className="space-y-1">
+              {sections.map((sec, secIndex) => (
+                <li key={sec.id}>
+                  <a
+                    href={`#set-${sec.id}`}
+                    className={`block px-3 py-2 rounded-md text-sm transition-colors line-clamp-2 ${
+                      activeSectionId === sec.id
+                        ? 'bg-primary/10 text-primary font-medium'
+                        : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+                    }`}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      activateSection(sec.id)
+                      const el = document.getElementById(`set-${sec.id}`)
+                      if (el) {
+                        const y = el.getBoundingClientRect().top + window.scrollY - 100
+                        window.scrollTo({ top: y, behavior: 'smooth' })
+                      }
+                    }}
+                  >
+                    {sec.title || `Set ${secIndex + 1}`}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </aside>
+
+        <main className="exam-builder flex-1 p-6 md:p-8 lg:p-12 min-w-0">
+          <div className="max-w-3xl mx-auto space-y-8">
           
           <div className="exam-builder-toolbar flex items-center justify-between pb-4">
             <div>
@@ -1174,13 +1288,6 @@ export default function TeacherCreateExamPage() {
                   {sections.length} {sections.length === 1 ? 'set' : 'sets'} · {totalQuestions}{' '}
                   {totalQuestions === 1 ? 'question' : 'questions'}
                 </p>
-                {isSaving ? (
-                  <span className="text-xs font-medium text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded-full animate-pulse">Saving...</span>
-                ) : lastSaved ? (
-                  <span className="text-xs font-medium text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full">
-                    {isEditMode ? 'Changes saved' : 'Draft saved'}
-                  </span>
-                ) : null}
               </div>
             </div>
             <Button
@@ -1200,7 +1307,7 @@ export default function TeacherCreateExamPage() {
                 for (let i = 0; i < secIndex; i++) qOffset += sections[i].questions.length
                 const isActiveSet = activeSectionId === sec.id
                 return (
-                  <div key={sec.id} className="exam-builder-set">
+                  <div key={sec.id} id={`set-${sec.id}`} className="exam-builder-set">
                     <section
                       className={`exam-builder-panel exam-builder-panel--meta${isActiveSet ? ' exam-builder-panel--active' : ''}`}
                     >
@@ -1210,13 +1317,6 @@ export default function TeacherCreateExamPage() {
                           <p className="exam-builder-panel__title">Set details</p>
                         </div>
                         <div className="exam-builder-panel__actions">
-                          <Button
-                            variant={isActiveSet ? 'default' : 'secondary'}
-                            size="sm"
-                            onClick={() => activateSection(sec.id)}
-                          >
-                            {isActiveSet ? 'Adding here' : 'Add questions here'}
-                          </Button>
                           {sections.length > 1 && (
                             <Button
                               variant="destructive"
@@ -1406,8 +1506,30 @@ export default function TeacherCreateExamPage() {
                       </div>
                     </section>
 
-                    {isActiveSet && !editingQuestion ? (
-                      <section className="exam-builder-panel exam-builder-panel--composer exam-builder-panel--active">
+                    {!editingQuestion && (!isActiveSet || !showQuestionForm) ? (
+                      <div 
+                        className="mt-6 border-2 border-dashed border-border rounded-xl p-6 cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all flex flex-col items-center justify-center text-center group"
+                        onClick={() => {
+                          if (sec.id !== activeSectionId) {
+                            if (editingQuestion) cancelEditQuestion();
+                            else resetQuestionForm();
+                            setActiveSectionId(sec.id);
+                          }
+                          setShowQuestionForm(true);
+                          setTimeout(() => {
+                            document.getElementById(`set-${sec.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                          }, 50);
+                        }}
+                      >
+                        <p className="text-sm font-semibold text-foreground">New question</p>
+                        <p className="text-xs text-muted-foreground mt-1 mb-4">Adds to <span className="uppercase font-medium text-primary/80">{sec.title || `Set ${secIndex + 1}`}</span></p>
+                        <Button variant="outline" className="bg-background shadow-sm pointer-events-none group-hover:border-primary/50 text-foreground">
+                          <Plus className="mr-2" size={16} />
+                          {sec.questions.length > 0 ? 'Add another question' : 'Add first question'}
+                        </Button>
+                      </div>
+                    ) : isActiveSet && !editingQuestion ? (
+                      <section className="exam-builder-panel exam-builder-panel--composer exam-builder-panel--active mt-6">
                         <div className="exam-builder-panel__head">
                           <div>
                             <p className="exam-builder-panel__title">New question</p>
@@ -1415,21 +1537,11 @@ export default function TeacherCreateExamPage() {
                               Adds to {sec.title || `Set ${secIndex + 1}`}
                             </p>
                           </div>
+                          <Button variant="ghost" size="icon" onClick={() => setShowQuestionForm(false)} className="text-muted-foreground hover:text-foreground">
+                            <X size={16} />
+                          </Button>
                         </div>
-                        {showQuestionForm ? (
-                          renderQuestionForm(false)
-                        ) : (
-                          <div className="exam-builder-panel__body">
-                            <Button
-                              variant="outline"
-                              className="w-full exam-builder-add-trigger"
-                              onClick={() => setShowQuestionForm(true)}
-                            >
-                              <Plus className="mr-2" size={16} />
-                              {sec.questions.length > 0 ? 'Add another question' : 'Add first question'}
-                            </Button>
-                          </div>
-                        )}
+                        {renderQuestionForm(false)}
                       </section>
                     ) : null}
                   </div>
@@ -1440,6 +1552,7 @@ export default function TeacherCreateExamPage() {
 
         </div>
       </main>
+      </div>
 
       {ConfirmDialog}
 

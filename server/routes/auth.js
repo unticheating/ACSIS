@@ -572,4 +572,32 @@ router.post('/onboarding/join', requireAuth, async (req, res) => {
   }
 })
 
+router.post('/profile/avatar', requireAuth, async (req, res) => {
+  const session = req.authSession
+  if (!session?.uid) return res.status(401).json({ error: 'Not authenticated.' })
+
+  const pool = getPool()
+  if (!pool) return res.status(503).json({ error: 'Database unavailable.' })
+
+  const { avatarDataUrl } = req.body ?? {}
+  if (typeof avatarDataUrl !== 'string' || !avatarDataUrl.startsWith('data:image/')) {
+    return res.status(400).json({ error: 'Invalid image data.' })
+  }
+  // Limit to ~3MB base64
+  if (avatarDataUrl.length > 4 * 1024 * 1024) {
+    return res.status(413).json({ error: 'Image too large. Please use an image under 3 MB.' })
+  }
+
+  try {
+    await pool.query('UPDATE users SET avatar_url = $1 WHERE uid = $2', [avatarDataUrl, session.uid])
+    // Refresh and re-issue the session cookie
+    const nextSession = await buildSessionFromUid(pool, session.uid, { googleSub: session.googleSub })
+    setSessionCookie(res, nextSession)
+    return res.json({ ok: true, avatarUrl: avatarDataUrl })
+  } catch (err) {
+    console.error('[auth/profile/avatar]', err)
+    return res.status(500).json({ error: 'Failed to update profile picture.' })
+  }
+})
+
 export default router

@@ -16,7 +16,7 @@ import {
   listStudentAnswersForSessionQuery,
   markSessionSubmittedQuery,
   updateExamStatusByIdQuery,
-  deleteExamSessionsQuery,
+  resetExamSessionsQuery,
   upsertStudentAnswerQuery,
 } from '../repositories/examSessionRepository.js'
 
@@ -389,7 +389,7 @@ export async function restartExamService(classId, examId, teacherMemberId = null
     return { ok: false, status: 500, error: 'Failed to restart exam.' }
   }
 
-  await deleteExamSessionsQuery(examId)
+  await resetExamSessionsQuery(examId)
 
   if (teacherMemberId) {
     void recordTeacherActivityQuery({

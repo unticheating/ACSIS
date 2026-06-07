@@ -44,11 +44,15 @@ html.dark .stu-class-card,
 html.dark .stu-stream-item,
 html.dark .stu-enroll-join-box,
 html.dark .super-admin-link,
-html.dark .admin-settings-palette,
+html.dark .admin-settings-palette {
+  background: var(--bg-surface, #1a1a1a) !important;
+  border-color: var(--border-default, #2a2a2a) !important;
+}
 
 html.dark .reports-page .alert-sub {
   color: #f87171 !important;
 }
+
 html.dark .admin-settings-logo-preview,
 html.dark .admin-settings-logo-btn,
 html.dark .detected-item {
@@ -109,12 +113,14 @@ html.dark .table-wrapper {
   overflow: hidden;
 }
 
-html.dark .table thead tr {
+html.dark .table thead tr,
+html.dark .um-table thead tr {
   background: var(--acsis-brand-muted-bg, color-mix(in srgb, var(--acsis-brand) 14%, #1a1a1a)) !important;
   border-bottom: 1px solid var(--border-default, #2a2a2a) !important;
 }
 
-html.dark .table th {
+html.dark .table th,
+html.dark .um-table th {
   color: var(--acsis-brand-muted-text, var(--fg-default)) !important;
   font-weight: 600;
 }

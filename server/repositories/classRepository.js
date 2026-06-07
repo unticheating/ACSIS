@@ -159,6 +159,34 @@ export async function getClassOwnerMemberIdQuery(classId) {
   return result.rows[0]?.memberId ?? null;
 }
 
+export async function getInstitutionDetailsByClassIdQuery(classId) {
+  const pool = getPool();
+  const result = await pool.query(
+    `SELECT i.institution_name as "name", i.logo 
+     FROM institutions i 
+     JOIN classes c ON i.institution_id = c.institution_id 
+     WHERE c.class_id = $1`,
+    [classId]
+  );
+  return result.rows[0];
+}
+
+export async function listClassEnrolledStudentEmailsQuery(classId) {
+  const pool = getPool();
+  const result = await pool.query(
+    `SELECT u.email, u.first_name, u.last_name
+     FROM class_enrollments ce
+     JOIN institution_members im ON ce.member_id = im.member_id
+     JOIN users u ON im.uid = u.uid
+     WHERE ce.class_id = $1`,
+    [classId]
+  );
+  return result.rows.map(r => ({
+    email: r.email,
+    name: [r.first_name, r.last_name].filter(Boolean).join(' ') || 'Student'
+  }));
+}
+
 export async function listClassEnrolledStudentsQuery(classId, memberId) {
   const pool = getPool();
   const { rows } = await pool.query(

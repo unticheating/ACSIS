@@ -59,7 +59,15 @@ export default function StudentClassStreamPage() {
   }, [classId])
 
   const examsSorted = useMemo(() => {
-    const list = [...(cls?.exams || [])]
+    let list = [...(cls?.exams || [])]
+    list = list.filter((exam) => {
+      if ((exam.status || '').toLowerCase() === 'closed') return false
+      if (exam.scheduledEnd) {
+        const end = new Date(exam.scheduledEnd).getTime()
+        if (Number.isFinite(end) && Date.now() > end) return false
+      }
+      return true
+    })
     list.sort((a, b) => Number(b.id) - Number(a.id))
     return list
   }, [cls])
@@ -186,6 +194,7 @@ export default function StudentClassStreamPage() {
         </div>
       ) : (
         <div className="acsis-mc-stream">
+          <h2 className="text-xl font-semibold text-foreground mb-4">Upcoming exams</h2>
           <ul className="acsis-stream-list">
             {examsSorted.map((exam, index) => (
               <FadeIn as="li" delay={0.1 + (index * 0.05)} key={exam.id} className="acsis-stream-item acsis-card-surface">

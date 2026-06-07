@@ -144,3 +144,13 @@ export async function initialJoinClassByCode(accessCode) {
   })
   return parseJson(res)
 }
+
+export async function updateProfileAvatar(avatarDataUrl) {
+  const res = await fetch(`${API_BASE}/api/auth/profile/avatar`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ avatarDataUrl }),
+  })
+  return parseJson(res)
+}

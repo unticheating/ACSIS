@@ -1483,7 +1483,9 @@
 
 .acsis-exam-detail__settings-head {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
   gap: 14px;
   margin-bottom: 22px;
   padding-bottom: 18px;

@@ -407,9 +407,23 @@ export async function updateExamStatusByIdQuery(classId, examId, status, schedul
   return rowCount > 0
 }
 
-export async function deleteExamSessionsQuery(examId) {
+export async function resetExamSessionsQuery(examId) {
   const pool = getPool()
-  await pool.query(`DELETE FROM exam_sessions WHERE exam_id = $1`, [examId])
+  await pool.query(
+    `DELETE FROM exam_results 
+     WHERE session_id IN (SELECT session_id FROM exam_sessions WHERE exam_id = $1 AND status != 'submitted')`,
+    [examId]
+  )
+  await pool.query(
+    `UPDATE exam_sessions 
+     SET status = 'in_progress', 
+         submitted_at = NULL, 
+         locked_at = NULL, 
+         lock_reason = NULL, 
+         auto_submitted = FALSE 
+     WHERE exam_id = $1 AND status != 'submitted'`, 
+    [examId]
+  )
 }
 
 export async function unlockExamSessionsQuery(examId) {

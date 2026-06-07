@@ -2,6 +2,7 @@ import { getExamWithQuestionsQuery } from '../repositories/examRepository.js'
 import { getTeacherClassByIdQuery } from '../repositories/classRepository.js'
 import {
   computeExamRanksQuery,
+  getMemberDisplayNameQuery,
   getTopRankedSessionQuery,
   listSessionsForScoreEmailQuery,
   markResultEmailSentQuery,
@@ -53,6 +54,8 @@ export async function releaseExamScoresService(
     let emailsSent = 0
     let emailsSkipped = 0
 
+    const teacherInfo = await getMemberDisplayNameQuery(teacherMemberId)
+
     if (sendEmail) {
       const sessions = await listSessionsForScoreEmailQuery(examId, releaseIds)
       for (const row of sessions) {
@@ -68,6 +71,8 @@ export async function releaseExamScoresService(
           totalPoints: row.totalPoints,
           percentage: row.percentage,
           answerKey: includeAnswerKey ? exam.questions : null,
+          teacherName: teacherInfo.name,
+          teacherAvatarUrl: teacherInfo.avatarUrl,
         })
         if (result.sent) {
           await markResultEmailSentQuery(row.sessionId)

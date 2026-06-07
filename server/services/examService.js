@@ -12,13 +12,20 @@ import {
 } from '../repositories/examRepository.js';
 import { closeOtherTeacherOngoingExamsQuery } from '../repositories/examResultsRepository.js';
 import { finalizeExamResultsService } from './examReleaseService.js';
-import { getClassByIdQuery, getTeacherClassByIdQuery, getClassOwnerMemberIdQuery } from '../repositories/classRepository.js';
+import { 
+  getClassByIdQuery, 
+  getTeacherClassByIdQuery, 
+  getClassOwnerMemberIdQuery,
+  getInstitutionDetailsByClassIdQuery,
+  listClassEnrolledStudentEmailsQuery
+} from '../repositories/classRepository.js';
 import { getExamAssignmentAccessQuery } from '../repositories/examAssignmentRepository.js'
 import { checkEnrollment } from '../repositories/studentRepository.js';
 import { nextStatusAfterClose, nextStatusAfterPublish } from '../lib/examStatus.js';
 import { getStudentSessionsForExamsQuery } from '../repositories/examSessionRepository.js';
 import { generateExamPassword } from '../lib/examCodes.js';
 import { recordTeacherActivityQuery } from '../repositories/teacherActivityRepository.js'
+import { sendUpcomingExamEmail } from '../lib/sendEmail.js';
 
 function normalizeExamPassword(password) {
   if (password == null) return null;
@@ -350,6 +357,31 @@ export async function publishExamService(classId, examId, teacherMemberId = null
     if (!success) {
       return { ok: false, status: 404, error: 'Exam not found or you do not have permission.' };
     }
+
+    // Send emails to enrolled students about the upcoming exam
+    try {
+      const institution = await getInstitutionDetailsByClassIdQuery(classId);
+      const students = await listClassEnrolledStudentEmailsQuery(classId);
+      const emailPromises = students.map(student => {
+        if (!student.email) return Promise.resolve();
+        return sendUpcomingExamEmail({
+          to: student.email,
+          studentName: student.name,
+          examTitle: exam.title,
+          institutionName: institution?.name || 'Your Institution',
+          institutionLogo: institution?.logo || null,
+          scheduledStart: exam.scheduledStart,
+          scheduledEnd: exam.scheduledEnd,
+        });
+      });
+      // Do not block the request on sending emails
+      Promise.allSettled(emailPromises).catch(err => {
+        console.error('[examService.publishExam] Failed to send upcoming exam emails:', err);
+      });
+    } catch (err) {
+      console.error('[examService.publishExam] Error preparing upcoming exam emails:', err);
+    }
+
     return { ok: true, status: nextStatus, code: exam.code };
   } catch (err) {
     console.error('[examService.publishExam]', err);

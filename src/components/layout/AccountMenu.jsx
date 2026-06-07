@@ -1,4 +1,4 @@
-import { ChevronsUpDown, LogOut, Moon, Settings, Sun } from 'lucide-react'
+import { ChevronsUpDown, LogOut, Moon, Settings, Sun, User } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import {
   DropdownMenu,
@@ -11,6 +11,8 @@ import { DropdownMenuActionItem } from '@/components/ui/dropdown-menu-action-ite
 import { useSession } from '@/context/SessionContext.jsx'
 import { useTheme } from '@/context/ThemeContext.jsx'
 import { useAcsisConfirm } from '@/hooks/useAcsisConfirm.jsx'
+import { useState } from 'react'
+import ProfileSettingsDialog from './ProfileSettingsDialog.jsx'
 
 /**
  * @param {{
@@ -31,6 +33,7 @@ export default function AccountMenu({
   const { accounts, activeAccount, switchAccount, logout, sessionMode } = useSession()
   const { theme, toggleTheme } = useTheme()
   const { confirm, ConfirmDialog } = useAcsisConfirm()
+  const [profileOpen, setProfileOpen] = useState(false)
   const otherAccounts =
     sessionMode === 'demo' ? accounts.filter((a) => a.id !== activeAccount.id) : []
 
@@ -83,6 +86,12 @@ export default function AccountMenu({
             ))
           : null}
         {otherAccounts.length > 0 ? <DropdownMenuSeparator /> : null}
+
+        <DropdownMenuItem onSelect={() => setProfileOpen(true)} className="cursor-pointer gap-2 py-1.5 focus:bg-accent focus:text-accent-foreground">
+          <User size={16} strokeWidth={2} aria-hidden />
+          Profile Settings
+        </DropdownMenuItem>
+
         {settingsPath ? (
           <DropdownMenuItem asChild className="cursor-pointer p-0 focus:bg-transparent">
             <Link
@@ -124,6 +133,7 @@ export default function AccountMenu({
         </DropdownMenuActionItem>
       </DropdownMenuContent>
       {ConfirmDialog}
+      <ProfileSettingsDialog open={profileOpen} onOpenChange={setProfileOpen} />
     </DropdownMenu>
   )
 }

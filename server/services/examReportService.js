@@ -301,13 +301,14 @@ export async function exportExamReportService(
 
     const generatedAt = new Date()
 
-    const [sessions, stats, violations, generatorName, top] = await Promise.all([
+    const [sessions, stats, violations, teacherInfo, top] = await Promise.all([
       listExamSessionsForExamQuery(classId, examId),
       getExamSubmissionStatsQuery(examId),
       listCheatingLogsForExamQuery(examId),
       getMemberDisplayNameQuery(teacherMemberId),
       getTopRankedSessionQuery(examId),
     ])
+    const generatorName = teacherInfo.name
 
     const logType =
       reportType === 'violations'
@@ -332,6 +333,7 @@ export async function exportExamReportService(
 
     if (format === 'csv') {
       const csv = buildCsv(exam, sessions, violations, generatorName, generatedAt)
+
       return {
         ok: true,
         contentType: 'text/csv; charset=utf-8',

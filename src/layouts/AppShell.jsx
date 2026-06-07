@@ -31,7 +31,7 @@ export default function AppShell({ role }) {
 
   const { nav } = shellConfig[role]
   const settingsPath =
-    role === 'admin' ? '/admin/settings' : role === 'super_admin' ? '/super-admin/settings' : null
+    role === 'super_admin' ? '/super-admin/settings' : null
 
   const portalChrome =
     role === 'admin' || role === 'super_admin' ? (
