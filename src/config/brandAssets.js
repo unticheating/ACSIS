@@ -8,7 +8,7 @@
  * After changing, hard-refresh the tab (Ctrl+Shift+R) — browsers cache favicons aggressively.
  */
 import appLogoSrc from '../../img/plpupdatedlogo 3.png'
-import documentLogoSrc from '../../img/plpupdatedlogo 3.png' /* palitan here */
+import documentLogoSrc from '../../img/acsis-logo.svg'
 
 /** Sidebar, headers, exam chrome, auth shell */
 export const APP_LOGO_SRC = appLogoSrc

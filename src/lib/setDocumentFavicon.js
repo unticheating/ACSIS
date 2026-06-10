@@ -6,8 +6,14 @@ const APPLE_ICON_ID = 'acsis-apple-touch-icon'
  * @param {string} href Resolved image URL (e.g. from brandAssets DOCUMENT_LOGO_SRC)
  * @param {string} [type]
  */
-export function setDocumentFavicon(href, type = 'image/png') {
+function faviconMimeType(href) {
+  if (typeof href === 'string' && href.includes('.svg')) return 'image/svg+xml'
+  return 'image/png'
+}
+
+export function setDocumentFavicon(href, type) {
   if (!href || typeof document === 'undefined') return
+  const mimeType = type ?? faviconMimeType(href)
 
   document
     .querySelectorAll(
@@ -26,7 +32,7 @@ export function setDocumentFavicon(href, type = 'image/png') {
     link.rel = 'icon'
     document.head.appendChild(link)
   }
-  link.type = type
+  link.type = mimeType
   link.href = href
 
   let apple = document.getElementById(APPLE_ICON_ID)

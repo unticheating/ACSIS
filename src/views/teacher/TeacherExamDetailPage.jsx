@@ -61,7 +61,11 @@ import {
 import { Label } from '@/components/ui/label.jsx'
 import { Input } from '@/components/ui/input.jsx'
 import { DateTimePicker } from '@/components/ui/date-time-picker.jsx'
-import { mapExamToBuilderState } from '@/lib/mapExamToBuilder.js'
+import {
+  groupExamQuestionsBySet,
+  mapExamToBuilderState,
+  shouldShowQuestionSetHeader,
+} from '@/lib/mapExamToBuilder.js'
 import { buildExamSectionsPayload } from '@/lib/examContentPayload.js'
 import confetti from 'canvas-confetti'
 import '../../pages/teacher-ui/my_classes.css'
@@ -230,6 +234,15 @@ function formatSessionStatus(status) {
   if (status === 'in_progress') return 'In progress'
   if (!status) return '—'
   return String(status).replace(/_/g, ' ')
+}
+
+function formatSubmissionTime(iso) {
+  if (!iso) return '—'
+  try {
+    return new Date(iso).toLocaleString()
+  } catch {
+    return '—'
+  }
 }
 
 function sessionStatusClass(status) {
@@ -409,13 +422,44 @@ export default function TeacherExamDetailPage() {
       list.sort((a, b) => (b.warningCount || 0) - (a.warningCount || 0))
     } else if (filterMode === 'Submission time (Oldest to Newest)') {
       list.sort((a, b) => {
-        const timeA = a.endTime ? new Date(a.endTime).getTime() : a.updatedAt ? new Date(a.updatedAt).getTime() : 9999999999999
-        const timeB = b.endTime ? new Date(b.endTime).getTime() : b.updatedAt ? new Date(b.updatedAt).getTime() : 9999999999999
+        const timeA = a.submittedAt ? new Date(a.submittedAt).getTime() : Number.POSITIVE_INFINITY
+        const timeB = b.submittedAt ? new Date(b.submittedAt).getTime() : Number.POSITIVE_INFINITY
         return timeA - timeB
       })
     }
     return list
   }, [results?.sessions, searchQuery, filterMode])
+
+  const falsePositiveCountBySession = useMemo(() => {
+    const map = new Map()
+    for (const v of results?.violations ?? []) {
+      if (!v.dismissedAt || !v.sessionId) continue
+      map.set(v.sessionId, (map.get(v.sessionId) ?? 0) + 1)
+    }
+    return map
+  }, [results?.violations])
+
+  const questionSets = useMemo(
+    () => (hit?.questions?.length ? groupExamQuestionsBySet(hit) : []),
+    [hit],
+  )
+
+  const resultsTableColumns = useMemo(() => {
+    const isSurname = filterMode === 'Surname A-Z'
+    const isScoreRank = filterMode === 'Score rank'
+    const isSubmissionTime = filterMode === 'Submission time (Oldest to Newest)'
+    const isViolations = filterMode === 'Violations (highest to lowest)'
+    return {
+      rank: isScoreRank,
+      review: isSurname || isScoreRank || isSubmissionTime,
+      score: isScoreRank,
+      submissionTime: isSubmissionTime,
+      released: !isViolations,
+      warnings: true,
+      falsePositives: isViolations,
+      action: !isViolations,
+    }
+  }, [filterMode])
 
   if (loading) {
     return (
@@ -1232,29 +1276,56 @@ export default function TeacherExamDetailPage() {
               </div>
             ) : (
               <>
-                <ol className="acsis-exam-detail__question-list">
-                  {exam.questions.map((q, index) => (
-                    <li key={q.id || index} className="acsis-exam-detail__question-item">
-                      <span className="acsis-exam-detail__question-num" aria-hidden>
-                        {index + 1}
-                      </span>
-                      <div className="acsis-exam-detail__question-body">
-                        <div className="acsis-exam-detail__question-meta">
-                          <span className="acsis-exam-detail__type-badge">
-                            {labelForQuestionType(q.type)}
-                          </span>
-                          <span className="acsis-exam-detail__question-points">
-                            {Number(q.points || 0)} pts
-                          </span>
-                        </div>
-                        <p className="acsis-exam-detail__question-text">
-                          {q.question || q.question_text || 'Untitled question'}
-                        </p>
-                        <ExamQuestionAnswerPresentation question={q} />
-                      </div>
-                    </li>
-                  ))}
-                </ol>
+                <div className="acsis-exam-detail__question-sets">
+                  {questionSets.map((sec, secIndex) => {
+                    let qOffset = 0
+                    for (let i = 0; i < secIndex; i++) qOffset += questionSets[i].questions.length
+                    const showSetHeader = shouldShowQuestionSetHeader(questionSets, sec, secIndex)
+                    const setTitle = sec.title?.trim() || `Set ${secIndex + 1}`
+
+                    return (
+                      <section key={sec.id} className="acsis-exam-detail__question-set">
+                        {showSetHeader ? (
+                          <header className="acsis-exam-detail__question-set-head">
+                            <div className="acsis-exam-detail__question-set-head-main">
+                              <h3 className="acsis-exam-detail__question-set-title">{setTitle}</h3>
+                              <span className="acsis-exam-detail__question-set-count">
+                                {sec.questions.length}{' '}
+                                {sec.questions.length === 1 ? 'question' : 'questions'}
+                              </span>
+                            </div>
+                            {sec.description?.trim() ? (
+                              <p className="acsis-exam-detail__question-set-desc">{sec.description}</p>
+                            ) : null}
+                          </header>
+                        ) : null}
+                        <ol className="acsis-exam-detail__question-list">
+                          {sec.questions.map((q, index) => (
+                            <li key={q.id || `${sec.id}-${index}`} className="acsis-exam-detail__question-item">
+                              <span className="acsis-exam-detail__question-num" aria-hidden>
+                                {qOffset + index + 1}
+                              </span>
+                              <div className="acsis-exam-detail__question-body">
+                                <div className="acsis-exam-detail__question-meta">
+                                  <span className="acsis-exam-detail__type-badge">
+                                    {labelForQuestionType(q.type)}
+                                  </span>
+                                  <span className="acsis-exam-detail__question-points">
+                                    {Number(q.points || 0)} pts
+                                  </span>
+                                </div>
+                                <p className="acsis-exam-detail__question-text">
+                                  {q.question || q.question_text || 'Untitled question'}
+                                </p>
+                                <ExamQuestionAnswerPresentation question={q} />
+                              </div>
+                            </li>
+                          ))}
+                        </ol>
+                      </section>
+                    )
+                  })}
+                </div>
                 <div style={{ display: 'flex', justifyContent: 'center', padding: '1rem 0 2rem 0' }}>
                   <button
                     type="button"
@@ -1399,23 +1470,38 @@ export default function TeacherExamDetailPage() {
                   <table className="acsis-exam-detail__table">
                     <thead>
                     <tr>
+                      {resultsTableColumns.rank ? (
+                        <th className="acsis-exam-detail__table-col-rank">Score rank</th>
+                      ) : null}
                       <th>Student</th>
                       <th>Status</th>
-                      <th>Review</th>
-                      {filterMode !== 'Surname A-Z' ? (
+                      {resultsTableColumns.review ? <th>Review</th> : null}
+                      {resultsTableColumns.submissionTime ? (
+                        <th>Submission time</th>
+                      ) : null}
+                      {resultsTableColumns.score ? (
                         <th className="acsis-exam-detail__table-col-num">Score</th>
                       ) : null}
-                      {filterMode === 'Score rank' ? (
-                        <th className="acsis-exam-detail__table-col-num">Score rank</th>
+                      {resultsTableColumns.released ? <th>Released</th> : null}
+                      {resultsTableColumns.warnings ? (
+                        <th className="acsis-exam-detail__table-col-num">Warnings</th>
                       ) : null}
-                      <th>Released</th>
-                      <th className="acsis-exam-detail__table-col-num">Warnings</th>
-                      <th className="acsis-exam-detail__table-col-action" />
+                      {resultsTableColumns.falsePositives ? (
+                        <th className="acsis-exam-detail__table-col-num">Flagged false positives</th>
+                      ) : null}
+                      {resultsTableColumns.action ? (
+                        <th className="acsis-exam-detail__table-col-action" />
+                      ) : null}
                     </tr>
                   </thead>
                   <tbody>
                     {filteredSessions.map((s) => (
                       <tr key={s.sessionId}>
+                        {resultsTableColumns.rank ? (
+                          <td className="acsis-exam-detail__table-col-rank">
+                            {s.rank != null ? `#${s.rank}` : '—'}
+                          </td>
+                        ) : null}
                         <td>
                           <span className="acsis-exam-detail__table-student-name">
                             {[s.lastName, s.firstName].filter(Boolean).join(', ') || s.studentName}
@@ -1433,62 +1519,75 @@ export default function TeacherExamDetailPage() {
                             '—'
                           )}
                         </td>
-                        <td className="acsis-exam-detail__table-review">
-                          {s.status === 'submitted'
-                            ? s.reviewComplete
-                              ? 'Reviewed'
-                              : (s.uncheckedCount ?? 0) > 0
-                                ? `Optional (${s.uncheckedCount})`
-                                : 'Auto-graded'
-                            : '—'}
-                        </td>
-                        {filterMode !== 'Surname A-Z' ? (
+                        {resultsTableColumns.review ? (
+                          <td className="acsis-exam-detail__table-review">
+                            {s.status === 'submitted'
+                              ? s.reviewComplete
+                                ? 'Reviewed'
+                                : (s.uncheckedCount ?? 0) > 0
+                                  ? `Optional (${s.uncheckedCount})`
+                                  : 'Auto-graded'
+                              : '—'}
+                          </td>
+                        ) : null}
+                        {resultsTableColumns.submissionTime ? (
+                          <td className="acsis-exam-detail__table-submission-time">
+                            {formatSubmissionTime(s.submittedAt)}
+                          </td>
+                        ) : null}
+                        {resultsTableColumns.score ? (
                           <td className="acsis-exam-detail__table-col-num acsis-exam-detail__table-score">
                             {s.status === 'submitted' && s.percentage != null
                               ? `${s.percentage}% (${s.rawScore}/${s.totalPoints})`
                               : '—'}
                           </td>
                         ) : null}
-                        {filterMode === 'Score rank' ? (
-                          <td className="acsis-exam-detail__table-col-num">
-                            {s.rank != null ? `#${s.rank}` : '—'}
+                        {resultsTableColumns.released ? (
+                          <td>
+                            {s.status === 'submitted' ? (
+                              s.scoreReleased ? (
+                                <span className="acsis-exam-detail__released-yes">Released</span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="acsis-exam-detail__table-action"
+                                  disabled={releasing}
+                                  onClick={() => void handleReleaseOneStudent(s.sessionId)}
+                                >
+                                  Release
+                                </button>
+                              )
+                            ) : (
+                              '—'
+                            )}
                           </td>
                         ) : null}
-                        <td>
-                          {s.status === 'submitted' ? (
-                            s.scoreReleased ? (
-                              <span className="acsis-exam-detail__released-yes">Released</span>
-                            ) : (
+                        {resultsTableColumns.warnings ? (
+                          <td className="acsis-exam-detail__table-col-num acsis-exam-detail__table-warnings">
+                            {s.warningCount}
+                          </td>
+                        ) : null}
+                        {resultsTableColumns.falsePositives ? (
+                          <td className="acsis-exam-detail__table-col-num">
+                            {falsePositiveCountBySession.get(s.sessionId) ?? 0}
+                          </td>
+                        ) : null}
+                        {resultsTableColumns.action ? (
+                          <td className="acsis-exam-detail__table-col-action">
+                            {s.status === 'submitted' && s.sessionId ? (
                               <button
                                 type="button"
                                 className="acsis-exam-detail__table-action"
-                                disabled={releasing}
-                                onClick={() => void handleReleaseOneStudent(s.sessionId)}
+                                onClick={() => {
+                                  setReviewInitialSessionId(s.sessionId)
+                                  setReviewOpen(true)
+                                }}
                               >
-                                Release
+                                Review
                               </button>
-                            )
-                          ) : (
-                            '—'
-                          )}
-                        </td>
-                        <td className="acsis-exam-detail__table-col-num acsis-exam-detail__table-warnings">
-                          {s.warningCount}
-                        </td>
-                        <td className="acsis-exam-detail__table-col-action">
-                          {s.status === 'submitted' && s.sessionId ? (
-                            <button
-                              type="button"
-                              className="acsis-exam-detail__table-action"
-                              onClick={() => {
-                                setReviewInitialSessionId(s.sessionId)
-                                setReviewOpen(true)
-                              }}
-                            >
-                              Review
-                            </button>
-                          ) : null}
-                        </td>
+                            ) : null}
+                          </td>
+                        ) : null}
                       </tr>
                     ))}
                   </tbody>

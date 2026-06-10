@@ -54,3 +54,15 @@ export function mapExamToBuilderState(exam) {
 
   return { sections, description }
 }
+
+/** Question sets for read-only views (exam detail, previews). */
+export function groupExamQuestionsBySet(exam) {
+  return mapExamToBuilderState(exam).sections.filter((s) => s.questions.length > 0)
+}
+
+export function shouldShowQuestionSetHeader(sections, sec, secIndex) {
+  if (sections.length > 1) return true
+  if (sec.description?.trim()) return true
+  const defaultTitle = `Set ${secIndex + 1}`
+  return Boolean(sec.title?.trim() && sec.title.trim() !== defaultTitle)
+}

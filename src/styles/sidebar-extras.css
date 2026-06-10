@@ -201,6 +201,8 @@ html.acsis-sidebar-collapsed .acsis-sidebar-header {
 
 html.acsis-sidebar-collapsed .sidebar {
   overflow: visible;
+  /* Above sticky .content-header (--z-sticky) so rail tooltips aren't clipped behind breadcrumb */
+  z-index: calc(var(--z-sticky, 120) + 1);
 }
 
 html.acsis-sidebar-collapsed .sidebar-nav {
@@ -262,7 +264,7 @@ html.acsis-sidebar-collapsed .nav-item[data-tooltip]::after {
   position: absolute;
   left: calc(100% + 10px);
   top: 50%;
-  z-index: 120;
+  z-index: 1;
   padding: 6px 10px;
   border-radius: 8px;
   background: var(--acsis-tooltip-bg, var(--acsis-brand-hover, var(--acsis-brand-700, #1e293b)));

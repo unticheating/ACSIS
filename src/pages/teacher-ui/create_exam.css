@@ -364,6 +364,45 @@ button {
 
 /* ── React exam builder (TeacherCreateExamPage) ── */
 
+.exam-builder-page {
+  --exam-builder-header-h: 73px;
+  margin-left: calc(-1 * var(--acsis-main-pad-x, 14px));
+  margin-right: calc(-1 * var(--acsis-main-pad-x, 14px));
+  width: calc(100% + 2 * var(--acsis-main-pad-x, 14px));
+  margin-top: calc(-1 * var(--acsis-main-pad-y, 12px));
+  min-height: calc(100dvh - var(--acsis-shell-header-size, 59px));
+}
+
+.exam-builder-page__header {
+  position: sticky;
+  top: var(--acsis-mobile-top-offset, 64px);
+  z-index: calc(var(--z-sticky, 120) - 1);
+}
+
+@media (min-width: 768px) {
+  .exam-builder-page__header {
+    top: var(--acsis-shell-header-size, 59px);
+  }
+}
+
+.exam-builder-page__outline {
+  position: sticky;
+  top: calc(var(--acsis-mobile-top-offset, 64px) + var(--exam-builder-header-h));
+  max-height: calc(100dvh - var(--acsis-mobile-top-offset, 64px) - var(--exam-builder-header-h));
+  align-self: flex-start;
+}
+
+@media (min-width: 768px) {
+  .exam-builder-page__outline {
+    top: calc(var(--acsis-shell-header-size, 59px) + var(--exam-builder-header-h));
+    max-height: calc(100dvh - var(--acsis-shell-header-size, 59px) - var(--exam-builder-header-h));
+  }
+}
+
+.exam-builder-outline-item--empty {
+  border: 1px dashed hsl(var(--border) / 0.8);
+}
+
 .exam-builder-toolbar {
   border-bottom: 1px solid transparent;
   transition: border-color 0.18s ease;

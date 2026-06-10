@@ -290,6 +290,7 @@ async function syncExamContentWithSessions(client, examId, payload) {
   const existingSectionIds = new Set(existingSections.map((r) => r.section_id));
   const existingQuestionIds = new Set(existingQuestions.map((r) => r.question_id));
   const keptQuestionIds = new Set();
+  const keptSectionIds = new Set();
 
   let orderNum = 0;
 
@@ -323,6 +324,7 @@ async function syncExamContentWithSessions(client, examId, payload) {
       sectionId = secResult.rows[0].section_id;
       existingSectionIds.add(sectionId);
     }
+    keptSectionIds.add(sectionId);
 
     for (const q of sec.questions || []) {
       orderNum += 1;
@@ -345,6 +347,14 @@ async function syncExamContentWithSessions(client, examId, payload) {
     }
     await client.query(`DELETE FROM choices WHERE question_id = $1`, [questionId]);
     await client.query(`DELETE FROM questions WHERE question_id = $1`, [questionId]);
+  }
+
+  for (const sectionId of existingSectionIds) {
+    if (keptSectionIds.has(sectionId)) continue;
+    await client.query(`DELETE FROM exam_sections WHERE section_id = $1 AND exam_id = $2`, [
+      sectionId,
+      examId,
+    ]);
   }
 }
 

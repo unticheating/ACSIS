@@ -1039,9 +1039,9 @@ export default function TeacherCreateExamPage() {
   }
 
   return (
-    <div className="flex flex-col bg-background min-h-[calc(100vh-64px)]">
+    <div className="exam-builder-page acsis-create-exam flex flex-col bg-background min-h-[calc(100vh-64px)]">
       {/* TOP HEADER */}
-      <header className="border-b border-border bg-card px-6 py-4 flex items-center justify-between shrink-0 z-10 shadow-sm">
+      <header className="exam-builder-page__header border-b border-border bg-card px-6 py-4 flex items-center justify-between shrink-0 shadow-sm">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" asChild className="rounded-full text-muted-foreground hover:text-foreground">
             <Link to={backHref}>
@@ -1244,33 +1244,42 @@ export default function TeacherCreateExamPage() {
       {/* MAIN CONTENT - QUESTIONS BUILDER */}
       <div className="flex flex-1 items-start">
         {/* SIDEBAR OUTLINE */}
-        <aside className="w-56 lg:w-64 border-r border-border bg-background hidden md:block shrink-0 sticky top-0 h-[calc(100vh-100px)] overflow-y-auto">
+        <aside className="exam-builder-page__outline w-56 lg:w-64 border-r border-border bg-background hidden md:block shrink-0 self-start overflow-y-auto">
           <div className="p-6">
             <h3 className="font-semibold text-xs mb-3 text-muted-foreground uppercase tracking-wider">Exam Outline</h3>
             <ul className="space-y-1">
-              {sections.map((sec, secIndex) => (
+              {sections.map((sec, secIndex) => {
+                const questionCount = sec.questions.length
+                const isEmpty = questionCount === 0
+                return (
                 <li key={sec.id}>
                   <a
                     href={`#set-${sec.id}`}
-                    className={`block px-3 py-2 rounded-md text-sm transition-colors line-clamp-2 ${
+                    className={`block px-3 py-2 rounded-md text-sm transition-colors ${
                       activeSectionId === sec.id
                         ? 'bg-primary/10 text-primary font-medium'
                         : 'hover:bg-muted text-muted-foreground hover:text-foreground'
-                    }`}
+                    }${isEmpty ? ' exam-builder-outline-item--empty' : ''}`}
                     onClick={(e) => {
                       e.preventDefault()
                       activateSection(sec.id)
                       const el = document.getElementById(`set-${sec.id}`)
                       if (el) {
-                        const y = el.getBoundingClientRect().top + window.scrollY - 100
+                        const header = document.querySelector('.exam-builder-page__header')
+                        const offset = header ? header.getBoundingClientRect().height + 12 : 100
+                        const y = el.getBoundingClientRect().top + window.scrollY - offset
                         window.scrollTo({ top: y, behavior: 'smooth' })
                       }
                     }}
                   >
-                    {sec.title || `Set ${secIndex + 1}`}
+                    <span className="line-clamp-2">{sec.title || `Set ${secIndex + 1}`}</span>
+                    <span className="mt-0.5 block text-[11px] font-medium opacity-80">
+                      {isEmpty ? 'No questions' : `${questionCount} ${questionCount === 1 ? 'question' : 'questions'}`}
+                    </span>
                   </a>
                 </li>
-              ))}
+                )
+              })}
             </ul>
           </div>
         </aside>

@@ -6,7 +6,8 @@
 }
 
 html {
-    overflow-x: hidden;
+    /* clip avoids the scroll-container side effect of hidden, which breaks position: sticky */
+    overflow-x: clip;
     /* Reserve scrollbar width so content does not shift when the page becomes scrollable */
     scrollbar-gutter: stable;
 }
@@ -50,7 +51,7 @@ body {
     min-height: 100vh;
     width: 100%;
     max-width: 100vw;
-    overflow-x: hidden;
+    overflow-x: clip;
     box-sizing: border-box;
     background: var(--acsis-canvas, #DDEEE4);
 }
@@ -295,6 +296,8 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
     position: sticky;
     top: 0;
     z-index: var(--z-sticky, 120);
+    /* Stay above scrolling panels/tables inside the main column */
+    isolation: isolate;
 }
 
 .content-header .breadcrumb {
@@ -314,7 +317,9 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
         width: calc(100% + 2 * var(--acsis-main-pad-x));
         padding: var(--acsis-shell-header-pad-top, 12px) var(--acsis-main-pad-x)
             var(--acsis-shell-header-pad-bottom, 10px);
-        position: static;
+        position: sticky;
+        top: 0;
+        z-index: var(--z-sticky, 120);
         border-radius: 0;
         box-shadow: none;
     }
