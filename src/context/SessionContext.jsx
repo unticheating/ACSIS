@@ -101,6 +101,7 @@ function accountFromAuthUser(user) {
     avatarLetter: user.avatarLetter,
     avatarUrl: user.avatarUrl,
     isSuperAdmin: user.isSuperAdmin,
+    studentNumber: user.studentNumber ?? null,
   }
 }
 

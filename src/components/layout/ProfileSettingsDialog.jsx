@@ -47,8 +47,7 @@ export default function ProfileSettingsDialog({ open, onOpenChange }) {
     return () => {
       if (previewUrl && previewUrl.startsWith('blob:')) URL.revokeObjectURL(previewUrl)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open])
+  }, [open, activeAccount?.studentNumber])
 
   const handleStudentNumChange = (e) => {
     let val = e.target.value.replace(/[^0-9-]/g, '')
@@ -126,7 +125,10 @@ export default function ProfileSettingsDialog({ open, onOpenChange }) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[420px]">
+      <DialogContent
+        className="sm:max-w-[420px]"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>Profile Settings</DialogTitle>
           <DialogDescription>

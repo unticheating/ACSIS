@@ -1,4 +1,4 @@
-import { ensureStudentRow } from './studentProfile.js'
+import { ensureStudentRow, getStudentNumber } from './studentProfile.js'
 
 /** @typedef {'admin' | 'teacher' | 'student' | 'super_admin'} Portal */
 
@@ -190,12 +190,10 @@ export async function buildSessionFromUid(pool, uid, opts = {}) {
     portalInfo.membershipStatus = 'active'
   }
 
+  let studentNumber = null
   if (portalInfo.portal === 'student' && portalInfo.memberId) {
-    const { rows: stRows } = await pool.query(
-      `SELECT student_number FROM students WHERE member_id = $1`,
-      [portalInfo.memberId]
-    )
-    if (!stRows[0] || !stRows[0].student_number) {
+    studentNumber = await getStudentNumber(pool, portalInfo.memberId)
+    if (!studentNumber) {
       needsStudentNumber = true
     }
 
@@ -225,6 +223,7 @@ export async function buildSessionFromUid(pool, uid, opts = {}) {
     needsInitialJoin,
     needsStudentNumber,
     needsJoinClass,
+    studentNumber,
   }
 }
 
