@@ -181,23 +181,19 @@ router.get('/google/callback', async (req, res) => {
       return redirectWithError(res, 'no_membership')
     }
 
-    if (!config.emailVerificationEnabled) {
-      const finished = await finishLoginWithoutVerification(pool, user.uid, res, {
-        googleSub: profile.sub,
-      })
-      if (!finished.ok) {
-        return redirectWithError(res, 'no_membership')
-      }
-      const redirectUrl = new URL(config.frontendUrl)
-      // fallback to / if no entry path but they need initial join
-      redirectUrl.pathname = finished.session.entryPath || '/'
-      redirectUrl.searchParams.set('auth', 'success')
-      return res.redirect(redirectUrl.toString())
+    const finished = await finishLoginWithoutVerification(pool, user.uid, res, {
+      googleSub: profile.sub,
+    })
+    
+    if (!finished.ok) {
+      return redirectWithError(res, 'no_membership')
     }
-
-    clearSessionCookie(res)
-    await beginEmailVerification(pool, user.uid, user.email, res)
-    return redirectToVerify(res, user.email)
+    
+    const redirectUrl = new URL(config.frontendUrl)
+    // fallback to / if no entry path but they need initial join
+    redirectUrl.pathname = finished.session.entryPath || '/'
+    redirectUrl.searchParams.set('auth', 'success')
+    return res.redirect(redirectUrl.toString())
   } catch (err) {
     console.error('[auth/google/callback]', err)
     return redirectWithError(res, 'auth_failed')
