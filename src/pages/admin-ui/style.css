@@ -3356,3 +3356,17 @@ body.sidebar-open {
         grid-template-columns: 1fr;
     }
 }
+
+@media (max-width: 767px) {
+    .acsis-main {
+        margin-left: 0 !important;
+        width: 100% !important;
+        padding-top: calc(var(--acsis-mobile-top-offset) + var(--acsis-main-pad-y, 12px));
+        padding-right: var(--acsis-main-pad-x, 14px);
+        padding-bottom: calc(
+            var(--acsis-bottom-nav-height) + env(safe-area-inset-bottom, 0px) + var(--acsis-main-pad-y, 12px)
+        );
+        padding-left: var(--acsis-main-pad-x, 14px);
+        scroll-padding-top: var(--acsis-mobile-top-offset);
+    }
+}
