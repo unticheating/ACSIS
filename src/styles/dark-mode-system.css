@@ -1108,6 +1108,35 @@ html.dark .acsis-exam-detail__table td {
   border-bottom-color: var(--border-default, #2a2a2a) !important;
 }
 
+html.dark .exam-audit-logs__table-wrap {
+  background: var(--bg-surface, #1a1a1a) !important;
+  border-color: var(--border-default, #2a2a2a) !important;
+}
+
+html.dark .exam-audit-logs__table th {
+  background: var(--bg-elevated, #212121) !important;
+  color: var(--fg-muted, #a3a3a3) !important;
+  border-bottom-color: var(--border-default, #2a2a2a) !important;
+}
+
+html.dark .exam-audit-logs__table td {
+  color: var(--fg-default, #f5f5f5) !important;
+  border-bottom-color: var(--border-default, #2a2a2a) !important;
+}
+
+html.dark .exam-audit-logs__action {
+  color: var(--fg-default, #f5f5f5) !important;
+}
+
+html.dark .exam-audit-logs__time,
+html.dark .exam-audit-logs__details {
+  color: var(--fg-muted, #a3a3a3) !important;
+}
+
+html.dark .exam-title-row p {
+  color: var(--fg-muted, #a3a3a3) !important;
+}
+
 html.dark .acsis-stream-back,
 html.dark .stu-stream-back {
   color: var(--acsis-brand-muted-text, var(--acsis-brand)) !important;

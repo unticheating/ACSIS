@@ -65,8 +65,34 @@ export async function getEnrolledClasses(memberId) {
      JOIN institution_members im ON c.member_id = im.member_id
      JOIN users u ON im.uid = u.uid
      WHERE ce.member_id = $1 AND c.is_active = TRUE
-     ORDER BY ce.enrolled_at DESC`,
+     ORDER BY ce.sort_order ASC, ce.enrolled_at DESC`,
     [memberId]
   );
   return result.rows;
+}
+
+export async function updateEnrollmentSortOrders(memberId, classIdSortPairs) {
+  const pool = getPool();
+  
+  if (!classIdSortPairs || classIdSortPairs.length === 0) return true;
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    
+    for (const { classId, sortOrder } of classIdSortPairs) {
+      await client.query(
+        'UPDATE class_enrollments SET sort_order = $1 WHERE member_id = $2 AND class_id = $3',
+        [sortOrder, memberId, classId]
+      );
+    }
+    
+    await client.query('COMMIT');
+    return true;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 }

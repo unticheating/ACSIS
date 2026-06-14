@@ -74,9 +74,10 @@
 
 /* Enrolled class grid — patterned header cards */
 .stu-my-classes .acsis-mc-course-grid--top {
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, 300px);
   gap: 18px;
   align-items: stretch;
+  justify-content: start;
 }
 
 .stu-my-classes .acsis-mc-course-grid--top > li {

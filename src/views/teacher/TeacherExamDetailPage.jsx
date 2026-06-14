@@ -1625,6 +1625,8 @@ export default function TeacherExamDetailPage() {
           onClose={() => setPresentOpen(false)}
           examTitle={hit?.title || 'Exam'}
           questions={exam.questions}
+          questionStats={results?.questionStats}
+          submittedCount={results?.stats?.submitted ?? 0}
         />
       ) : null}
 

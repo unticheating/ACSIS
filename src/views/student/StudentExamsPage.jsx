@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import TeacherPageHeader from '@/components/teacher/TeacherPageHeader.jsx'
 import StudentCourseCard from '@/components/student/StudentCourseCard.jsx'
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import {
   Dialog,
   DialogContent,
@@ -99,6 +100,28 @@ export default function StudentExamsPage() {
     }
   }
 
+  async function handleDragEnd(result) {
+    if (!result.destination) return
+
+    const items = Array.from(enrolled)
+    const [reorderedItem] = items.splice(result.source.index, 1)
+    items.splice(result.destination.index, 0, reorderedItem)
+
+    setEnrolled(items)
+
+    try {
+      const classIds = items.map((c) => c.id)
+      await apiFetch('/api/student/classes/sort', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ classIds })
+      })
+    } catch (err) {
+      console.error('Failed to save sort order:', err)
+      acsisToastError('Failed to save class order.')
+    }
+  }
+
   const headerMeta = loading
     ? undefined
     : `${enrolled.length} ${enrolled.length === 1 ? 'class' : 'classes'}`
@@ -130,11 +153,31 @@ export default function StudentExamsPage() {
               </button>
             </div>
           ) : (
-            <ul className="acsis-mc-course-grid acsis-mc-course-grid--top">
-              {enrolled.map((c, index) => (
-                <StudentCourseCard key={c.id} course={c} delay={index * 0.05} />
-              ))}
-            </ul>
+            <DragDropContext onDragEnd={handleDragEnd}>
+              <Droppable droppableId="enrolled-classes" direction="horizontal">
+                {(provided) => (
+                  <ul
+                    className="acsis-mc-course-grid acsis-mc-course-grid--top"
+                    {...provided.droppableProps}
+                    ref={provided.innerRef}
+                  >
+                    {enrolled.map((c, index) => (
+                      <Draggable key={c.id} draggableId={String(c.id)} index={index}>
+                        {(dragProvided, dragSnapshot) => (
+                          <StudentCourseCard 
+                            course={c} 
+                            delay={index * 0.05} 
+                            provided={dragProvided}
+                            isDragging={dragSnapshot.isDragging}
+                          />
+                        )}
+                      </Draggable>
+                    ))}
+                    {provided.placeholder}
+                  </ul>
+                )}
+              </Droppable>
+            </DragDropContext>
           )}
         </div>
       </div>

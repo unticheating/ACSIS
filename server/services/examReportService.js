@@ -1,5 +1,17 @@
 import PDFDocument from 'pdfkit'
+import ExcelJS from 'exceljs'
+import fs from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
+import SVGtoPDF from 'svg-to-pdfkit'
 import { getExamWithQuestionsQuery } from '../repositories/examRepository.js'
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const acsisLogoPath = path.join(__dirname, '../../img/acsis-logo.svg');
+const plpLogoPath = path.join(__dirname, '../../img/plpupdatedlogo 3.png');
+const googleSansRegularPath = path.join(__dirname, '../fonts/GoogleSans-Regular.ttf');
+const googleSansBoldPath = path.join(__dirname, '../fonts/GoogleSans-Bold.ttf');
 import { getTeacherClassByIdQuery } from '../repositories/classRepository.js'
 import {
   getExamSubmissionStatsQuery,
@@ -53,33 +65,86 @@ function ensureSpace(doc, needed = 48) {
   }
 }
 
-function drawReportHeader(doc, { reportTitle, exam, className, generatorName, generatedAt }) {
-  doc.font('Helvetica-Bold').fontSize(18).fillColor('#111827')
-  doc.text(reportTitle, MARGIN, doc.y, { width: CONTENT_WIDTH, align: 'center' })
-  doc.moveDown(0.6)
+function setFont(doc, type = 'regular') {
+  try {
+    const fontPath = type === 'bold' ? googleSansBoldPath : googleSansRegularPath;
+    if (fs.existsSync(fontPath)) {
+      doc.font(fontPath);
+      return;
+    }
+  } catch (e) {}
+  doc.font(type === 'bold' ? 'Helvetica-Bold' : 'Helvetica');
+}
 
-  doc.font('Helvetica').fontSize(10).fillColor('#374151')
-  doc.text(formatGeneratedStatement(generatorName, generatedAt), MARGIN, doc.y, {
-    width: CONTENT_WIDTH,
-    align: 'center',
-  })
-  doc.moveDown(0.5)
-
-  doc.fontSize(10).fillColor('#4b5563')
-  doc.text(`Exam: ${exam.title || 'Untitled'}`, MARGIN, doc.y, { width: CONTENT_WIDTH, align: 'center' })
-  doc.text(`Class: ${className || '—'}`, MARGIN, doc.y, { width: CONTENT_WIDTH, align: 'center' })
-  doc.moveDown(1)
-
-  doc.moveTo(MARGIN, doc.y).lineTo(MARGIN + CONTENT_WIDTH, doc.y).strokeColor('#d1d5db').stroke()
-  doc.moveDown(0.75)
-  doc.fillColor('#000')
+function drawReportHeader(doc, { exam, cls, generatorName, generatedAt, teacherLogoBase64, departmentName }) {
+  // Tiny top header
+  setFont(doc, 'regular');
+  doc.fontSize(8).fillColor('#6b7280')
+  doc.text(formatGeneratedStatement(generatorName, generatedAt), MARGIN, MARGIN, { align: 'left' })
+  doc.moveDown(1.5)
+  
+  const currentY = doc.y;
+  
+  // Left aligned logos
+  let nextLogoX = MARGIN;
+  
+  if (fs.existsSync(plpLogoPath)) {
+    try {
+      doc.image(plpLogoPath, nextLogoX, currentY, { fit: [60, 60] });
+      nextLogoX += 75; // Increased spacing for larger logos
+    } catch (e) {
+      console.error('Failed to load PLP logo', e);
+    }
+  }
+  
+  if (teacherLogoBase64) {
+    try {
+      const buffer = Buffer.from(teacherLogoBase64.replace(/^data:image\/\w+;base64,/, ""), 'base64');
+      doc.image(buffer, nextLogoX, currentY, { fit: [60, 60] });
+    } catch (e) {
+      console.error('Failed to load teacher logo', e);
+    }
+  }
+  
+  // Right aligned Institution name
+  setFont(doc, 'bold');
+  doc.fontSize(12).fillColor('#111827')
+  doc.text('Pamantasan ng Lungsod ng Pasig', MARGIN, currentY + 8, { align: 'right', width: CONTENT_WIDTH })
+  
+  if (departmentName) {
+    setFont(doc, 'regular');
+    doc.fontSize(10).fillColor('#4b5563')
+    doc.text(departmentName, MARGIN, doc.y, { align: 'right', width: CONTENT_WIDTH })
+  }
+  
+  doc.y = Math.max(doc.y, currentY + 70);
+  doc.moveTo(MARGIN, doc.y).lineTo(MARGIN + CONTENT_WIDTH, doc.y).strokeColor('#e5e7eb').stroke()
+  doc.y += 15;
+  
+  // Title
+  setFont(doc, 'bold');
+  doc.fontSize(18).fillColor('#111827')
+  doc.text(exam.title || 'Untitled Exam', { align: 'center', width: CONTENT_WIDTH })
+  
+  // Subtitle
+  const className = cls.name || cls.courseCode || 'Class'
+  const sectionLabel = cls.sectionCode ? ` — ${cls.sectionCode}` : '';
+  const dateLabel = exam.scheduledStart ? new Date(exam.scheduledStart).toLocaleDateString('en-US') : (exam.createdAt ? new Date(exam.createdAt).toLocaleDateString('en-US') : '');
+  const itemsCount = exam.questions ? exam.questions.length : 0;
+  
+  setFont(doc, 'regular');
+  doc.fontSize(10).fillColor('#6b7280')
+  doc.text(`${className}${sectionLabel} • AY ${cls.academicYear || ''}, Sem ${cls.semester || ''}`, { align: 'center', width: CONTENT_WIDTH })
+  doc.text(`${dateLabel} • ${itemsCount} items`, { align: 'center', width: CONTENT_WIDTH })
+  doc.moveDown(2);
 }
 
 function drawSectionTitle(doc, title) {
   ensureSpace(doc, 40)
-  doc.font('Helvetica-Bold').fontSize(12).fillColor('#111827')
+  setFont(doc, 'bold');
+  doc.fontSize(11).fillColor('#111827')
   doc.text(title, MARGIN, doc.y)
-  doc.moveDown(0.4)
+  doc.moveDown(0.5)
   doc.fillColor('#000')
 }
 
@@ -132,31 +197,37 @@ function drawTable(doc, { headers, rows, colWidths }) {
   doc.fillColor('#000')
 }
 
-function drawStatsBlock(doc, stats, top) {
-  drawSectionTitle(doc, 'Summary')
-
-  drawTable(doc, {
-    headers: ['Metric', 'Count'],
-    rows: [
-      ['Enrolled', String(stats.enrolled ?? 0)],
-      ['Joined', String(stats.joined ?? 0)],
-      ['Submitted', String(stats.submitted ?? 0)],
-    ],
-    colWidths: [CONTENT_WIDTH * 0.55, CONTENT_WIDTH * 0.45],
-  })
-
-  if (top?.percentage != null) {
-    doc.moveDown(0.25)
-    doc.font('Helvetica').fontSize(10).fillColor('#15803d')
-    doc.text(
-      `Top 1: ${top.studentName} (${top.schoolId || '—'}) — ${top.percentage}% (${top.rawScore} pts)`,
-      MARGIN,
-      doc.y,
-      { width: CONTENT_WIDTH, align: 'center' },
-    )
-    doc.fillColor('#000')
-    doc.moveDown(0.5)
+function drawStatsBlock(doc, sessions) {
+  const submittedSessions = sessions.filter(s => s.status === 'submitted' && s.percentage != null);
+  let avgScore = '—', highest = '—', lowest = '—', passed = '—', failed = '—';
+  if (submittedSessions.length > 0) {
+    avgScore = Math.round(submittedSessions.reduce((acc, s) => acc + Number(s.percentage), 0) / submittedSessions.length) + '%';
+    highest = Math.max(...submittedSessions.map(s => Number(s.percentage))) + '%';
+    lowest = Math.min(...submittedSessions.map(s => Number(s.percentage))) + '%';
+    passed = submittedSessions.filter(s => Number(s.percentage) >= 50).length;
+    failed = submittedSessions.filter(s => Number(s.percentage) < 50).length;
   }
+  
+  const summaryLabels = ['Average', 'Highest', 'Lowest', 'Passed', 'Failed'];
+  const summaryVals = [avgScore, highest, lowest, passed, failed];
+  
+  const colW = CONTENT_WIDTH / 5;
+  const boxY = doc.y;
+  doc.rect(MARGIN, boxY, CONTENT_WIDTH, 44).fillAndStroke('#f9fafb', '#e5e7eb');
+  
+  setFont(doc, 'bold');
+  doc.fillColor('#111827').fontSize(14);
+  for (let i = 0; i < 5; i++) {
+    doc.text(String(summaryVals[i]), MARGIN + (i * colW), boxY + 10, { width: colW, align: 'center' });
+  }
+  setFont(doc, 'regular');
+  doc.fillColor('#6b7280').fontSize(9);
+  for (let i = 0; i < 5; i++) {
+    doc.text(summaryLabels[i], MARGIN + (i * colW), boxY + 26, { width: colW, align: 'center' });
+  }
+  
+  doc.y = boxY + 65;
+  doc.fillColor('#000');
 }
 
 function reviewStatusLabel(s) {
@@ -207,48 +278,217 @@ function drawViolationsTable(doc, violations) {
   })
 }
 
-function buildCsv(exam, sessions, violations, generatorName, generatedAt) {
-  const lines = [
-    formatGeneratedStatement(generatorName, generatedAt),
-    `Exam,${JSON.stringify(exam.title || '')}`,
-    '',
-    'No.,Student,School ID,Status,Review,Score %,Raw,Total,Rank,Warnings',
-  ]
-  sortSessionsForReport(sessions).forEach((s, index) => {
-    lines.push(
-      [
-        String(index + 1),
-        JSON.stringify(s.studentName),
-        JSON.stringify(s.schoolId || ''),
-        s.status,
-        reviewStatusLabel(s),
-        s.percentage != null ? s.percentage : '',
-        s.rawScore != null ? s.rawScore : '',
-        s.totalPoints != null ? s.totalPoints : '',
-        s.rank != null ? s.rank : '',
-        s.warningCount,
-      ].join(','),
-    )
-  })
-  if (violations.length) {
-    lines.push('', 'Violations', 'Student,Event,Details,When')
-    for (const v of violations) {
-      lines.push(
-        [
-          JSON.stringify(v.studentName),
-          JSON.stringify(v.eventType),
-          JSON.stringify(v.details || ''),
-          JSON.stringify(v.occurredAt || ''),
-        ].join(','),
-      )
+async function buildExcelBuffer({ exam, cls, sessions, violations, generatorName, generatedAt, reportType, teacherLogoBase64, departmentName }) {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = generatorName;
+  workbook.created = generatedAt;
+  
+  const sheet = workbook.addWorksheet('Performance Report', { 
+    views: [{ showGridLines: false }],
+    pageSetup: { 
+      paperSize: 9, // A4
+      orientation: 'portrait',
+      fitToPage: true,
+      fitToWidth: 1,
+      margins: { left: 0.7, right: 0.7, top: 0.75, bottom: 0.75, header: 0.3, footer: 0.3 }
     }
+  });
+  
+  if (reportType === 'violations') {
+    sheet.getColumn(1).width = 30; // Student
+    sheet.getColumn(2).width = 20; // Event
+    sheet.getColumn(3).width = 35; // Details
+    sheet.getColumn(4).width = 18; // When
+  } else {
+    sheet.getColumn(1).width = 6;  // No.
+    sheet.getColumn(2).width = 32; // Student
+    sheet.getColumn(3).width = 15; // School ID
+    sheet.getColumn(4).width = 18; // Score
+    sheet.getColumn(5).width = 8;  // Rank
+    sheet.getColumn(6).width = 10; // Warnings
   }
-  return lines.join('\n')
+
+  // Row 1: generated at
+  const genRow = sheet.addRow([formatGeneratedStatement(generatorName, generatedAt)]);
+  genRow.font = { italic: true, size: 9, color: { argb: 'FF888888' } };
+  sheet.mergeCells(`A1:F1`);
+  genRow.height = 20;
+
+  // Row 2: Institution
+  const instRow = sheet.addRow(['', '', 'Institution: Pamantasan ng Lungsod ng Pasig']);
+  instRow.font = { bold: true, size: 10, color: { argb: 'FF111827' } };
+  sheet.mergeCells(`C2:F2`);
+  instRow.getCell(3).alignment = { horizontal: 'right' };
+  instRow.height = 25;
+
+  // Row 3: Department
+  const deptRow = sheet.addRow(['', '', departmentName ? `Department: ${departmentName}` : '']);
+  if (departmentName) {
+    deptRow.font = { size: 10, color: { argb: 'FF4B5563' } };
+    sheet.mergeCells(`C3:F3`);
+    deptRow.getCell(3).alignment = { horizontal: 'right' };
+  }
+  deptRow.height = 25;
+
+  // Logos (placed at row 1 so they float over A2 and B2)
+  let logoXOffset = 0;
+  if (fs.existsSync(plpLogoPath)) {
+    try {
+      const plpLogoId = workbook.addImage({ filename: plpLogoPath, extension: 'png' });
+      sheet.addImage(plpLogoId, { tl: { col: 0, row: 1 }, ext: { width: 60, height: 60 } });
+      logoXOffset += 1.2; // Use fractional offset to add a nice gap
+    } catch(e) {}
+  }
+  
+  if (teacherLogoBase64) {
+    try {
+      const b64Data = teacherLogoBase64.replace(/^data:image\/\w+;base64,/, "");
+      const extMatch = teacherLogoBase64.match(/^data:image\/(\w+);base64,/);
+      const ext = extMatch ? extMatch[1] : 'png';
+      const teacherLogoId = workbook.addImage({ base64: b64Data, extension: ext });
+      sheet.addImage(teacherLogoId, { tl: { col: logoXOffset, row: 1 }, ext: { width: 60, height: 60 } });
+    } catch(e) {}
+  }
+
+  sheet.addRow([]);
+
+  const titleRow = sheet.addRow([exam.title || 'Untitled Exam']);
+  titleRow.font = { bold: true, size: 16, color: { argb: 'FF111827' } };
+  sheet.mergeCells(`A5:F5`);
+  titleRow.alignment = { horizontal: 'center' };
+  
+  const className = cls.name || cls.courseCode || 'Class'
+  const sectionLabel = cls.sectionCode ? ` — ${cls.sectionCode}` : '';
+  const dateLabel = exam.scheduledStart ? new Date(exam.scheduledStart).toLocaleDateString('en-US') : (exam.createdAt ? new Date(exam.createdAt).toLocaleDateString('en-US') : '');
+  const itemsCount = exam.questions ? exam.questions.length : 0;
+  
+  const sub1 = sheet.addRow([`${className}${sectionLabel} • AY ${cls.academicYear || ''}, Sem ${cls.semester || ''}`]);
+  const sub2 = sheet.addRow([`${dateLabel} • ${itemsCount} items`]);
+  sub1.font = { size: 10, color: { argb: 'FF6B7280' } };
+  sub1.alignment = { horizontal: 'center' };
+  sheet.mergeCells(`A${sub1.number}:F${sub1.number}`);
+  
+  sub2.font = { size: 10, color: { argb: 'FF6B7280' } };
+  sub2.alignment = { horizontal: 'center' };
+  sheet.mergeCells(`A${sub2.number}:F${sub2.number}`);
+
+  sheet.addRow([]);
+  
+  const submittedSessions = sessions.filter(s => s.status === 'submitted' && s.percentage != null);
+  let avgScore = '—', highest = '—', lowest = '—', passed = '—', failed = '—';
+  if (submittedSessions.length > 0) {
+    avgScore = Math.round(submittedSessions.reduce((acc, s) => acc + Number(s.percentage), 0) / submittedSessions.length) + '%';
+    highest = Math.max(...submittedSessions.map(s => Number(s.percentage))) + '%';
+    lowest = Math.min(...submittedSessions.map(s => Number(s.percentage))) + '%';
+    passed = submittedSessions.filter(s => Number(s.percentage) >= 50).length;
+    failed = submittedSessions.filter(s => Number(s.percentage) < 50).length;
+  }
+  
+  // Summary Block
+  const statLabelRow = sheet.addRow(['Average', 'Highest', 'Lowest', 'Passed', 'Failed', '']);
+  const statValRow = sheet.addRow([avgScore, highest, lowest, passed, failed, '']);
+  
+  statLabelRow.font = { size: 10, color: { argb: 'FF6B7280' } };
+  statLabelRow.alignment = { horizontal: 'center' };
+  
+  statValRow.font = { bold: true, size: 14, color: { argb: 'FF111827' } };
+  statValRow.alignment = { horizontal: 'center' };
+  
+  // apply light background to stats block
+  for (let col = 1; col <= 5; col++) {
+    const cellL = statLabelRow.getCell(col);
+    const cellV = statValRow.getCell(col);
+    cellL.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9FAFB' } };
+    cellV.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9FAFB' } };
+    
+    // Add thin border around the stats block
+    const border = {
+      top: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+      bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+      left: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+      right: { style: 'thin', color: { argb: 'FFE5E7EB' } }
+    };
+    cellL.border = border;
+    cellV.border = border;
+  }
+
+  sheet.addRow([]);
+  sheet.addRow([]);
+
+  // Function to style headers
+  const styleTableHeader = (row) => {
+    row.font = { bold: true, size: 10, color: { argb: 'FF111827' } };
+    row.eachCell((cell) => {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF3F4F6' } };
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+        bottom: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+      };
+      cell.alignment = { vertical: 'middle', horizontal: 'left' };
+    });
+  };
+
+  const styleTableRow = (row) => {
+    row.font = { size: 10, color: { argb: 'FF1F2937' } };
+    row.eachCell((cell) => {
+      cell.border = {
+        bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } }
+      };
+      cell.alignment = { vertical: 'middle', horizontal: 'left' };
+    });
+  };
+  
+  // Data
+  if (reportType === 'violations') {
+    const headerTitleRow = sheet.addRow(['Integrity Violations']);
+    headerTitleRow.font = { bold: true, size: 12, color: { argb: 'FF111827' } };
+    sheet.addRow([]);
+
+    const headerRow = sheet.addRow(['Student', 'Event', 'Details', 'When', '', '']);
+    styleTableHeader(headerRow);
+    
+    for (const v of violations) {
+      const dataRow = sheet.addRow([
+        v.studentName || '—',
+        v.eventType || '—',
+        v.details || '—',
+        v.occurredAt ? new Date(v.occurredAt).toLocaleString('en-PH') : '—',
+        '',
+        ''
+      ]);
+      styleTableRow(dataRow);
+    }
+  } else {
+    const headerTitleRow = sheet.addRow(['Student Results']);
+    headerTitleRow.font = { bold: true, size: 12, color: { argb: 'FF111827' } };
+    sheet.addRow([]);
+
+    const headerRow = sheet.addRow(['No.', 'Student', 'School ID', 'Score', 'Rank', 'Warnings']);
+    styleTableHeader(headerRow);
+
+    sortSessionsForReport(sessions).forEach((s, index) => {
+      const scoreLabel = s.status === 'submitted' && s.percentage != null 
+        ? `${s.percentage}% (${s.rawScore}/${s.totalPoints})`
+        : '—';
+      const rankLabel = s.rank != null ? `#${s.rank}` : '—';
+      const dataRow = sheet.addRow([
+        index + 1,
+        s.studentName || '—',
+        s.schoolId || '—',
+        scoreLabel,
+        rankLabel,
+        s.warningCount || 0
+      ]);
+      styleTableRow(dataRow);
+    });
+  }
+
+  return await workbook.xlsx.writeBuffer();
 }
 
 function buildPdfBuffer({
   exam,
-  className,
+  cls,
   sessions,
   stats,
   top,
@@ -257,22 +497,49 @@ function buildPdfBuffer({
   reportTitle,
   reportType,
   generatedAt,
+  teacherLogoBase64,
+  departmentName
 }) {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: MARGIN, size: 'A4' })
+    const doc = new PDFDocument({ margin: MARGIN, size: 'A4', bufferPages: true })
     const chunks = []
     doc.on('data', (c) => chunks.push(c))
     doc.on('end', () => resolve(Buffer.concat(chunks)))
     doc.on('error', reject)
 
     try {
-      drawReportHeader(doc, { reportTitle, exam, className, generatorName, generatedAt })
-      drawStatsBlock(doc, stats, top)
+      drawReportHeader(doc, { exam, cls, generatorName, generatedAt, teacherLogoBase64, departmentName })
+      drawStatsBlock(doc, sessions)
 
       if (reportType === 'violations') {
         drawViolationsTable(doc, violations)
       } else {
         drawStudentResultsTable(doc, sessions)
+      }
+      
+      const pages = doc.bufferedPageRange();
+      for (let i = 0; i < pages.count; i++) {
+        doc.switchToPage(i);
+        
+        const oldBottomMargin = doc.page.margins.bottom;
+        doc.page.margins.bottom = 0;
+        
+        const footerY = doc.page.height - 30;
+        
+        try {
+          if (fs.existsSync(acsisLogoPath)) {
+            const svgContent = fs.readFileSync(acsisLogoPath, 'utf8');
+            SVGtoPDF(doc, svgContent, MARGIN, footerY - 5, { width: 14, height: 14 });
+          }
+        } catch (err) {
+          // ignore
+        }
+        
+        setFont(doc, 'bold');
+        doc.fontSize(9).fillColor('#9ca3af');
+        doc.text('via ACSIS', MARGIN + 20, footerY, { align: 'left', lineBreak: false });
+        
+        doc.page.margins.bottom = oldBottomMargin;
       }
 
       doc.end()
@@ -286,7 +553,7 @@ export async function exportExamReportService(
   classId,
   examId,
   teacherMemberId,
-  { format = 'pdf', reportType = 'class_results' } = {},
+  { format = 'pdf', reportType = 'class_results', teacherLogoBase64, departmentName } = {},
 ) {
   try {
     const cls = await getTeacherClassByIdQuery(classId, teacherMemberId)
@@ -331,20 +598,30 @@ export async function exportExamReportService(
         }
       : null
 
-    if (format === 'csv') {
-      const csv = buildCsv(exam, sessions, violations, generatorName, generatedAt)
+    if (format === 'excel') {
+      const excelBuffer = await buildExcelBuffer({
+        exam,
+        cls,
+        sessions,
+        violations,
+        generatorName,
+        generatedAt,
+        reportType,
+        teacherLogoBase64,
+        departmentName,
+      })
 
       return {
         ok: true,
-        contentType: 'text/csv; charset=utf-8',
-        filename: `acsis-report-${examId}.csv`,
-        body: Buffer.from(csv, 'utf8'),
+        contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        filename: `acsis-report-${examId}.xlsx`,
+        body: excelBuffer,
       }
     }
 
     const pdf = await buildPdfBuffer({
       exam,
-      className,
+      cls,
       sessions,
       stats,
       top: topForExport,
@@ -353,6 +630,8 @@ export async function exportExamReportService(
       reportTitle,
       reportType,
       generatedAt,
+      teacherLogoBase64,
+      departmentName,
     })
 
     return {

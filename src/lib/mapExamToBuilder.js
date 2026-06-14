@@ -18,6 +18,9 @@ function mapQuestion(q) {
     imageUrl: q.imageUrl || null,
     presentationAnswer: q.presentationAnswer ?? null,
     answerExplanation: q.answerExplanation ?? null,
+    matchingPairs: q.matchingPairs || [],
+    diagramVariant: q.diagramVariant ?? null,
+    diagramReference: q.diagramReference ?? null,
   }
 }
 

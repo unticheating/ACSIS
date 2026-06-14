@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { enroll, getClasses, unenroll, updateStudentNumber } from '../controllers/studentController.js';
+import { enroll, getClasses, unenroll, updateStudentNumber, updateClassesSort } from '../controllers/studentController.js';
 import {
   getStudentClassStream,
   getStudentExamSession,
@@ -21,6 +21,7 @@ router.use(requireStudentMember);
 router.post('/enroll', enroll);
 router.get('/performance', getStudentPerformance);
 router.get('/classes', getClasses);
+router.put('/classes/sort', updateClassesSort);
 router.delete('/classes/:classId/enroll', unenroll);
 router.get('/classes/:classId/exams', getStudentClassStream);
 router.post('/classes/:classId/exams/:examId/join', joinStudentExam);

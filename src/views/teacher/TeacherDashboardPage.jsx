@@ -86,6 +86,7 @@ export default function TeacherDashboardPage() {
 
       const nested = await Promise.all(
         classesData.map(async (course) => {
+          if (course.isArchived) return []
           const classId = course.id ?? course.classId
           if (classId == null) return []
           try {
@@ -159,7 +160,7 @@ export default function TeacherDashboardPage() {
     if (!classesByTermId.has(key)) classesByTermId.set(key, [])
     classesByTermId.get(key).push(course)
   }
-  const selectableTerms = terms.filter((term) => (classesByTermId.get(String(term.id)) || []).length > 0)
+  const selectableTerms = terms.filter((term) => !term.isArchived && (classesByTermId.get(String(term.id)) || []).length > 0)
   const selectedTermIds = new Set(selectedSections.map((termId) => String(termId)))
   const selectedTermIdList = Array.from(selectedTermIds)
   const normalizeCourseText = (value) => String(value || '').trim().replace(/\s+/g, ' ').toLowerCase()

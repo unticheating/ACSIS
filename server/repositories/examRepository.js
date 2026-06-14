@@ -1,12 +1,23 @@
 import { getPool } from '../db.js';
 import { STUDENT_VISIBLE_STATUS_SQL } from '../lib/examStatus.js';
 import { ensureExamSectionsSchema } from '../lib/ensureExamSectionsSchema.js';
-import { resolveIdentificationPayload } from '../lib/identificationAnswers.js';
+import {
+  normalizeAnswerExplanation,
+  resolveIdentificationPayload,
+} from '../lib/identificationAnswers.js';
+import {
+  resolveMatchingPayload,
+  serializeMatchingPair,
+  parseMatchingPairText,
+} from '../lib/matchingAnswers.js';
 
 function mapQuestionTypeToDb(type) {
   if (type === 'multiple-choice' || type === 'multiple') return 'mcq';
   if (type === 'truefalse') return 'true_false';
   if (type === 'coding') return 'coding';
+  if (type === 'matching') return 'matching';
+  if (type === 'essay') return 'essay';
+  if (type === 'diagramming') return 'diagramming';
   return 'identification';
 }
 
@@ -26,7 +37,8 @@ async function insertQuestionWithChoices(client, examId, sectionId, q, orderNum)
   const dbType = mapQuestionTypeToDb(q.type);
   const imageUrl = q.imageUrl || null;
   const identMeta =
-    dbType === 'identification' ? resolveIdentificationPayload(q) : { presentation: null, explanation: null };
+    dbType === 'identification' ? resolveIdentificationPayload(q) : { presentation: null };
+  const explanation = normalizeAnswerExplanation(q);
   const qResult = await client.query(
     `INSERT INTO questions (
        exam_id, section_id, question_text, question_type, points, order_num, image_url,
@@ -42,37 +54,12 @@ async function insertQuestionWithChoices(client, examId, sectionId, q, orderNum)
       orderNum,
       imageUrl,
       dbType === 'identification' ? identMeta.presentation || null : null,
-      dbType === 'identification' ? identMeta.explanation : null,
+      explanation,
     ],
   );
   const questionId = qResult.rows[0].question_id;
 
-  if (dbType === 'mcq') {
-    for (let j = 0; j < q.options.length; j++) {
-      const choiceText = q.options[j];
-      const isCorrect = choiceText === q.correctAnswer;
-      await client.query(
-        `INSERT INTO choices (question_id, choice_text, is_correct, order_num)
-         VALUES ($1, $2, $3, $4)`,
-        [questionId, choiceText, isCorrect, j + 1],
-      );
-    }
-  } else if (dbType === 'coding') {
-    const language =
-      Array.isArray(q.options) && q.options[0] ? String(q.options[0]).trim() : 'javascript';
-    await client.query(
-      `INSERT INTO choices (question_id, choice_text, is_correct, order_num)
-       VALUES ($1, $2, FALSE, 1)`,
-      [questionId, language],
-    );
-    await client.query(
-      `INSERT INTO choices (question_id, choice_text, is_correct, order_num)
-       VALUES ($1, $2, TRUE, 2)`,
-      [questionId, q.correctAnswer],
-    );
-  } else {
-    await insertIdentificationChoices(client, questionId, q);
-  }
+  await insertChoicesForQuestion(client, questionId, q, dbType);
 }
 
 async function insertChoicesForQuestion(client, questionId, q, dbType) {
@@ -99,6 +86,40 @@ async function insertChoicesForQuestion(client, questionId, q, dbType) {
        VALUES ($1, $2, TRUE, 2)`,
       [questionId, q.correctAnswer],
     );
+  } else if (dbType === 'matching') {
+    const pairs = resolveMatchingPayload(q);
+    for (let j = 0; j < pairs.length; j++) {
+      await client.query(
+        `INSERT INTO choices (question_id, choice_text, is_correct, order_num)
+         VALUES ($1, $2, TRUE, $3)`,
+        [questionId, serializeMatchingPair(pairs[j]), j + 1],
+      );
+    }
+  } else if (dbType === 'essay') {
+    const rubric = String(q.correctAnswer || 'Manual grading required').trim() || 'Manual grading required';
+    await client.query(
+      `INSERT INTO choices (question_id, choice_text, is_correct, order_num)
+       VALUES ($1, $2, TRUE, 1)`,
+      [questionId, rubric],
+    );
+  } else if (dbType === 'diagramming') {
+    const variant =
+      (Array.isArray(q.options) && q.options[0] ? String(q.options[0]).trim() : null) ||
+      String(q.diagramVariant || 'flowchart').trim() ||
+      'flowchart';
+    await client.query(
+      `INSERT INTO choices (question_id, choice_text, is_correct, order_num)
+       VALUES ($1, $2, FALSE, 1)`,
+      [questionId, variant],
+    );
+    const reference = String(q.correctAnswer || q.diagramReference || '').trim();
+    if (reference) {
+      await client.query(
+        `INSERT INTO choices (question_id, choice_text, is_correct, order_num)
+         VALUES ($1, $2, TRUE, 2)`,
+        [questionId, reference],
+      );
+    }
   } else {
     await insertIdentificationChoices(client, questionId, q);
   }
@@ -134,7 +155,8 @@ async function updateQuestionInPlace(client, examId, sectionId, q, orderNum, que
   const dbType = mapQuestionTypeToDb(q.type);
   const imageUrl = q.imageUrl || null;
   const identMeta =
-    dbType === 'identification' ? resolveIdentificationPayload(q) : { presentation: null, explanation: null };
+    dbType === 'identification' ? resolveIdentificationPayload(q) : { presentation: null };
+  const explanation = normalizeAnswerExplanation(q);
   await client.query(
     `UPDATE questions
      SET question_text = $1,
@@ -152,7 +174,7 @@ async function updateQuestionInPlace(client, examId, sectionId, q, orderNum, que
       sectionId,
       imageUrl,
       dbType === 'identification' ? identMeta.presentation || null : null,
-      dbType === 'identification' ? identMeta.explanation : null,
+      explanation,
       questionId,
       examId,
     ],
@@ -169,18 +191,26 @@ async function updateQuestionInPlace(client, examId, sectionId, q, orderNum, que
       `SELECT choice_id, order_num FROM choices WHERE question_id = $1 ORDER BY order_num ASC`,
       [questionId],
     );
-    if (existing.length !== (q.options?.length || 0)) {
-      const err = new Error('Cannot change the number of choices after students have answered.');
-      err.code = 'QUESTION_LOCKED';
-      throw err;
-    }
-    for (let j = 0; j < q.options.length; j++) {
-      const choiceText = q.options[j];
+    const options = q.options || [];
+    for (let j = 0; j < options.length; j++) {
+      const choiceText = options[j];
       const isCorrect = choiceText === q.correctAnswer;
-      await client.query(
-        `UPDATE choices SET choice_text = $1, is_correct = $2 WHERE choice_id = $3`,
-        [choiceText, isCorrect, existing[j].choice_id],
-      );
+      if (j < existing.length) {
+        await client.query(
+          `UPDATE choices SET choice_text = $1, is_correct = $2 WHERE choice_id = $3`,
+          [choiceText, isCorrect, existing[j].choice_id],
+        );
+      } else {
+        await client.query(
+          `INSERT INTO choices (question_id, choice_text, is_correct, order_num) VALUES ($1, $2, $3, $4)`,
+          [questionId, choiceText, isCorrect, j + 1]
+        );
+      }
+    }
+    if (existing.length > options.length) {
+      for (let j = options.length; j < existing.length; j++) {
+        await client.query(`DELETE FROM choices WHERE choice_id = $1`, [existing[j].choice_id]);
+      }
     }
     return;
   }
@@ -209,21 +239,52 @@ async function updateQuestionInPlace(client, examId, sectionId, q, orderNum, que
     return;
   }
 
-  const { acceptable } = resolveIdentificationPayload(q);
+  // Fallback for Identification, True/False, Essay, Matching, Diagramming
+  // Re-generate the expected choices the same way `insertChoicesForQuestion` does
+  let newChoices = [];
+  if (dbType === 'matching') {
+    const pairs = resolveMatchingPayload(q);
+    newChoices = pairs.map((p, idx) => ({ text: serializeMatchingPair(p), isCorrect: true, order: idx + 1 }));
+  } else if (dbType === 'essay') {
+    const rubric = String(q.correctAnswer || 'Manual grading required').trim() || 'Manual grading required';
+    newChoices = [{ text: rubric, isCorrect: true, order: 1 }];
+  } else if (dbType === 'diagramming') {
+    const variant = (Array.isArray(q.options) && q.options[0] ? String(q.options[0]).trim() : null) ||
+      String(q.diagramVariant || 'flowchart').trim() || 'flowchart';
+    newChoices.push({ text: variant, isCorrect: false, order: 1 });
+    const reference = String(q.correctAnswer || q.diagramReference || '').trim();
+    if (reference) {
+      newChoices.push({ text: reference, isCorrect: true, order: 2 });
+    }
+  } else {
+    // Identification / True-False fallback
+    const { acceptable } = resolveIdentificationPayload(q);
+    newChoices = acceptable.map((ans, idx) => ({ text: ans, isCorrect: true, order: idx + 1 }));
+  }
+
   const { rows: existing } = await client.query(
-    `SELECT choice_id FROM choices WHERE question_id = $1 AND is_correct = TRUE ORDER BY order_num ASC`,
+    `SELECT choice_id FROM choices WHERE question_id = $1 ORDER BY order_num ASC`,
     [questionId],
   );
-  if (existing.length !== acceptable.length) {
-    const err = new Error('Cannot change the number of acceptable answers after students have answered.');
-    err.code = 'QUESTION_LOCKED';
-    throw err;
+
+  for (let j = 0; j < newChoices.length; j++) {
+    const nc = newChoices[j];
+    if (j < existing.length) {
+      await client.query(
+        `UPDATE choices SET choice_text = $1, is_correct = $2, order_num = $3 WHERE choice_id = $4`,
+        [nc.text, nc.isCorrect, nc.order, existing[j].choice_id]
+      );
+    } else {
+      await client.query(
+        `INSERT INTO choices (question_id, choice_text, is_correct, order_num) VALUES ($1, $2, $3, $4)`,
+        [questionId, nc.text, nc.isCorrect, nc.order]
+      );
+    }
   }
-  for (let j = 0; j < acceptable.length; j++) {
-    await client.query(`UPDATE choices SET choice_text = $1 WHERE choice_id = $2`, [
-      acceptable[j],
-      existing[j].choice_id,
-    ]);
+  if (existing.length > newChoices.length) {
+    for (let j = newChoices.length; j < existing.length; j++) {
+      await client.query(`DELETE FROM choices WHERE choice_id = $1`, [existing[j].choice_id]);
+    }
   }
 }
 
@@ -639,6 +700,9 @@ function mapQuestionTypeFromDb(dbType) {
   if (dbType === 'mcq') return 'multiple-choice';
   if (dbType === 'true_false') return 'truefalse';
   if (dbType === 'coding') return 'coding';
+  if (dbType === 'matching') return 'matching';
+  if (dbType === 'essay') return 'essay';
+  if (dbType === 'diagramming') return 'diagramming';
   return 'identification';
 }
 
@@ -654,6 +718,7 @@ async function attachChoicesToQuestion(pool, row) {
     sectionId: row.sectionId ?? null,
     sectionTitle: row.sectionTitle ?? null,
     sectionDescription: row.sectionDescription ?? null,
+    answerExplanation: row.answerExplanation?.trim() || '',
   };
 
   if (qType === 'multiple-choice' || qType === 'truefalse') {
@@ -678,7 +743,34 @@ async function attachChoicesToQuestion(pool, row) {
     qObj.correctAnswer = acceptable.join(', ');
     qObj.presentationAnswer =
       row.presentationAnswer?.trim() || acceptable[0] || '';
-    qObj.answerExplanation = row.answerExplanation?.trim() || '';
+  } else if (qType === 'matching') {
+    const cResult = await pool.query(
+      `SELECT choice_text FROM choices WHERE question_id = $1 ORDER BY order_num ASC`,
+      [row.id],
+    );
+    const matchingPairs = cResult.rows
+      .map((c) => parseMatchingPairText(c.choice_text))
+      .filter(Boolean);
+    qObj.matchingPairs = matchingPairs;
+    qObj.correctAnswer = JSON.stringify(matchingPairs);
+  } else if (qType === 'essay') {
+    const cResult = await pool.query(
+      `SELECT choice_text FROM choices WHERE question_id = $1 AND is_correct = TRUE ORDER BY order_num ASC LIMIT 1`,
+      [row.id],
+    );
+    qObj.correctAnswer = cResult.rows[0]?.choice_text?.trim() || '';
+  } else if (qType === 'diagramming') {
+    const cResult = await pool.query(
+      `SELECT choice_text, is_correct FROM choices WHERE question_id = $1 ORDER BY order_num ASC`,
+      [row.id],
+    );
+    const variantRow = cResult.rows.find((c) => !c.is_correct) || cResult.rows[0];
+    const refRow = cResult.rows.find((c) => c.is_correct);
+    const variant = variantRow?.choice_text?.trim() || 'flowchart';
+    qObj.diagramVariant = variant;
+    qObj.options = [variant];
+    qObj.diagramReference = refRow?.choice_text?.trim() || '';
+    qObj.correctAnswer = qObj.diagramReference;
   } else {
     const cResult = await pool.query(
       `SELECT choice_text, is_correct FROM choices WHERE question_id = $1 ORDER BY order_num ASC`,

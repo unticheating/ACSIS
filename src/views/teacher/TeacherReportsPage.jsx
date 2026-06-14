@@ -1,8 +1,26 @@
 import { useEffect, useState, useMemo } from 'react'
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell
+} from 'recharts'
 import { fetchTeacherExamResults, fetchTeacherReportExams } from '@/lib/teacherExamResultsApi.js'
 import { exportExamReport } from '@/lib/teacherExamGradingApi.js'
 import { acsisToastError } from '@/lib/acsisToast.js'
 import FadeIn from '@/components/ui/fade-in.jsx'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter
+} from '@/components/ui/dialog.jsx'
 import '../../pages/teacher-ui/reports.css'
 
 function formatDate(iso) {
@@ -23,6 +41,117 @@ function sortSessionsByRank(sessions) {
   })
 }
 
+function ExamCard({ exam, onClick, index }) {
+  const sectionParts = [exam.programCode, exam.sectionCode].filter(Boolean)
+  const sectionLabel = sectionParts.join(' / ')
+
+  return (
+    <FadeIn delay={0.05 + index * 0.04} className="rp-exam-card" onClick={() => onClick(exam)}>
+      {sectionLabel ? (
+        <div className="rp-exam-card__section">{sectionLabel}</div>
+      ) : null}
+      <div className="rp-exam-card__title">{exam.title || 'Untitled Exam'}</div>
+      <div className="rp-exam-card__class">{exam.className || 'Class'}</div>
+      <div className="rp-exam-card__bottom">
+        <span className="rp-exam-card__sub-num">{exam.submittedCount ?? 0}</span>
+        <span className="rp-exam-card__sub-lbl"> submitted</span>
+      </div>
+    </FadeIn>
+  )
+}
+
+const PASS_THRESHOLD = 50
+
+const CustomChartTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="rp-barchart-tooltip">
+        <p className="rp-barchart-tooltip-label">{`Score: ${label}`}</p>
+        <p className="rp-barchart-tooltip-value">
+          {`${payload[0].value} Student${payload[0].value !== 1 ? 's' : ''}`}
+        </p>
+      </div>
+    )
+  }
+  return null
+}
+
+function ScoreBarChart({ sessions }) {
+  const scored = sessions.filter(
+    (s) => s.status === 'submitted' && s.percentage != null,
+  )
+  if (scored.length === 0) {
+    return <p className="rp-muted" style={{ marginTop: 8 }}>No score data to display yet.</p>
+  }
+
+  let totalScore = scored.length > 0 && scored[0].totalPoints ? Number(scored[0].totalPoints) : 100
+  if (totalScore <= 0 || isNaN(totalScore)) totalScore = 100
+
+  let bucketCount = 10
+  if (totalScore < 10) {
+    bucketCount = totalScore
+  }
+
+  const bucketSize = totalScore / bucketCount
+
+  const buckets = Array.from({ length: bucketCount }, (_, i) => {
+    const minRaw = Math.ceil(i * bucketSize)
+    const maxRaw = i === bucketCount - 1 ? totalScore : Math.ceil((i + 1) * bucketSize) - 1
+    const label = minRaw >= maxRaw ? `${minRaw}` : `${minRaw}-${maxRaw}`
+    const passed = maxRaw >= (totalScore * (PASS_THRESHOLD / 100))
+    return { label, minRaw, maxRaw, passed }
+  })
+
+  const counts = buckets.map((b) => ({
+    name: b.label,
+    count: scored.filter((s) => {
+      const r = Number(s.rawScore)
+      return r >= b.minRaw && r <= b.maxRaw
+    }).length,
+    passed: b.passed,
+  }))
+
+  const maxCount = Math.max(...counts.map((c) => c.count), 1)
+
+  return (
+    <div className="rp-barchart-wrap" style={{ width: '100%', height: 260 }}>
+      <div className="rp-barchart-legend" style={{ justifyContent: 'flex-end', marginBottom: 16 }}>
+        <span className="rp-barchart-swatch rp-barchart-swatch--fail" /> Failed (&lt;50%)
+        <span className="rp-barchart-swatch rp-barchart-swatch--pass" /> Passed (50%+)
+      </div>
+      <div style={{ width: '100%', height: 200 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={counts} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" opacity={0.1} />
+            <XAxis 
+              dataKey="name" 
+              tick={{ fontSize: 12, fill: 'currentColor', opacity: 0.6 }}
+              tickLine={false}
+              axisLine={{ stroke: 'currentColor', opacity: 0.2 }}
+            />
+            <YAxis 
+              allowDecimals={false} 
+              tick={{ fontSize: 12, fill: 'currentColor', opacity: 0.6 }}
+              tickLine={false}
+              axisLine={{ stroke: 'currentColor', opacity: 0.2 }}
+              domain={[0, maxCount <= 5 ? 5 : 'auto']}
+            />
+            <Tooltip 
+              cursor={{ fill: 'currentColor', opacity: 0.05 }}
+              content={<CustomChartTooltip />}
+            />
+            <Bar dataKey="count" radius={[4, 4, 0, 0]} maxBarSize={40}>
+              {counts.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={entry.passed ? '#22c55e' : '#ef4444'} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  )
+}
+
 export default function TeacherReportsPage() {
   const [selectedExamId, setSelectedExamId] = useState('')
   const [activeTab, setActiveTab] = useState('detailed')
@@ -35,6 +164,10 @@ export default function TeacherReportsPage() {
   const [violations, setViolations] = useState([])
   const [topStudent, setTopStudent] = useState(null)
   const [exporting, setExporting] = useState(false)
+  const [exportModalOpen, setExportModalOpen] = useState(false)
+  const [exportFormat, setExportFormat] = useState('pdf')
+  const [teacherLogoBase64, setTeacherLogoBase64] = useState(() => localStorage.getItem('acsis_teacher_logo') || '')
+  const [departmentName, setDepartmentName] = useState(() => localStorage.getItem('acsis_department_name') || '')
 
   useEffect(() => {
     let cancelled = false
@@ -101,21 +234,50 @@ export default function TeacherReportsPage() {
 
   const sessionsByRank = useMemo(() => sortSessionsByRank(sessions), [sessions])
 
-  const handleExport = async (format) => {
+  const handleExport = async () => {
     if (!currentExam?.classId || !currentExam?.id) return
     setExporting(true)
     try {
       const reportType =
         activeTab === 'violations' ? 'violations' : activeTab === 'summary' ? 'summary' : 'detailed'
       await exportExamReport(currentExam.classId, currentExam.id, {
-        format: format === 'CSV' ? 'csv' : 'pdf',
+        format: exportFormat,
         reportType,
+        teacherLogoBase64: teacherLogoBase64 || undefined,
+        departmentName: departmentName || undefined
       })
+      setExportModalOpen(false)
     } catch (err) {
       acsisToastError(err instanceof Error ? err.message : 'Export failed.')
     } finally {
       setExporting(false)
     }
+  }
+
+  const handleLogoUpload = (e) => {
+    const file = e.target.files[0]
+    if (!file) {
+      setTeacherLogoBase64('')
+      localStorage.removeItem('acsis_teacher_logo')
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = (evt) => {
+      const result = evt.target.result
+      setTeacherLogoBase64(result)
+      try {
+        localStorage.setItem('acsis_teacher_logo', result)
+      } catch (err) {
+        console.warn('Logo too large for localStorage', err)
+      }
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleDepartmentChange = (e) => {
+    const val = e.target.value
+    setDepartmentName(val)
+    localStorage.setItem('acsis_department_name', val)
   }
 
   const handleChangeExam = () => {
@@ -132,39 +294,40 @@ export default function TeacherReportsPage() {
         )
       : null
 
+  const sectionParts = currentExam
+    ? [currentExam.programCode, currentExam.sectionCode].filter(Boolean)
+    : []
+  const sectionLabel = sectionParts.join(' — ')
+
   return (
     <div className="acsis-view reports-page">
       <div className="container" style={{ padding: 0 }}>
         {!currentExam && (
-          <div className="panel" style={{ maxWidth: '100%', marginBottom: '24px' }}>
+          <FadeIn delay={0.05} className="panel">
             <div className="report-header" style={{ marginBottom: '20px' }}>
-              <h3 className="text-xl font-bold text-foreground m-0 mb-1.5">Performance Report</h3>
-              <p className="text-sm text-muted-foreground m-0">
+              <h3 className="rp-page-title">Performance Report</h3>
+              <p className="rp-page-sub">
                 Select an exam to view scores and violations from the database.
               </p>
             </div>
 
-            <div className="flex flex-col gap-2 max-w-[800px]">
-              <label htmlFor="exam-select" className="text-sm font-semibold text-foreground">
-                Select Exam
-              </label>
-              <select
-                id="exam-select"
-                className="acsis-reports-exam-select flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                value={selectedExamId}
-                onChange={(e) => setSelectedExamId(e.target.value)}
-                disabled={loadingExams}
-              >
-                <option value="">Choose an exam...</option>
-                {allExams.map((exam) => (
-                  <option key={exam.id} value={exam.id}>
-                    {exam.title || 'Untitled Exam'} ({exam.className || 'Class'}) — {exam.submittedCount ?? 0}{' '}
-                    submitted
-                  </option>
+            {loadingExams ? (
+              <div className="rp-loading">Loading exams…</div>
+            ) : allExams.length === 0 ? (
+              <div className="rp-empty">No exams found. Create an exam in your classes first.</div>
+            ) : (
+              <div className="rp-exam-grid">
+                {allExams.map((exam, i) => (
+                  <ExamCard
+                    key={exam.id}
+                    exam={exam}
+                    index={i}
+                    onClick={(e) => setSelectedExamId(String(e.id))}
+                  />
                 ))}
-              </select>
-            </div>
-          </div>
+              </div>
+            )}
+          </FadeIn>
         )}
 
         {currentExam && (
@@ -172,13 +335,16 @@ export default function TeacherReportsPage() {
             <FadeIn delay={0.1} className="panel">
               <div className="exam-title-row">
                 <div>
-                  <h2>{currentExam.title}</h2>
-                  <p>
-                    {currentExam.className} · {stats ? `${stats.submitted}/${stats.enrolled} submitted` : 'Loading…'}
+                  <h2 className="rp-exam-heading">{currentExam.title}</h2>
+                  <p className="rp-exam-subheading">
+                    {currentExam.className}
+                    {sectionLabel ? <span className="rp-exam-section-chip">{sectionLabel}</span> : null}
+                    {' '}·{' '}
+                    {stats ? `${stats.submitted}/${stats.enrolled} submitted` : 'Loading…'}
                   </p>
                 </div>
                 <button type="button" className="btn-ghost-text" onClick={handleChangeExam}>
-                  Change Exam
+                  ← Change Exam
                 </button>
               </div>
 
@@ -212,80 +378,171 @@ export default function TeacherReportsPage() {
                     type="button"
                     className="btn-action btn-blue"
                     disabled={exporting}
-                    onClick={() => handleExport('CSV')}
+                    onClick={() => { setExportFormat('excel'); setExportModalOpen(true); }}
                   >
-                    Download CSV
+                    Download Excel
                   </button>
                   <button
                     type="button"
                     className="btn-action btn-green"
                     disabled={exporting}
-                    onClick={() => handleExport('PDF')}
+                    onClick={() => { setExportFormat('pdf'); setExportModalOpen(true); }}
                   >
-                    {exporting ? 'Exporting…' : 'Download PDF'}
+                    Download PDF
                   </button>
                 </div>
               </div>
             </FadeIn>
 
+            <Dialog open={exportModalOpen} onOpenChange={setExportModalOpen}>
+              <DialogContent className="rp-pdf-dialog">
+                <DialogHeader>
+                  <DialogTitle>Export {exportFormat === 'excel' ? 'Excel' : 'PDF'} Report</DialogTitle>
+                  <DialogDescription>
+                    Configure your report header before generating the document.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="rp-pdf-settings" style={{ padding: '20px 0', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div className="rp-pdf-form-group">
+                    <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '8px', display: 'block' }}>
+                      Teacher / Department Logo (Optional)
+                    </label>
+                    <input 
+                      type="file" 
+                      accept="image/png, image/jpeg" 
+                      onChange={handleLogoUpload}
+                      style={{ display: 'block', width: '100%', padding: '8px', border: '1px solid var(--border-color)', borderRadius: '6px' }}
+                    />
+                    <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                      This logo will appear next to the ACSIS logo on the header.
+                    </p>
+                    {teacherLogoBase64 && (
+                      <>
+                        <div style={{ marginTop: '12px', border: '1px dashed var(--border-color)', padding: '10px', borderRadius: '6px', display: 'inline-block' }}>
+                          <img src={teacherLogoBase64} alt="Teacher Logo Preview" style={{ maxHeight: '60px', objectFit: 'contain' }} />
+                        </div>
+                        <div style={{ marginTop: '16px' }}>
+                          <label style={{ fontSize: '14px', fontWeight: '500', marginBottom: '8px', display: 'block' }}>
+                            Department Name (Optional)
+                          </label>
+                          <input 
+                            type="text" 
+                            placeholder="e.g. College of Computer Studies"
+                            value={departmentName}
+                            onChange={handleDepartmentChange}
+                            style={{ display: 'block', width: '100%', padding: '8px', border: '1px solid var(--border-color)', borderRadius: '6px' }}
+                          />
+                          <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                            This will appear below the Institution name on the right.
+                          </p>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+                <DialogFooter>
+                  <button className="btn-ghost-text" onClick={() => setExportModalOpen(false)}>Cancel</button>
+                  <button className="btn-action btn-green" onClick={handleExport} disabled={exporting}>
+                    {exporting ? `Generating ${exportFormat === 'excel' ? 'Excel' : 'PDF'}...` : 'Confirm & Download'}
+                  </button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
             {reportError ? (
-              <p className="text-sm text-red-600 px-1" role="alert">
+              <p className="rp-error" role="alert">
                 {reportError}
               </p>
             ) : null}
             {loadingReport && !stats ? (
-              <p className="text-sm text-gray-500 px-1">Loading report data…</p>
+              <p className="rp-loading">Loading report data…</p>
             ) : null}
 
-            {activeTab === 'summary' && (
-              <FadeIn delay={0.1} className="tab-panel active panel">
-                <div className="report-header">
-                  <h3>Summary Report</h3>
-                  <p>{currentExam.title}</p>
-                </div>
-                {topStudent ? (
-                  <div className="violation-alert-box" style={{ background: '#f0fdf4', borderColor: '#bbf7d0' }}>
-                    <div className="alert-title" style={{ color: '#166534' }}>
-                      Top 1 — Class rank
-                    </div>
-                    <div className="alert-count" style={{ color: '#15803d' }}>
-                      {topStudent.studentName}
-                    </div>
-                    <div className="alert-sub">
-                      {topStudent.schoolId || '—'} · {topStudent.percentage}% ({topStudent.rawScore} pts)
-                    </div>
+            {activeTab === 'summary' && (() => {
+              const scored = sessions.filter(
+                (s) => s.status === 'submitted' && s.percentage != null,
+              )
+              const highScore = scored.length
+                ? Math.max(...scored.map((s) => Number(s.percentage)))
+                : null
+              const lowScore = scored.length
+                ? Math.min(...scored.map((s) => Number(s.percentage)))
+                : null
+              const passed = scored.filter((s) => Number(s.percentage) >= PASS_THRESHOLD).length
+              const failed = scored.filter((s) => Number(s.percentage) < PASS_THRESHOLD).length
+
+              return (
+                <FadeIn delay={0.1} className="tab-panel active panel">
+                  <div className="report-header">
+                    <h3 className="rp-section-title">Summary Report</h3>
+                    <p className="rp-section-sub">{currentExam.title}</p>
                   </div>
-                ) : null}
-                {stats ? (
-                  <div className="sdc-stats" style={{ maxWidth: 520 }}>
-                    <FadeIn delay={0.15} className="sdc-stat">
-                      <div className="stat-val">{stats.enrolled}</div>
-                      <div className="stat-lbl">Enrolled</div>
-                    </FadeIn>
-                    <FadeIn delay={0.2} className="sdc-stat">
-                      <div className="stat-val">{stats.joined}</div>
-                      <div className="stat-lbl">Joined</div>
-                    </FadeIn>
-                    <FadeIn delay={0.25} className="sdc-stat">
-                      <div className="stat-val text-green">{stats.submitted}</div>
-                      <div className="stat-lbl">Submitted</div>
-                    </FadeIn>
-                    <FadeIn delay={0.3} className="sdc-stat">
-                      <div className="stat-val">{avgScore != null ? `${avgScore}%` : '—'}</div>
-                      <div className="stat-lbl">Class average</div>
-                    </FadeIn>
-                  </div>
-                ) : (
-                  <p className="text-gray">No summary data yet.</p>
-                )}
-              </FadeIn>
-            )}
+
+                  {/* Participation row */}
+                  {stats ? (
+                    <>
+                      <p className="rp-summary-group-label">Participation</p>
+                      <div className="rp-summary-grid">
+                        <FadeIn delay={0.12} className="rp-summary-stat">
+                          <div className="rp-summary-stat__val">{stats.enrolled}</div>
+                          <div className="rp-summary-stat__lbl">Enrolled</div>
+                        </FadeIn>
+                        <FadeIn delay={0.16} className="rp-summary-stat">
+                          <div className="rp-summary-stat__val">{stats.joined}</div>
+                          <div className="rp-summary-stat__lbl">Joined</div>
+                        </FadeIn>
+                        <FadeIn delay={0.20} className="rp-summary-stat">
+                          <div className="rp-summary-stat__val rp-summary-stat__val--green">{stats.submitted}</div>
+                          <div className="rp-summary-stat__lbl">Submitted</div>
+                        </FadeIn>
+                      </div>
+
+                      <p className="rp-summary-group-label" style={{ marginTop: 20 }}>Scores</p>
+                      <div className="rp-summary-grid">
+                        <FadeIn delay={0.24} className="rp-summary-stat">
+                          <div className="rp-summary-stat__val">
+                            {avgScore != null ? `${avgScore}%` : '—'}
+                          </div>
+                          <div className="rp-summary-stat__lbl">Average</div>
+                        </FadeIn>
+                        <FadeIn delay={0.28} className="rp-summary-stat">
+                          <div className="rp-summary-stat__val rp-summary-stat__val--green">
+                            {highScore != null ? `${highScore}%` : '—'}
+                          </div>
+                          <div className="rp-summary-stat__lbl">Highest</div>
+                        </FadeIn>
+                        <FadeIn delay={0.32} className="rp-summary-stat">
+                          <div className="rp-summary-stat__val rp-summary-stat__val--red">
+                            {lowScore != null ? `${lowScore}%` : '—'}
+                          </div>
+                          <div className="rp-summary-stat__lbl">Lowest</div>
+                        </FadeIn>
+                        <FadeIn delay={0.36} className="rp-summary-stat">
+                          <div className="rp-summary-stat__val rp-summary-stat__val--green">{passed}</div>
+                          <div className="rp-summary-stat__lbl">Passed</div>
+                        </FadeIn>
+                        <FadeIn delay={0.40} className="rp-summary-stat">
+                          <div className="rp-summary-stat__val rp-summary-stat__val--red">{failed}</div>
+                          <div className="rp-summary-stat__lbl">Failed</div>
+                        </FadeIn>
+                      </div>
+
+                      {/* Score Distribution Bar Chart */}
+                      <p className="rp-summary-group-label" style={{ marginTop: 24 }}>Score Distribution</p>
+                      <ScoreBarChart sessions={sessions} />
+                    </>
+                  ) : (
+                    <p className="rp-muted">No summary data yet.</p>
+                  )}
+                </FadeIn>
+              )
+            })()}
 
             {activeTab === 'violations' && (
               <FadeIn delay={0.1} className="tab-panel active panel">
                 <div className="report-header">
-                  <h3>Violations Report</h3>
-                  <p>{currentExam.title}</p>
+                  <h3 className="rp-section-title">Violations Report</h3>
+                  <p className="rp-section-sub">{currentExam.title}</p>
                 </div>
 
                 <div className="violation-alert-box">
@@ -295,21 +552,21 @@ export default function TeacherReportsPage() {
                 </div>
 
                 {violations.length === 0 ? (
-                  <p className="text-sm text-gray-500">No violations logged for this exam.</p>
+                  <p className="rp-muted">No violations logged for this exam.</p>
                 ) : (
-                  <ul className="space-y-2">
+                  <ul className="rp-violations-list">
                     {violations.map((v, index) => (
                       <FadeIn
                         as="li"
-                        delay={0.15 + (index * 0.05)}
+                        delay={0.15 + index * 0.05}
                         key={v.id}
-                        className="text-sm border border-gray-100 rounded-lg p-3 bg-gray-50 flex flex-wrap justify-between gap-2"
+                        className="rp-violation-item"
                       >
-                        <span>
+                        <span className="rp-violation-item__text">
                           <strong>{v.studentName}</strong> ({v.schoolId || '—'}) — {v.eventType}
                           {v.details ? `: ${v.details}` : ''}
                         </span>
-                        <span className="text-gray-500">{formatDate(v.occurredAt)}</span>
+                        <span className="rp-violation-item__time">{formatDate(v.occurredAt)}</span>
                       </FadeIn>
                     ))}
                   </ul>
@@ -320,15 +577,15 @@ export default function TeacherReportsPage() {
             {activeTab === 'detailed' && (
               <FadeIn delay={0.1} className="tab-panel active panel">
                 <div className="report-header">
-                  <h3>Student results</h3>
-                  <p>Sorted by rank — Rank #1 appears first.</p>
+                  <h3 className="rp-section-title">Student results</h3>
+                  <p className="rp-section-sub">Sorted by rank — Rank #1 appears first.</p>
                 </div>
 
                 {sessionsByRank.length === 0 ? (
-                  <p className="text-sm text-gray-500">No student sessions yet. Students must join and submit the exam.</p>
+                  <p className="rp-muted">No student sessions yet. Students must join and submit the exam.</p>
                 ) : (
                   sessionsByRank.map((student, index) => (
-                    <FadeIn delay={0.15 + (index * 0.05)} key={student.sessionId} className="student-detail-card">
+                    <FadeIn delay={0.15 + index * 0.05} key={student.sessionId} className="student-detail-card">
                       <div className="sdc-header">
                         <div className="sdc-info">
                           <h4>
@@ -351,12 +608,12 @@ export default function TeacherReportsPage() {
                             </>
                           ) : student.status === 'submitted' ? (
                             <>
-                              <div className="score-val text-gray">—</div>
+                              <div className="score-val rp-muted-val">—</div>
                               <div className="score-lbl">Grading pending</div>
                             </>
                           ) : (
                             <>
-                              <div className="score-val text-gray">—</div>
+                              <div className="score-val rp-muted-val">—</div>
                               <div className="score-lbl">Not submitted</div>
                             </>
                           )}
@@ -372,7 +629,7 @@ export default function TeacherReportsPage() {
                           <div className="stat-lbl">Warnings</div>
                         </div>
                         <div className="sdc-stat">
-                          <div className="stat-val">{formatDate(student.submittedAt)}</div>
+                          <div className="stat-val rp-date-val">{formatDate(student.submittedAt)}</div>
                           <div className="stat-lbl">Submitted</div>
                         </div>
                       </div>

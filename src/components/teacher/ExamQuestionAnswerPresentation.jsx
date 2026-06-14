@@ -4,6 +4,18 @@ import {
   labelForQuestionType,
   parseIdentificationAnswersList,
 } from '@/lib/questionTypes.js'
+import DiagramEditor from '@/components/exam/DiagramEditor.jsx'
+
+function AnswerExplanationBlock({ text }) {
+  const explain = (text || '').trim()
+  if (!explain) return null
+  return (
+    <div className="acsis-exam-answer-key__explain">
+      <span className="acsis-exam-answer-key__label">Explain</span>
+      <p className="acsis-exam-answer-key__explain-text line-clamp-3" title={explain}>{explain}</p>
+    </div>
+  )
+}
 
 /**
  * Teacher-facing correct-answer presentation (exam detail Questions tab, builder preview).
@@ -15,7 +27,6 @@ export default function ExamQuestionAnswerPresentation({ question, className = '
 
   if (type === 'identification') {
     const { acceptable, presentation } = identificationDisplayFromQuestion(q)
-    const explain = (q.answerExplanation || '').trim()
     return (
       <div className={`acsis-exam-answer-key${className ? ` ${className}` : ''}`}>
         <div className="acsis-exam-answer-key__row acsis-exam-answer-key__row--primary">
@@ -36,12 +47,7 @@ export default function ExamQuestionAnswerPresentation({ question, className = '
             </span>
           </div>
         ) : null}
-        {explain ? (
-          <div className="acsis-exam-answer-key__explain">
-            <span className="acsis-exam-answer-key__label">Explain</span>
-            <p className="acsis-exam-answer-key__explain-text">{explain}</p>
-          </div>
-        ) : null}
+        <AnswerExplanationBlock text={q.answerExplanation} />
       </div>
     )
   }
@@ -55,6 +61,7 @@ export default function ExamQuestionAnswerPresentation({ question, className = '
           <span className="acsis-exam-answer-key__label">Correct option</span>
           <span className="acsis-exam-answer-key__value">{correct || '—'}</span>
         </div>
+        <AnswerExplanationBlock text={q.answerExplanation} />
       </div>
     )
   }
@@ -72,6 +79,68 @@ export default function ExamQuestionAnswerPresentation({ question, className = '
           <span className="acsis-exam-answer-key__label">Expected solution</span>
           <pre className="acsis-exam-answer-key__code">{q.correctAnswer || '—'}</pre>
         </div>
+        <AnswerExplanationBlock text={q.answerExplanation} />
+      </div>
+    )
+  }
+
+  if (type === 'matching') {
+    const pairs = Array.isArray(q.matchingPairs) && q.matchingPairs.length
+      ? q.matchingPairs
+      : []
+    return (
+      <div className={`acsis-exam-answer-key${className ? ` ${className}` : ''}`}>
+        <div className="acsis-exam-answer-key__row acsis-exam-answer-key__row--primary">
+          <span className="acsis-exam-answer-key__label">Correct matches</span>
+          <div className="space-y-1">
+            {pairs.length ? (
+              pairs.map((pair, idx) => (
+                <div key={`${pair.left}-${idx}`} className="text-sm">
+                  <span className="font-medium">{pair.left}</span>
+                  <span className="text-muted-foreground"> → </span>
+                  <span>{pair.right}</span>
+                </div>
+              ))
+            ) : (
+              <span className="acsis-exam-answer-key__value">—</span>
+            )}
+          </div>
+        </div>
+        <AnswerExplanationBlock text={q.answerExplanation} />
+      </div>
+    )
+  }
+
+  if (type === 'essay') {
+    return (
+      <div className={`acsis-exam-answer-key${className ? ` ${className}` : ''}`}>
+        <div className="acsis-exam-answer-key__row acsis-exam-answer-key__row--primary">
+          <span className="acsis-exam-answer-key__label">Sample / rubric</span>
+          <p className="acsis-exam-answer-key__value whitespace-pre-wrap line-clamp-4" title={q.correctAnswer}>{q.correctAnswer || 'Manual grading'}</p>
+        </div>
+        <AnswerExplanationBlock text={q.answerExplanation} />
+      </div>
+    )
+  }
+
+  if (type === 'diagramming') {
+    return (
+      <div className={`acsis-exam-answer-key${className ? ` ${className}` : ''}`}>
+        <div className="acsis-exam-answer-key__row acsis-exam-answer-key__row--primary flex-col items-start gap-2">
+          <div className="flex items-center gap-2">
+            <span className="acsis-exam-answer-key__label">Diagram Reference</span>
+            <span className="acsis-exam-answer-key__chip">{q.diagramVariant || q.options?.[0] || 'flowchart'}</span>
+          </div>
+          <div className="w-full h-[250px] rounded-md overflow-hidden border border-border/50">
+            <DiagramEditor
+              variant={q.diagramVariant || q.options?.[0] || 'flowchart'}
+              value={q.correctAnswer || ''}
+              readOnly={true}
+              height={250}
+            />
+          </div>
+        </div>
+        <AnswerExplanationBlock text={q.answerExplanation} />
       </div>
     )
   }
@@ -82,11 +151,16 @@ export default function ExamQuestionAnswerPresentation({ question, className = '
         <span className="acsis-exam-answer-key__label">Answer</span>
         <span className="acsis-exam-answer-key__value">{q.correctAnswer || '—'}</span>
       </div>
+      <AnswerExplanationBlock text={q.answerExplanation} />
     </div>
   )
 }
 
 /** @param {string} acceptableRaw comma-separated */
+export function buildAnswerExplanationField(explanationRaw) {
+  return { answerExplanation: (explanationRaw || '').trim() || null }
+}
+
 export function buildIdentificationQuestionFields(acceptableRaw, presentationRaw, explanationRaw) {
   const acceptable = parseIdentificationAnswersList(acceptableRaw)
   const presentation =
@@ -98,7 +172,7 @@ export function buildIdentificationQuestionFields(acceptableRaw, presentationRaw
   return {
     correctAnswer: joinIdentificationAnswersList(merged),
     presentationAnswer: presentation,
-    answerExplanation: (explanationRaw || '').trim() || null,
+    ...buildAnswerExplanationField(explanationRaw),
     acceptableAnswers: merged,
   }
 }

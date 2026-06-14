@@ -19,7 +19,7 @@ export const shellConfig = {
       { to: '/teacher', label: 'Dashboard', end: true, icon: LayoutGrid },
       { to: '/teacher/my-classes', label: 'My Classes', mobileLabel: 'Classes', icon: ClipboardList },
       { to: '/teacher/detections', label: 'Detections', icon: AlertCircle },
-      { to: '/teacher/logs', label: 'Logs', icon: ScrollText },
+      { to: '/teacher/logs', label: 'Audit logs', mobileLabel: 'Audit', icon: ScrollText },
       { to: '/teacher/reports', label: 'Reports', icon: BarChart3 },
     ],
   },
@@ -88,7 +88,7 @@ export function resolveShellPageTitle(role, pathname) {
 
   const extras =
     role === 'teacher'
-      ? { '/teacher/create-exam': 'Create examination' }
+      ? { '/teacher/create-exam': 'Exam Builder' }
       : role === 'student'
         ? { '/student/performance': 'Performance' }
         : {}

@@ -14,9 +14,10 @@ import {
   listExamsForTeacherReportsQuery,
   listStudentAnswersForSessionQuery,
   listStudentPerformanceQuery,
+  getQuestionAnswerStatsForExamQuery,
 } from '../repositories/examResultsRepository.js'
 import {
-  listTeacherActivityLogsQuery,
+  listExamAuditLogsQuery,
   recordTeacherActivityQuery,
 } from '../repositories/teacherActivityRepository.js'
 import {
@@ -184,11 +185,12 @@ export async function getTeacherExamResultsService(classId, examId, teacherMembe
 
     await computeExamRanksQuery(examId)
 
-    const [sessions, stats, violations, topStudent] = await Promise.all([
+    const [sessions, stats, violations, topStudent, questionStats] = await Promise.all([
       listExamSessionsForExamQuery(classId, examId),
       getExamSubmissionStatsQuery(examId),
       listCheatingLogsForExamQuery(examId),
       getTopRankedSessionQuery(examId),
+      getQuestionAnswerStatsForExamQuery(examId),
     ])
 
     return {
@@ -210,6 +212,7 @@ export async function getTeacherExamResultsService(classId, examId, teacherMembe
           }
         : null,
       sessions,
+      questionStats,
       violations: violations.map((v) => ({
         id: v.id,
         sessionId: v.sessionId,
@@ -276,6 +279,19 @@ export async function dismissTeacherViolationService(
     }
 
     notifyMonitoringUpdate(classId, examId)
+
+    if (!result.alreadyDismissed) {
+      void recordTeacherActivityQuery({
+        teacherMemberId,
+        classId,
+        examId,
+        studentMemberId: log.studentMemberId ?? null,
+        eventType: 'violation_dismissed',
+        details: `Dismissed ${log.eventType || 'violation'} for ${log.studentName || 'student'}`,
+      }).catch((err) => {
+        console.error('[examResultsService.dismissTeacherViolation] audit log failed:', err)
+      })
+    }
 
     return {
       ok: true,
@@ -361,11 +377,11 @@ export async function updateTeacherExamAssignmentRosterService(classId, examId, 
 
 export async function getTeacherActivityLogsService(teacherMemberId, limit = 50) {
   try {
-    const logs = await listTeacherActivityLogsQuery(teacherMemberId, limit)
+    const logs = await listExamAuditLogsQuery(teacherMemberId, limit)
     return { ok: true, logs }
   } catch (err) {
     console.error('[examResultsService.getTeacherActivityLogs]', err)
-    return { ok: false, status: 500, error: 'Failed to load teacher activity logs.' }
+    return { ok: false, status: 500, error: 'Failed to load exam audit logs.' }
   }
 }
 

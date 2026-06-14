@@ -203,6 +203,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  width: 100%;
   min-height: 0;
   padding: clamp(8px, 2vmin, 20px) clamp(12px, 2vmin, 24px);
   text-align: center;
@@ -302,12 +303,19 @@
   overflow-x: auto;
 }
 
+.exam-present-answer--diagram {
+  max-width: min(100%, 800px) !important;
+  margin-left: auto;
+  margin-right: auto;
+}
+
 .exam-present-back-scroll {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: clamp(12px, 2vmin, 20px);
+  width: 100%;
   min-height: 0;
   overflow-y: auto;
   padding: clamp(4px, 1vmin, 12px) 0;
@@ -351,14 +359,135 @@
 }
 
 .exam-present-toolbar {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  justify-content: center;
-  gap: 10px;
+  gap: 12px;
   padding: 12px 16px;
   border-top: 1px solid var(--border-default, #f3f4f6);
   background: var(--bg-surface-muted, #fafafa);
   flex-shrink: 0;
+}
+
+.exam-present-toolbar__nav {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.exam-present-toolbar__stat-wrap {
+  position: relative;
+  justify-self: center;
+}
+
+.exam-present-toolbar__stat {
+  margin: 0;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  text-align: center;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--fg-muted, #6b7280);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.exam-present-toolbar__stat:hover:not(:disabled),
+.exam-present-toolbar__stat[aria-expanded='true'] {
+  background: color-mix(in srgb, var(--acsis-brand, #16a34a) 8%, var(--bg-surface, #fff));
+  color: var(--fg-default, #374151);
+}
+
+.exam-present-toolbar__stat:disabled {
+  cursor: default;
+}
+
+.exam-present-shell.is-fullscreen .exam-present-toolbar__stat,
+.exam-present-shell:fullscreen .exam-present-toolbar__stat {
+  font-size: 0.9375rem;
+}
+
+.exam-present-students-panel {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  width: min(92vw, 320px);
+  max-height: min(50vh, 320px);
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid var(--border-default, #e5e7eb);
+  border-radius: 12px;
+  background: var(--bg-surface, #fff);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.14);
+}
+
+.exam-present-students-panel__title {
+  margin: 0 0 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-muted, #6b7280);
+}
+
+.exam-present-students-panel__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.exam-present-students-panel__item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--bg-elevated, #f9fafb);
+}
+
+.exam-present-students-panel__name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--fg-default, #111827);
+}
+
+.exam-present-students-panel__id {
+  grid-column: 1;
+  font-size: 0.75rem;
+  color: var(--fg-muted, #6b7280);
+}
+
+.exam-present-students-panel__status {
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.exam-present-students-panel__item.is-correct .exam-present-students-panel__status {
+  color: var(--acsis-brand-muted-text, #15803d);
+}
+
+.exam-present-students-panel__item.is-incorrect .exam-present-students-panel__status {
+  color: #b91c1c;
+}
+
+.exam-present-students-panel__item.is-pending .exam-present-students-panel__status {
+  color: var(--fg-muted, #6b7280);
 }
 
 .exam-present-shell:fullscreen .exam-present-toolbar,
@@ -403,7 +532,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  margin-left: auto;
+  justify-self: end;
   padding: 10px 16px;
   border: 1px solid var(--border-default, #e5e7eb);
   border-radius: 999px;
@@ -418,6 +547,125 @@
 .exam-present-flip-btn:hover {
   background: color-mix(in srgb, var(--acsis-brand, #16a34a) 8%, var(--bg-surface, #fff));
   border-color: color-mix(in srgb, var(--acsis-brand, #16a34a) 24%, var(--border-default, #e5e7eb));
+}
+
+/* Desktop fullscreen — wider card and larger type for projection */
+@media (min-width: 768px) {
+  .exam-present-shell.is-fullscreen .exam-present-card,
+  .exam-present-shell:fullscreen .exam-present-card {
+    width: min(92vw, 1200px);
+    height: min(72vh, 860px);
+    aspect-ratio: auto;
+    max-height: 100%;
+  }
+
+  .exam-present-shell.is-fullscreen .exam-present-card-inner,
+  .exam-present-shell:fullscreen .exam-present-card-inner {
+    aspect-ratio: auto;
+    height: 100%;
+  }
+
+  .exam-present-shell.is-fullscreen .exam-present-face,
+  .exam-present-shell:fullscreen .exam-present-face {
+    padding: clamp(24px, 3vmin, 40px);
+  }
+
+  .exam-present-shell.is-fullscreen .exam-present-title,
+  .exam-present-shell:fullscreen .exam-present-title {
+    font-size: 1.25rem;
+  }
+
+  .exam-present-shell.is-fullscreen .exam-present-subtitle,
+  .exam-present-shell:fullscreen .exam-present-subtitle {
+    font-size: 0.9375rem;
+  }
+
+  .exam-present-shell.is-fullscreen .exam-present-meta__num,
+  .exam-present-shell:fullscreen .exam-present-meta__num {
+    font-size: 0.875rem;
+  }
+
+  .exam-present-shell.is-fullscreen .exam-present-meta__type,
+  .exam-present-shell:fullscreen .exam-present-meta__type {
+    padding: 6px 14px;
+    font-size: 0.8125rem;
+  }
+
+  .exam-present-shell.is-fullscreen .exam-present-question,
+  .exam-present-shell:fullscreen .exam-present-question {
+    max-width: 56ch;
+    font-size: clamp(1.75rem, 2.8vw, 2.75rem);
+    line-height: 1.4;
+  }
+
+  .exam-present-shell.is-fullscreen .exam-present-image,
+  .exam-present-shell:fullscreen .exam-present-image {
+    max-width: min(100%, 420px);
+    max-height: min(32vh, 280px);
+  }
+
+  .exam-present-shell.is-fullscreen .exam-present-options,
+  .exam-present-shell:fullscreen .exam-present-options {
+    gap: clamp(10px, 1.4vmin, 14px);
+  }
+
+  .exam-present-shell.is-fullscreen .exam-present-option,
+  .exam-present-shell:fullscreen .exam-present-option {
+    min-height: 3.5rem;
+    padding: 14px 18px;
+    font-size: clamp(1.0625rem, 1.6vw, 1.375rem);
+    line-height: 1.4;
+  }
+
+  .exam-present-shell.is-fullscreen .exam-present-answer-label,
+  .exam-present-shell:fullscreen .exam-present-answer-label {
+    font-size: 0.875rem;
+  }
+
+  .exam-present-shell.is-fullscreen .exam-present-answer,
+  .exam-present-shell:fullscreen .exam-present-answer {
+    max-width: 48ch;
+    font-size: clamp(2.75rem, 5vw, 4.5rem);
+  }
+
+  .exam-present-shell.is-fullscreen .exam-present-answer--code,
+  .exam-present-shell:fullscreen .exam-present-answer--code {
+    max-width: min(100%, 720px);
+    font-size: clamp(1rem, 1.5vw, 1.25rem);
+  }
+
+  .exam-present-shell.is-fullscreen .exam-present-explanation-label,
+  .exam-present-shell:fullscreen .exam-present-explanation-label {
+    font-size: 0.875rem;
+  }
+
+  .exam-present-shell.is-fullscreen .exam-present-explanation,
+  .exam-present-shell:fullscreen .exam-present-explanation {
+    max-width: 80ch;
+  }
+
+  .exam-present-shell.is-fullscreen .exam-present-explanation-text,
+  .exam-present-shell:fullscreen .exam-present-explanation-text {
+    max-width: 100%;
+    font-size: clamp(1rem, 1.5vw, 1.25rem);
+    line-height: 1.6;
+  }
+
+  .exam-present-shell.is-fullscreen .exam-present-hint,
+  .exam-present-shell:fullscreen .exam-present-hint {
+    font-size: 0.875rem;
+  }
+
+  .exam-present-shell.is-fullscreen .exam-present-counter,
+  .exam-present-shell:fullscreen .exam-present-counter {
+    font-size: 1rem;
+  }
+
+  .exam-present-shell.is-fullscreen .exam-present-flip-btn,
+  .exam-present-shell:fullscreen .exam-present-flip-btn {
+    font-size: 0.9375rem;
+    padding: 12px 20px;
+  }
 }
 
 @media (max-width: 520px) {
@@ -435,11 +683,20 @@
     grid-template-columns: 1fr;
   }
 
-  .exam-present-flip-btn {
-    margin-left: 0;
+  .exam-present-toolbar {
+    grid-template-columns: 1fr;
+    justify-items: center;
   }
 
-  .exam-present-toolbar {
-    flex-wrap: wrap;
+  .exam-present-toolbar__nav {
+    justify-content: center;
+  }
+
+  .exam-present-toolbar__stat {
+    white-space: normal;
+  }
+
+  .exam-present-flip-btn {
+    justify-self: center;
   }
 }

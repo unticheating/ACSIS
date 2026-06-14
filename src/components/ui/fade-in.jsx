@@ -1,6 +1,7 @@
 import { motion } from "motion/react";
+import { forwardRef } from "react";
 
-export default function FadeIn({
+const FadeIn = forwardRef(({
   children,
   delay = 0,
   duration = 0.3,
@@ -9,7 +10,7 @@ export default function FadeIn({
   once = true,
   as = "div",
   ...props
-}) {
+}, ref) => {
   const directionOffset = {
     up: { y: 15, x: 0 },
     down: { y: -15, x: 0 },
@@ -29,9 +30,12 @@ export default function FadeIn({
       viewport={{ once, margin: "-20px" }}
       transition={{ duration, delay, ease: "easeOut" }}
       className={className}
+      ref={ref}
       {...props}
     >
       {children}
     </Component>
   );
-}
+});
+
+export default FadeIn;

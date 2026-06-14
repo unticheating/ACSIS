@@ -90,7 +90,7 @@
   justify-content: space-between;
   padding: var(--header-pad-y) var(--header-pad-x);
   flex-shrink: 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid color-mix(in srgb, var(--exam-text) 8%, transparent);
 }
 
 .acsis-student-exam .exam-logo {
@@ -102,8 +102,8 @@
   justify-content: center;
   flex-shrink: 0;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: color-mix(in srgb, var(--exam-text) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--exam-text) 20%, transparent);
 }
 
 .acsis-student-exam .exam-logo-img {
@@ -193,7 +193,7 @@
 .acsis-student-exam .lobby-spinner {
   width: 28px;
   height: 28px;
-  border: 3px solid rgba(255, 255, 255, 0.25);
+  border: 3px solid color-mix(in srgb, var(--exam-text) 25%, transparent);
   border-top-color: var(--exam-text);
   border-radius: 50%;
   animation: acsis-student-exam-spin 0.85s linear infinite;
@@ -306,15 +306,15 @@
 
 .acsis-student-exam .question-box {
   width: 100%;
-  background: var(--exam-question-box);
+  background: transparent;
   color: var(--exam-question-text);
   border-radius: 18px;
-  padding: clamp(18px, 3vw, 26px) clamp(20px, 3vw, 28px);
-  font-size: clamp(14px, 2vw, 17px);
-  line-height: 1.55;
+  padding: 0;
+  font-size: clamp(18px, 2.5vw, 22px);
+  line-height: 1.6;
   font-weight: 500;
-  margin-bottom: 20px;
-  border: 1px solid var(--exam-question-border, rgba(22, 101, 52, 0.15));
+  margin-bottom: 24px;
+  border: none;
 }
 
 .acsis-student-exam .question-box--section {
@@ -341,12 +341,13 @@
 }
 
 .acsis-student-exam .question-box--prompt {
+  margin-top: 28px;
   margin-bottom: 20px;
 }
 
 .acsis-student-exam .exam-question-image {
-  border: 1px solid var(--exam-question-border, rgba(255, 255, 255, 0.15));
-  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid color-mix(in srgb, var(--exam-text) 15%, transparent);
+  background: color-mix(in srgb, var(--exam-text) 5%, transparent);
 }
 
 .acsis-student-exam .options-list {
@@ -426,7 +427,7 @@
   font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
   font-size: 0.92em;
   font-weight: 600;
-  background: rgba(0, 0, 0, 0.08);
+  background: color-mix(in srgb, var(--exam-text) 8%, transparent);
   padding: 2px 8px;
   border-radius: 6px;
 }
@@ -443,8 +444,8 @@
   padding: 16px 18px;
   border-radius: 16px;
   border: 2px solid var(--exam-accent);
-  background: rgba(0, 0, 0, 0.35);
-  color: #e8ffe8;
+  background: color-mix(in srgb, var(--exam-text) 5%, transparent);
+  color: var(--exam-text);
   font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
   font-size: 13px;
   line-height: 1.55;
@@ -535,7 +536,7 @@
   flex: 1;
   height: 8px;
   border-radius: 99px;
-  background: rgba(255, 255, 255, 0.35);
+  background: color-mix(in srgb, var(--exam-text) 25%, transparent);
   overflow: hidden;
   min-width: 120px;
 }
@@ -618,6 +619,38 @@
   width: 100%;
   text-align: center;
   padding: 0 16px;
+}
+
+/* Accessibility icon buttons in exam top bar */
+.acsis-student-exam .exam-topbar-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  border: 1px solid color-mix(in srgb, var(--exam-text) 8%, transparent);
+  background: color-mix(in srgb, var(--exam-text) 5%, transparent);
+  color: color-mix(in srgb, var(--exam-text) 65%, transparent);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+
+.acsis-student-exam .exam-topbar-icon-btn:hover {
+  background: color-mix(in srgb, var(--exam-text) 12%, transparent);
+  color: var(--exam-text);
+  border-color: color-mix(in srgb, var(--exam-text) 18%, transparent);
+}
+
+.acsis-student-exam .exam-topbar-icon-btn--active {
+  background: color-mix(in srgb, var(--acsis-brand) 20%, transparent);
+  color: var(--acsis-brand);
+  border-color: color-mix(in srgb, var(--acsis-brand) 40%, transparent);
+}
+
+.acsis-student-exam .exam-topbar-icon-btn--active:hover {
+  background: color-mix(in srgb, var(--acsis-brand) 28%, transparent);
 }
 
 .acsis-student-exam .exam-session-exit {

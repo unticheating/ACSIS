@@ -22,6 +22,12 @@ export function parseIdentificationAnswersList(text) {
   return out;
 }
 
+/** @param {string | null | undefined | { answerExplanation?: string | null }} q */
+export function normalizeAnswerExplanation(q) {
+  const raw = typeof q === 'string' ? q : q?.answerExplanation;
+  return raw != null && String(raw).trim() !== '' ? String(raw).trim() : null;
+}
+
 /**
  * @param {{
  *   correctAnswer?: string | null,
@@ -32,10 +38,7 @@ export function parseIdentificationAnswersList(text) {
 export function resolveIdentificationPayload(q) {
   let acceptable = parseIdentificationAnswersList(q.correctAnswer);
   const presentation = normalizeIdentificationAnswer(q.presentationAnswer) || acceptable[0] || '';
-  const explanation =
-    q.answerExplanation != null && String(q.answerExplanation).trim() !== ''
-      ? String(q.answerExplanation).trim()
-      : null;
+  const explanation = normalizeAnswerExplanation(q);
 
   if (presentation && !acceptable.includes(presentation)) {
     acceptable = [presentation, ...acceptable];

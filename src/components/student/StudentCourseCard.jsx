@@ -16,9 +16,11 @@ import FadeIn from '@/components/ui/fade-in.jsx'
  *     exams?: object[],
  *   },
  *   delay?: number,
+ *   provided?: any,
+ *   isDragging?: boolean,
  * }} props
  */
-export default function StudentCourseCard({ course, delay = 0 }) {
+export default function StudentCourseCard({ course, delay = 0, provided, isDragging }) {
   const navigate = useNavigate()
   const { primary, secondary } = formatCourseDisplayLabels(course)
   const examCount = (course.exams || []).length
@@ -31,11 +33,18 @@ export default function StudentCourseCard({ course, delay = 0 }) {
   }
 
   return (
-    <FadeIn as="li" delay={delay} className="stu-course-card-wrap">
-      <article
-        className="stu-course-card"
-        role="button"
-        tabIndex={0}
+    <li
+      className={`stu-course-card-wrap flex ${isDragging ? 'opacity-90 scale-105 z-50 relative' : ''}`}
+      ref={provided?.innerRef}
+      {...provided?.draggableProps}
+      {...provided?.dragHandleProps}
+      style={provided?.draggableProps.style}
+    >
+      <FadeIn as="div" delay={delay} className="flex-1 flex flex-col min-w-0">
+        <article
+          className="stu-course-card flex-1"
+          role="button"
+          tabIndex={0}
         onClick={open}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
@@ -55,6 +64,7 @@ export default function StudentCourseCard({ course, delay = 0 }) {
           </span>
         </div>
       </article>
-    </FadeIn>
+      </FadeIn>
+    </li>
   )
 }

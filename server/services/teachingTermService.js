@@ -64,16 +64,34 @@ export async function createTeachingTermService(institutionId, memberId, body) {
 }
 
 export async function updateTeachingTermService(termId, memberId, body) {
-  if (body.isArchived === undefined) {
+  if (
+    body.isArchived === undefined &&
+    body.programCode === undefined &&
+    body.sectionCode === undefined &&
+    body.academicYear === undefined &&
+    body.semester === undefined
+  ) {
     return { ok: false, status: 400, error: 'Nothing to update.' }
   }
+
+  if (body.semester !== undefined && !SEMESTERS.has(body.semester)) {
+    return { ok: false, status: 400, error: 'Semester must be 1st, 2nd, or Summer.' }
+  }
+
   try {
     const term = await updateTeachingTermQuery(termId, memberId, {
-      isArchived: Boolean(body.isArchived),
+      isArchived: body.isArchived !== undefined ? Boolean(body.isArchived) : undefined,
+      programCode: body.programCode !== undefined ? String(body.programCode).trim() : undefined,
+      sectionCode: body.sectionCode !== undefined ? String(body.sectionCode).trim() : undefined,
+      academicYear: body.academicYear !== undefined ? String(body.academicYear).trim() : undefined,
+      semester: body.semester !== undefined ? String(body.semester).trim() : undefined,
     })
     if (!term) return { ok: false, status: 404, error: 'Section not found.' }
     return { ok: true, term }
   } catch (err) {
+    if (err.code === '23505') {
+      return { ok: false, status: 409, error: 'This section already exists for that term.' }
+    }
     console.error('[teachingTermService.update]', err)
     return { ok: false, error: 'Database error.' }
   }

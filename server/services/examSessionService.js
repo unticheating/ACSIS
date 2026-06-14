@@ -1,6 +1,7 @@
 import { getPool } from '../db.js'
 import { normalizeExamPassword } from '../lib/examCodes.js'
 import { EXAM_STATUS, nextStatusAfterRestart, nextStatusAfterStart } from '../lib/examStatus.js'
+import { autoCloseExams } from './examService.js'
 import {
   createExamSessionQuery,
   findChoiceIdByTextQuery,
@@ -123,6 +124,8 @@ export async function joinExamService(classId, examId, studentMemberId, password
     return { ok: false, status: 404, error: 'Exam not found.' }
   }
 
+  await autoCloseExams(classId, [exam])
+
   const status = (exam.status || '').toLowerCase()
   if (status === EXAM_STATUS.DRAFT) {
     return { ok: false, status: 403, error: 'This exam is not published yet.' }
@@ -179,6 +182,8 @@ export async function getStudentExamSessionService(classId, examId, studentMembe
   if (!examRow) {
     return { ok: false, status: 404, error: 'Exam not found.' }
   }
+
+  await autoCloseExams(classId, [examRow])
 
   const status = (examRow.status || '').toLowerCase()
   if (status === EXAM_STATUS.DRAFT) {
@@ -301,6 +306,8 @@ export async function startExamService(classId, examId, teacherMemberId = null, 
     return { ok: false, status: 404, error: 'Exam not found.' }
   }
 
+  await autoCloseExams(classId, [exam])
+
   const next = nextStatusAfterStart(exam.status)
   if (!next) {
     return { ok: false, status: 400, error: 'Only exams in the lobby or closed can be started.' }
@@ -419,6 +426,8 @@ async function requireOpenSession(classId, examId, studentMemberId) {
   if (!exam) {
     return { ok: false, status: 404, error: 'Exam not found.' }
   }
+
+  await autoCloseExams(classId, [exam])
 
   if ((exam.status || '').toLowerCase() !== EXAM_STATUS.OPEN) {
     return { ok: false, status: 403, error: 'Exam is not live yet.' }

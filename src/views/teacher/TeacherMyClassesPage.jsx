@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { Archive, ArchiveRestore, ChevronDown, MoreVertical, Plus, Trash2 } from 'lucide-react'
+import { Archive, ArchiveRestore, ChevronDown, MoreVertical, Plus, Trash2, Pencil } from 'lucide-react'
 import AnimatedHoverIcon from '@/components/icons/AnimatedHoverIcon.jsx'
 import { UserPlusIcon } from '@/components/icons/hoverIcons.js'
 import {
@@ -39,13 +39,14 @@ import '../../pages/student-ui/enrolled_classes.css'
  *   isOpen: boolean,
  *   onToggle: () => void,
  *   onAddCourse: (term: object) => void,
+ *   onEdit?: (term: object) => void,
  *   onArchive?: (id: string|number) => void,
  *   onRestore?: (id: string|number) => void,
  *   onDelete?: (term: object) => void,
  *   dimmed?: boolean,
  * }} props
  */
-function SectionCardItem({ group, isOpen, onToggle, onAddCourse, onArchive, onRestore, onDelete, dimmed = false, delay = 0 }) {
+function SectionCardItem({ group, isOpen, onToggle, onAddCourse, onEdit, onArchive, onRestore, onDelete, dimmed = false, delay = 0 }) {
   const { term, courses, isOrphan } = group
   const title = isOrphan ? 'Other courses' : formatSectionTitle(term)
   const period = isOrphan ? 'Not linked to a section' : formatTermPeriod(term)
@@ -95,6 +96,11 @@ function SectionCardItem({ group, isOpen, onToggle, onAddCourse, onArchive, onRe
                 {!term.isArchived ? (
                   <DropdownMenuActionItem icon={Plus} onSelect={() => onAddCourse(term)}>
                     Add course
+                  </DropdownMenuActionItem>
+                ) : null}
+                {!term.isArchived ? (
+                  <DropdownMenuActionItem icon={Pencil} onSelect={() => onEdit?.(term)}>
+                    Edit section
                   </DropdownMenuActionItem>
                 ) : null}
                 {!term.isArchived ? <DropdownMenuSeparator /> : null}
@@ -217,6 +223,41 @@ export default function TeacherMyClassesPage() {
   const [createAy, setCreateAy] = useState('2025-2026')
   const [createSem, setCreateSem] = useState('1st')
   const [creating, setCreating] = useState(false)
+
+  const [editTerm, setEditTerm] = useState(null)
+  const [editProgram, setEditProgram] = useState('')
+  const [editSectionCode, setEditSectionCode] = useState('')
+  const [editAy, setEditAy] = useState('')
+  const [editSem, setEditSem] = useState('')
+  const [editing, setEditing] = useState(false)
+
+  function handleOpenEdit(term) {
+    setEditProgram(term.programCode || '')
+    setEditSectionCode(term.sectionCode || '')
+    setEditAy(term.academicYear || '')
+    setEditSem(term.semester || '')
+    setEditTerm(term)
+  }
+
+  async function handleEditSection(e) {
+    e.preventDefault()
+    if (!editTerm) return
+    setEditing(true)
+    try {
+      const success = await patchSection(editTerm.id, {
+        programCode: editProgram.trim(),
+        sectionCode: editSectionCode.trim(),
+        academicYear: editAy.trim(),
+        semester: editSem.trim()
+      })
+      if (success) {
+        acsisToastSuccess('Section updated.')
+        setEditTerm(null)
+      }
+    } finally {
+      setEditing(false)
+    }
+  }
 
   const fetchAll = useCallback(async () => {
     try {
@@ -478,6 +519,7 @@ export default function TeacherMyClassesPage() {
                   isOpen={openSectionId === String(group.term.id)}
                   onToggle={() => toggleSection(group.term.id)}
                   onAddCourse={(term) => setAddCourseTerm(term)}
+                  onEdit={handleOpenEdit}
                   onArchive={handleArchiveSection}
                   onRestore={handleRestoreSection}
                   onDelete={handleDeleteSection}
@@ -523,6 +565,7 @@ export default function TeacherMyClassesPage() {
                         isOpen={openArchivedSectionId === String(group.term.id)}
                         onToggle={() => toggleArchivedSection(group.term.id)}
                         onAddCourse={(term) => setAddCourseTerm(term)}
+                        onEdit={handleOpenEdit}
                         onArchive={handleArchiveSection}
                         onRestore={handleRestoreSection}
                         onDelete={handleDeleteSection}
@@ -611,6 +654,72 @@ export default function TeacherMyClassesPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={Boolean(editTerm)} onOpenChange={(open) => !open && setEditTerm(null)}>
+        <DialogContent className="sm:max-w-md">
+          <form onSubmit={handleEditSection}>
+            <DialogHeader>
+              <DialogTitle>Edit section</DialogTitle>
+              <DialogDescription>Update program, section code, academic year, and semester.</DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-sec-program">Program</Label>
+                  <Input
+                    id="edit-sec-program"
+                    value={editProgram}
+                    onChange={(e) => setEditProgram(e.target.value)}
+                    placeholder="BSIT"
+                    required
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-sec-code">Section</Label>
+                  <Input
+                    id="edit-sec-code"
+                    value={editSectionCode}
+                    onChange={(e) => setEditSectionCode(e.target.value)}
+                    placeholder="3D"
+                    required
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-sec-ay">Academic year</Label>
+                  <Input
+                    id="edit-sec-ay"
+                    value={editAy}
+                    onChange={(e) => setEditAy(e.target.value)}
+                    placeholder="2025-2026"
+                    required
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-sec-sem">Semester</Label>
+                  <Input
+                    id="edit-sec-sem"
+                    value={editSem}
+                    onChange={(e) => setEditSem(e.target.value)}
+                    placeholder="1st"
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <button type="button" className="acsis-btn-ghost" onClick={() => setEditTerm(null)} disabled={editing}>
+                Cancel
+              </button>
+              <button type="submit" className="acsis-mc-create-btn" disabled={editing} style={{ border: 'none' }}>
+                {editing ? 'Saving…' : 'Save changes'}
+              </button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       {ConfirmDialog}
     </div>
   )

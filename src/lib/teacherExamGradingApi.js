@@ -38,11 +38,11 @@ export async function releaseExamScores(
   return parseJson(res)
 }
 
-export async function exportExamReport(classId, examId, { format = 'pdf', reportType = 'class_results' } = {}) {
+export async function exportExamReport(classId, examId, { format = 'pdf', reportType = 'class_results', teacherLogoBase64, departmentName } = {}) {
   const res = await apiFetch(`/api/teacher/classes/${classId}/exams/${examId}/reports/export`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ format, reportType }),
+    body: JSON.stringify({ format, reportType, teacherLogoBase64, departmentName }),
   })
   if (!res.ok) {
     const data = await res.json().catch(() => ({}))

@@ -460,7 +460,7 @@ button {
 .exam-builder-panel__head {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 12px 16px;
   padding: 14px 18px;
@@ -681,6 +681,10 @@ button {
   flex: 1;
   min-width: 0;
   padding: 1rem 1.125rem 1.125rem;
+}
+
+.exam-builder-question:not(.exam-builder-question--editing) .exam-builder-question__content {
+  min-height: 140px;
 }
 
 .exam-builder-type-badge {

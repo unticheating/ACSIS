@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams, useNavigate } from 'react-router-dom'
-import { Clock, Plus, Shuffle, Trash2, ArrowLeft, GripVertical, Layers, ImageIcon, X, Pencil, Copy, Calculator, Settings } from 'lucide-react'
+import { Clock, Plus, Shuffle, Trash2, ArrowLeft, GripVertical, Layers, ImageIcon, X, Pencil, Copy, Calculator, Settings, Eye } from 'lucide-react'
 import { Label } from '@/components/ui/label.jsx'
 import { Button } from '@/components/ui/button.jsx'
 import { Input } from '@/components/ui/input.jsx'
@@ -26,6 +26,7 @@ import {
   labelForQuestionType,
 } from '@/lib/questionTypes.js'
 import ExamQuestionAnswerPresentation, {
+  buildAnswerExplanationField,
   buildIdentificationQuestionFields,
 } from '@/components/teacher/ExamQuestionAnswerPresentation.jsx'
 import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
@@ -34,7 +35,20 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import Editor from '@monaco-editor/react'
 import { MONACO_EXAM_EDITOR_OPTIONS } from '@/lib/monacoExamEditor.js'
 import { DateTimePicker } from '@/components/ui/date-time-picker.jsx'
+import MatchingPairEditor from '@/components/exam/MatchingPairEditor.jsx'
+import DiagramEditor from '@/components/exam/DiagramEditor.jsx'
+import {
+  emptyMatchingPair,
+  matchingPairsFromQuestion,
+  normalizeMatchingPairs,
+  serializeMatchingPairs,
+} from '@/lib/matchingQuestion.js'
+import { DEFAULT_DIAGRAM_VARIANT, emptyDiagramData } from '@/lib/diagramQuestion.js'
 import '../../pages/teacher-ui/create_exam.css'
+
+function emptyMatchingPairsState() {
+  return [emptyMatchingPair()]
+}
 
 function emptyMc() {
   return { opt1: '', opt2: '', opt3: '', opt4: '', correct: '' }
@@ -136,10 +150,14 @@ export default function TeacherCreateExamPage() {
   const [mc, setMc] = useState(emptyMc)
   const [identAcceptableAnswers, setIdentAcceptableAnswers] = useState('')
   const [identPresentationAnswer, setIdentPresentationAnswer] = useState('')
-  const [identAnswerExplanation, setIdentAnswerExplanation] = useState('')
+  const [answerExplanation, setAnswerExplanation] = useState('')
   const [tfAnswer, setTfAnswer] = useState('')
   const [codingAnswer, setCodingAnswer] = useState('')
   const [codingLanguage, setCodingLanguage] = useState('javascript')
+  const [matchingPairs, setMatchingPairs] = useState(emptyMatchingPairsState)
+  const [essayRubric, setEssayRubric] = useState('')
+  const [diagramVariant, setDiagramVariant] = useState(DEFAULT_DIAGRAM_VARIANT)
+  const [diagramReference, setDiagramReference] = useState(emptyDiagramData())
   const [questionImage, setQuestionImage] = useState(null) // base64 data URI
   const imageInputRef = useRef(null)
 
@@ -185,10 +203,14 @@ export default function TeacherCreateExamPage() {
     resetMc()
     setIdentAcceptableAnswers('')
     setIdentPresentationAnswer('')
-    setIdentAnswerExplanation('')
+    setAnswerExplanation('')
     setTfAnswer('')
     setCodingAnswer('')
     setCodingLanguage('javascript')
+    setMatchingPairs(emptyMatchingPairsState())
+    setEssayRubric('')
+    setDiagramVariant(DEFAULT_DIAGRAM_VARIANT)
+    setDiagramReference(emptyDiagramData())
   }, [resetMc])
 
   const resetQuestionForm = useCallback(() => {
@@ -205,6 +227,9 @@ export default function TeacherCreateExamPage() {
     if (type === 'multiple-choice' || type === 'multiple' || type === 'mcq') return 'multiple'
     if (type === 'truefalse' || type === 'true_false') return 'truefalse'
     if (type === 'coding') return 'coding'
+    if (type === 'matching') return 'matching'
+    if (type === 'essay') return 'essay'
+    if (type === 'diagramming') return 'diagramming'
     return 'identification'
   }
 
@@ -229,7 +254,7 @@ export default function TeacherCreateExamPage() {
       setQuestionPoints(q.points || 1)
       setIdentAcceptableAnswers('')
       setIdentPresentationAnswer('')
-      setIdentAnswerExplanation('')
+      setAnswerExplanation(q.answerExplanation || '')
       setTfAnswer('')
       setCodingAnswer('')
       setCodingLanguage('javascript')
@@ -239,7 +264,7 @@ export default function TeacherCreateExamPage() {
       const { acceptable, presentation } = identificationDisplayFromQuestion(q)
       setIdentAcceptableAnswers(joinIdentificationAnswersList(acceptable))
       setIdentPresentationAnswer(presentation)
-      setIdentAnswerExplanation(q.answerExplanation || '')
+      setAnswerExplanation(q.answerExplanation || '')
       setTfAnswer('')
       setCodingAnswer('')
       setCodingLanguage('javascript')
@@ -248,7 +273,7 @@ export default function TeacherCreateExamPage() {
       resetMc()
       setIdentAcceptableAnswers('')
       setIdentPresentationAnswer('')
-      setIdentAnswerExplanation('')
+      setAnswerExplanation(q.answerExplanation || '')
       setTfAnswer(q.correctAnswer === 'True' ? 'true' : q.correctAnswer === 'False' ? 'false' : '')
       setCodingAnswer('')
       setCodingLanguage('javascript')
@@ -257,10 +282,53 @@ export default function TeacherCreateExamPage() {
       resetMc()
       setIdentAcceptableAnswers('')
       setIdentPresentationAnswer('')
-      setIdentAnswerExplanation('')
+      setAnswerExplanation(q.answerExplanation || '')
       setTfAnswer('')
       setCodingLanguage(q.options?.[0] || q.language || 'javascript')
       setCodingAnswer(q.correctAnswer || '')
+      setMatchingPairs(emptyMatchingPairsState())
+      setEssayRubric('')
+      setDiagramVariant(DEFAULT_DIAGRAM_VARIANT)
+      setDiagramReference(emptyDiagramData())
+    } else if (formType === 'matching') {
+      setQuestionPoints(q.points || 1)
+      resetMc()
+      setIdentAcceptableAnswers('')
+      setIdentPresentationAnswer('')
+      setAnswerExplanation(q.answerExplanation || '')
+      setTfAnswer('')
+      setCodingAnswer('')
+      setCodingLanguage('javascript')
+      setMatchingPairs(matchingPairsFromQuestion(q).length ? matchingPairsFromQuestion(q) : emptyMatchingPairsState())
+      setEssayRubric('')
+      setDiagramVariant(DEFAULT_DIAGRAM_VARIANT)
+      setDiagramReference(emptyDiagramData())
+    } else if (formType === 'essay') {
+      setQuestionPoints(q.points || 1)
+      resetMc()
+      setIdentAcceptableAnswers('')
+      setIdentPresentationAnswer('')
+      setAnswerExplanation(q.answerExplanation || '')
+      setTfAnswer('')
+      setCodingAnswer('')
+      setCodingLanguage('javascript')
+      setMatchingPairs(emptyMatchingPairsState())
+      setEssayRubric(q.correctAnswer || '')
+      setDiagramVariant(DEFAULT_DIAGRAM_VARIANT)
+      setDiagramReference(emptyDiagramData())
+    } else if (formType === 'diagramming') {
+      setQuestionPoints(q.points || 1)
+      resetMc()
+      setIdentAcceptableAnswers('')
+      setIdentPresentationAnswer('')
+      setAnswerExplanation(q.answerExplanation || '')
+      setTfAnswer('')
+      setCodingAnswer('')
+      setCodingLanguage('javascript')
+      setMatchingPairs(emptyMatchingPairsState())
+      setEssayRubric('')
+      setDiagramVariant(q.diagramVariant || q.options?.[0] || DEFAULT_DIAGRAM_VARIANT)
+      setDiagramReference(q.diagramReference || q.correctAnswer || emptyDiagramData())
     }
 
     setQuestionImage(q.imageUrl || null)
@@ -310,7 +378,7 @@ export default function TeacherCreateExamPage() {
       const identFields = buildIdentificationQuestionFields(
         identAcceptableAnswers,
         identPresentationAnswer,
-        identAnswerExplanation,
+        answerExplanation,
       )
       if (!identFields.correctAnswer) {
         acsisToastError('Enter at least one acceptable answer (comma-separated).')
@@ -331,9 +399,24 @@ export default function TeacherCreateExamPage() {
       }
       correctAnswer = code
       options = [codingLanguage]
+    } else if (questionType === 'matching') {
+      const pairs = normalizeMatchingPairs(matchingPairs)
+      if (pairs.length < 2) {
+        acsisToastError('Add at least two matching pairs.')
+        return
+      }
+      correctAnswer = serializeMatchingPairs(pairs)
+      options = []
+    } else if (questionType === 'essay') {
+      correctAnswer = essayRubric.trim() || 'Manual grading required'
+      options = []
+    } else if (questionType === 'diagramming') {
+      correctAnswer = diagramReference
+      options = [diagramVariant]
     }
 
     const typeLabel = questionType === 'multiple' ? 'multiple-choice' : questionType
+    const normalizedMatching = questionType === 'matching' ? normalizeMatchingPairs(matchingPairs) : []
     const questionPayload = {
       type: typeLabel,
       question: text,
@@ -345,8 +428,20 @@ export default function TeacherCreateExamPage() {
         ? buildIdentificationQuestionFields(
             identAcceptableAnswers,
             identPresentationAnswer,
-            identAnswerExplanation,
+            answerExplanation,
           )
+        : buildAnswerExplanationField(answerExplanation)),
+      ...(questionType === 'matching'
+        ? { matchingPairs: normalizedMatching, correctAnswer: serializeMatchingPairs(normalizedMatching) }
+        : {}),
+      ...(questionType === 'essay' ? { correctAnswer: essayRubric.trim() || 'Manual grading required' } : {}),
+      ...(questionType === 'diagramming'
+        ? {
+            diagramVariant,
+            diagramReference,
+            options: [diagramVariant],
+            correctAnswer: diagramReference,
+          }
         : {}),
     }
 
@@ -804,16 +899,6 @@ export default function TeacherCreateExamPage() {
               Leave blank to use the first acceptable answer.
             </p>
           </div>
-          <div className="space-y-2">
-            <Label>Explain (optional)</Label>
-            <textarea
-              className="flex min-h-[88px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              placeholder="Why this is the correct answer — shown on the exam Questions tab"
-              value={identAnswerExplanation}
-              onChange={(e) => setIdentAnswerExplanation(e.target.value)}
-              rows={3}
-            />
-          </div>
         </div>
       )
     }
@@ -872,11 +957,66 @@ export default function TeacherCreateExamPage() {
         </div>
       )
     }
+    if (questionType === 'matching') {
+      return (
+        <div className="space-y-2">
+          <Label>Matching pairs</Label>
+          <MatchingPairEditor pairs={matchingPairs} onChange={setMatchingPairs} />
+        </div>
+      )
+    }
+    if (questionType === 'essay') {
+      return (
+        <div className="space-y-2">
+          <Label>Sample answer / rubric (optional)</Label>
+          <textarea
+            rows={6}
+            className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[140px]"
+            placeholder="Optional rubric or sample answer for manual grading..."
+            value={essayRubric}
+            onChange={(e) => setEssayRubric(e.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">Essay questions are graded manually by the teacher.</p>
+        </div>
+      )
+    }
+    if (questionType === 'diagramming') {
+      return (
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Diagram type</Label>
+            <select
+              value={diagramVariant}
+              onChange={(e) => setDiagramVariant(e.target.value)}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <option value="flowchart">Flowchart</option>
+              <option value="erd">ERD (Entity Relationship)</option>
+            </select>
+          </div>
+          <div className="space-y-2">
+            <Label>Reference Diagram</Label>
+            <DiagramEditor
+              variant={diagramVariant}
+              value={diagramReference}
+              onChange={setDiagramReference}
+              height={500}
+            />
+            <p className="text-xs text-muted-foreground">
+              This diagram will be used as the reference answer when presenting the exam.
+            </p>
+          </div>
+        </div>
+      )
+    }
     return null
   }, [
+    diagramReference,
+    diagramVariant,
+    essayRubric,
     identAcceptableAnswers,
     identPresentationAnswer,
-    identAnswerExplanation,
+    matchingPairs,
     mc,
     questionType,
     tfAnswer,
@@ -903,6 +1043,9 @@ export default function TeacherCreateExamPage() {
                 <option value="identification">Identification</option>
                 <option value="truefalse">True / False</option>
                 <option value="coding">Coding / Scripting</option>
+                <option value="matching">Matching</option>
+                <option value="essay">Essay / Paragraph</option>
+                <option value="diagramming">Diagramming</option>
               </select>
             </div>
             <div className="space-y-2">
@@ -1006,6 +1149,16 @@ export default function TeacherCreateExamPage() {
       </div>
 
       <div className="pt-4 exam-builder-options-divider">{optionsBlock}</div>
+      <div className="space-y-2">
+        <Label>Explain (optional)</Label>
+        <textarea
+          className="flex min-h-[88px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          placeholder="Why this is the correct answer — shown on the exam Questions tab"
+          value={answerExplanation}
+          onChange={(e) => setAnswerExplanation(e.target.value)}
+          rows={3}
+        />
+      </div>
       <div className="flex flex-wrap gap-2">
         <Button onClick={saveQuestion} className="w-full md:w-auto">
           {isEditing ? <Pencil size={16} className="mr-2" /> : <Plus size={16} className="mr-2" />}
@@ -1030,6 +1183,22 @@ export default function TeacherCreateExamPage() {
       ? `/teacher/my-classes/${selectedClass}`
       : '/teacher/my-classes'
 
+  const handlePreview = () => {
+    const payload = buildExamSectionsPayload(sections)
+    const flatQuestions = payload.flatMap((sec) => sec.questions.map(q => ({ ...q, sectionId: sec.id, sectionTitle: sec.title, sectionDescription: sec.description })))
+    const previewData = {
+      title: examTitle || 'Untitled Exam',
+      description: examDescription,
+      scheduledStart: new Date().toISOString(),
+      scheduledEnd: null,
+      status: 'open',
+      sections: payload,
+      questions: flatQuestions
+    }
+    localStorage.setItem('examPreviewData', JSON.stringify(previewData))
+    window.open('/student/exam/session?classId=preview&examId=preview', '_blank')
+  }
+
   if (loadingEditExam) {
     return (
       <div className="flex items-center justify-center h-full min-h-[320px] p-8 text-muted-foreground">
@@ -1050,14 +1219,23 @@ export default function TeacherCreateExamPage() {
           </Button>
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-bold tracking-tight text-foreground line-clamp-1 max-w-[400px]">
-              {examTitle || (isEditMode ? 'Edit exam' : 'Create exam')}
+              {examTitle || (isEditMode ? 'Edit exam' : 'Exam Builder')}
             </h1>
-            <Button variant="ghost" size="icon" onClick={() => setSettingsOpen(true)} className="rounded-full text-muted-foreground hover:text-foreground h-8 w-8">
-              <Settings size={18} />
-            </Button>
+            <div className="flex items-center gap-1">
+              <Button variant="ghost" size="icon" onClick={handlePreview} title="Preview Student View" className="rounded-full text-muted-foreground hover:text-foreground h-8 w-8">
+                <Eye size={18} />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={() => setSettingsOpen(true)} className="rounded-full text-muted-foreground hover:text-foreground h-8 w-8">
+                <Settings size={18} />
+              </Button>
+            </div>
           </div>
         </div>
-        <div>
+        <div className="flex items-center gap-4">
+          <p className="text-sm text-muted-foreground">
+            {sections.length} {sections.length === 1 ? 'set' : 'sets'} · {totalQuestions}{' '}
+            {totalQuestions === 1 ? 'question' : 'questions'}
+          </p>
           {isSaving ? (
             <span className="text-xs font-medium text-amber-600 bg-amber-500/10 px-3 py-1.5 rounded-full animate-pulse">Saving...</span>
           ) : lastSaved ? (
@@ -1244,7 +1422,7 @@ export default function TeacherCreateExamPage() {
       {/* MAIN CONTENT - QUESTIONS BUILDER */}
       <div className="flex flex-1 items-start">
         {/* SIDEBAR OUTLINE */}
-        <aside className="exam-builder-page__outline w-56 lg:w-64 border-r border-border bg-background hidden md:block shrink-0 self-start overflow-y-auto">
+        <aside className="exam-builder-page__outline w-56 lg:w-64 bg-background hidden md:block shrink-0 self-start overflow-y-auto">
           <div className="p-6">
             <h3 className="font-semibold text-xs mb-3 text-muted-foreground uppercase tracking-wider">Exam Outline</h3>
             <ul className="space-y-1">
@@ -1285,30 +1463,8 @@ export default function TeacherCreateExamPage() {
         </aside>
 
         <main className="exam-builder flex-1 p-6 md:p-8 lg:p-12 min-w-0">
-          <div className="max-w-3xl mx-auto space-y-8">
+          <div className="max-w-5xl mx-auto space-y-8">
           
-          <div className="exam-builder-toolbar flex items-center justify-between pb-4">
-            <div>
-              <h2 className="text-xl font-bold text-foreground">
-                {isEditMode ? 'Edit questions' : 'Exam builder'}
-              </h2>
-              <div className="flex items-center gap-2 mt-1">
-                <p className="text-sm text-muted-foreground">
-                  {sections.length} {sections.length === 1 ? 'set' : 'sets'} · {totalQuestions}{' '}
-                  {totalQuestions === 1 ? 'question' : 'questions'}
-                </p>
-              </div>
-            </div>
-            <Button
-              variant="outline"
-              onClick={addSection}
-              className="gap-2 shadow-sm"
-            >
-              <Layers size={16} />
-              Add set
-            </Button>
-          </div>
-
           <DragDropContext onDragEnd={onDragEnd}>
             <div className="exam-builder-sets">
               {sections.map((sec, secIndex) => {
@@ -1323,7 +1479,6 @@ export default function TeacherCreateExamPage() {
                       <div className="exam-builder-panel__head">
                         <div>
                           <p className="exam-builder-panel__eyebrow">Question set {secIndex + 1}</p>
-                          <p className="exam-builder-panel__title">Set details</p>
                         </div>
                         <div className="exam-builder-panel__actions">
                           {sections.length > 1 && (
@@ -1433,7 +1588,7 @@ export default function TeacherCreateExamPage() {
                                       <div className="exam-builder-question__content">
                                         <div className="flex justify-between items-start gap-4">
                                           <div>
-                                            <h3 className="font-medium text-foreground leading-relaxed whitespace-pre-wrap">
+                                            <h3 className="font-medium text-foreground leading-relaxed whitespace-pre-wrap line-clamp-4" title={q.question}>
                                               {q.question}
                                             </h3>
                                             <p className="text-xs text-muted-foreground mt-1">
@@ -1558,6 +1713,17 @@ export default function TeacherCreateExamPage() {
               })}
             </div>
           </DragDropContext>
+          
+          <div className="flex justify-center mt-6">
+            <Button
+              variant="outline"
+              onClick={addSection}
+              className="gap-2 shadow-sm bg-background hover:bg-muted"
+            >
+              <Plus size={16} />
+              Add new set
+            </Button>
+          </div>
 
         </div>
       </main>

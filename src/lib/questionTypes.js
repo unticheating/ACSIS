@@ -9,6 +9,9 @@ const QUESTION_TYPE_LABELS = {
   truefalse: 'True / False',
   true_false: 'True / False',
   coding: 'Coding',
+  matching: 'Matching',
+  essay: 'Essay / Paragraph',
+  diagramming: 'Diagramming',
 }
 
 const QUESTION_TYPE_SORT = {
@@ -16,6 +19,9 @@ const QUESTION_TYPE_SORT = {
   Identification: 1,
   'True / False': 2,
   Coding: 3,
+  Matching: 4,
+  'Essay / Paragraph': 5,
+  Diagramming: 6,
 }
 
 /**

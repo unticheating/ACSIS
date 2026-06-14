@@ -82,4 +82,23 @@
   .acsis-prose {
     max-width: var(--prose-max);
   }
+
+}
+
+/* Remove inner focus rings from all inputs globally — must be outside @layer so
+   it outranks Tailwind utility classes (focus-visible:ring-*) in the cascade.
+   Outer wrapper containers (label with focus-within) handle visible focus rings. */
+input:focus,
+input:focus-visible,
+input:focus-within,
+textarea:focus,
+textarea:focus-visible,
+select:focus,
+select:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+  --tw-ring-shadow: 0 0 #0000 !important;
+  --tw-ring-offset-shadow: 0 0 #0000 !important;
+  --tw-shadow: 0 0 #0000 !important;
+  border-color: inherit !important;
 }

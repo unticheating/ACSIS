@@ -1,4 +1,4 @@
-import { enrollByAccessCode, getEnrolledClasses, unenrollFromClass } from '../services/studentService.js';
+import { enrollByAccessCode, getEnrolledClasses, unenrollFromClass, updateClassSortOrder } from '../services/studentService.js';
 import { upsertStudentNumber } from '../lib/studentProfile.js';
 import { getPool } from '../db.js';
 
@@ -59,6 +59,23 @@ export async function updateStudentNumber(req, res) {
     return res.json({ ok: true });
   } catch (err) {
     console.error('[studentController.updateStudentNumber]', err);
+    return res.status(500).json({ error: 'Internal server error.' });
+  }
+}
+
+export async function updateClassesSort(req, res) {
+  try {
+    const { classIds } = req.body;
+    if (!classIds || !Array.isArray(classIds)) {
+      return res.status(400).json({ error: 'classIds array is required.' });
+    }
+    const result = await updateClassSortOrder(req.memberId, classIds);
+    if (!result.ok) {
+      return res.status(400).json({ error: result.error });
+    }
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('[studentController.updateClassesSort]', err);
     return res.status(500).json({ error: 'Internal server error.' });
   }
 }

@@ -9,6 +9,7 @@ import {
   getEnrolledClasses as getClassesRepo,
   getStudentMember,
   unenrollStudent,
+  updateEnrollmentSortOrders,
 } from '../repositories/studentRepository.js'
 
 export async function enrollByAccessCode(memberId, code) {
@@ -82,5 +83,19 @@ export async function unenrollFromClass(memberId, classId) {
     return { ok: false, status: 404, error: 'You are not enrolled in this class.' }
   }
   await unenrollStudent(memberId, classId)
+  return { ok: true }
+}
+
+export async function updateClassSortOrder(memberId, classIds) {
+  if (!Array.isArray(classIds)) {
+    return { ok: false, error: 'classIds must be an array.' }
+  }
+  
+  const classIdSortPairs = classIds.map((classId, index) => ({
+    classId,
+    sortOrder: index
+  }))
+
+  await updateEnrollmentSortOrders(memberId, classIdSortPairs)
   return { ok: true }
 }

@@ -311,6 +311,16 @@ export async function gradeSessionAnswersQuery(sessionId) {
              AND TRIM(c.choice_text) = TRIM(COALESCE(sa.answer_text, ''))
          )
        )
+       WHEN q.question_type = 'matching' THEN (
+         COALESCE(TRIM(sa.answer_text), '') <> ''
+         AND NOT EXISTS (
+           SELECT 1 FROM choices c
+           WHERE c.question_id = sa.question_id AND c.is_correct = TRUE
+             AND COALESCE(sa.answer_text::jsonb ->> split_part(c.choice_text, E'\x1e', 1), '')
+               IS DISTINCT FROM split_part(c.choice_text, E'\x1e', 2)
+         )
+       )
+       WHEN q.question_type IN ('essay', 'diagramming') THEN NULL
        ELSE NULL
      END
      FROM questions q
@@ -320,8 +330,30 @@ export async function gradeSessionAnswersQuery(sessionId) {
 
   const { rows } = await pool.query(
     `SELECT
-       COALESCE(SUM(CASE WHEN sa.is_correct = TRUE THEN q.points ELSE 0 END), 0) AS raw_score,
-       COALESCE(SUM(q.points), 0) AS total_points
+       COALESCE(SUM(
+         CASE 
+           WHEN q.question_type = 'matching' THEN 
+             CASE 
+               WHEN sa.manually_checked = TRUE THEN 
+                 CASE WHEN sa.is_correct = TRUE THEN q.points * (SELECT COUNT(*) FROM choices c WHERE c.question_id = q.question_id AND c.is_correct = TRUE) ELSE 0 END
+               ELSE
+                 q.points * (
+                   SELECT COUNT(*) FROM choices c
+                   WHERE c.question_id = q.question_id AND c.is_correct = TRUE
+                     AND COALESCE(sa.answer_text::jsonb ->> split_part(c.choice_text, E'\\x1e', 1), '') = split_part(c.choice_text, E'\\x1e', 2)
+                 )
+             END
+           WHEN sa.is_correct = TRUE THEN q.points 
+           ELSE 0 
+         END
+       ), 0) AS raw_score,
+       COALESCE(SUM(
+         CASE 
+           WHEN q.question_type = 'matching' THEN 
+             q.points * (SELECT COUNT(*) FROM choices c WHERE c.question_id = q.question_id AND c.is_correct = TRUE)
+           ELSE q.points 
+         END
+       ), 0) AS total_points
      FROM questions q
      LEFT JOIN student_answers sa ON sa.question_id = q.question_id AND sa.session_id = $1
      WHERE q.exam_id = (SELECT exam_id FROM exam_sessions WHERE session_id = $1)`,

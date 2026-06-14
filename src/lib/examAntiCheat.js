@@ -27,10 +27,10 @@ export function displayStrikeCount(warningCount, maxWarnings) {
 export function warningCountBadgeClass(count, maxWarnings) {
   const max = resolveMaxWarnings(maxWarnings)
   const n = Number(count) || 0
-  if (n <= 0) return 'bg-white/10 text-white/80'
-  if (n >= max - 1) return 'bg-red-900/40 text-red-200'
-  if (n >= Math.max(1, Math.floor(max * 0.5))) return 'bg-orange-900/40 text-orange-200'
-  return 'bg-amber-900/30 text-amber-100'
+  if (n <= 0) return 'bg-foreground/5 text-foreground/80'
+  if (n >= max - 1) return 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200'
+  if (n >= Math.max(1, Math.floor(max * 0.5))) return 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200'
+  return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-100'
 }
 
 export const CHEAT_EVENT_LABELS = {

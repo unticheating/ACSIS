@@ -59,32 +59,38 @@ app.use('/api/teacher/terms', teacherTermsRouter)
 app.use('/api/teacher/classes', teacherClassesRouter)
 app.use('/api/student', studentRouter)
 
-app.listen(config.port, async () => {
-  if (config.databaseUrl) {
-    try {
-      await ensurePasswordResetSchema()
-      await ensureCheatEventSchema()
-      await ensureExamAssignmentSchema()
-      await ensureTeacherActivitySchema()
-      await ensureCheatingLogDismissedColumns()
-    } catch (err) {
-      console.warn('  Password reset schema check failed:', err.message)
+// Export the app for serverless deployment (Vercel)
+export default app
+
+// Only start the server if not running in a serverless environment
+if (!process.env.VERCEL) {
+  app.listen(config.port, async () => {
+    if (config.databaseUrl) {
+      try {
+        await ensurePasswordResetSchema()
+        await ensureCheatEventSchema()
+        await ensureExamAssignmentSchema()
+        await ensureTeacherActivitySchema()
+        await ensureCheatingLogDismissedColumns()
+      } catch (err) {
+        console.warn('  Password reset schema check failed:', err.message)
+      }
     }
-  }
-  console.log(`ACSIS auth API listening on http://localhost:${config.port}`)
-  console.log(`  Frontend: ${config.frontendUrl}`)
-  console.log(`  Google callback: ${config.google.callbackUrl}`)
-  console.log(`  Allowed email domain: @${config.allowedEmailDomain}`)
-  if (!config.databaseUrl) {
-    console.warn('  DATABASE_URL not set — password login uses ADMIN_DEV_* from .env')
-  } else {
-    console.log('  Database: connected via DATABASE_URL (ADMIN_DEV_* is ignored for login)')
-  }
-  if (!config.emailVerificationEnabled) {
-    console.warn(
-      '  Email OTP: disabled (EMAIL_VERIFICATION_ENABLED=false or dev default) — sign-in skips /verify',
-    )
-  } else {
-    await logSmtpStatus()
-  }
-})
+    console.log(`ACSIS auth API listening on http://localhost:${config.port}`)
+    console.log(`  Frontend: ${config.frontendUrl}`)
+    console.log(`  Google callback: ${config.google.callbackUrl}`)
+    console.log(`  Allowed email domain: @${config.allowedEmailDomain}`)
+    if (!config.databaseUrl) {
+      console.warn('  DATABASE_URL not set — password login uses ADMIN_DEV_* from .env')
+    } else {
+      console.log('  Database: connected via DATABASE_URL (ADMIN_DEV_* is ignored for login)')
+    }
+    if (!config.emailVerificationEnabled) {
+      console.warn(
+        '  Email OTP: disabled (EMAIL_VERIFICATION_ENABLED=false or dev default) — sign-in skips /verify',
+      )
+    } else {
+      await logSmtpStatus()
+    }
+  })
+}

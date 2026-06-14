@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Clock, LayoutGrid, CheckCircle2, Circle, AlertTriangle, Keyboard as KeyboardIcon } from 'lucide-react'
+import { Clock, LayoutGrid, CheckCircle2, Circle, AlertTriangle, Keyboard as KeyboardIcon, Moon, Sun, ChevronLeft, ChevronRight } from 'lucide-react'
 import Editor from '@monaco-editor/react'
 import { ExamSessionHeader } from '@/components/student/ExamSessionHeader.jsx'
 import { ExamKeyboard } from '@/components/student/ExamKeyboard.jsx'
+import { CollapsibleQuestion } from '@/components/student/CollapsibleQuestion.jsx'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog.jsx'
 import { Button } from '@/components/ui/button.jsx'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx'
 import { Input } from '@/components/ui/input.jsx'
@@ -52,9 +54,37 @@ function isExamScene(name) {
 
 
 import { labelForQuestionType } from '@/lib/questionTypes.js'
+import { MatchingQuestionInput } from '@/components/exam/MatchingPairEditor.jsx'
+import DiagramEditor from '@/components/exam/DiagramEditor.jsx'
+import {
+  matchingPairsFromQuestion,
+  parseMatchingStudentAnswer,
+  shuffleArray,
+  stringifyMatchingStudentAnswer,
+} from '@/lib/matchingQuestion.js'
+import { diagramVariantFromQuestion, emptyDiagramData } from '@/lib/diagramQuestion.js'
 
 function questionTypeLabel(type) {
   return labelForQuestionType(type)
+}
+
+function isQuestionAnswered(question, rawAnswer) {
+  if (rawAnswer == null || String(rawAnswer).trim() === '') return false
+  const type = String(question?.type || '').toLowerCase()
+  if (type === 'matching') {
+    const pairs = matchingPairsFromQuestion(question)
+    const map = parseMatchingStudentAnswer(rawAnswer)
+    return pairs.length > 0 && pairs.every((pair) => String(map[pair.left] || '').trim())
+  }
+  if (type === 'diagramming') {
+    try {
+      const data = JSON.parse(String(rawAnswer))
+      return Array.isArray(data?.nodes) && data.nodes.length > 0
+    } catch {
+      return false
+    }
+  }
+  return String(rawAnswer).trim() !== ''
 }
 
 function formatClock(totalSec) {
@@ -69,7 +99,7 @@ export default function StudentExamSessionPage() {
   const classId = searchParams.get('classId') || ''
   const examId = searchParams.get('examId') || ''
   const { activeAccount } = useSession()
-  const { theme } = useTheme()
+  const { theme, toggleTheme } = useTheme()
   const { institution } = useInstitutionTheme()
   const institutionMaxWarnings = institution?.maxWarnings
 
@@ -81,10 +111,31 @@ export default function StudentExamSessionPage() {
   const [joining, setJoining] = useState(false)
   const [scene, setScene] = useState('lobby')
   const [showKeyboard, setShowKeyboard] = useState(false)
+  const [isSubmitDialogOpen, setIsSubmitDialogOpen] = useState(false)
   const monacoEditorRef = useRef(null)
   const sceneRef = useRef(scene)
 
   const loadSession = useCallback(async () => {
+    if (classId === 'preview') {
+      try {
+        const previewStr = localStorage.getItem('examPreviewData')
+        if (!previewStr) throw new Error('No preview data')
+        const previewData = JSON.parse(previewStr)
+        setNeedsPassword(false)
+        setHit({ exam: { ...previewData, status: 'open' } })
+        setExamLocked(false)
+        setMaxWarnings(resolveMaxWarnings(undefined, institutionMaxWarnings))
+        setWarningCount(0)
+        setError(null)
+      } catch (err) {
+        setError('Failed to load preview.')
+        acsisToastError('Failed to load preview.')
+      } finally {
+        setLoading(false)
+      }
+      return
+    }
+
     if (!classId || !examId) {
       setLoading(false)
       return
@@ -139,6 +190,7 @@ export default function StudentExamSessionPage() {
   }, [loadSession])
 
   useEffect(() => {
+    if (classId === 'preview') return undefined
     if (!hit?.exam || needsPassword) return undefined
     const st = normalizeExamStatus(hit.exam.status)
     if (st !== PG_EXAM_STATUS.WAITING) return undefined
@@ -147,10 +199,11 @@ export default function StudentExamSessionPage() {
       loadSession()
     }, 2500)
     return () => window.clearInterval(interval)
-  }, [hit?.exam?.status, needsPassword, loadSession])
+  }, [classId, hit?.exam?.status, needsPassword, loadSession])
 
   /** Sync lock/strike state when professor dismisses a false positive during the exam. */
   useEffect(() => {
+    if (classId === 'preview') return undefined
     if (scene !== 'question' || !classId || !examId) return undefined
     const interval = window.setInterval(async () => {
       try {
@@ -249,10 +302,23 @@ export default function StudentExamSessionPage() {
   const [lastViolationLabel, setLastViolationLabel] = useState('')
   const lockingRef = useRef(false)
   const autosaveSkipRef = useRef(true)
+  const matchingOptionsRef = useRef({})
   const fullscreenKeyHandledUntilRef = useRef(0)
   const examLockedRef = useRef(false)
   const warningCountRef = useRef(0)
   const maxWarningsRef = useRef(resolveMaxWarnings(undefined, institutionMaxWarnings))
+
+  const currentQ = questions[currentQuestionIndex]
+
+  const matchingRightOptions = useMemo(() => {
+    if (!currentQ || currentQ.type !== 'matching') return []
+    const qid = String(currentQ.id)
+    if (!matchingOptionsRef.current[qid]) {
+      const pairs = matchingPairsFromQuestion(currentQ)
+      matchingOptionsRef.current[qid] = shuffleArray(pairs.map((pair) => pair.right))
+    }
+    return matchingOptionsRef.current[qid]
+  }, [currentQ])
 
   useEffect(() => {
     examLockedRef.current = examLocked
@@ -281,6 +347,11 @@ export default function StudentExamSessionPage() {
 
   const applyExamLock = useCallback(
     async (reason = 'time_up') => {
+      if (classId === 'preview') {
+        setExamLocked(true)
+        setLockReason(reason)
+        return
+      }
       if (!classId || !examId || lockingRef.current) return
       lockingRef.current = true
       try {
@@ -303,6 +374,11 @@ export default function StudentExamSessionPage() {
   )
 
   const submitToServer = useCallback(async () => {
+    if (classId === 'preview') {
+      setSubmitResult({ scoreReleased: false, scorePending: true })
+      setScene('submitted')
+      return
+    }
     if (!classId || !examId) {
       setScene('submitted')
       return
@@ -382,6 +458,7 @@ export default function StudentExamSessionPage() {
   }, [scene, hit?.exam, examLocked, applyExamLock])
 
   useEffect(() => {
+    if (classId === 'preview') return undefined
     if (scene !== 'question' || examLocked || !classId || !examId || questions.length === 0) {
       return undefined
     }
@@ -441,6 +518,32 @@ export default function StudentExamSessionPage() {
       if (detectionRunningRef.current) return
       if (!opts.skipCooldown && Date.now() < postCooldownUntilRef.current) return
       if (!isExamScene(sceneRef.current)) return
+      if (classId === 'preview') {
+        const strikeMax = resolveMaxWarnings(maxWarningsRef.current, institutionMaxWarnings)
+        const strikesNow = Number(warningCountRef.current) || 0
+        if (examLockedRef.current || strikesNow >= strikeMax) return
+
+        detectionRunningRef.current = true
+        if (!opts.skipCooldown) postCooldownUntilRef.current = Date.now() + 1500
+
+        const nextStrike = Math.min(strikesNow + 1, strikeMax)
+        const isFinalStrike = nextStrike >= strikeMax
+        setLastViolationLabel(details ? `${labelForCheatEvent(eventType)} (${details})` : labelForCheatEvent(eventType))
+        setOverlayStrikeDisplay(nextStrike)
+        showViolationOverlay(sceneRef.current, {
+          restoreFullscreenAfter: Boolean(opts.restoreFullscreenAfter) && !isFinalStrike,
+        })
+        
+        setWarningCount(nextStrike)
+        warningCountRef.current = nextStrike
+        if (nextStrike >= strikeMax) {
+          setExamLocked(true)
+          examLockedRef.current = true
+          setLockReason('max_warnings')
+          pendingMaxWarningsLockRef.current = true
+        }
+        return
+      }
       if (!classId || !examId) return
 
       const strikeMax = resolveMaxWarnings(maxWarningsRef.current, institutionMaxWarnings)
@@ -759,7 +862,7 @@ export default function StudentExamSessionPage() {
   if (loading) {
     return (
       <div className="acsis-student-exam min-h-screen flex items-center justify-center">
-        <p className="text-sm font-medium text-white/70 animate-pulse">Loading exam details…</p>
+        <p className="text-sm font-medium text-foreground/70 animate-pulse">Loading exam details…</p>
       </div>
     )
   }
@@ -767,12 +870,12 @@ export default function StudentExamSessionPage() {
   if (needsPassword && classId && examId) {
     return (
       <div className="acsis-student-exam min-h-screen flex items-center justify-center p-6">
-        <Card className="w-full max-w-md border-white/15 bg-black/40 text-card-foreground shadow-lg backdrop-blur-sm">
+        <Card className="w-full max-w-md border-white/15 bg-background/40 text-card-foreground shadow-lg backdrop-blur-sm">
           <CardHeader className="space-y-1.5">
-            <CardTitle className="text-lg font-semibold tracking-tight text-white">
+            <CardTitle className="text-lg font-semibold tracking-tight text-foreground">
               Enter exam code
             </CardTitle>
-            <CardDescription className="text-white/70">
+            <CardDescription className="text-foreground/70">
               Type the code your instructor shared after publishing the exam. After you join once, use
               Continue exam from your class - the code step will not appear again.
             </CardDescription>
@@ -780,13 +883,13 @@ export default function StudentExamSessionPage() {
           <CardContent>
             <form onSubmit={submitExamPassword} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="exam-code" className="text-sm font-medium text-white/90">
+                <Label htmlFor="exam-code" className="text-sm font-medium text-foreground/90">
                   Exam code
                 </Label>
                 <Input
                   id="exam-code"
                   type="text"
-                  className="text-center font-mono text-base tracking-widest uppercase bg-black/40 border-emerald-600/50 text-white"
+                  className="text-center font-mono text-base tracking-widest uppercase bg-background/40 border-emerald-600/50 text-foreground"
                   placeholder="Exam code"
                   value={examPassword}
                   onChange={(e) => setExamPassword(e.target.value.toUpperCase())}
@@ -815,7 +918,7 @@ export default function StudentExamSessionPage() {
     )
   }
 
-  if (error || !classId || !examId || !hit) {
+  if (error || !classId || (!examId && classId !== 'preview') || !hit) {
     return (
       <div className="acsis-student-exam min-h-screen flex items-center justify-center p-6">
         <Card className="w-full max-w-md border-border bg-card text-center shadow-lg">
@@ -839,13 +942,7 @@ export default function StudentExamSessionPage() {
     )
   }
 
-  const currentQ = questions[currentQuestionIndex]
 
-  const showSectionIntro =
-    currentQ &&
-    (currentQuestionIndex === 0 ||
-      questions[currentQuestionIndex - 1]?.sectionId !== currentQ.sectionId) &&
-    (currentQ.sectionTitle || currentQ.sectionDescription)
 
   const strikesDisplay = displayStrikeCount(warningCount, maxWarnings)
   const maxStrikesReached = strikesDisplay >= maxWarnings
@@ -858,38 +955,45 @@ export default function StudentExamSessionPage() {
       <div className="acsis-student-exam min-h-screen flex flex-col">
         <ExamSessionHeader title={examTitle} />
         <main className="lobby-main">
-          <h2 className="lobby-warning-title">Warning:</h2>
-          <div className="lobby-copy text-sm leading-relaxed text-foreground opacity-90">
-            <p>This examination system monitors your activity to ensure academic fairness.</p>
-            <p>
-              Actions like <strong>tab switching</strong>, <strong>leaving the exam page</strong>,{' '}
-              <strong>screenshots</strong>, <strong>right-clicking</strong>, pressing the{' '}
-              <strong>Windows key</strong>, or leaving fullscreen (<strong>F11</strong> / <strong>Esc</strong>) are
-              counted as strikes. After an F11/Esc warning, you will return to fullscreen automatically.
-            </p>
-            <p>
-              You are allowed up to <strong>{maxWarnings} strikes</strong> only. If this limit is exceeded, your
-              exam will be <strong>locked</strong>: you cannot change or move between answers; use{' '}
-              <strong>Send exam</strong> when you are ready to submit.
-            </p>
-            <p>Please remain on this page and complete the exam honestly.</p>
+          <div className="my-auto flex flex-col items-center">
+            <h2 className="lobby-warning-title animate-pulse">Warning:</h2>
+            <div className="lobby-copy text-sm leading-relaxed text-foreground opacity-90">
+              <p>This examination system monitors your activity to ensure academic fairness.</p>
+              <p className="mt-4">
+                You are allowed up to <strong className="text-red-500">{maxWarnings} strikes</strong> only. If this limit is exceeded, your
+                exam will be <strong className="text-red-500">locked</strong>: you cannot change or move between answers; use{' '}
+                <strong>Send exam</strong> when you are ready to submit.
+              </p>
+              <p className="mt-4">Please remain on this page and complete the exam honestly.</p>
+              <p className="mt-6">
+                The following actions are counted as strikes:
+              </p>
+              <div className="flex flex-wrap items-center justify-center gap-2.5 my-5">
+                <span className="inline-flex items-center rounded-full border border-red-500/30 bg-red-500/10 px-3.5 py-1.5 text-sm font-semibold tracking-wide text-red-500">Tab switching</span>
+                <span className="inline-flex items-center rounded-full border border-red-500/30 bg-red-500/10 px-3.5 py-1.5 text-sm font-semibold tracking-wide text-red-500">Leaving the exam page</span>
+                <span className="inline-flex items-center rounded-full border border-red-500/30 bg-red-500/10 px-3.5 py-1.5 text-sm font-semibold tracking-wide text-red-500">Screenshots</span>
+                <span className="inline-flex items-center rounded-full border border-red-500/30 bg-red-500/10 px-3.5 py-1.5 text-sm font-semibold tracking-wide text-red-500">Right-clicking</span>
+                <span className="inline-flex items-center rounded-full border border-red-500/30 bg-red-500/10 px-3.5 py-1.5 text-sm font-semibold tracking-wide text-red-500">Windows key</span>
+                <span className="inline-flex items-center rounded-full border border-red-500/30 bg-red-500/10 px-3.5 py-1.5 text-sm font-semibold tracking-wide text-red-500">Leaving fullscreen (F11 / Esc)</span>
+              </div>
+            </div>
           </div>
-          <div className="lobby-footer">
-            <div className="lobby-spinner" aria-hidden />
-            <p className="lobby-waiting text-sm font-medium text-foreground opacity-80">
+          
+          <div className="mt-auto flex flex-col items-center pb-4">
+            <div className="lobby-footer !pb-2">
+              <div className="lobby-spinner" aria-hidden />
+              <p className="lobby-waiting text-sm font-medium text-foreground opacity-80">
+                {inLobby
+                  ? `Waiting for ${instructorWait} to start the exam…`
+                  : 'Exam in progress - starting shortly…'}
+              </p>
+            </div>
+            <p className="exam-type-hint text-xs text-muted-foreground m-0">
               {inLobby
-                ? `Waiting for ${instructorWait} to start the exam…`
-                : 'Exam in progress - starting shortly…'}
+                ? 'You are in the lobby. The timer starts when your instructor goes live.'
+                : 'Your session is ongoing. Do not re-enter the exam code from the class page.'}
             </p>
           </div>
-          <p className="exam-type-hint mt-6 text-xs text-muted-foreground">
-            {inLobby
-              ? 'You are in the lobby. The timer starts when your instructor goes live.'
-              : 'Your session is ongoing. Do not re-enter the exam code from the class page.'}
-          </p>
-          <Link to={`/student/my-classes/${classId}`} className="exam-session-exit">
-            ← Back to class
-          </Link>
         </main>
       </div>
     )
@@ -970,20 +1074,20 @@ export default function StudentExamSessionPage() {
     typeof document !== 'undefined'
       ? createPortal(
           <div
-            className={`detection-overlay${detectionOpen ? ' is-active' : ''}${
+            className={`detection-overlay text-white ${detectionOpen ? ' is-active' : ''}${
               overlayIsFinalStrike ? ' detection-overlay--final' : ''
             }`}
             role="alertdialog"
             aria-modal="true"
             aria-live="assertive"
           >
-            <AlertTriangle className="detection-overlay__icon" aria-hidden />
-            <h2 className="detection-title">
+            <AlertTriangle className="detection-overlay__icon text-white" aria-hidden />
+            <h2 className="detection-title text-white">
               {overlayIsFinalStrike
                 ? 'Final Warning: Maximum Strikes Reached'
                 : 'Warning: Suspicious Activity!'}
             </h2>
-            <p className="detection-sub">
+            <p className="detection-sub text-white">
               {overlayIsFinalStrike ? (
                 <>
                   You have reached <strong>{maxWarnings} of {maxWarnings}</strong> integrity warnings.
@@ -997,7 +1101,7 @@ export default function StudentExamSessionPage() {
                 </>
               )}
             </p>
-            <p className="detection-strikes">
+            <p className="detection-strikes text-white">
               Strike {overlayStrikes} of {maxWarnings}
               {overlayIsFinalStrike
                 ? ' - no further warnings remain'
@@ -1005,7 +1109,7 @@ export default function StudentExamSessionPage() {
                   ? ' - one more locks your exam'
                   : ''}
             </p>
-            <p className="detection-countdown">
+            <p className="detection-countdown text-white">
               {overlayIsFinalStrike
                 ? `Returning to your locked exam in ${detectionReturn} seconds…`
                 : `Returning to exam in ${detectionReturn} seconds…`}
@@ -1022,7 +1126,7 @@ export default function StudentExamSessionPage() {
         titleClassName="hidden sm:block max-w-md"
         className="sticky top-0 z-10 shrink-0"
       >
-        <div className="flex items-center gap-3 ml-auto shrink-0">
+        <div className="flex items-center gap-2 ml-auto shrink-0">
           <div
             className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold ${warningCountBadgeClass(
               displayStrikeCount(warningCount, maxWarnings),
@@ -1037,18 +1141,43 @@ export default function StudentExamSessionPage() {
             <Clock className="w-4 h-4 shrink-0 opacity-80" aria-hidden />
             {secondsLeft != null && secondsLeft > 0 ? formatClock(secondsLeft) : '--:--'}
           </div>
+          {/* Accessibility toolbar */}
+          <div className="flex items-center gap-1 pl-1 border-l border-white/10">
+            <button
+              type="button"
+              onClick={toggleTheme}
+              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              className="exam-topbar-icon-btn"
+            >
+              {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
+            {currentQ && ['identification', 'coding', 'essay', 'diagramming'].includes(currentQ.type) && (
+              <button
+                type="button"
+                onClick={() => setShowKeyboard((v) => !v)}
+                title={showKeyboard ? 'Hide on-screen keyboard' : 'Show on-screen keyboard'}
+                aria-label={showKeyboard ? 'Hide on-screen keyboard' : 'Show on-screen keyboard'}
+                aria-pressed={showKeyboard}
+                className={`exam-topbar-icon-btn${showKeyboard ? ' exam-topbar-icon-btn--active' : ''}`}
+              >
+                <KeyboardIcon className="w-4 h-4" />
+              </button>
+            )}
+          </div>
         </div>
       </ExamSessionHeader>
 
-      <div className="flex-1 flex flex-col lg:flex-row w-full max-w-7xl mx-auto items-stretch">
+      <div className="flex-1 flex flex-col lg:flex-row w-full max-w-[1600px] mx-auto items-stretch">
+        <div className="hidden lg:block lg:w-80 shrink-0" />
         <main className="exam-stage flex-1 flex flex-col min-w-0">
           {currentQ ? (
-            <div className="flex-1 flex flex-col max-w-3xl w-full mx-auto">
+            <div className={`flex-1 flex flex-col w-full mx-auto max-w-3xl`}>
               {examLocked ? (
-                <div
-                  className="mb-6 rounded-xl border border-amber-500/40 bg-amber-950/40 px-4 py-3 text-sm text-amber-100"
-                  role="status"
-                >
+                  <div
+                    className="mb-6 rounded-xl border border-amber-500/40 bg-amber-100 dark:bg-amber-950/40 px-4 py-3 text-sm text-amber-900 dark:text-amber-100"
+                    role="status"
+                  >
                   {lockReason === 'max_warnings'
                     ? 'Maximum warnings reached. You cannot change answers or switch questions. Click Send exam when ready.'
                     : 'Time is up. You cannot change answers or switch questions. Click Send exam when ready.'}
@@ -1058,24 +1187,24 @@ export default function StudentExamSessionPage() {
                 className={maxStrikesReached ? 'exam-strike-lock-blur' : undefined}
                 aria-hidden={maxStrikesReached ? true : undefined}
               >
-                {showSectionIntro && currentQ.sectionDescription ? (
-                  <div className="question-box question-box--section mb-6">
-                    <p className="question-box--section__desc whitespace-pre-wrap">
-                      {currentQ.sectionDescription}
-                    </p>
-                  </div>
-                ) : null}
 
-                <div className="mb-8">
+
+                <div className="mb-8 mt-6">
                   <div className="exam-question-meta-row">
-                    <span className="exam-set-name">
-                      {currentQ.sectionTitle || 'General'}
+                    <span className="exam-set-name flex flex-wrap items-center gap-2">
+                      <span>{currentQ.sectionTitle || 'General'}</span>
+                      {currentQ.sectionDescription ? (
+                        <span className="font-normal text-muted-foreground">
+                          - {currentQ.sectionDescription}
+                        </span>
+                      ) : null}
                     </span>
                     <span className="exam-type-badge">{questionTypeLabel(currentQ.type)}</span>
                   </div>
-                  <div className="question-box question-box--prompt whitespace-pre-wrap">
-                    {currentQ.question}
-                  </div>
+                  <CollapsibleQuestion 
+                    text={currentQ.question} 
+                    className="question-box question-box--prompt whitespace-pre-wrap" 
+                  />
                   {currentQ.imageUrl && (
                     <div className="mt-6">
                       <img
@@ -1135,19 +1264,11 @@ export default function StudentExamSessionPage() {
                 )}
 
                 {currentQ.type === 'identification' && (
-                  <div className="max-w-xl">
-                    <div className="flex items-center justify-between mb-2">
+                  <div className="w-full">
+                    <div className="mb-2">
                       <p className="exam-type-hint m-0 text-left">
                         Type your answer below
                       </p>
-                      <button
-                        type="button"
-                        onClick={() => setShowKeyboard(!showKeyboard)}
-                        className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
-                      >
-                        <KeyboardIcon className="w-4 h-4" />
-                        On-screen keyboard
-                      </button>
                     </div>
                     <input
                       id="id-answer"
@@ -1168,18 +1289,10 @@ export default function StudentExamSessionPage() {
 
                 {currentQ.type === 'coding' && (
                   <div className="code-editor-wrap max-w-3xl w-full">
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="mb-2">
                       <p className="exam-type-hint m-0 text-left">
                         Language: {normalizeCodingLanguage(currentQ.language || currentQ.options?.[0])}
                       </p>
-                      <button
-                        type="button"
-                        onClick={() => setShowKeyboard(!showKeyboard)}
-                        className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
-                      >
-                        <KeyboardIcon className="w-4 h-4" />
-                        On-screen keyboard
-                      </button>
                     </div>
                     <Editor
                       height="min(42vh, 360px)"
@@ -1197,6 +1310,61 @@ export default function StudentExamSessionPage() {
                     />
                   </div>
                 )}
+
+                {currentQ.type === 'matching' && (
+                  <div>
+                    <p className="exam-type-hint mb-3 text-left">Match each item on the left to the correct option.</p>
+                    <MatchingQuestionInput
+                      pairs={matchingPairsFromQuestion(currentQ)}
+                      rightOptions={matchingRightOptions}
+                      value={parseMatchingStudentAnswer(answers[currentQ.id])}
+                      disabled={examLocked}
+                      onChange={(map) =>
+                        !examLocked &&
+                        setAnswers((prev) => ({
+                          ...prev,
+                          [currentQ.id]: stringifyMatchingStudentAnswer(map),
+                        }))
+                      }
+                    />
+                  </div>
+                )}
+
+                {currentQ.type === 'essay' && (
+                  <div className="max-w-3xl">
+                    <p className="exam-type-hint mb-2 text-left">Write your answer in the box below.</p>
+                    <textarea
+                      rows={10}
+                      className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[220px]"
+                      placeholder="Type your essay response..."
+                      value={answers[currentQ.id] || ''}
+                      readOnly={examLocked}
+                      onChange={(e) =>
+                        !examLocked &&
+                        setAnswers((prev) => ({ ...prev, [currentQ.id]: e.target.value }))
+                      }
+                    />
+                  </div>
+                )}
+
+                {currentQ.type === 'diagramming' && (
+                  <div className="w-full">
+                    <p className="exam-type-hint mb-2 text-left">
+                      Build a {diagramVariantFromQuestion(currentQ) === 'erd' ? 'entity relationship diagram' : 'flowchart'}.
+                      Drag shapes from the toolbox, connect handles, and click a node to edit its label.
+                    </p>
+                    <DiagramEditor
+                      key={currentQ.id}
+                      variant={diagramVariantFromQuestion(currentQ)}
+                      value={answers[currentQ.id] || emptyDiagramData()}
+                      readOnly={examLocked}
+                      onChange={(json) =>
+                        !examLocked && setAnswers((prev) => ({ ...prev, [currentQ.id]: json }))
+                      }
+                      height="min(50vh, 400px)"
+                    />
+                  </div>
+                )}
                 </div>
               </div>
 
@@ -1206,36 +1374,38 @@ export default function StudentExamSessionPage() {
                     type="button"
                     onClick={() => setCurrentQuestionIndex((i) => Math.max(0, i - 1))}
                     disabled={currentQuestionIndex === 0}
-                    className="btn-next"
+                    className="bg-transparent flex items-center justify-center gap-2 px-4 py-2 rounded-md hover:bg-muted text-sm font-medium transition-colors"
                     style={
                       currentQuestionIndex === 0
                         ? { opacity: 0.45, cursor: 'not-allowed' }
                         : undefined
                     }
                   >
-                    ← Previous
+                    <ChevronLeft className="w-4 h-4" /> Previous
                   </button>
                 ) : (
                   <span className="text-xs text-muted-foreground" aria-hidden />
                 )}
                 <div className="exam-footer-right">
-                  {examLocked ? (
-                    <button type="button" onClick={() => submitToServer()} className="btn-next">
-                      Send exam
-                    </button>
-                  ) : currentQuestionIndex < questions.length - 1 ? (
+                  {!examLocked && currentQuestionIndex === questions.length - 1 ? (
                     <button
                       type="button"
-                      onClick={() => setCurrentQuestionIndex((i) => i + 1)}
-                      className="btn-next"
+                      onClick={() => setIsSubmitDialogOpen(true)}
+                      className="btn-next bg-primary text-primary-foreground flex items-center justify-center gap-2"
                     >
-                      Next →
-                    </button>
-                  ) : (
-                    <button type="button" onClick={() => submitToServer()} className="btn-next">
                       Submit exam
                     </button>
-                  )}
+                  ) : !examLocked ? (
+                    <button
+                      type="button"
+                      onClick={() => setCurrentQuestionIndex((i) => Math.min(questions.length - 1, i + 1))}
+                      disabled={currentQuestionIndex >= questions.length - 1}
+                      className="bg-transparent flex items-center justify-center gap-2 px-4 py-2 rounded-md hover:bg-muted text-sm font-medium transition-colors"
+                      style={currentQuestionIndex >= questions.length - 1 ? { opacity: 0.45, cursor: 'not-allowed' } : undefined}
+                    >
+                      Next <ChevronRight className="w-4 h-4" />
+                    </button>
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -1280,7 +1450,7 @@ export default function StudentExamSessionPage() {
             >
               {questions.map((q, idx) => {
                 const isActive = idx === currentQuestionIndex
-                const isAnswered = !!answers[q.id] && answers[q.id].trim() !== ''
+                const isAnswered = isQuestionAnswered(q, answers[q.id])
                 let btnClass =
                   'relative flex items-center justify-center w-full aspect-square rounded-lg text-sm font-medium transition-all border-2 '
                 if (isActive) {
@@ -1316,26 +1486,26 @@ export default function StudentExamSessionPage() {
             <div className="progress-row mb-4">
               <span className="progress-label">Completion</span>
               <span className="progress-label">
-                {Object.keys(answers).filter((k) => answers[k] && answers[k].trim() !== '').length} /{' '}
+                {questions.filter((q) => isQuestionAnswered(q, answers[q.id])).length} /{' '}
                 {questions.length}
               </span>
             </div>
-            <button type="button" onClick={() => submitToServer()} className="btn-next w-full justify-center">
-              {examLocked ? 'Send exam' : 'Finish & submit'}
-            </button>
+              <button type="button" onClick={() => setIsSubmitDialogOpen(true)} className="btn-next w-full justify-center">
+                {examLocked ? 'Send exam' : 'Submit exam'}
+              </button>
           </div>
         </aside>
 
       </div>
 
-      {showKeyboard && currentQ && (currentQ.type === 'identification' || currentQ.type === 'coding') && (
+      {showKeyboard && currentQ && ['identification', 'coding', 'essay', 'diagramming'].includes(currentQ.type) && (
         <ExamKeyboard
           value={answers[currentQ.id] || ''}
           onChange={(val) =>
             !examLocked &&
             setAnswers((prev) => ({
               ...prev,
-              [currentQ.id]: currentQ.type === 'coding' ? val : val.toUpperCase(),
+              [currentQ.id]: currentQ.type === 'identification' ? val.toUpperCase() : val,
             }))
           }
           onClose={() => setShowKeyboard(false)}
@@ -1345,6 +1515,21 @@ export default function StudentExamSessionPage() {
       )}
 
       {detectionOverlay}
+
+      <Dialog open={isSubmitDialogOpen} onOpenChange={setIsSubmitDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Submit Exam</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to submit your exam? Once submitted, you cannot change your answers.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex gap-2 sm:justify-end mt-4">
+            <Button variant="outline" onClick={() => setIsSubmitDialogOpen(false)}>Cancel</Button>
+            <Button onClick={() => { setIsSubmitDialogOpen(false); submitToServer(); }}>Submit</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

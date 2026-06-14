@@ -21,7 +21,7 @@ import {
 } from '../repositories/classRepository.js';
 import { getExamAssignmentAccessQuery } from '../repositories/examAssignmentRepository.js'
 import { checkEnrollment } from '../repositories/studentRepository.js';
-import { nextStatusAfterClose, nextStatusAfterPublish } from '../lib/examStatus.js';
+import { EXAM_STATUS, nextStatusAfterClose, nextStatusAfterPublish } from '../lib/examStatus.js';
 import { getStudentSessionsForExamsQuery } from '../repositories/examSessionRepository.js';
 import { generateExamPassword } from '../lib/examCodes.js';
 import { recordTeacherActivityQuery } from '../repositories/teacherActivityRepository.js'
@@ -264,9 +264,27 @@ async function attachStudentSessionsToExams(exams, studentMemberId) {
   })
 }
 
+export async function autoCloseExams(classId, exams) {
+  const now = Date.now();
+  for (const exam of exams) {
+    if ((exam.status === EXAM_STATUS.OPEN || exam.status === EXAM_STATUS.WAITING) && exam.scheduledEnd) {
+      const endMs = new Date(exam.scheduledEnd).getTime();
+      if (Number.isFinite(endMs) && now >= endMs) {
+        try {
+          await closeExamService(classId || exam.classId, exam.id);
+        } catch (err) {
+          console.error('[autoCloseExams] failed to close exam', err);
+        }
+        exam.status = EXAM_STATUS.CLOSED;
+      }
+    }
+  }
+}
+
 export async function listTeacherExamsWithClassMetaService(memberId) {
   try {
     const rows = await listTeacherExamsWithClassMetaQuery(memberId);
+    await autoCloseExams(null, rows);
     return { ok: true, exams: rows };
   } catch (err) {
     console.error('[examService.listTeacherExamsWithClassMeta]', err);
@@ -291,6 +309,7 @@ export async function getClassExamsService(classId, requireActive = false, stude
     }
     
     const exams = await getExamsByClassIdQuery(classId, requireActive)
+    await autoCloseExams(classId, exams);
 
     let filteredExams = exams
     // If a student is requesting the exams, hide any exam which has assignment rows
@@ -546,6 +565,8 @@ export async function getExamDetailsService(classId, examId, requireActive = fal
     if (!exam) {
       return { ok: false, status: 404, error: 'Exam not found or not active.' };
     }
+
+    await autoCloseExams(classId, [exam]);
 
     return {
       ok: true,

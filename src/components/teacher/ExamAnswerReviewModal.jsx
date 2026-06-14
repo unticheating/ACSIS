@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, X, Maximize } from 'lucide-react'
+import DiagramEditor from '@/components/exam/DiagramEditor.jsx'
 import { fetchTeacherExamSessionDetail } from '@/lib/teacherExamResultsApi.js'
 import { manualGradeAnswer } from '@/lib/teacherExamGradingApi.js'
 import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
@@ -41,6 +42,7 @@ export default function ExamAnswerReviewModal({
   const [savingId, setSavingId] = useState(null)
   const [answers, setAnswers] = useState([])
   const [sessionMeta, setSessionMeta] = useState(null)
+  const [expandedDiagram, setExpandedDiagram] = useState(null)
 
   const currentStudent = queue[studentIndex] || null
   const reviewedCount = answers.filter((a) => a.manuallyChecked).length
@@ -173,6 +175,7 @@ export default function ExamAnswerReviewModal({
               <ul className="exam-review-answer-list">
                 {answers.map((a, idx) => {
                   const isIdent = String(a.questionType || '').toLowerCase() === 'identification'
+                  const isDiagram = String(a.questionType || '').toLowerCase() === 'diagramming'
                   const answerDisplay = formatReviewAnswerText(a.questionType, a.answer)
                   const keyDisplay = a.expectedAnswer
                     ? formatReviewAnswerText(a.questionType, a.expectedAnswer)
@@ -193,12 +196,26 @@ export default function ExamAnswerReviewModal({
                     <p className="exam-review-q-text">{a.questionText}</p>
                     <div className="exam-review-row">
                       <span className="exam-review-k">Answer:</span>
-                      <span className={`exam-review-v${isIdent ? ' exam-review-v--ident' : ''}`}>
-                        {answerDisplay}
-                      </span>
+                      {isDiagram ? (
+                        <div className="relative border border-border rounded w-full mt-2 overflow-hidden group">
+                          <DiagramEditor value={a.answer} readOnly height={180} />
+                          <button
+                            type="button"
+                            className="absolute top-2 right-2 bg-background/90 text-foreground p-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity border shadow-sm hover:bg-muted"
+                            onClick={() => setExpandedDiagram({ title: 'Student Answer', value: a.answer })}
+                            aria-label="Expand Diagram"
+                          >
+                            <Maximize className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <span className={`exam-review-v${isIdent ? ' exam-review-v--ident' : ''}`}>
+                          {answerDisplay}
+                        </span>
+                      )}
                     </div>
-                    {keyDisplay ? (
-                      <div className="exam-review-row muted">
+                    {keyDisplay && !isDiagram ? (
+                      <div className="exam-review-row muted flex-col items-start gap-1">
                         <span className="exam-review-k">Key:</span>
                         <span className={`exam-review-v${isIdent ? ' exam-review-v--ident' : ''}`}>
                           {keyDisplay}
@@ -231,6 +248,26 @@ export default function ExamAnswerReviewModal({
           )}
         </div>
       </div>
+
+      {expandedDiagram && (
+        <div className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4" onClick={() => setExpandedDiagram(null)}>
+          <div className="bg-background rounded-lg shadow-xl w-full max-w-5xl h-[85vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-3 border-b border-border bg-muted/30">
+              <h3 className="font-semibold text-sm">{expandedDiagram.title}</h3>
+              <button
+                type="button"
+                className="p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                onClick={() => setExpandedDiagram(null)}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-hidden relative">
+              <DiagramEditor value={expandedDiagram.value} readOnly height="100%" />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

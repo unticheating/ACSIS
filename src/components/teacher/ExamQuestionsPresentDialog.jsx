@@ -7,7 +7,25 @@ import {
   presentChoicesForQuestion,
   presentExplanationFromQuestion,
 } from '@/components/teacher/ExamQuestionAnswerPresentation.jsx'
+import DiagramEditor from '@/components/exam/DiagramEditor.jsx'
 import '../../styles/exam-questions-present.css'
+
+function formatStudentsCorrectPhrase(correctCount, submittedCount) {
+  if (!submittedCount) return 'No submissions yet'
+  if (correctCount === 1) return '1 student answered correctly'
+  return `${correctCount} students answered correctly`
+}
+
+function questionStatForQuestion(questionStats, questionId) {
+  if (!Array.isArray(questionStats) || questionId == null) return null
+  return questionStats.find((s) => Number(s.questionId) === Number(questionId)) || null
+}
+
+function studentResponseLabel(isCorrect) {
+  if (isCorrect === true) return 'Correct'
+  if (isCorrect === false) return 'Incorrect'
+  return 'Pending review'
+}
 
 function PresentQuestionFront({ questionKey, index, total, question, questionText, imageUrl }) {
   const options = presentChoicesForQuestion(question)
@@ -39,7 +57,7 @@ function PresentQuestionFront({ questionKey, index, total, question, questionTex
   )
 }
 
-function PresentQuestionBack({ index, total, question, answerText, explanation, isCoding }) {
+function PresentQuestionBack({ index, total, question, answerText, explanation, isCoding, isDiagramming, isFullscreen }) {
   return (
     <div className="exam-present-face exam-present-face--back">
       <div className="exam-present-meta">
@@ -53,6 +71,18 @@ function PresentQuestionBack({ index, total, question, answerText, explanation, 
           <p className="exam-present-answer-label">Answer</p>
           {isCoding ? (
             <pre className="exam-present-answer exam-present-answer--code">{answerText}</pre>
+          ) : isDiagramming ? (
+            <div
+              className="exam-present-answer--diagram w-full rounded-md overflow-hidden border border-border/50"
+              style={{ height: isFullscreen ? 'min(55vh, 600px)' : 300 }}
+            >
+              <DiagramEditor
+                variant={question?.diagramVariant || question?.options?.[0] || 'flowchart'}
+                value={answerText}
+                readOnly={true}
+                height="100%"
+              />
+            </div>
           ) : (
             <p className="exam-present-answer">{answerText}</p>
           )}
@@ -69,12 +99,21 @@ function PresentQuestionBack({ index, total, question, answerText, explanation, 
   )
 }
 
-export default function ExamQuestionsPresentDialog({ open, onClose, examTitle, questions }) {
+export default function ExamQuestionsPresentDialog({
+  open,
+  onClose,
+  examTitle,
+  questions,
+  questionStats = [],
+  submittedCount = 0,
+}) {
   const shellRef = useRef(null)
   const items = Array.isArray(questions) ? questions : []
   const [index, setIndex] = useState(0)
   const [flipped, setFlipped] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [studentsPanelOpen, setStudentsPanelOpen] = useState(false)
+  const studentsPanelRef = useRef(null)
 
   const current = items[index] || null
   const total = items.length
@@ -144,7 +183,20 @@ export default function ExamQuestionsPresentDialog({ open, onClose, examTitle, q
 
   useEffect(() => {
     setFlipped(false)
+    setStudentsPanelOpen(false)
   }, [questionKey])
+
+  useEffect(() => {
+    if (!studentsPanelOpen) return undefined
+
+    function onPointerDown(e) {
+      if (studentsPanelRef.current?.contains(e.target)) return
+      setStudentsPanelOpen(false)
+    }
+
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [studentsPanelOpen])
 
   useEffect(() => {
     if (!open) return undefined
@@ -163,6 +215,10 @@ export default function ExamQuestionsPresentDialog({ open, onClose, examTitle, q
     function onKeyDown(e) {
       if (e.key === 'Escape') {
         e.preventDefault()
+        if (studentsPanelOpen) {
+          setStudentsPanelOpen(false)
+          return
+        }
         if (document.fullscreenElement === shellRef.current) {
           void exitFullscreen()
         } else {
@@ -193,7 +249,7 @@ export default function ExamQuestionsPresentDialog({ open, onClose, examTitle, q
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [open, goPrev, goNext, toggleFlip, toggleFullscreen, exitFullscreen, onClose])
+  }, [open, goPrev, goNext, toggleFlip, toggleFullscreen, exitFullscreen, onClose, studentsPanelOpen])
 
   const handleClose = useCallback(async () => {
     await exitFullscreen()
@@ -206,6 +262,12 @@ export default function ExamQuestionsPresentDialog({ open, onClose, examTitle, q
   const answerText = presentAnswerTextFromQuestion(current)
   const explanation = presentExplanationFromQuestion(current)
   const isCoding = isCodingQuestionType(current?.type)
+  const isDiagramming = String(current?.type || '').toLowerCase() === 'diagramming'
+  const currentQuestionStat = questionStatForQuestion(questionStats, current?.id)
+  const correctCount = Number(currentQuestionStat?.correctCount || 0)
+  const studentsCorrectPhrase = formatStudentsCorrectPhrase(correctCount, submittedCount)
+  const questionStudents = currentQuestionStat?.students || []
+  const canShowStudents = submittedCount > 0 && questionStudents.length > 0
 
   return (
     <div className="exam-present-overlay" role="presentation" onClick={() => void handleClose()}>
@@ -250,11 +312,18 @@ export default function ExamQuestionsPresentDialog({ open, onClose, examTitle, q
         </header>
 
         <div className="exam-present-stage">
-          <button
+          <div
             key={questionKey}
-            type="button"
             className={`exam-present-card${flipped ? ' is-flipped' : ''}`}
             onClick={toggleFlip}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                toggleFlip()
+              }
+            }}
             aria-label={flipped ? 'Show question' : 'Show answer'}
           >
             <div className="exam-present-card-inner">
@@ -273,39 +342,87 @@ export default function ExamQuestionsPresentDialog({ open, onClose, examTitle, q
                 answerText={answerText}
                 explanation={explanation}
                 isCoding={isCoding}
+                isDiagramming={isDiagramming}
+                isFullscreen={isFullscreen}
               />
             </div>
-          </button>
+          </div>
         </div>
 
         <footer className="exam-present-toolbar" onClick={(e) => e.stopPropagation()}>
-          <button
-            type="button"
-            className="exam-present-icon-btn"
-            disabled={index <= 0}
-            onClick={(e) => {
-              e.stopPropagation()
-              goPrev()
-            }}
-            aria-label="Previous question"
-          >
-            <ChevronLeft className="w-5 h-5" aria-hidden />
-          </button>
-          <span className="exam-present-counter">
-            {index + 1} / {total}
-          </span>
-          <button
-            type="button"
-            className="exam-present-icon-btn"
-            disabled={index >= total - 1}
-            onClick={(e) => {
-              e.stopPropagation()
-              goNext()
-            }}
-            aria-label="Next question"
-          >
-            <ChevronRight className="w-5 h-5" aria-hidden />
-          </button>
+          <div className="exam-present-toolbar__nav">
+            <button
+              type="button"
+              className="exam-present-icon-btn"
+              disabled={index <= 0}
+              onClick={(e) => {
+                e.stopPropagation()
+                goPrev()
+              }}
+              aria-label="Previous question"
+            >
+              <ChevronLeft className="w-5 h-5" aria-hidden />
+            </button>
+            <span className="exam-present-counter">
+              {index + 1} / {total}
+            </span>
+            <button
+              type="button"
+              className="exam-present-icon-btn"
+              disabled={index >= total - 1}
+              onClick={(e) => {
+                e.stopPropagation()
+                goNext()
+              }}
+              aria-label="Next question"
+            >
+              <ChevronRight className="w-5 h-5" aria-hidden />
+            </button>
+          </div>
+          <div className="exam-present-toolbar__stat-wrap" ref={studentsPanelRef}>
+            <button
+              type="button"
+              className="exam-present-toolbar__stat"
+              aria-live="polite"
+              aria-expanded={studentsPanelOpen}
+              aria-haspopup="dialog"
+              disabled={!canShowStudents}
+              onClick={(e) => {
+                e.stopPropagation()
+                if (!canShowStudents) return
+                setStudentsPanelOpen((open) => !open)
+              }}
+            >
+              {studentsCorrectPhrase}
+            </button>
+            {studentsPanelOpen && canShowStudents ? (
+              <div className="exam-present-students-panel" role="dialog" aria-label="Student responses">
+                <p className="exam-present-students-panel__title">Student responses</p>
+                <ul className="exam-present-students-panel__list">
+                  {questionStudents.map((student, studentIndex) => (
+                    <li
+                      key={`${student.schoolId || student.studentName}-${studentIndex}`}
+                      className={`exam-present-students-panel__item${
+                        student.isCorrect === true
+                          ? ' is-correct'
+                          : student.isCorrect === false
+                            ? ' is-incorrect'
+                            : ' is-pending'
+                      }`}
+                    >
+                      <span className="exam-present-students-panel__name">{student.studentName}</span>
+                      {student.schoolId ? (
+                        <span className="exam-present-students-panel__id">{student.schoolId}</span>
+                      ) : null}
+                      <span className="exam-present-students-panel__status">
+                        {studentResponseLabel(student.isCorrect)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </div>
           <button
             type="button"
             className="exam-present-flip-btn"

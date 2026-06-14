@@ -62,14 +62,41 @@ export async function createTeachingTermQuery(institutionId, memberId, programCo
   }
 }
 
-export async function updateTeachingTermQuery(termId, memberId, { isArchived }) {
+export async function updateTeachingTermQuery(termId, memberId, updates) {
   const pool = getPool()
+  const setClauses = []
+  const values = [termId, memberId]
+  let idx = 3
+
+  if (updates.isArchived !== undefined) {
+    setClauses.push(`is_archived = $${idx++}`)
+    values.push(updates.isArchived)
+  }
+  if (updates.programCode !== undefined) {
+    setClauses.push(`program_code = $${idx++}`)
+    values.push(updates.programCode)
+  }
+  if (updates.sectionCode !== undefined) {
+    setClauses.push(`section_code = $${idx++}`)
+    values.push(updates.sectionCode)
+  }
+  if (updates.academicYear !== undefined) {
+    setClauses.push(`school_year = $${idx++}`)
+    values.push(updates.academicYear)
+  }
+  if (updates.semester !== undefined) {
+    setClauses.push(`semester = $${idx++}::semester_type`)
+    values.push(updates.semester)
+  }
+
+  if (setClauses.length === 0) return null
+
   const result = await pool.query(
     `UPDATE teaching_terms
-     SET is_archived = COALESCE($3, is_archived)
+     SET ${setClauses.join(', ')}
      WHERE term_id = $1 AND member_id = $2
      RETURNING term_id, program_code, section_code, school_year, semester, is_archived`,
-    [termId, memberId, isArchived],
+    values,
   )
   const row = result.rows[0]
   if (!row) return null

@@ -79,6 +79,7 @@ export async function listTeacherClassesQuery(memberId) {
        c.header_color as "headerColor",
        c.term_id as "termId",
        t.section_code as "sectionCode",
+       t.is_archived as "isArchived",
        (SELECT COUNT(*)::int FROM exams e
         WHERE e.class_id = c.class_id AND e.is_archived = FALSE) as "examCount",
        (SELECT COUNT(*)::int FROM class_enrollments ce
@@ -110,6 +111,7 @@ export async function getClassByIdQuery(classId) {
        c.term_id as "termId",
        t.program_code as "programCode",
        t.section_code as "sectionCode",
+       t.is_archived as "isArchived",
        (SELECT COUNT(*)::int FROM class_enrollments ce
         WHERE ce.class_id = c.class_id) as "enrollmentCount"
      FROM classes c
@@ -136,6 +138,7 @@ export async function getTeacherClassByIdQuery(classId, memberId) {
        c.term_id as "termId",
        t.program_code as "programCode",
        t.section_code as "sectionCode",
+       t.is_archived as "isArchived",
        (SELECT COUNT(*)::int FROM class_enrollments ce
         WHERE ce.class_id = c.class_id) as "enrollmentCount"
      FROM classes c

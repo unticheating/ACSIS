@@ -455,9 +455,11 @@ export default function TeacherClassExamsPage() {
         </div>
 
         {pageView === 'exams' ? (
-          <Link to={createHref} className="acsis-mc-create-btn acsis-class-toolbar__create">
-            Create exam
-          </Link>
+          !cls.isArchived && (
+            <Link to={createHref} className="acsis-mc-create-btn acsis-class-toolbar__create">
+              Create exam
+            </Link>
+          )
         ) : (
           <div className="relative ml-auto w-full sm:w-auto mt-2 sm:mt-0 flex-shrink-0">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" aria-hidden />
@@ -535,10 +537,14 @@ export default function TeacherClassExamsPage() {
             <h2 className="acsis-mc-empty__title">
               {filter === 'all' ? 'No exams yet' : 'No exams in this filter'}
             </h2>
-            <p className="acsis-mc-empty__text">Create an exam for this course.</p>
-            <Link to={createHref} className="acsis-mc-create-btn">
-              Create exam
-            </Link>
+            {!cls.isArchived && (
+              <>
+                <p className="acsis-mc-empty__text">Create an exam for this course.</p>
+                <Link to={createHref} className="acsis-mc-create-btn">
+                  Create exam
+                </Link>
+              </>
+            )}
           </div>
         ) : (
           <div className="acsis-mc-stream">

@@ -25,9 +25,8 @@ const keyboardLayout = {
  * Move the caret inside the plain #id-answer input.
  */
 function moveInputCaret(direction) {
-  const el = document.getElementById('id-answer')
-  if (!el) return
-  el.focus()
+  const el = document.activeElement
+  if (!el || (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA')) return
   const pos = el.selectionStart ?? 0
   const next = direction === 'left' ? Math.max(0, pos - 1) : Math.min(el.value.length, pos + 1)
   el.setSelectionRange(next, next)
@@ -80,15 +79,67 @@ export function ExamKeyboard({ value, onChange, onClose, questionType, editorRef
       } else if (!button.startsWith('{') && !button.endsWith('}')) {
         editorRef.current.trigger('keyboard', 'type', { text: button })
       }
+      return
+    }
+
+    // For diagramming and essay, simulate input on active element
+    if (questionType === 'diagramming' || questionType === 'essay') {
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
+        const start = activeEl.selectionStart || 0;
+        const end = activeEl.selectionEnd || 0;
+        const val = activeEl.value;
+
+        let insertText = '';
+        let isDelete = false;
+
+        if (button === '{bksp}') {
+          isDelete = true;
+        } else if (button === '{enter}') {
+          if (activeEl.tagName === 'TEXTAREA') insertText = '\n';
+        } else if (button === '{space}') {
+          insertText = ' ';
+        } else if (button === '{tab}') {
+          // ignore tab or handle spaces
+        } else if (!button.startsWith('{') && !button.endsWith('}')) {
+          insertText = button;
+        }
+
+        const nativeSetter = Object.getOwnPropertyDescriptor(
+          activeEl.tagName === 'TEXTAREA' ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype,
+          'value'
+        ).set;
+
+        if (isDelete) {
+          if (start > 0 || start !== end) {
+            const deleteStart = start === end ? start - 1 : start;
+            const before = val.substring(0, deleteStart);
+            const after = val.substring(end);
+            const newValue = before + after;
+            nativeSetter.call(activeEl, newValue);
+            activeEl.setSelectionRange(deleteStart, deleteStart);
+            activeEl.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+        } else if (insertText) {
+          const before = val.substring(0, start);
+          const after = val.substring(end);
+          const newValue = before + insertText + after;
+          nativeSetter.call(activeEl, newValue);
+          const newPos = start + insertText.length;
+          activeEl.setSelectionRange(newPos, newPos);
+          activeEl.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      }
+      return;
     }
   }
 
   // Ensure keyboard internal state matches parent value if it changed externally
   useEffect(() => {
-    if (keyboardRef.current && value !== keyboardRef.current.getInput()) {
+    if (questionType === 'identification' && keyboardRef.current && value !== keyboardRef.current.getInput()) {
       keyboardRef.current.setInput(value || '')
     }
-  }, [value])
+  }, [value, questionType])
 
   const preventFocusSteal = (e) => e.preventDefault()
 
@@ -111,10 +162,9 @@ export function ExamKeyboard({ value, onChange, onClose, questionType, editorRef
             keyboardRef={(r) => (keyboardRef.current = r)}
             layoutName={layoutName}
             layout={keyboardLayout}
-            value={value || ''}
+            value={questionType === 'identification' ? (value || '') : undefined}
             onChange={(val) => {
-              // For coding, we handle insertions manually via onKeyPress to respect Monaco cursor
-              if (questionType !== 'coding') {
+              if (questionType === 'identification') {
                 onChange(val)
               }
             }}

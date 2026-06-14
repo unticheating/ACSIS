@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { resolveMatchingPayload } from '../lib/matchingAnswers.js';
 import {
   closeExamService,
   createExamService,
@@ -43,13 +44,32 @@ const choiceSchema = z.string().min(1, 'Option text cannot be empty');
 
 const questionSchema = z.object({
   id: z.union([z.number().int().positive(), z.string()]).optional(),
-  type: z.enum(['multiple', 'multiple-choice', 'identification', 'truefalse', 'coding']),
+  type: z.enum([
+    'multiple',
+    'multiple-choice',
+    'identification',
+    'truefalse',
+    'coding',
+    'matching',
+    'essay',
+    'diagramming',
+  ]),
   question: z.string().min(1, 'Question text cannot be empty'),
   options: z.array(choiceSchema).optional(),
-  correctAnswer: z.string().min(1, 'Correct answer is required'),
+  correctAnswer: z.string().optional().default(''),
   presentationAnswer: z.string().optional().nullable(),
   answerExplanation: z.string().optional().nullable(),
   imageUrl: z.string().optional().nullable(),
+  matchingPairs: z
+    .array(
+      z.object({
+        left: z.string(),
+        right: z.string(),
+      }),
+    )
+    .optional(),
+  diagramVariant: z.enum(['flowchart', 'erd']).optional(),
+  diagramReference: z.string().optional().nullable(),
 }).superRefine((val, ctx) => {
   if ((val.type === 'multiple' || val.type === 'multiple-choice') && (!val.options || val.options.length < 2)) {
     ctx.addIssue({
@@ -68,6 +88,30 @@ const questionSchema = z.object({
         code: z.ZodIssueCode.custom,
         message: 'Enter at least one acceptable identification answer (comma-separated).',
         path: ['correctAnswer'],
+      });
+    }
+  }
+  if (val.type === 'truefalse' && !String(val.correctAnswer || '').trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'True / False questions require a correct answer.',
+      path: ['correctAnswer'],
+    });
+  }
+  if (val.type === 'coding' && !String(val.correctAnswer || '').trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Coding questions require an expected solution.',
+      path: ['correctAnswer'],
+    });
+  }
+  if (val.type === 'matching') {
+    const pairs = resolveMatchingPayload(val);
+    if (pairs.length < 2) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Matching questions need at least two pairs.',
+        path: ['matchingPairs'],
       });
     }
   }
@@ -120,8 +164,10 @@ const releaseScoresSchema = z.object({
 });
 
 const exportReportSchema = z.object({
-  format: z.enum(['pdf', 'csv']).optional().default('pdf'),
-  reportType: z.enum(['summary', 'detailed', 'violations', 'class_results']).optional().default('class_results'),
+  format: z.enum(['csv', 'pdf', 'excel']).optional(),
+  reportType: z.enum(['detailed', 'summary', 'violations']).optional(),
+  teacherLogoBase64: z.string().optional(),
+  departmentName: z.string().optional(),
 });
 
 export async function getTeacherExamsCatalog(req, res) {
@@ -669,11 +715,13 @@ export async function postReleaseExamScores(req, res) {
 export async function postExportExamReport(req, res) {
   const { classId, examId } = req.params;
   try {
-    const body = exportReportSchema.parse(req.body ?? {});
+    const payload = exportReportSchema.parse(req.body ?? {});
 
     const result = await exportExamReportService(classId, examId, req.memberId, {
-      format: body.format,
-      reportType: body.reportType,
+      format: payload.format,
+      reportType: payload.reportType,
+      teacherLogoBase64: payload.teacherLogoBase64,
+      departmentName: payload.departmentName,
     });
     if (!result.ok) {
       return res.status(result.status || 500).json({ error: result.error });

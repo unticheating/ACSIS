@@ -118,6 +118,77 @@ export async function listStudentAnswersForSessionQuery(sessionId) {
   }))
 }
 
+export async function getQuestionAnswerStatsForExamQuery(examId) {
+  const pool = getPool()
+  const memberJoin = await sessionMemberJoin('es', 'im')
+  const { rows } = await pool.query(
+    `SELECT
+       sa.question_id AS "questionId",
+       sa.is_correct AS "isCorrect",
+       ${SQL_MEMBER_SCHOOL_ID} AS "schoolId",
+       u.first_name,
+       u.middle_name,
+       u.last_name
+     FROM student_answers sa
+     JOIN exam_sessions es ON es.session_id = sa.session_id
+     JOIN questions q ON q.question_id = sa.question_id
+     JOIN institution_members im ON ${memberJoin}
+     ${SQL_JOIN_STUDENTS}
+     JOIN users u ON im.uid = u.uid
+     WHERE q.exam_id = $1
+       AND es.status = 'submitted'
+     ORDER BY sa.question_id, u.last_name, u.first_name`,
+    [examId],
+  )
+
+  const byQuestion = new Map()
+  for (const row of rows) {
+    const questionId = Number(row.questionId)
+    if (!byQuestion.has(questionId)) {
+      byQuestion.set(questionId, {
+        questionId,
+        correctCount: 0,
+        answeredCount: 0,
+        students: [],
+      })
+    }
+    const entry = byQuestion.get(questionId)
+    const isCorrect = row.isCorrect
+    if (isCorrect === true) entry.correctCount += 1
+    entry.answeredCount += 1
+    entry.students.push({
+      studentName: formatStudentName(row) || 'Unknown student',
+      schoolId: row.schoolId || '',
+      isCorrect: isCorrect === true ? true : isCorrect === false ? false : null,
+    })
+  }
+
+  return Array.from(byQuestion.values())
+}
+
+export async function getAnswerAuditContextQuery(sessionId, answerId) {
+  const pool = getPool()
+  const memberJoin = await sessionMemberJoin('es', 'im')
+  const { rows } = await pool.query(
+    `SELECT
+       q.section_id AS "sectionId",
+       sec.title AS "sectionTitle",
+       q.question_text AS "questionText",
+       im.member_id AS "studentMemberId",
+       TRIM(u.first_name || ' ' || COALESCE(u.middle_name || ' ', '') || u.last_name) AS "studentName"
+     FROM student_answers sa
+     JOIN exam_sessions es ON es.session_id = sa.session_id
+     JOIN questions q ON q.question_id = sa.question_id
+     LEFT JOIN exam_sections sec ON sec.section_id = q.section_id
+     JOIN institution_members im ON ${memberJoin}
+     JOIN users u ON im.uid = u.uid
+     WHERE sa.session_id = $1 AND sa.answer_id = $2
+     LIMIT 1`,
+    [sessionId, answerId],
+  )
+  return rows[0] || null
+}
+
 export async function updateManualAnswerGradeQuery(sessionId, answerId, { isCorrect, checkedBy }) {
   const pool = getPool()
   const { rowCount } = await pool.query(
@@ -405,11 +476,14 @@ export async function listExamsForTeacherReportsQuery(memberId) {
        e.status,
        c.class_id AS "classId",
        c.class_name AS "className",
+       t.section_code AS "sectionCode",
+       t.program_code AS "programCode",
        (SELECT COUNT(*)::int FROM exam_sessions es WHERE es.exam_id = e.exam_id) AS "sessionCount",
        (SELECT COUNT(*)::int FROM exam_sessions es
         WHERE es.exam_id = e.exam_id AND es.status = 'submitted') AS "submittedCount"
      FROM exams e
      JOIN classes c ON e.class_id = c.class_id
+     LEFT JOIN teaching_terms t ON t.term_id = c.term_id
      WHERE c.member_id = $1 AND c.is_active = TRUE AND e.is_archived = FALSE
      ORDER BY e.created_at DESC`,
     [memberId],
@@ -533,11 +607,20 @@ export async function dismissCheatingLogQuery(logId, sessionId, teacherMemberId)
 export async function getCheatingLogForTeacherDismissQuery(logId, classId, examId) {
   await ensureCheatingLogDismissedColumns()
   const pool = getPool()
+  const memberJoin = await sessionMemberJoin('es', 'im')
   const { rows } = await pool.query(
-    `SELECT cl.log_id AS id, cl.session_id AS "sessionId", cl.dismissed_at AS "dismissedAt"
+    `SELECT
+       cl.log_id AS id,
+       cl.session_id AS "sessionId",
+       cl.event_type AS "eventType",
+       cl.dismissed_at AS "dismissedAt",
+       im.member_id AS "studentMemberId",
+       TRIM(u.first_name || ' ' || COALESCE(u.middle_name || ' ', '') || u.last_name) AS "studentName"
      FROM cheating_logs cl
      JOIN exam_sessions es ON es.session_id = cl.session_id
      JOIN exams e ON e.exam_id = es.exam_id
+     JOIN institution_members im ON ${memberJoin}
+     JOIN users u ON im.uid = u.uid
      WHERE cl.log_id = $1 AND e.exam_id = $2 AND e.class_id = $3`,
     [logId, examId, classId],
   )
