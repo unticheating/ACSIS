@@ -279,33 +279,24 @@
 }
 
 @media (max-width: 767px) {
-  /* Tighter spacing for mobile: make brand gap minimal and reduce top padding */
-  .acsis-immersive {
-    --acsis-auth-brand-gap: clamp(8px, 3vh, 20px);
-  }
-
-  .acsis-immersive__main {
-    padding: clamp(40px, 8vh, 64px) 16px 32px; /* smaller top padding */
-  }
-
   .acsis-immersive__brand-row {
-    gap: clamp(10px, 3vw, 16px);
-    margin-bottom: 8px;
+    gap: clamp(14px, 4.5vw, 22px);
+    margin-bottom: 14px;
   }
 
   .acsis-immersive__brand .acsis-immersive__title--brand {
-    font-size: clamp(3rem, 11vw, 4.5rem);
+    font-size: clamp(3.85rem, 14vw, 5.5rem);
   }
 
   .acsis-immersive__brand-logo {
-    width: clamp(48px, 13vw, 64px) !important;
-    height: clamp(48px, 13vw, 64px) !important;
-    min-width: clamp(48px, 13vw, 64px) !important;
-    min-height: clamp(48px, 13vw, 64px) !important;
+    width: clamp(58px, 17vw, 72px) !important;
+    height: clamp(58px, 17vw, 72px) !important;
+    min-width: clamp(58px, 17vw, 72px) !important;
+    min-height: clamp(58px, 17vw, 72px) !important;
   }
 
   .acsis-immersive__brand .acsis-immersive__subtitle {
-    font-size: 0.78rem;
+    font-size: 0.8rem;
   }
 }
 
