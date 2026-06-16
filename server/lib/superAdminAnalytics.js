@@ -36,6 +36,7 @@ export async function listInstitutionViolationComparisonQuery(pool) {
        i.institution_id AS "institutionId",
        i.institution_name AS "institutionName",
        i.acronym,
+       t.primary_color AS "primaryColor",
        i.max_warnings AS "maxWarnings",
        i.is_active AS "isActive",
        COUNT(DISTINCT im.member_id) FILTER (WHERE im.role = 'student' AND im.is_active = TRUE)::int AS "studentCount",
@@ -48,12 +49,13 @@ export async function listInstitutionViolationComparisonQuery(pool) {
        COUNT(cl.log_id)::int AS "violationEvents",
        COUNT(DISTINCT es.session_id) FILTER (WHERE es.ticket_issued_at IS NOT NULL)::int AS "ticketsIssued"
      FROM institutions i
+     JOIN themes t ON t.theme_id = i.theme_id
      LEFT JOIN institution_members im ON im.institution_id = i.institution_id
      LEFT JOIN classes c ON c.institution_id = i.institution_id AND c.is_active = TRUE
      LEFT JOIN exams e ON e.class_id = c.class_id
      LEFT JOIN exam_sessions es ON es.exam_id = e.exam_id
      LEFT JOIN cheating_logs cl ON cl.session_id = es.session_id
-     GROUP BY i.institution_id, i.institution_name, i.acronym, i.max_warnings, i.is_active
+     GROUP BY i.institution_id, i.institution_name, i.acronym, t.primary_color, i.max_warnings, i.is_active
      ORDER BY "violationEvents" DESC, i.institution_name ASC`,
   )
   return rows.map((r) => ({
@@ -76,16 +78,42 @@ export async function listInstitutionViolationTrendsQuery(pool) {
     `SELECT
        i.institution_id AS "institutionId",
        i.acronym,
-       to_char(date_trunc('month', cl.occurred_at), 'YYYY-MM') AS month,
+       t.primary_color AS "primaryColor",
+       to_char(date_trunc('week', cl.occurred_at), 'YYYY-MM-DD') AS week,
        COUNT(cl.log_id)::int AS "eventCount"
      FROM cheating_logs cl
      JOIN exam_sessions es ON es.session_id = cl.session_id
      JOIN exams e ON e.exam_id = es.exam_id
      JOIN classes c ON c.class_id = e.class_id
      JOIN institutions i ON i.institution_id = c.institution_id
-     WHERE cl.occurred_at >= date_trunc('month', NOW()) - INTERVAL '5 months'
-     GROUP BY i.institution_id, i.acronym, date_trunc('month', cl.occurred_at)
-     ORDER BY month ASC, i.acronym ASC`,
+     JOIN themes t ON t.theme_id = i.theme_id
+     WHERE cl.occurred_at >= date_trunc('week', NOW()) - INTERVAL '51 weeks'
+     GROUP BY i.institution_id, i.acronym, t.primary_color, date_trunc('week', cl.occurred_at)
+     ORDER BY week ASC, i.acronym ASC`,
+  )
+  return rows
+}
+
+/**
+ * Monthly new member onboarding per institution (last 6 months).
+ * @param {import('pg').Pool} pool
+ */
+export async function listInstitutionOnboardingTrendsQuery(pool) {
+  const { rows } = await pool.query(
+    `SELECT
+       i.institution_id AS "institutionId",
+       i.acronym,
+       t.primary_color AS "primaryColor",
+       to_char(date_trunc('week', im.joined_at), 'YYYY-MM-DD') AS week,
+       COUNT(im.member_id)::int AS "memberCount"
+     FROM institution_members im
+     JOIN institutions i ON i.institution_id = im.institution_id
+     JOIN themes t ON t.theme_id = i.theme_id
+     WHERE im.is_active = TRUE
+       AND im.is_pending = FALSE
+       AND im.joined_at >= date_trunc('week', NOW()) - INTERVAL '51 weeks'
+     GROUP BY i.institution_id, i.acronym, t.primary_color, date_trunc('week', im.joined_at)
+     ORDER BY week ASC, i.acronym ASC`,
   )
   return rows
 }

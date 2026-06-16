@@ -44,6 +44,7 @@ html.dark .stu-class-card,
 html.dark .stu-stream-item,
 html.dark .stu-enroll-join-box,
 html.dark .super-admin-link,
+html.dark .super-admin-quick-action,
 html.dark .admin-settings-palette {
   background: var(--bg-surface, #1a1a1a) !important;
   border-color: var(--border-default, #2a2a2a) !important;
@@ -68,7 +69,8 @@ html.dark .detected-item {
 html.dark .panel:hover,
 html.dark .acsis-class-card:hover,
 html.dark .detected-item:hover,
-html.dark .super-admin-link:hover {
+html.dark .super-admin-link:hover,
+html.dark .super-admin-quick-action:hover {
   border-color: var(--acsis-brand-ring, color-mix(in srgb, var(--acsis-brand) 38%, #2a2a2a)) !important;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.05),
@@ -1441,4 +1443,113 @@ html.dark .acsis-immersive__btn-primary {
 
 html.dark .acsis-immersive__btn-primary:hover {
   box-shadow: var(--acsis-primary-btn-shadow-hover) !important;
+}
+
+/* ── Admin dashboard: Detected Students list cards — dark mode ── */
+
+/* All cards: flat dark surface, no color bleeds */
+html.dark .acsis-admin-detected-list__card.acsis-detections-list-card {
+  background: var(--bg-surface, #1a1a1a) !important;
+  border-color: var(--border-default, #2a2a2a) !important;
+}
+
+html.dark .acsis-admin-detected-list__card.acsis-detections-list-card--warn1,
+html.dark .acsis-admin-detected-list__card.acsis-detections-list-card--warn2,
+html.dark .acsis-admin-detected-list__card.acsis-detections-list-card--warn3,
+html.dark .acsis-admin-detected-list__card.acsis-detections-list-card--done-warn3,
+html.dark .acsis-admin-detected-list__card.acsis-detections-list-card--ticketed {
+  background: var(--bg-surface, #1a1a1a) !important;
+}
+
+/* Keep the left border as the only severity signal */
+html.dark .acsis-admin-detected-list__card.acsis-detections-list-card--warn1 {
+  border-color: #4d7c0f !important;
+}
+
+html.dark .acsis-admin-detected-list__card.acsis-detections-list-card--warn2 {
+  border-color: #92400e !important;
+}
+
+html.dark .acsis-admin-detected-list__card.acsis-detections-list-card--warn3,
+html.dark .acsis-admin-detected-list__card.acsis-detections-list-card--done-warn3 {
+  border-color: #7f1d1d !important;
+}
+
+html.dark .acsis-admin-detected-list__card.acsis-detections-list-card--ticketed {
+  border-color: #4c1d95 !important;
+}
+
+/* Strikes column — flat elevated, severity colour only on the number */
+html.dark .acsis-admin-detected-list__card .acsis-detections-list-card__strikes {
+  background: var(--bg-elevated, #212121) !important;
+  border-right-color: var(--border-default, #2a2a2a) !important;
+}
+
+html.dark .acsis-admin-detected-list__card .acsis-detections-list-card__strikes--warn1 {
+  background: var(--bg-elevated, #212121) !important;
+  border-right-color: var(--border-default, #2a2a2a) !important;
+  color: #a3a3a3 !important;
+}
+
+html.dark .acsis-admin-detected-list__card .acsis-detections-list-card__strikes--warn2 {
+  background: var(--bg-elevated, #212121) !important;
+  border-right-color: var(--border-default, #2a2a2a) !important;
+  color: #a3a3a3 !important;
+}
+
+html.dark .acsis-admin-detected-list__card .acsis-detections-list-card__strikes--warn3,
+html.dark .acsis-admin-detected-list__card .acsis-detections-list-card__strikes--done-warn3 {
+  background: var(--bg-elevated, #212121) !important;
+  border-right-color: var(--border-default, #2a2a2a) !important;
+  color: #a3a3a3 !important;
+}
+
+/* Name, ID, status text — all use standard shell tokens */
+html.dark .acsis-admin-detected-list__card .acsis-detections-list-card__name {
+  color: var(--fg-default, #f5f5f5) !important;
+}
+
+html.dark .acsis-admin-detected-list__card .acsis-detections-list-card__name-first {
+  color: var(--fg-muted, #a3a3a3) !important;
+}
+
+html.dark .acsis-admin-detected-list__card .acsis-detections-list-card__id {
+  color: var(--fg-muted, #a3a3a3) !important;
+}
+
+html.dark .acsis-admin-detected-list__card .acsis-detections-list-card__status--warn1,
+html.dark .acsis-admin-detected-list__card .acsis-detections-list-card__status--warn2,
+html.dark .acsis-admin-detected-list__card .acsis-detections-list-card__status--warn3,
+html.dark .acsis-admin-detected-list__card .acsis-detections-list-card__status--done-warn3 {
+  color: var(--fg-muted, #a3a3a3) !important;
+}
+
+/* Action column */
+html.dark .acsis-admin-detected-list__card-action {
+  background: var(--bg-elevated, #212121) !important;
+  border-left-color: var(--border-default, #2a2a2a) !important;
+}
+
+html.dark .acsis-admin-detected-list__card.acsis-detections-list-card--ticketed
+  .acsis-admin-detected-list__card-action {
+  background: var(--bg-elevated, #212121) !important;
+  border-left-color: var(--border-default, #2a2a2a) !important;
+}
+
+/* Issue ticket button */
+html.dark .acsis-admin-detected-list__card .ticket-btn {
+  background: var(--bg-elevated, #212121) !important;
+  color: #fca5a5 !important;
+  border: 1px solid #7f1d1d !important;
+}
+
+html.dark .acsis-admin-detected-list__card .ticket-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, #7f1d1d 25%, var(--bg-elevated, #212121)) !important;
+}
+
+/* Ticketed badge */
+html.dark .acsis-admin-detected-list__card .violation-status-badge.vstatus-ticketed {
+  background: var(--bg-elevated, #212121) !important;
+  color: var(--fg-muted, #a3a3a3) !important;
+  border: 1px solid var(--border-default, #2a2a2a) !important;
 }

@@ -133,7 +133,13 @@ export default function AdminDetectedStudentList({
             </div>
             <div className="acsis-admin-detected-list__card-action">
               {student.ticketIssued ? (
-                <span className="violation-status-badge vstatus-ticketed">Ticketed</span>
+                <button
+                  type="button"
+                  className="view-info-link view-receipt-btn"
+                  onClick={() => onIssueTicket(student.sessionId, true)}
+                >
+                  View receipt
+                </button>
               ) : (
                 <button
                   type="button"

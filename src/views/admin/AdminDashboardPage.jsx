@@ -4,6 +4,7 @@ import AdminDetectedStudentList from '@/components/admin/AdminDetectedStudentLis
 import { SummaryStatCard, SummaryStatGrid } from '@/components/dashboard/SummaryStatCard.jsx'
 import { fetchAdminDashboard, formatRelativeTime } from '@/lib/adminDashboardApi.js'
 import { issueViolationTicket } from '@/lib/adminViolationsApi.js'
+import { resolveMaxWarnings } from '@/lib/examAntiCheat.js'
 import FadeIn from '@/components/ui/fade-in.jsx'
 import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
 import { useAcsisConfirm } from '@/hooks/useAcsisConfirm.jsx'
@@ -15,9 +16,11 @@ export default function AdminDashboardPage({ basePath = '/admin' }) {
   const { confirm, ConfirmDialog } = useAcsisConfirm()
   const [stats, setStats] = useState({ ongoingExams: 0, totalExams: 0, detectedStudents: 0 })
   const [ongoingExams, setOngoingExams] = useState([])
+  const [pendingFaculty, setPendingFaculty] = useState([])
   const [detectedStudents, setDetectedStudents] = useState([])
   const [maxWarnings, setMaxWarnings] = useState(3)
   const [hasMoreOngoing, setHasMoreOngoing] = useState(false)
+  const [hasMorePendingFaculty, setHasMorePendingFaculty] = useState(false)
   const [hasMoreDetected, setHasMoreDetected] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -33,8 +36,10 @@ export default function AdminDashboardPage({ basePath = '/admin' }) {
       setStats(data.stats || {})
       setMaxWarnings(data.maxWarnings ?? 3)
       setOngoingExams((data.ongoingExams || []).slice(0, previewLimit))
+      setPendingFaculty((data.pendingFaculty || []).slice(0, previewLimit))
       setDetectedStudents((data.detectedStudents || []).slice(0, previewLimit))
       setHasMoreOngoing(Boolean(data.hasMoreOngoingExams))
+      setHasMorePendingFaculty(Boolean(data.hasMorePendingFaculty))
       setHasMoreDetected(Boolean(data.hasMoreDetectedStudents))
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to load dashboard.'
@@ -70,6 +75,11 @@ export default function AdminDashboardPage({ basePath = '/admin' }) {
     }
   }
 
+  const max = resolveMaxWarnings(maxWarnings)
+  const displayDetectedStudents = detectedStudents.filter(
+    (s) => s.ticketIssued || s.status === 'ticketed' || (s.strikes && s.strikes >= max)
+  )
+
   return (
     <div className="acsis-stack">
       <div className="content-header">
@@ -90,9 +100,9 @@ export default function AdminDashboardPage({ basePath = '/admin' }) {
 
         <SummaryStatGrid>
           <SummaryStatCard
-            label="On-Going Examinations"
-            value={loading ? '…' : stats.ongoingExams}
-            tone="success"
+            label="Pending Approvals"
+            value={loading ? '…' : (stats.pendingFaculty || 0)}
+            tone="warning"
             delay={0.1}
           />
           <SummaryStatCard
@@ -111,36 +121,34 @@ export default function AdminDashboardPage({ basePath = '/admin' }) {
 
         <FadeIn className="panel" delay={0.4}>
           <div className="panel-header">
-            <span className="panel-title">On-Going Examinations</span>
-            <Link to={`${basePath}/monitoring`} className="panel-view-all">
-              {hasMoreOngoing && stats.ongoingExams > ongoingExams.length
-                ? `View All (${stats.ongoingExams})`
+            <span className="panel-title">Pending Faculty Approvals</span>
+            <Link to={`${basePath}/faculty-approval`} className="panel-view-all">
+              {hasMorePendingFaculty && stats.pendingFaculty > pendingFaculty.length
+                ? `View All (${stats.pendingFaculty})`
                 : 'View All'}
             </Link>
           </div>
-          <div className="exam-list">
+          <div className="faculty-approval-list">
             {loading ? (
               <p className="um-loading">Loading…</p>
-            ) : ongoingExams.length === 0 ? (
+            ) : pendingFaculty.length === 0 ? (
               <p className="admin-placeholder-lead" style={{ padding: '1rem' }}>
-                No exams are open or waiting right now.
+                No faculty members are pending approval right now.
               </p>
             ) : (
-              ongoingExams.map((exam) => (
-                <div key={exam.id} className="exam-item">
-                  <div className="exam-info">
-                    <div className="exam-name" title={exam.name}>
-                      {exam.name}
+              pendingFaculty.map((faculty) => (
+                <div key={faculty.id} className="faculty-approval-item" style={{ gridTemplateColumns: '1fr auto' }}>
+                  <div className="faculty-info">
+                    <div className="exam-name" title={faculty.name}>
+                      {faculty.name}
                     </div>
-                    <div className="exam-by" title={exam.by ? `by ${exam.by}` : undefined}>
-                      by {exam.by}
+                    <div className="exam-by" title={faculty.email}>
+                      {faculty.email}
                     </div>
                   </div>
-                  <div className="exam-timer-wrap">
-                    <div className="exam-timer">{exam.status}</div>
-                    <div className="exam-timer-sub">{formatRelativeTime(exam.updatedAt) || 'recently'}</div>
+                  <div className="faculty-action">
+                     <span className="exam-timer">{formatRelativeTime(faculty.createdAt) || 'recent'}</span>
                   </div>
-                  <div className="exam-progress">{exam.done}</div>
                 </div>
               ))
             )}
@@ -151,20 +159,20 @@ export default function AdminDashboardPage({ basePath = '/admin' }) {
           <div className="panel-header">
             <span className="panel-title">Detected Students</span>
             <Link to={`${basePath}/monitoring#admin-all-violations`} className="panel-view-all">
-              {hasMoreDetected && stats.detectedStudents > detectedStudents.length
+              {hasMoreDetected && stats.detectedStudents > displayDetectedStudents.length
                 ? `View All (${stats.detectedStudents})`
                 : 'View All'}
             </Link>
           </div>
           {loading ? (
             <p className="um-loading">Loading…</p>
-          ) : detectedStudents.length === 0 ? (
+          ) : displayDetectedStudents.length === 0 ? (
             <p className="admin-placeholder-lead" style={{ padding: '1rem' }}>
               No students with proctoring warnings.
             </p>
           ) : (
             <AdminDetectedStudentList
-              students={detectedStudents}
+              students={displayDetectedStudents}
               maxWarnings={maxWarnings}
               ticketingId={ticketingId}
               onIssueTicket={ticketViolation}

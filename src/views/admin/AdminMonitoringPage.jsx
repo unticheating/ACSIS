@@ -11,7 +11,9 @@ import {
 import FadeIn from '@/components/ui/fade-in.jsx'
 import { Download } from 'lucide-react'
 import { acsisToastError } from '@/lib/acsisToast.js'
+import { resolveMaxWarnings } from '@/lib/examAntiCheat.js'
 import { useInstitutionTheme } from '@/context/InstitutionThemeContext.jsx'
+import AdminDetectedStudentList from '@/components/admin/AdminDetectedStudentList.jsx'
 import ViolationDetailModal from '@/views/admin/ViolationDetailModal.jsx'
 import '../../pages/admin-ui/style.css'
 
@@ -75,8 +77,7 @@ function ActivityFeedItems({ activities, loading, startDelay = 0.25 }) {
                 {act.dismissed ? <span className="activity-dismissed-badge">Dismissed</span> : null}
               </div>
               <div className="activity-sub">
-                {act.event}
-                {act.warningOrdinal > 0 ? ` · ${getOrdinal(act.warningOrdinal)} warning` : ''}
+                {act.warningOrdinal > 0 ? `${getOrdinal(act.warningOrdinal)} warning` : 'Activity recorded'}
               </div>
               <div className="activity-meta">
                 {act.exam}
@@ -86,6 +87,7 @@ function ActivityFeedItems({ activities, loading, startDelay = 0.25 }) {
             </div>
           </div>
           <div className="activity-right">
+            <span className="activity-action-chip">{act.event}</span>
             <span className="activity-time">{formatRelativeTime(act.time) || 'now'}</span>
           </div>
         </FadeIn>
@@ -229,48 +231,34 @@ export default function AdminMonitoringPage() {
             </button>
           </div>
 
-          {loading ? (
-            <p className="um-loading">Loading violation records…</p>
-          ) : violations.length === 0 ? (
-            <p className="admin-placeholder-lead">No proctoring violations recorded yet.</p>
-          ) : (
-            <div className="admin-table-container">
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>Strikes</th>
-                    <th>Student</th>
-                    <th>Exam</th>
-                    <th>Date</th>
-                    <th>Status</th>
-                    <th className="admin-table__actions">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {violations.map((v, index) => (
-                    <FadeIn key={v.id} as="tr" delay={0.25 + index * 0.05}>
-                      <td className="admin-table__strikes">{v.strikes}</td>
-                      <td className="admin-table__student">{v.student}</td>
-                      <td>{v.exam}</td>
-                      <td>{formatViolationDate(v.date)}</td>
-                      <td>
-                        <span
-                          className={`violation-status-badge vstatus-${violationStatusClass(v.status)}`}
-                        >
-                          {v.status}
-                        </span>
-                      </td>
-                      <td className="admin-table__actions">
-                        <button type="button" className="view-btn" onClick={() => viewViolation(v.id)}>
-                          View Receipt
-                        </button>
-                      </td>
-                    </FadeIn>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          {(() => {
+            const max = resolveMaxWarnings(maxWarnings)
+            const displayViolations = violations.filter(
+              (v) => v.status === 'ticketed' || (v.strikes && v.strikes >= max)
+            )
+
+            return loading ? (
+              <p className="um-loading">Loading violation records…</p>
+            ) : displayViolations.length === 0 ? (
+              <p className="admin-placeholder-lead">No maxed proctoring violations recorded yet.</p>
+            ) : (
+              <div className="admin-table-container admin-table-container--list-override">
+                <AdminDetectedStudentList
+                  students={displayViolations.map((v) => ({
+                    sessionId: v.id,
+                    studentName: v.student,
+                    examTitle: v.exam,
+                    strikes: v.strikes,
+                    status: v.status,
+                    ticketIssued: v.status === 'ticketed',
+                  }))}
+                  maxWarnings={maxWarnings}
+                  ticketingId={detailLoading && detailOpen ? null : null}
+                  onIssueTicket={viewViolation}
+                />
+              </div>
+            )
+          })()}
         </FadeIn>
 
         <FadeIn delay={0.3} className="panel" id="admin-activity-feed">

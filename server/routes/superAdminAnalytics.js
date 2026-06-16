@@ -5,6 +5,7 @@ import {
   getSuperAdminOverviewQuery,
   listInstitutionAdminsQuery,
   listInstitutionViolationComparisonQuery,
+  listInstitutionOnboardingTrendsQuery,
   listInstitutionViolationTrendsQuery,
 } from '../lib/superAdminAnalytics.js'
 import { requireAuth, requireSuperAdmin } from '../lib/sessionAuth.js'
@@ -19,12 +20,13 @@ router.get('/', async (_req, res) => {
     return res.status(503).json({ error: 'Database unavailable.' })
   }
   try {
-    const [overview, institutions, trends] = await Promise.all([
+    const [overview, institutions, trends, onboardingTrends] = await Promise.all([
       getSuperAdminOverviewQuery(pool),
       listInstitutionViolationComparisonQuery(pool),
       listInstitutionViolationTrendsQuery(pool),
+      listInstitutionOnboardingTrendsQuery(pool),
     ])
-    return res.json({ overview, institutions, trends })
+    return res.json({ overview, institutions, trends, onboardingTrends })
   } catch (err) {
     console.error('[super-admin/analytics]', err)
     return res.status(500).json({ error: 'Failed to load analytics.' })

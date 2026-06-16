@@ -37,6 +37,34 @@ html:not(.dark) {
     );
     --acsis-main-pad-x: clamp(14px, 2.5vw, 28px);
     --acsis-main-pad-y: clamp(12px, 2vw, 22px);
+    
+    /* Component defaults */
+    --bg-surface: #ffffff;
+    --bg-surface-muted: #f3f4f6;
+    --border-default: #e4ede8;
+    --fg-default: #1a2e22;
+    --fg-muted: #7a9585;
+    --brand-mark: #14532d;
+    --brand-page: #1a2e22;
+}
+
+html.dark {
+    --acsis-canvas: #0a0a0a;
+    --acsis-sidebar-bg: #121212;
+    --acsis-sidebar-border: #262626;
+    --acsis-content-header-bg: rgba(18, 18, 18, 0.85);
+    --acsis-brand-muted-bg: #1e1e1e;
+    --acsis-brand-muted-text: #e5e5e5;
+    --acsis-nav-fg: #a3a3a3;
+    --acsis-nav-icon: #737373;
+    
+    --bg-surface: #121212;
+    --bg-surface-muted: #1e1e1e;
+    --border-default: #262626;
+    --fg-default: #e5e5e5;
+    --fg-muted: #a3a3a3;
+    --brand-mark: #4ade80;
+    --brand-page: #f8fafc;
 }
 
 body {
@@ -282,6 +310,8 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
 /* Breadcrumb bar — same surface + height as .acsis-sidebar-header */
 .content-header {
     background: var(--acsis-content-header-bg, var(--acsis-sidebar-bg, #f8fafc));
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     box-sizing: border-box;
     min-height: var(--acsis-shell-header-size, 59px);
     padding: var(--acsis-shell-header-pad-top, 12px) 18px var(--acsis-shell-header-pad-bottom, 10px);
@@ -322,6 +352,8 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
         z-index: var(--z-sticky, 120);
         border-radius: 0;
         box-shadow: none;
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
     }
 }
 
@@ -713,11 +745,30 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
 ======================== */
 .panel {
     background: var(--bg-surface, #ffffff);
-    border-radius: 14px;
+    border-radius: 16px;
     border: 1px solid var(--border-default, #e4ede8);
-    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
-    padding: 22px 24px;
-    margin-bottom: 18px;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.03);
+    padding: 24px 28px;
+    margin-bottom: 20px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.panel:hover {
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+    border-color: color-mix(in srgb, var(--border-default) 80%, var(--acsis-brand));
+}
+
+html.dark .panel {
+    background: rgba(18, 18, 18, 0.6);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border-default, #262626);
+}
+
+html.dark .panel:hover {
+    border-color: #4ade80;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
 }
 
 .panel-header {
@@ -770,33 +821,39 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
 }
 
 /* ========================
-   EXAM LIST ITEMS
+   EXAM/FACULTY LIST ITEMS
 ======================== */
-.exam-list {
+.exam-list,
+.faculty-approval-list {
     display: flex;
     flex-direction: column;
     gap: 0;
 }
 
-.exam-item {
+.exam-item,
+.faculty-approval-item {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 14px 0;
-    border-top: 1px solid #f0f6f2;
+    padding: 16px 12px;
+    border-top: 1px solid var(--border-default, #f0f6f2);
+    border-radius: 8px;
+    transition: background-color 0.15s ease;
 }
 
-.exam-item:first-child {
+.exam-item:hover,
+.faculty-approval-item:hover {
+    background-color: var(--bg-surface-muted, #f8fafc);
+}
+
+.exam-item:first-child,
+.faculty-approval-item:first-child {
     border-top: none;
-    padding-top: 0;
-}
-
-.exam-item:last-child {
-    padding-bottom: 0;
 }
 
 /* Admin dashboard — title left, status center, progress right */
-.panel .exam-list .exam-item {
+.panel .exam-list .exam-item,
+.panel .faculty-approval-list .faculty-approval-item {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
     align-items: center;
@@ -1109,6 +1166,68 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
 
 .ticket-btn:hover {
     background: #a93226;
+}
+
+.view-receipt-btn {
+    background: #fff;
+    color: #475569;
+    border: 1px solid #cbd5e1;
+    border-radius: 7px;
+    padding: 9px 18px;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+    font-family: inherit;
+    letter-spacing: -0.01em;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.view-receipt-btn:hover {
+    background: #f8fafc;
+    border-color: #94a3b8;
+    color: #1e293b;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+html.dark .view-receipt-btn {
+    background: var(--bg-elevated, #212121);
+    color: var(--fg-default, #f5f5f5);
+    border-color: var(--border-default, #2a2a2a);
+}
+
+html.dark .view-receipt-btn:hover {
+    background: var(--bg-surface, #2a2a2a);
+    border-color: var(--border-muted, #3a3a3a);
+}
+
+.activity-action-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-radius: 4px;
+    background: #eff6ff;
+    color: #1d4ed8;
+    border: 1px solid #bfdbfe;
+    margin-right: 12px;
+}
+
+html.dark .activity-action-chip {
+    background: color-mix(in srgb, #3b82f6 15%, var(--bg-elevated, #212121));
+    color: #93c5fd;
+    border-color: color-mix(in srgb, #3b82f6 30%, var(--border-default, #2a2a2a));
+}
+
+.admin-table-container--list-override {
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
 }
 
 /* ========================
@@ -3353,22 +3472,22 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
     gap: 12px;
     padding: 12px 14px;
     border-radius: 12px;
-    border: 1px solid var(--border-default, #e4ede8);
-    background: #fafcfa;
+    border: 1px solid var(--border-default, #e2e8f0);
+    background: var(--acsis-brand-muted-bg, #f1f5f9);
     text-decoration: none;
-    color: var(--fg-default, #1a2e22);
+    color: var(--fg-default, #0f172a);
     font-weight: 600;
     font-size: 14px;
     transition: border-color 0.15s ease, background 0.15s ease;
 }
 
 .super-admin-link:hover {
-    border-color: rgba(22, 163, 74, 0.45);
-    background: #f0fdf4;
+    border-color: color-mix(in srgb, var(--acsis-brand, #334155) 28%, var(--border-default, #e2e8f0));
+    background: color-mix(in srgb, var(--acsis-brand, #334155) 8%, var(--bg-surface, #ffffff));
 }
 
 .super-admin-link__icon {
-    color: var(--acsis-brand, #16a34a);
+    color: var(--acsis-brand, #334155);
     flex-shrink: 0;
 }
 

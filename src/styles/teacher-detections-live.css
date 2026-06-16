@@ -476,23 +476,17 @@
 }
 
 .acsis-detections-list-card--violator {
-  border-width: 2px;
+  /* Minimal UI: removed thick borders */
 }
 
-.acsis-detections-list-card--warn1 {
-  border-color: #fde047;
-  background: #fffbeb;
-}
-
-.acsis-detections-list-card--warn2 {
-  border-color: #fdba74;
-  background: #fff7ed;
-}
-
+/* Minimal UI: cards themselves have no background/border tints,
+   relying only on the strikes column for severity. */
+.acsis-detections-list-card--warn1,
+.acsis-detections-list-card--warn2,
 .acsis-detections-list-card--warn3,
 .acsis-detections-list-card--done-warn3 {
-  border-color: #fca5a5;
-  background: #fef2f2;
+  background: #fff;
+  border-color: #e2e8f0;
 }
 
 .acsis-detections-list-card__strikes {
