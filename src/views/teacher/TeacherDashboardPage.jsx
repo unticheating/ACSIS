@@ -228,38 +228,29 @@ export default function TeacherDashboardPage() {
 
   return (
     <div className="acsis-view">
-      <div className="grid gap-4 md:grid-cols-3 mb-8">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">My Classes</CardTitle>
-            <BookOpen className="h-5 w-5 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{totalClasses}</div>
-            <p className="text-xs text-muted-foreground mt-1">Total sections taught</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Exams</CardTitle>
-            <Activity className="h-5 w-5 text-emerald-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{activeExams}</div>
-            <p className="text-xs text-muted-foreground mt-1">Exams currently ongoing</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Students</CardTitle>
-            <Users className="h-5 w-5 text-purple-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{totalStudents}</div>
-            <p className="text-xs text-muted-foreground mt-1">Enrolled across all classes</p>
-          </CardContent>
-        </Card>
-      </div>
+      <SummaryStatGrid>
+        <SummaryStatCard
+          label="My Classes"
+          value={totalClasses}
+          hint="Total sections taught"
+          icon={<BookOpen className="h-10 w-10 text-blue-500" strokeWidth={2} />}
+          delay={0.05}
+        />
+        <SummaryStatCard
+          label="Active Exams"
+          value={activeExams}
+          hint="Exams currently ongoing"
+          icon={<Activity className="h-10 w-10 text-emerald-500" strokeWidth={2} />}
+          delay={0.1}
+        />
+        <SummaryStatCard
+          label="Total Students"
+          value={totalStudents}
+          hint="Enrolled across all classes"
+          icon={<Users className="h-10 w-10 text-purple-500" strokeWidth={2} />}
+          delay={0.15}
+        />
+      </SummaryStatGrid>
       {/* Exams strip */}
       <div className="mt-8">
         <div className="flex items-center justify-between gap-4 mb-6">

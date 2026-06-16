@@ -1,10 +1,17 @@
 /* Shared dashboard summary stat cards (all roles) */
 
+.acsis-summary-stats-wrap {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  margin-bottom: 22px;
+  box-sizing: border-box;
+}
+
 .acsis-summary-stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
-  margin-bottom: 22px;
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
@@ -14,16 +21,90 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.acsis-summary-stats-fade {
+  display: none;
+}
+
 @media (max-width: 900px) {
   .acsis-summary-stats--4 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-@media (max-width: 700px) {
+@media (max-width: 767px) {
+  .acsis-summary-stats-wrap {
+    margin-left: calc(-1 * var(--acsis-main-pad-x, 14px));
+    margin-right: calc(-1 * var(--acsis-main-pad-x, 14px));
+    width: calc(100% + 2 * var(--acsis-main-pad-x, 14px));
+  }
+
   .acsis-summary-stats,
   .acsis-summary-stats--4 {
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 12px;
+    padding: 2px var(--acsis-main-pad-x, 14px) 10px;
+    scroll-padding-inline: var(--acsis-main-pad-x, 14px);
+  }
+
+  .acsis-summary-stats::-webkit-scrollbar {
+    display: none;
+  }
+
+  .acsis-summary-stats > * {
+    flex: 0 0 100%;
+    scroll-snap-align: center;
+    min-width: 0;
+  }
+
+  .acsis-summary-stat {
+    height: 100%;
+  }
+
+  .acsis-summary-stats-fade {
+    display: block;
+    position: absolute;
+    top: 2px;
+    bottom: 10px;
+    width: 36px;
+    z-index: 2;
+    pointer-events: none;
+    opacity: 1;
+    transition: opacity 0.25s ease;
+  }
+
+  .acsis-summary-stats-fade--start {
+    left: 0;
+    background: linear-gradient(
+      to right,
+      var(--acsis-canvas, #ddeee4) 0%,
+      color-mix(in srgb, var(--acsis-canvas, #ddeee4) 55%, transparent) 55%,
+      transparent 100%
+    );
+  }
+
+  .acsis-summary-stats-fade--end {
+    right: 0;
+    background: linear-gradient(
+      to left,
+      var(--acsis-canvas, #ddeee4) 0%,
+      color-mix(in srgb, var(--acsis-canvas, #ddeee4) 55%, transparent) 55%,
+      transparent 100%
+    );
+  }
+
+  .acsis-summary-stats-wrap.is-at-start .acsis-summary-stats-fade--start {
+    opacity: 0;
+  }
+
+  .acsis-summary-stats-wrap.is-at-end .acsis-summary-stats-fade--end {
+    opacity: 0;
   }
 }
 
@@ -114,4 +195,11 @@ a.acsis-summary-stat {
   text-decoration: none;
   color: inherit;
   cursor: pointer;
+}
+
+@media (max-width: 767px) {
+  .acsis-summary-stat.acsis-card-surface:hover,
+  .acsis-summary-stat.acsis-card-surface:focus-within {
+    transform: none;
+  }
 }

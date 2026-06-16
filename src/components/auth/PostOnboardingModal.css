@@ -31,6 +31,10 @@
   animation: shadcn-content-show 150ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+.shadcn-dialog-content--wide {
+  max-width: 520px;
+}
+
 html.dark .shadcn-dialog-content {
   background-color: var(--bg-elevated, #020817); /* Radix dark slate */
   border-color: var(--border-default, #1e293b);
@@ -153,6 +157,169 @@ html.dark .shadcn-input:focus-visible {
   justify-content: flex-start;
   padding: 1.5rem;
   border-top: 1px solid var(--border-default, #f1f5f9);
+}
+
+.shadcn-dialog-footer--split {
+  flex-direction: row;
+  justify-content: space-between;
+}
+
+.shadcn-dialog-footer--stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.625rem;
+}
+
+.shadcn-btn-full {
+  width: 100%;
+}
+
+.shadcn-btn-secondary {
+  background-color: transparent;
+  color: var(--fg-default, #0f172a);
+  border: 1px solid var(--border-default, #e2e8f0);
+}
+
+html.dark .shadcn-btn-secondary {
+  color: #f8fafc;
+  border-color: #334155;
+}
+
+.shadcn-btn-secondary:hover {
+  background-color: var(--bg-muted, #f8fafc);
+}
+
+html.dark .shadcn-btn-secondary:hover {
+  background-color: #1e293b;
+}
+
+.onboarding-institution-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  max-height: min(50vh, 320px);
+  overflow-y: auto;
+}
+
+.onboarding-institution-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.75rem;
+  border: 2px solid var(--border-default, #e2e8f0);
+  border-radius: 0.5rem;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s, box-shadow 0.15s;
+}
+
+html.dark .onboarding-institution-item {
+  border-color: #334155;
+}
+
+.onboarding-institution-item:hover {
+  border-color: var(--green-primary, #16a34a);
+  background-color: var(--bg-muted, #f8fafc);
+}
+
+html.dark .onboarding-institution-item:hover {
+  background-color: #1e293b;
+}
+
+.onboarding-institution-item.is-selected {
+  border-color: var(--green-primary, #16a34a);
+  background-color: rgba(22, 163, 74, 0.08);
+  box-shadow: 0 0 0 1px var(--green-primary, #16a34a);
+}
+
+html.dark .onboarding-institution-item.is-selected {
+  background-color: rgba(34, 197, 94, 0.12);
+}
+
+.onboarding-institution-item__radio {
+  flex-shrink: 0;
+  width: 1.125rem;
+  height: 1.125rem;
+  border-radius: 9999px;
+  border: 2px solid var(--border-default, #cbd5e1);
+  background: #fff;
+  transition: border-color 0.15s, background-color 0.15s, box-shadow 0.15s;
+}
+
+html.dark .onboarding-institution-item__radio {
+  background: #0f172a;
+  border-color: #475569;
+}
+
+.onboarding-institution-item__radio.is-selected {
+  border-color: var(--green-primary, #16a34a);
+  background-color: var(--green-primary, #16a34a);
+  box-shadow: inset 0 0 0 3px #fff;
+}
+
+html.dark .onboarding-institution-item__radio.is-selected {
+  box-shadow: inset 0 0 0 3px #0f172a;
+}
+
+.onboarding-institution-item__check {
+  flex-shrink: 0;
+  margin-left: auto;
+  color: var(--green-primary, #16a34a);
+}
+
+.onboarding-institution-selected {
+  margin: 0.875rem 0 0;
+  padding: 0.625rem 0.75rem;
+  border-radius: 0.375rem;
+  font-size: 0.8125rem;
+  color: var(--fg-default, #0f172a);
+  background: rgba(22, 163, 74, 0.1);
+  border: 1px solid rgba(22, 163, 74, 0.25);
+}
+
+html.dark .onboarding-institution-selected {
+  color: #f8fafc;
+  background: rgba(34, 197, 94, 0.14);
+  border-color: rgba(34, 197, 94, 0.35);
+}
+
+.onboarding-institution-hint {
+  margin: 0.875rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--fg-muted, #64748b);
+}
+
+.onboarding-institution-item__logo {
+  flex-shrink: 0;
+  border-radius: 0.375rem;
+  object-fit: contain;
+}
+
+.onboarding-institution-item__text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.onboarding-institution-item__name {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--fg-default, #0f172a);
+}
+
+html.dark .onboarding-institution-item__name {
+  color: #f8fafc;
+}
+
+.onboarding-institution-item__acronym {
+  font-size: 0.75rem;
+  color: var(--fg-muted, #64748b);
 }
 
 html.dark .shadcn-dialog-footer {

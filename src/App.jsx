@@ -7,6 +7,7 @@ import LoginPage from './views/LoginPage.jsx'
 import ChangePasswordPage from './views/ChangePasswordPage.jsx'
 import VerifyEmailPage from './views/VerifyEmailPage.jsx'
 import PostOnboardingModal from './components/auth/PostOnboardingModal.jsx'
+import PendingFacultyModal from './components/auth/PendingFacultyModal.jsx'
 import AuthRedirectToastListener from './components/auth/AuthRedirectToastListener.jsx'
 import { useSession } from './context/SessionContext.jsx'
 
@@ -45,25 +46,36 @@ const SuperAdminInstitutionsPage = lazy(() => import('./views/super-admin/SuperA
 const SuperAdminAnalyticsPage = lazy(() => import('./views/super-admin/SuperAdminAnalyticsPage.jsx'))
 
 export default function App() {
-  const { authUser, sessionMode, refreshAuth } = useSession()
+  const { authUser, sessionMode, refreshAuth, logout } = useSession()
 
   const showOnboarding =
     sessionMode === 'auth' &&
     authUser &&
     !authUser.mustChangePassword &&
-    (authUser.needsInitialJoin || authUser.needsStudentNumber || authUser.needsJoinClass)
+    !authUser.needsFacultyApproval &&
+    (authUser.needsOnboardingChoice || authUser.needsStudentNumber || authUser.needsJoinClass)
+
+  const showPendingFaculty =
+    sessionMode === 'auth' &&
+    authUser &&
+    !authUser.mustChangePassword &&
+    Boolean(authUser.needsFacultyApproval)
 
   return (
     <>
     <AuthRedirectToastListener />
-    {showOnboarding && (
+    {showPendingFaculty ? (
+      <PendingFacultyModal authUser={authUser} onLogout={logout} />
+    ) : null}
+    {showOnboarding ? (
       <PostOnboardingModal
         authUser={authUser}
         onComplete={async () => {
+          await refreshAuth()
           window.location.reload()
         }}
       />
-    )}
+    ) : null}
     <Routes>
       <Route path="/" element={<LoginPage />} />
       <Route path="/change-password" element={<ChangePasswordPage />} />

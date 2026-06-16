@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Search } from 'lucide-react'
+import { RefreshCw, Search, UserPlus, UserX, X } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
-  DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog.jsx'
 import {
@@ -20,7 +18,9 @@ import { formatSchoolIdInput, validateSchoolIdClient } from '@/lib/userFormConst
 import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
 import { useAcsisConfirm } from '@/hooks/useAcsisConfirm.jsx'
 import FadeIn from '@/components/ui/fade-in.jsx'
+import UserAvatar from '@/components/admin/UserAvatar.jsx'
 import UserDetailsModal from '@/views/admin/UserDetailsModal.jsx'
+import AdminPendingApprovalsModal from '@/views/admin/AdminPendingApprovalsModal.jsx'
 import { useInstitutionTheme } from '@/context/InstitutionThemeContext.jsx'
 import '../../pages/admin-ui/style.css'
 
@@ -40,6 +40,7 @@ const emptyForm = {
   schoolId: '',
   password: '',
   pendingFaculty: false,
+  isSuperAdmin: false,
 }
 
 export default function AdminUserManagementPage() {
@@ -47,6 +48,9 @@ export default function AdminUserManagementPage() {
   const studentEmailDomain = institution.emailDomain || 'plpasig.edu.ph'
   const { confirm, ConfirmDialog } = useAcsisConfirm()
   const [activeTab, setActiveTab] = useState('all')
+  const [pendingOpen, setPendingOpen] = useState(false)
+  const [approvingUid, setApprovingUid] = useState(null)
+  const [rejectingUid, setRejectingUid] = useState(null)
   const [search, setSearch] = useState('')
   const [users, setUsers] = useState([])
   const [pendingFaculty, setPendingFaculty] = useState(0)
@@ -82,6 +86,19 @@ export default function AdminUserManagementPage() {
     loadUsers()
   }, [loadUsers])
 
+  const tabCounts = useMemo(() => {
+    const counts = { all: users.length, student: 0, faculty: 0, admin: 0 }
+    for (const u of users) {
+      if (u.role in counts) counts[u.role] += 1
+    }
+    return counts
+  }, [users])
+
+  const pendingUsers = useMemo(
+    () => users.filter((u) => u.role === 'faculty' && u.status === 'pending'),
+    [users],
+  )
+
   const filteredUsers = useMemo(() => {
     const q = search.trim().toLowerCase()
     return users.filter((u) => {
@@ -94,6 +111,9 @@ export default function AdminUserManagementPage() {
       )
     })
   }, [activeTab, search, users])
+
+  const showStudentNumber = activeTab === 'student'
+  const tableColSpan = showStudentNumber ? 7 : 6
 
   function openAdd() {
     setForm(emptyForm)
@@ -117,6 +137,7 @@ export default function AdminUserManagementPage() {
       schoolId: user.schoolId || '',
       password: '',
       pendingFaculty: false,
+      isSuperAdmin: Boolean(user.isSuperAdmin),
     })
     setEditOpen(true)
   }
@@ -185,6 +206,7 @@ export default function AdminUserManagementPage() {
         middleName: form.middleName || null,
         email: form.email,
         schoolId: form.schoolId,
+        role: form.role,
       }
       await updateAdminUser(editingUid, payload)
       setEditOpen(false)
@@ -220,6 +242,34 @@ export default function AdminUserManagementPage() {
     }
   }
 
+  async function onReject(user) {
+    const ok = await confirm({
+      title: `Reject ${user.name}?`,
+      description:
+        'Their faculty request will be removed. They can submit a new request later if needed.',
+      confirmLabel: 'Reject',
+      destructive: true,
+    })
+    if (!ok) return
+    setBanner(null)
+    setRejectingUid(user.uid)
+    try {
+      await updateAdminUser(user.uid, { reject: true })
+      acsisToastSuccess(`${user.name}'s request was rejected.`)
+      if (selectedUser?.uid === user.uid) {
+        setDetailsOpen(false)
+        setSelectedUser(null)
+      }
+      await loadUsers()
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to reject request.'
+      setBanner(msg)
+      acsisToastError(msg)
+    } finally {
+      setRejectingUid(null)
+    }
+  }
+
   async function onApprove(user) {
     const ok = await confirm({
       title: `Approve ${user.name}?`,
@@ -228,6 +278,7 @@ export default function AdminUserManagementPage() {
     })
     if (!ok) return
     setBanner(null)
+    setApprovingUid(user.uid)
     try {
       await updateAdminUser(user.uid, { approve: true })
       acsisToastSuccess(`${user.name} approved.`)
@@ -236,6 +287,8 @@ export default function AdminUserManagementPage() {
       const msg = err instanceof Error ? err.message : 'Failed to approve user.'
       setBanner(msg)
       acsisToastError(msg)
+    } finally {
+      setApprovingUid(null)
     }
   }
 
@@ -294,31 +347,48 @@ export default function AdminUserManagementPage() {
           </span>
         )}
       </label>
-      {!editOpen ? (
-        <label>
-          Role
+      <label>
+        Role
+        {form.isSuperAdmin ? (
+          <input type="text" readOnly value={roleLabel(form.role)} />
+        ) : (
           <select value={form.role} onChange={(e) => patchForm('role', e.target.value)}>
             <option value="student">Student</option>
             <option value="faculty">Faculty</option>
             <option value="admin">Administrator</option>
           </select>
-        </label>
-      ) : null}
-      <label>
-        {form.role === 'student' ? 'Student number' : 'Employee ID'}
-        <input
-          type="text"
-          inputMode="numeric"
-          required={form.role === 'student'}
-          placeholder="00-00000"
-          pattern="\d{2}-\d{5}"
-          maxLength={8}
-          title="Format: 00-00000"
-          value={form.schoolId}
-          onChange={(e) => patchForm('schoolId', formatSchoolIdInput(e.target.value))}
-        />
-        <span className="um-field-hint">Format: 00-00000 (example: 24-00123)</span>
+        )}
       </label>
+      {form.role === 'student' ? (
+        <label>
+          Student number
+          <input
+            type="text"
+            inputMode="numeric"
+            required
+            placeholder="00-00000"
+            pattern="\\d{2}-\\d{5}"
+            maxLength={8}
+            title="Format: 00-00000"
+            value={form.schoolId}
+            onChange={(e) => patchForm('schoolId', formatSchoolIdInput(e.target.value))}
+          />
+          <span className="um-field-hint">Format: 00-00000 (example: 24-00123)</span>
+        </label>
+      ) : (
+        <label>
+          Employee ID
+          <input
+            type="text"
+            placeholder="e.g. FAC-2019-0142"
+            maxLength={50}
+            title="Institution employee ID"
+            value={form.schoolId}
+            onChange={(e) => patchForm('schoolId', e.target.value.slice(0, 50))}
+          />
+          <span className="um-field-hint">Optional. Use your institution employee ID (not a student number).</span>
+        </label>
+      )}
       {!editOpen && form.role === 'admin' ? (
         <label className="um-form-full">
           Password <span className="um-optional">(for email login)</span>
@@ -361,7 +431,7 @@ export default function AdminUserManagementPage() {
           </p>
         ) : null}
 
-        <FadeIn delay={0.05} className="um-topbar">
+        <FadeIn delay={0.05} className="um-controls-row">
           <div className="um-tabs" role="tablist" aria-label="Filter users by role">
             {TABS.map((tab) => (
               <button
@@ -373,39 +443,97 @@ export default function AdminUserManagementPage() {
                 onClick={() => setActiveTab(tab.id)}
               >
                 {tab.label}
+                <span className="um-tab-count">{loading ? '…' : tabCounts[tab.id]}</span>
               </button>
             ))}
           </div>
-          <div className="um-topbar-right">
+          <div className="um-controls-end">
             {pendingFaculty > 0 ? (
-              <span className="pending-badge">Pending faculty approval ({pendingFaculty})</span>
+              <button
+                type="button"
+                className="um-pending-alert"
+                onClick={() => setPendingOpen(true)}
+              >
+                {pendingFaculty} pending approval
+              </button>
             ) : null}
             <label className="um-search">
               <Search size={16} strokeWidth={2} aria-hidden />
               <input
                 type="search"
-                placeholder="Search name, email, or student ID"
+                placeholder="Search name, email, or ID"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
+                aria-label="Search users"
               />
+              {search ? (
+                <button
+                  type="button"
+                  className="um-search-clear"
+                  onClick={() => setSearch('')}
+                  aria-label="Clear search"
+                >
+                  <X size={14} strokeWidth={2} aria-hidden />
+                </button>
+              ) : null}
             </label>
           </div>
         </FadeIn>
 
         <FadeIn delay={0.1} className="panel">
-          <div className="panel-header">
+          <div className="panel-header panel-header--split">
             <span className="panel-title">
               Users
-              <span className="violation-count">({filteredUsers.length})</span>
+              <span className="violation-count">({loading ? '…' : filteredUsers.length})</span>
             </span>
-            <button type="button" className="btn" onClick={openAdd} disabled={loading}>
-              Add user
-            </button>
+            <div className="um-panel-actions">
+              <button
+                type="button"
+                className="btn btn--ghost um-refresh-btn"
+                onClick={loadUsers}
+                disabled={loading}
+                aria-label="Refresh user list"
+              >
+                <RefreshCw size={15} strokeWidth={2} className={loading ? 'um-spin' : undefined} aria-hidden />
+                Refresh
+              </button>
+              <button type="button" className="btn" onClick={openAdd} disabled={loading}>
+                <UserPlus size={16} strokeWidth={2} aria-hidden />
+                Add user
+              </button>
+            </div>
           </div>
 
           <div className="um-table-wrapper">
             {loading ? (
-              <p className="um-loading">Loading users…</p>
+              <table className="um-table" aria-hidden>
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    {showStudentNumber ? <th>Student no.</th> : null}
+                    <th>Status</th>
+                    <th className="um-col-hide-md">Role</th>
+                    <th className="um-col-hide-lg">Created</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Array.from({ length: 6 }, (_, i) => (
+                    <tr key={i} className="um-skeleton-row">
+                      <td><span className="um-skeleton um-skeleton--name" /></td>
+                      <td><span className="um-skeleton um-skeleton--email" /></td>
+                      {showStudentNumber ? (
+                        <td><span className="um-skeleton um-skeleton--short" /></td>
+                      ) : null}
+                      <td><span className="um-skeleton um-skeleton--badge" /></td>
+                      <td className="um-col-hide-md"><span className="um-skeleton um-skeleton--badge" /></td>
+                      <td className="um-col-hide-lg"><span className="um-skeleton um-skeleton--short" /></td>
+                      <td><span className="um-skeleton um-skeleton--actions" /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             ) : (
               <>
                 <p id="um-table-hint" className="um-sr-only">
@@ -416,18 +544,45 @@ export default function AdminUserManagementPage() {
                   <tr>
                     <th>Name</th>
                     <th>Email</th>
-                    <th>Student / ID no.</th>
+                    {showStudentNumber ? <th>Student no.</th> : null}
                     <th>Status</th>
-                    <th>Role</th>
-                    <th>Date created</th>
+                    <th className="um-col-hide-md">Role</th>
+                    <th className="um-col-hide-lg">Date created</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredUsers.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="um-empty">
-                        No users found. Add a user or adjust your filters.
+                      <td colSpan={tableColSpan}>
+                        <div className="um-empty-state">
+                          <div className="um-empty-state__icon" aria-hidden>
+                            <UserX size={28} strokeWidth={1.5} />
+                          </div>
+                          <p className="um-empty-state__title">No users match your filters</p>
+                          <p className="um-empty-state__desc">
+                            {search || activeTab !== 'all'
+                              ? 'Try clearing search or switching to a different role tab.'
+                              : 'Get started by adding your first institution account.'}
+                          </p>
+                          {!search && activeTab === 'all' ? (
+                            <button type="button" className="btn" onClick={openAdd}>
+                              <UserPlus size={16} strokeWidth={2} aria-hidden />
+                              Add user
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              className="btn btn--ghost"
+                              onClick={() => {
+                                setSearch('')
+                                setActiveTab('all')
+                              }}
+                            >
+                              Clear filters
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ) : (
@@ -450,9 +605,14 @@ export default function AdminUserManagementPage() {
                           }
                         }}
                       >
-                        <td className="um-name">{u.name}</td>
+                        <td>
+                          <div className="um-user-cell">
+                            <UserAvatar user={u} />
+                            <span className="um-name">{u.name}</span>
+                          </div>
+                        </td>
                         <td className="um-email">{u.email}</td>
-                        <td>{u.schoolId || '—'}</td>
+                        {showStudentNumber ? <td>{u.schoolId || '—'}</td> : null}
                         <td>
                           <span
                             className={`um-status-badge${u.status !== 'active' ? ` um-status-badge--${u.status}` : ''}`}
@@ -460,8 +620,12 @@ export default function AdminUserManagementPage() {
                             {statusLabel(u.status)}
                           </span>
                         </td>
-                        <td>{roleLabel(u.role)}</td>
-                        <td>{formatDateCreated(u.dateCreated)}</td>
+                        <td className="um-col-hide-md">
+                          <span className={`um-role-badge um-role-badge--${u.role}`}>
+                            {roleLabel(u.role)}
+                          </span>
+                        </td>
+                        <td className="um-col-hide-lg um-muted">{formatDateCreated(u.dateCreated)}</td>
                         <td>
                           <div
                             className="um-actions"
@@ -470,13 +634,24 @@ export default function AdminUserManagementPage() {
                             onKeyDown={(e) => e.stopPropagation()}
                           >
                             {u.status === 'pending' ? (
-                              <button
-                                type="button"
-                                className="um-action-link"
-                                onClick={() => onApprove(u)}
-                              >
-                                Approve
-                              </button>
+                              <>
+                                <button
+                                  type="button"
+                                  className="um-action-link"
+                                  disabled={approvingUid === u.uid || rejectingUid === u.uid}
+                                  onClick={() => onApprove(u)}
+                                >
+                                  {approvingUid === u.uid ? 'Approving…' : 'Approve'}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="um-action-link um-action-link--danger"
+                                  disabled={approvingUid === u.uid || rejectingUid === u.uid}
+                                  onClick={() => onReject(u)}
+                                >
+                                  {rejectingUid === u.uid ? 'Rejecting…' : 'Reject'}
+                                </button>
+                              </>
                             ) : null}
                             <button
                               type="button"
@@ -508,26 +683,36 @@ export default function AdminUserManagementPage() {
       </div>
 
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
-        <DialogContent className="um-dialog">
+        <DialogContent className="admin-dialog-content um-user-form-dialog" aria-describedby={undefined}>
           <form onSubmit={onCreate}>
-            <DialogHeader>
-              <DialogTitle>Add user</DialogTitle>
-              <DialogDescription>
-                Creates a user in PostgreSQL for your institution. Student IDs must be unique.
+            <div className="admin-dialog-header">
+              <DialogTitle className="admin-dialog-title">Add user</DialogTitle>
+              <DialogDescription className="admin-dialog-desc">
+                Creates a user for your institution. Student numbers must be unique.
               </DialogDescription>
-            </DialogHeader>
-            {formFields}
-            <DialogFooter>
+            </div>
+            <div className="admin-dialog-body">{formFields}</div>
+            <div className="admin-dialog-footer">
               <button type="button" className="btn btn--ghost" onClick={() => setAddOpen(false)}>
                 Cancel
               </button>
               <button type="submit" className="btn" disabled={submitting}>
                 {submitting ? 'Saving…' : 'Save user'}
               </button>
-            </DialogFooter>
+            </div>
           </form>
         </DialogContent>
       </Dialog>
+
+      <AdminPendingApprovalsModal
+        open={pendingOpen}
+        onOpenChange={setPendingOpen}
+        users={pendingUsers}
+        onApprove={onApprove}
+        onReject={onReject}
+        approvingUid={approvingUid}
+        rejectingUid={rejectingUid}
+      />
 
       <UserDetailsModal
         open={detailsOpen}
@@ -535,25 +720,30 @@ export default function AdminUserManagementPage() {
         user={selectedUser}
         onEdit={openEdit}
         onApprove={onApprove}
+        onReject={onReject}
         onDeactivate={onDeactivate}
+        approvingUid={approvingUid}
+        rejectingUid={rejectingUid}
       />
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="um-dialog">
+        <DialogContent className="admin-dialog-content um-user-form-dialog" aria-describedby={undefined}>
           <form onSubmit={onSaveEdit}>
-            <DialogHeader>
-              <DialogTitle>Edit user</DialogTitle>
-              <DialogDescription>Update account details. Role changes are not supported here yet.</DialogDescription>
-            </DialogHeader>
-            {formFields}
-            <DialogFooter>
+            <div className="admin-dialog-header">
+              <DialogTitle className="admin-dialog-title">Edit user</DialogTitle>
+              <DialogDescription className="admin-dialog-desc">
+                Update account details, role, and institution ID fields.
+              </DialogDescription>
+            </div>
+            <div className="admin-dialog-body">{formFields}</div>
+            <div className="admin-dialog-footer">
               <button type="button" className="btn btn--ghost" onClick={() => setEditOpen(false)}>
                 Cancel
               </button>
               <button type="submit" className="btn" disabled={submitting}>
                 {submitting ? 'Saving…' : 'Save changes'}
               </button>
-            </DialogFooter>
+            </div>
           </form>
         </DialogContent>
       </Dialog>

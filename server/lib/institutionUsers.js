@@ -13,8 +13,14 @@ function validateSchoolId(schoolId, role) {
   if (!id) {
     return role === 'student' ? 'Student number is required.' : null
   }
-  if (!SCHOOL_ID_REGEX.test(id)) {
-    return 'ID must follow format 00-00000 (example: 24-00123).'
+  if (role === 'student') {
+    if (!SCHOOL_ID_REGEX.test(id)) {
+      return 'Student number must follow format 00-00000 (example: 24-00123).'
+    }
+    return null
+  }
+  if (id.length > 50) {
+    return 'Employee ID must be 50 characters or fewer.'
   }
   return null
 }
@@ -42,6 +48,7 @@ function mapRow(row) {
     schoolId: row.school_id || '',
     dateCreated: row.created_at,
     isSuperAdmin: row.is_super_admin,
+    avatarUrl: row.avatar_url || null,
   }
 }
 
@@ -51,7 +58,7 @@ function mapRow(row) {
  */
 export async function listInstitutionUsers(pool, institutionId) {
   const { rows } = await pool.query(
-    `SELECT u.uid, u.first_name, u.middle_name, u.last_name, u.suffix, u.email, u.created_at, u.is_super_admin,
+    `SELECT u.uid, u.first_name, u.middle_name, u.last_name, u.suffix, u.email, u.created_at, u.is_super_admin, u.avatar_url,
             im.member_id, im.role, ${SQL_MEMBER_SCHOOL_ID} AS school_id, im.is_active, im.is_pending
      FROM institution_members im
      INNER JOIN users u ON u.uid = im.uid
@@ -179,15 +186,18 @@ export async function createInstitutionUser(pool, institutionId, body) {
  * @param {object} body
  */
 export async function updateInstitutionUser(pool, institutionId, uid, body) {
-  const firstName = String(body.firstName || '').trim()
-  const lastName = String(body.lastName || '').trim()
+  const firstName = body.firstName !== undefined ? String(body.firstName || '').trim() : undefined
+  const lastName = body.lastName !== undefined ? String(body.lastName || '').trim() : undefined
   const middleName = body.middleName !== undefined ? (body.middleName ? String(body.middleName).trim() : null) : undefined
   const email = body.email ? String(body.email).trim().toLowerCase() : undefined
   const schoolId = body.schoolId !== undefined ? String(body.schoolId || '').trim() || null : undefined
+  const requestedRole =
+    body.role && ['student', 'faculty', 'admin'].includes(body.role) ? body.role : null
 
   const member = await pool.query(
-    `SELECT im.member_id, im.role, ${SQL_MEMBER_SCHOOL_ID} AS school_id
+    `SELECT im.member_id, im.role, im.is_pending, ${SQL_MEMBER_SCHOOL_ID} AS school_id, u.is_super_admin
      FROM institution_members im
+     INNER JOIN users u ON u.uid = im.uid
      ${SQL_JOIN_STUDENTS}
      WHERE im.institution_id = $1 AND im.uid = $2`,
     [institutionId, uid],
@@ -196,7 +206,26 @@ export async function updateInstitutionUser(pool, institutionId, uid, body) {
     return { ok: false, status: 404, error: 'User not found in this institution.' }
   }
 
-  const role = member.rows[0].role
+  if (body.reject === true) {
+    if (!member.rows[0].is_pending) {
+      return { ok: false, status: 400, error: 'Only pending requests can be rejected.' }
+    }
+    await pool.query(`DELETE FROM institution_members WHERE institution_id = $1 AND uid = $2`, [
+      institutionId,
+      uid,
+    ])
+    return { ok: true, rejected: true }
+  }
+
+  if (member.rows[0].is_super_admin && requestedRole && requestedRole !== member.rows[0].role) {
+    return { ok: false, status: 400, error: 'Super administrator role cannot be changed here.' }
+  }
+
+  const currentRole = member.rows[0].role
+  const memberId = member.rows[0].member_id
+  const role = requestedRole || currentRole
+  const roleChanged = Boolean(requestedRole && requestedRole !== currentRole)
+
   if (email) {
     const institutionDomain = await getInstitutionEmailDomain(pool, institutionId)
     const emailCheck = validateUserEmailForRole(email, role, institutionDomain)
@@ -205,7 +234,8 @@ export async function updateInstitutionUser(pool, institutionId, uid, body) {
     }
   }
 
-  const nextSchoolId = schoolId !== undefined ? schoolId : member.rows[0].school_id
+  const nextSchoolId =
+    schoolId !== undefined ? schoolId : role === 'student' ? member.rows[0].school_id : member.rows[0].school_id
   const schoolIdError = validateSchoolId(nextSchoolId, role)
   if (schoolIdError) {
     return { ok: false, status: 400, error: schoolIdError }
@@ -221,46 +251,69 @@ export async function updateInstitutionUser(pool, institutionId, uid, body) {
     }
   }
 
-  if (firstName) {
-    await pool.query(`UPDATE users SET first_name = $1 WHERE uid = $2`, [firstName, uid])
-  }
-  if (lastName) {
-    await pool.query(`UPDATE users SET last_name = $1 WHERE uid = $2`, [lastName, uid])
-  }
-  if (middleName !== undefined) {
-    await pool.query(`UPDATE users SET middle_name = $1 WHERE uid = $2`, [middleName, uid])
-  }
-  if (email) {
-    await pool.query(`UPDATE users SET email = $1 WHERE uid = $2`, [email, uid])
-  }
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
 
-  const memberUpdates = []
-  const params = [institutionId, uid]
-  let n = 3
-  if (schoolId !== undefined && role !== 'student') {
-    memberUpdates.push(`school_id = $${n++}`)
-    params.push(schoolId)
-  }
-  if (body.approve === true) {
-    memberUpdates.push('is_pending = FALSE', 'is_active = TRUE')
-  }
-  if (body.deactivate === true) {
-    memberUpdates.push('is_active = FALSE', 'is_pending = FALSE')
-  }
-  if (body.activate === true) {
-    memberUpdates.push('is_active = TRUE', 'is_pending = FALSE')
-  }
+    if (firstName) {
+      await client.query(`UPDATE users SET first_name = $1 WHERE uid = $2`, [firstName, uid])
+    }
+    if (lastName) {
+      await client.query(`UPDATE users SET last_name = $1 WHERE uid = $2`, [lastName, uid])
+    }
+    if (middleName !== undefined) {
+      await client.query(`UPDATE users SET middle_name = $1 WHERE uid = $2`, [middleName, uid])
+    }
+    if (email) {
+      await client.query(`UPDATE users SET email = $1 WHERE uid = $2`, [email, uid])
+    }
 
-  if (memberUpdates.length) {
-    await pool.query(
-      `UPDATE institution_members SET ${memberUpdates.join(', ')}
-       WHERE institution_id = $1 AND uid = $2`,
-      params,
-    )
-  }
+    const memberUpdates = []
+    const params = [institutionId, uid]
+    let n = 3
 
-  if (schoolId !== undefined && role === 'student') {
-    await upsertStudentNumber(pool, member.rows[0].member_id, institutionId, schoolId)
+    if (roleChanged) {
+      memberUpdates.push(`role = $${n++}`)
+      params.push(requestedRole)
+      if (requestedRole === 'student') {
+        memberUpdates.push('school_id = NULL')
+      } else if (currentRole === 'student') {
+        memberUpdates.push(`school_id = $${n++}`)
+        params.push(schoolId !== undefined ? schoolId : null)
+      }
+    } else if (schoolId !== undefined && role !== 'student') {
+      memberUpdates.push(`school_id = $${n++}`)
+      params.push(schoolId)
+    }
+
+    if (body.approve === true) {
+      memberUpdates.push('is_pending = FALSE', 'is_active = TRUE')
+    }
+    if (body.deactivate === true) {
+      memberUpdates.push('is_active = FALSE', 'is_pending = FALSE')
+    }
+    if (body.activate === true) {
+      memberUpdates.push('is_active = TRUE', 'is_pending = FALSE')
+    }
+
+    if (memberUpdates.length) {
+      await client.query(
+        `UPDATE institution_members SET ${memberUpdates.join(', ')}
+         WHERE institution_id = $1 AND uid = $2`,
+        params,
+      )
+    }
+
+    if (role === 'student' && (schoolId !== undefined || roleChanged)) {
+      await upsertStudentNumber(client, memberId, institutionId, nextSchoolId)
+    }
+
+    await client.query('COMMIT')
+  } catch (err) {
+    await client.query('ROLLBACK')
+    throw err
+  } finally {
+    client.release()
   }
 
   const users = await listInstitutionUsers(pool, institutionId)

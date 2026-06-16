@@ -92,6 +92,26 @@ export async function findOrCreateGoogleUser(pool, profile) {
 /**
  * @param {import('pg').Pool} pool
  * @param {number} uid
+ */
+export async function findPendingFacultyMembership(pool, uid) {
+  const { rows } = await pool.query(
+    `SELECT im.member_id, im.institution_id, i.institution_name, i.acronym
+     FROM institution_members im
+     JOIN institutions i ON i.institution_id = im.institution_id
+     WHERE im.uid = $1
+       AND im.role = 'faculty'
+       AND im.is_pending = TRUE
+       AND i.is_active = TRUE
+     ORDER BY im.joined_at DESC
+     LIMIT 1`,
+    [uid],
+  )
+  return rows[0] || null
+}
+
+/**
+ * @param {import('pg').Pool} pool
+ * @param {number} uid
  * @returns {Promise<{ portal: Portal | null, roleLabel: string | null, entryPath: string | null, membershipStatus: 'pending' | 'active' }>}
  */
 export async function resolveUserPortal(pool, uid, isSuperAdmin) {
@@ -180,14 +200,20 @@ export async function buildSessionFromUid(pool, uid, opts = {}) {
 
   let needsStudentNumber = false
   let needsJoinClass = false
-  let needsInitialJoin = false
+  let needsOnboardingChoice = false
+  let needsFacultyApproval = false
+  let pendingInstitutionName = null
 
   if (portalInfo.portal === null && !user.is_super_admin) {
-    needsInitialJoin = true
-    portalInfo.portal = 'student'
-    portalInfo.roleLabel = 'Student'
-    portalInfo.entryPath = '/student/my-classes'
-    portalInfo.membershipStatus = 'active'
+    const pendingFaculty = await findPendingFacultyMembership(pool, uid)
+    if (pendingFaculty) {
+      needsFacultyApproval = true
+      pendingInstitutionName = pendingFaculty.institution_name
+      portalInfo.roleLabel = 'Faculty (pending approval)'
+      portalInfo.membershipStatus = 'pending'
+    } else {
+      needsOnboardingChoice = true
+    }
   }
 
   let studentNumber = null
@@ -220,11 +246,22 @@ export async function buildSessionFromUid(pool, uid, opts = {}) {
     entryPath: portalInfo.entryPath,
     membershipStatus: portalInfo.membershipStatus,
     mustChangePassword: Boolean(user.password_reset_required),
-    needsInitialJoin,
+    needsOnboardingChoice,
+    needsFacultyApproval,
+    pendingInstitutionName,
     needsStudentNumber,
     needsJoinClass,
     studentNumber,
   }
+}
+
+/** @param {Awaited<ReturnType<typeof buildSessionFromUid>>} session */
+export function sessionAllowsLogin(session) {
+  return Boolean(
+    session.entryPath ||
+      session.needsOnboardingChoice ||
+      session.needsFacultyApproval,
+  )
 }
 
 export function buildSessionWithoutDatabase(profile) {

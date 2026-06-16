@@ -16,10 +16,16 @@ export function validateSchoolIdClient(schoolId, required, role = '') {
   const id = String(schoolId || '').trim()
   if (!id) {
     if (!required) return null
-    return role === 'student' ? 'Student number is required.' : 'Student / employee ID is required.'
+    return role === 'student' ? 'Student number is required.' : 'Employee ID is required.'
   }
-  if (!SCHOOL_ID_REGEX.test(id)) {
-    return 'ID must follow format 00-00000 (example: 24-00123).'
+  if (role === 'student' || role === '') {
+    if (!SCHOOL_ID_REGEX.test(id)) {
+      return 'Student number must follow format 00-00000 (example: 24-00123).'
+    }
+    return null
+  }
+  if (id.length > 50) {
+    return 'Employee ID must be 50 characters or fewer.'
   }
   return null
 }

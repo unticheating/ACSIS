@@ -35,8 +35,11 @@ import {
   buildSessionFromUid,
   buildSessionWithoutDatabase,
   findOrCreateGoogleUser,
+  findPendingFacultyMembership,
   resolveUserPortal,
+  sessionAllowsLogin,
 } from '../lib/users.js'
+import { requireAuth } from '../lib/sessionAuth.js'
 import { recordTeacherActivityQuery } from '../repositories/teacherActivityRepository.js'
 
 const router = Router()
@@ -85,7 +88,7 @@ async function beginEmailVerification(pool, uid, email, res) {
  */
 async function finishLoginWithoutVerification(pool, uid, res, opts = {}) {
   const session = await buildSessionFromUid(pool, uid, opts)
-  if (!session.entryPath && !session.needsInitialJoin) {
+  if (!sessionAllowsLogin(session)) {
     return { ok: false, status: 403, error: 'Your account is not assigned to an institution yet.' }
   }
   setSessionCookie(res, session)
@@ -190,7 +193,6 @@ router.get('/google/callback', async (req, res) => {
     }
     
     const redirectUrl = new URL(config.frontendUrl)
-    // fallback to / if no entry path but they need initial join
     redirectUrl.pathname = finished.session.entryPath || '/'
     redirectUrl.searchParams.set('auth', 'success')
     return res.redirect(redirectUrl.toString())
@@ -225,7 +227,7 @@ router.post('/start-verification', async (req, res) => {
       })
     }
 
-    if (!result.session.entryPath && !result.session.needsInitialJoin) {
+    if (!result.session.entryPath && !sessionAllowsLogin(result.session)) {
       return res.status(403).json({ error: 'Your account is not assigned to an institution yet.' })
     }
 
@@ -326,7 +328,7 @@ router.post('/verify-email', async (req, res) => {
     }
 
     const session = await buildSessionFromUid(pool, pending.uid)
-    if (!session.entryPath && !session.needsInitialJoin) {
+    if (!sessionAllowsLogin(session)) {
       return res.status(403).json({ error: 'Your account is not assigned to an institution yet.' })
     }
 
@@ -499,8 +501,6 @@ router.get('/config', async (_req, res) => {
   })
 })
 
-import { requireAuth } from '../lib/sessionAuth.js'
-
 router.post('/onboarding/join', requireAuth, async (req, res) => {
   const code = typeof req.body?.accessCode === 'string' ? req.body.accessCode.trim() : ''
   if (!code) {
@@ -565,6 +565,102 @@ router.post('/onboarding/join', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('[onboarding/join]', err)
     return res.status(500).json({ error: 'Internal server error.' })
+  }
+})
+
+router.get('/onboarding/institutions', requireAuth, async (req, res) => {
+  const pool = getPool()
+  if (!pool) return res.status(503).json({ error: 'Database unavailable.' })
+
+  try {
+    const { rows } = await pool.query(
+      `SELECT institution_id, institution_name, acronym, logo
+       FROM institutions
+       WHERE is_active = TRUE
+       ORDER BY institution_name ASC`,
+    )
+    return res.json({
+      institutions: rows.map((row) => ({
+        institutionId: row.institution_id,
+        institutionName: row.institution_name,
+        acronym: row.acronym,
+        logo: row.logo || null,
+      })),
+    })
+  } catch (err) {
+    console.error('[onboarding/institutions]', err)
+    return res.status(500).json({ error: 'Could not load institutions.' })
+  }
+})
+
+router.post('/onboarding/instructor', requireAuth, async (req, res) => {
+  const institutionId = Number.parseInt(String(req.body?.institutionId ?? ''), 10)
+  if (!Number.isFinite(institutionId) || institutionId <= 0) {
+    return res.status(400).json({ error: 'Please choose an institution.' })
+  }
+
+  const session = req.authSession
+  if (!session?.uid) return res.status(401).json({ error: 'Not authenticated.' })
+
+  const pool = getPool()
+  if (!pool) return res.status(503).json({ error: 'Database unavailable.' })
+
+  try {
+    const { rows: userRows } = await pool.query(
+      `SELECT is_super_admin FROM users WHERE uid = $1`,
+      [session.uid],
+    )
+    if (!userRows[0]) {
+      return res.status(404).json({ error: 'User not found.' })
+    }
+
+    const portalInfo = await resolveUserPortal(pool, session.uid, userRows[0].is_super_admin)
+    if (portalInfo.portal) {
+      return res.status(409).json({ error: 'You already belong to an institution.' })
+    }
+
+    const pendingFaculty = await findPendingFacultyMembership(pool, session.uid)
+    if (pendingFaculty) {
+      return res.status(409).json({ error: 'You already have a pending faculty request.' })
+    }
+
+    const { rows: instRows } = await pool.query(
+      `SELECT institution_id, institution_name
+       FROM institutions
+       WHERE institution_id = $1 AND is_active = TRUE`,
+      [institutionId],
+    )
+    if (!instRows[0]) {
+      return res.status(404).json({ error: 'Institution not found.' })
+    }
+
+    const { rows: existing } = await pool.query(
+      `SELECT member_id, role, is_pending
+       FROM institution_members
+       WHERE uid = $1 AND institution_id = $2`,
+      [session.uid, institutionId],
+    )
+    if (existing[0]) {
+      if (existing[0].role === 'faculty' && existing[0].is_pending) {
+        return res.json({
+          ok: true,
+          institutionName: instRows[0].institution_name,
+          alreadyPending: true,
+        })
+      }
+      return res.status(409).json({ error: 'You already have a membership record at this institution.' })
+    }
+
+    await pool.query(
+      `INSERT INTO institution_members (institution_id, uid, role, school_id, is_active, is_pending)
+       VALUES ($1, $2, 'faculty', NULL, FALSE, TRUE)`,
+      [institutionId, session.uid],
+    )
+
+    return res.json({ ok: true, institutionName: instRows[0].institution_name })
+  } catch (err) {
+    console.error('[onboarding/instructor]', err)
+    return res.status(500).json({ error: 'Could not submit your instructor request.' })
   }
 })
 

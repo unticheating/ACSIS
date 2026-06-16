@@ -1,9 +1,10 @@
-import { useEffect, useLayoutEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import AuthImmersiveShell from '@/components/auth/AuthImmersiveShell.jsx'
 import { useSession } from '@/context/SessionContext.jsx'
 import {
   AUTH_ERROR_MESSAGES,
+  isAuthAwaitingSetup,
   startGoogleSignIn,
   loginWithPassword,
   requestPasswordReset,
@@ -31,6 +32,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [forgotPasswordSubmitting, setForgotPasswordSubmitting] = useState(false)
   const [googleDomainBanner, setGoogleDomainBanner] = useState(false)
+  const noMembershipToastUidRef = useRef(null)
 
   useLayoutEffect(() => {
     const errorCode = resolveAuthRedirectErrorCode(searchParams)
@@ -58,10 +60,13 @@ export default function LoginPage() {
   }, [authLoading, isAuthenticated, authUser?.mustChangePassword, activeAccount.entryPath, location.pathname, navigate])
 
   useEffect(() => {
-    if (searchParams.get('auth') === 'success') {
-      refreshAuth().catch(() => {})
-    }
-  }, [refreshAuth, searchParams])
+    if (searchParams.get('auth') !== 'success') return
+    refreshAuth()
+      .then(() => {
+        setSearchParams(stripAuthRedirectParams(searchParams), { replace: true })
+      })
+      .catch(() => {})
+  }, [refreshAuth, searchParams, setSearchParams])
 
   useEffect(() => {
     const verifyEmail = searchParams.get('email')
@@ -71,9 +76,14 @@ export default function LoginPage() {
   }, [searchParams, location.pathname, navigate])
 
   useEffect(() => {
-    if (authUser && !authUser.portal) {
-      acsisToastError(AUTH_ERROR_MESSAGES.no_membership)
+    if (!authUser || authUser.portal || isAuthAwaitingSetup(authUser)) {
+      return
     }
+    if (noMembershipToastUidRef.current === authUser.uid) {
+      return
+    }
+    noMembershipToastUidRef.current = authUser.uid
+    acsisToastError(AUTH_ERROR_MESSAGES.no_membership)
   }, [authUser])
 
   function onGoogle() {

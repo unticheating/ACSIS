@@ -115,6 +115,12 @@ export const AUTH_ERROR_MESSAGES = {
     'Your account is recognized, but you are not assigned to an institution yet. Ask your administrator to add you.',
 }
 
+/** @param {Record<string, unknown> | null | undefined} user */
+export function isAuthAwaitingSetup(user) {
+  if (!user) return false
+  return Boolean(user.needsOnboardingChoice || user.needsFacultyApproval)
+}
+
 export async function saveStudentNumber(studentNumber) {
   const res = await fetch(`${API_BASE}/api/student/onboarding/student-number`, {
     method: 'POST',
@@ -141,6 +147,23 @@ export async function initialJoinClassByCode(accessCode) {
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
     body: JSON.stringify({ accessCode }),
+  })
+  return parseJson(res)
+}
+
+export async function fetchOnboardingInstitutions() {
+  const res = await fetch(`${API_BASE}/api/auth/onboarding/institutions`, {
+    credentials: 'include',
+  })
+  return parseJson(res)
+}
+
+export async function requestInstructorAccess(institutionId) {
+  const res = await fetch(`${API_BASE}/api/auth/onboarding/instructor`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ institutionId }),
   })
   return parseJson(res)
 }

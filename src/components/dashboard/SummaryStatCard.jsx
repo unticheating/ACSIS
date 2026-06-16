@@ -1,3 +1,4 @@
+import { Children, useCallback, useEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import FadeIn from '@/components/ui/fade-in.jsx'
 
@@ -44,11 +45,63 @@ export function SummaryStatCard({
  * @param {{ children: import('react').ReactNode, columns?: 3 | 4, className?: string }} props
  */
 export function SummaryStatGrid({ children, columns = 3, className }) {
+  const scrollRef = useRef(null)
+  const [atStart, setAtStart] = useState(true)
+  const [atEnd, setAtEnd] = useState(false)
+  const childCount = Children.count(children)
+
+  const updateScrollState = useCallback(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const maxScroll = el.scrollWidth - el.clientWidth
+    if (maxScroll <= 1) {
+      setAtStart(true)
+      setAtEnd(true)
+      return
+    }
+    setAtStart(el.scrollLeft <= 2)
+    setAtEnd(el.scrollLeft >= maxScroll - 2)
+  }, [])
+
+  useEffect(() => {
+    updateScrollState()
+    const el = scrollRef.current
+    if (!el) return undefined
+
+    el.addEventListener('scroll', updateScrollState, { passive: true })
+    const ro = typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(updateScrollState)
+      : null
+    ro?.observe(el)
+    window.addEventListener('resize', updateScrollState)
+
+    return () => {
+      el.removeEventListener('scroll', updateScrollState)
+      ro?.disconnect()
+      window.removeEventListener('resize', updateScrollState)
+    }
+  }, [updateScrollState, childCount])
+
   return (
     <div
-      className={cn('acsis-summary-stats', columns === 4 && 'acsis-summary-stats--4', className)}
+      className={cn(
+        'acsis-summary-stats-wrap',
+        atStart && 'is-at-start',
+        atEnd && 'is-at-end',
+        className,
+      )}
     >
-      {children}
+      <div className="acsis-summary-stats-fade acsis-summary-stats-fade--start" aria-hidden="true" />
+      <div className="acsis-summary-stats-fade acsis-summary-stats-fade--end" aria-hidden="true" />
+
+      <div
+        ref={scrollRef}
+        className={cn('acsis-summary-stats', columns === 4 && 'acsis-summary-stats--4')}
+        role="region"
+        aria-label="Summary statistics"
+      >
+        {children}
+      </div>
     </div>
   )
 }
