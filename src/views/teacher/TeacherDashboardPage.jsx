@@ -347,7 +347,7 @@ export default function TeacherDashboardPage() {
                       <DropdownMenuTrigger asChild>
                         <button
                           type="button"
-                          className="acsis-class-card__menu-btn opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+                          className="acsis-class-card__menu-btn transition-opacity"
                           aria-label="Exam options"
                         >
                           <MoreVertical size={18} strokeWidth={2} />
