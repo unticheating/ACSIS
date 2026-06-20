@@ -21,6 +21,7 @@ import {
 } from '@/lib/examFlowUi.js'
 import { joinStudentExam } from '@/lib/studentExamApi.js'
 import FadeIn from '@/components/ui/fade-in.jsx'
+import PageSpinner from '@/components/ui/page-spinner.jsx'
 import '../../pages/teacher-ui/my_classes.css'
 import '../../styles/class-card-patterns.css'
 import '../../pages/student-ui/enrolled_classes.css'
@@ -120,7 +121,7 @@ export default function StudentClassStreamPage() {
         <Link to="/student/my-classes" className="acsis-stream-back">
           ← Enrolled classes
         </Link>
-        <div className="acsis-mc-loading">Loading class…</div>
+        <PageSpinner label="Loading class…" />
       </div>
     )
   }

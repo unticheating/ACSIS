@@ -3,12 +3,13 @@ import { Link } from 'react-router-dom'
 import AdminDetectedStudentList from '@/components/admin/AdminDetectedStudentList.jsx'
 import { SummaryStatCard, SummaryStatGrid } from '@/components/dashboard/SummaryStatCard.jsx'
 import { fetchAdminDashboard, formatRelativeTime } from '@/lib/adminDashboardApi.js'
-import { issueViolationTicket } from '@/lib/adminViolationsApi.js'
+import { issueViolationTicket, fetchAdminViolationDetail } from '@/lib/adminViolationsApi.js'
 import { resolveMaxWarnings } from '@/lib/examAntiCheat.js'
 import FadeIn from '@/components/ui/fade-in.jsx'
 import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
 import { useAcsisConfirm } from '@/hooks/useAcsisConfirm.jsx'
 import { useInstitutionTheme } from '@/context/InstitutionThemeContext.jsx'
+import ViolationDetailModal from '@/views/admin/ViolationDetailModal.jsx'
 import '../../pages/admin-ui/style.css'
 
 export default function AdminDashboardPage({ basePath = '/admin' }) {
@@ -25,6 +26,11 @@ export default function AdminDashboardPage({ basePath = '/admin' }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [ticketingId, setTicketingId] = useState(null)
+
+  const [detailOpen, setDetailOpen] = useState(false)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState(null)
+  const [detail, setDetail] = useState(null)
 
   const previewLimit = 5
 
@@ -54,8 +60,29 @@ export default function AdminDashboardPage({ basePath = '/admin' }) {
     load()
   }, [load])
 
+  async function viewViolation(sessionId) {
+    setDetailOpen(true)
+    setDetailLoading(true)
+    setDetailError(null)
+    setDetail(null)
+    try {
+      const data = await fetchAdminViolationDetail(sessionId)
+      setDetail(data.detail)
+      if (data.maxWarnings != null) setMaxWarnings(data.maxWarnings)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to load session detail.'
+      setDetailError(msg)
+      acsisToastError(msg)
+    } finally {
+      setDetailLoading(false)
+    }
+  }
+
   async function ticketViolation(sessionId, alreadyTicketed) {
-    if (alreadyTicketed) return
+    if (alreadyTicketed) {
+      viewViolation(sessionId)
+      return
+    }
     const ok = await confirm({
       title: 'Issue violation ticket?',
       description: 'This will create an official violation ticket for this student session.',
@@ -77,7 +104,7 @@ export default function AdminDashboardPage({ basePath = '/admin' }) {
 
   const max = resolveMaxWarnings(maxWarnings)
   const displayDetectedStudents = detectedStudents.filter(
-    (s) => s.ticketIssued || s.status === 'ticketed' || (s.strikes && s.strikes >= max)
+    (s) => (!s.ticketIssued && s.status !== 'ticketed') && (s.strikes && s.strikes >= max)
   )
 
   return (
@@ -181,6 +208,14 @@ export default function AdminDashboardPage({ basePath = '/admin' }) {
         </FadeIn>
       </div>
       {ConfirmDialog}
+      <ViolationDetailModal
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        loading={detailLoading}
+        error={detailError}
+        detail={detail}
+        maxWarnings={maxWarnings}
+      />
     </div>
   )
 }

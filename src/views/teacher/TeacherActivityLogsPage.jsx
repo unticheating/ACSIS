@@ -82,22 +82,25 @@ export default function TeacherActivityLogsPage() {
 
   useEffect(() => {
     let cancelled = false
-    async function load() {
-      setLoading(true)
+    async function load(isBackground = false) {
+      if (!isBackground) setLoading(true)
       try {
         const data = await fetchTeacherActivityLogs(100)
-        if (!cancelled) setLogs(Array.isArray(data.logs) ? data.logs : [])
+        if (!cancelled) {
+          setLogs(Array.isArray(data.logs) ? data.logs : [])
+          setError(null)
+        }
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : 'Failed to load exam audit logs.')
-          setLogs([])
+          if (!isBackground) setLogs([])
         }
       } finally {
         if (!cancelled) setLoading(false)
       }
     }
-    load()
-    const timer = window.setInterval(load, 8000)
+    load(false)
+    const timer = window.setInterval(() => load(true), 8000)
     return () => {
       cancelled = true
       window.clearInterval(timer)
@@ -180,7 +183,7 @@ export default function TeacherActivityLogsPage() {
           </div>
         ) : null}
 
-        {(!loading || logs.length > 0) && !error && (
+        {(!loading || logs.length > 0) && (!error || logs.length > 0) && (
           <FadeIn className="panel" delay={0.1}>
             {filteredLogs.length === 0 ? (
               <div className="py-16 text-center flex flex-col items-center justify-center">

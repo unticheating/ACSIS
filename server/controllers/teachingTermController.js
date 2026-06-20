@@ -5,6 +5,7 @@ import {
   getTeachingTermDetailService,
   listTeachingTermsService,
   updateTeachingTermService,
+  updateTeachingTermsSortOrderService,
 } from '../services/teachingTermService.js'
 
 async function resolveInstitutionId(memberId) {
@@ -54,5 +55,15 @@ export async function deleteTeacherTerm(req, res) {
   if (!Number.isFinite(termId)) return res.status(400).json({ error: 'Invalid section id.' })
   const result = await deleteTeachingTermService(termId, req.memberId)
   if (!result.ok) return res.status(result.status || 500).json({ error: result.error })
+  return res.json({ ok: true })
+}
+
+export async function updateTeacherTermsSort(req, res) {
+  const { termIds } = req.body
+  if (!termIds || !Array.isArray(termIds)) {
+    return res.status(400).json({ error: 'termIds array is required.' })
+  }
+  const result = await updateTeachingTermsSortOrderService(req.memberId, termIds)
+  if (!result.ok) return res.status(500).json({ error: result.error })
   return res.json({ ok: true })
 }

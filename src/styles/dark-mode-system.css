@@ -1553,3 +1553,8 @@ html.dark .acsis-admin-detected-list__card .violation-status-badge.vstatus-ticke
   color: var(--fg-muted, #a3a3a3) !important;
   border: 1px solid var(--border-default, #2a2a2a) !important;
 }
+
+html.dark .strikes-badge--ongoing { background: color-mix(in srgb, #16a34a 20%, #1a1a1a) !important; color: #86efac !important; }
+html.dark .strikes-badge--warn1 { background: color-mix(in srgb, #84cc16 20%, #1a1a1a) !important; color: #d9f99d !important; }
+html.dark .strikes-badge--warn2 { background: color-mix(in srgb, #f59e0b 20%, #1a1a1a) !important; color: #fde68a !important; }
+html.dark .strikes-badge--warn3, html.dark .strikes-badge--done-warn3, html.dark .strikes-badge--ticketed { background: color-mix(in srgb, #dc2626 25%, #1a1a1a) !important; color: #fca5a5 !important; }

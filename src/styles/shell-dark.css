@@ -782,6 +782,23 @@ html.dark .acsis-mc-empty {
   color: #9cbcaa;
 }
 
+html.dark .acsis-mc-empty--exams {
+  background: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, 0.04) 0%,
+    rgba(255, 255, 255, 0.02) 100%
+  );
+  border-color: var(--border-default, #2a2a2a);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18), 0 4px 16px rgba(0, 0, 0, 0.14);
+}
+
+html.dark .acsis-mc-empty__icon {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--border-default, #2a2a2a);
+  color: var(--fg-subtle, #6b7280);
+  box-shadow: none;
+}
+
 html.dark .acsis-mc-empty__title {
   color: #c5e4d4;
 }

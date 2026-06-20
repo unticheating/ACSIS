@@ -2,7 +2,11 @@ import { resolveMaxWarnings } from '@/lib/examAntiCheat.js'
 import '../../styles/teacher-detections-live.css'
 
 function splitName(fullName) {
-  const parts = String(fullName || 'Student').trim().split(/\s+/)
+  const str = String(fullName || 'Student').trim()
+  if (str.includes(',')) {
+    return { firstName: str, lastName: '' }
+  }
+  const parts = str.split(/\s+/)
   if (parts.length < 2) return { firstName: parts[0] || 'Student', lastName: '' }
   return { firstName: parts[0], lastName: parts.slice(1).join(' ') }
 }
@@ -73,69 +77,39 @@ export default function AdminDetectedStudentList({
   const max = resolveMaxWarnings(maxWarnings)
 
   return (
-    <ul className="acsis-detections-list-view__cards acsis-admin-detected-list">
-      {items.map((student) => (
-        <li key={student.sessionId} className="acsis-admin-detected-list__row">
-          <div
-            className={`acsis-detections-list-card acsis-detections-list-card--${student.tone} acsis-detections-list-card--violator acsis-admin-detected-list__card`}
-          >
-            <div
-              className={`acsis-detections-list-card__strikes acsis-detections-list-card__strikes--${student.tone === 'ticketed' ? 'warn3' : student.tone}`}
-              aria-label={`${student.strikes} of ${max} warnings`}
-            >
-              <span className="acsis-detections-list-card__strikes-value">
-                {student.strikes > 0 ? student.strikes : '—'}
-              </span>
-              <span className="acsis-detections-list-card__strikes-label">/{max}</span>
-            </div>
-            <div className="acsis-detections-list-card__body">
-              <span
-                className={`acsis-detections-list-card__avatar acsis-detections-list-card__avatar--${student.tone === 'ticketed' ? 'warn3' : student.tone}`}
-              >
-                {student.avatarUrl ? (
-                  <img
-                    src={student.avatarUrl}
-                    alt=""
-                    className="w-full h-full object-cover rounded-full"
-                  />
-                ) : (
-                  seatInitials(student)
-                )}
-              </span>
-              <span className="acsis-detections-list-card__meta">
-                <span className="acsis-detections-list-card__name">
+    <div className="detected-list">
+      {items.map((student) => {
+        return (
+          <div key={student.sessionId} className="detected-item">
+            <div className="detected-left">
+              <div className={`strikes-badge strikes-badge--${student.tone}`}>
+                <span className="strikes-count">
+                  {student.strikes > 0 ? student.strikes : '—'}
+                </span>
+                <span className="strikes-label">strikes</span>
+              </div>
+              <div className="detected-info">
+                <div className="detected-name">
                   {student.lastName ? (
                     <>
-                      <span className="acsis-detections-list-card__name-last">
-                        {student.lastName}
-                      </span>
-                      {student.firstName ? (
-                        <span className="acsis-detections-list-card__name-first">
-                          , {student.firstName}
-                        </span>
-                      ) : null}
+                      {student.lastName}{student.firstName ? `, ${student.firstName}` : ''}
                     </>
                   ) : (
                     student.firstName || 'Student'
                   )}
-                </span>
-                <span className="acsis-detections-list-card__sub">
-                  {student.schoolId ? (
-                    <span className="acsis-detections-list-card__id">{student.schoolId}</span>
-                  ) : null}
-                  <span
-                    className={`acsis-detections-list-card__status acsis-detections-list-card__status--${student.tone === 'ticketed' ? 'warn3' : student.tone}`}
-                  >
-                    {student.statusLabel}
-                  </span>
-                </span>
-              </span>
+                  {student.examTitle && <span> in {student.examTitle}</span>}
+                </div>
+                <div className="detected-sub">
+                  {student.schoolId ? `${student.schoolId} • ` : ''}
+                  {student.statusLabel}
+                </div>
+              </div>
             </div>
-            <div className="acsis-admin-detected-list__card-action">
+            <div className="detected-right">
               {student.ticketIssued ? (
                 <button
                   type="button"
-                  className="view-info-link view-receipt-btn"
+                  className="view-receipt-btn"
                   onClick={() => onIssueTicket(student.sessionId, true)}
                 >
                   View receipt
@@ -143,7 +117,7 @@ export default function AdminDetectedStudentList({
               ) : (
                 <button
                   type="button"
-                  className="view-info-link ticket-btn"
+                  className="ticket-btn"
                   disabled={ticketingId === student.sessionId}
                   onClick={() => onIssueTicket(student.sessionId, false)}
                 >
@@ -152,8 +126,8 @@ export default function AdminDetectedStudentList({
               )}
             </div>
           </div>
-        </li>
-      ))}
-    </ul>
+        )
+      })}
+    </div>
   )
 }

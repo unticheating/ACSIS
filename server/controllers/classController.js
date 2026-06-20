@@ -6,6 +6,7 @@ import {
   getTeacherClassEnrollmentsService,
   updateTeacherClassService,
   deleteTeacherClassService,
+  getTeacherClassByIdService,
 } from '../services/classService.js';
 import {
   deleteAdminClassService,
@@ -85,6 +86,18 @@ export async function getTeacherClassEnrollments(req, res) {
     return res.status(result.status || 500).json({ error: result.error });
   }
   return res.json(result.students);
+}
+
+export async function getTeacherClass(req, res) {
+  const classId = Number(req.params.classId);
+  if (!Number.isFinite(classId)) {
+    return res.status(400).json({ error: 'Invalid class id.' });
+  }
+  const result = await getTeacherClassByIdService(req.memberId, classId);
+  if (!result.ok) {
+    return res.status(result.status || 500).json({ error: result.error });
+  }
+  return res.json(result.classData);
 }
 
 export async function updateTeacherClass(req, res) {

@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import PageSpinner from '@/components/ui/page-spinner.jsx'
 
 /** Legacy section URL — fold into My Classes accordion instead of an extra page. */
 export default function TeacherTermClassesPage() {
@@ -16,7 +17,7 @@ export default function TeacherTermClassesPage() {
 
   return (
     <div className="acsis-mc-view acsis-view">
-      <p className="acsis-mc-loading">Opening section…</p>
+      <PageSpinner label="Opening section…" />
     </div>
   )
 }

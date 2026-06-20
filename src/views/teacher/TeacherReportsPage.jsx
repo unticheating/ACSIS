@@ -13,6 +13,7 @@ import { fetchTeacherExamResults, fetchTeacherReportExams } from '@/lib/teacherE
 import { exportExamReport } from '@/lib/teacherExamGradingApi.js'
 import { acsisToastError } from '@/lib/acsisToast.js'
 import FadeIn from '@/components/ui/fade-in.jsx'
+import PageSpinner from '@/components/ui/page-spinner.jsx'
 import {
   Dialog,
   DialogContent,
@@ -202,12 +203,15 @@ export default function TeacherReportsPage() {
     }
 
     let cancelled = false
-    async function loadReport() {
-      setLoadingReport(true)
-      setReportError(null)
+    async function loadReport(isBackground = false) {
+      if (!isBackground) {
+        setLoadingReport(true)
+        setReportError(null)
+      }
       try {
         const data = await fetchTeacherExamResults(currentExam.classId, currentExam.id)
         if (cancelled) return
+        if (isBackground) setReportError(null)
         setStats(data.stats || null)
         setSessions(data.sessions || [])
         setViolations(data.violations || [])
@@ -215,17 +219,19 @@ export default function TeacherReportsPage() {
       } catch (err) {
         if (!cancelled) {
           setReportError(err instanceof Error ? err.message : 'Failed to load report.')
-          setStats(null)
-          setSessions([])
-          setViolations([])
+          if (!isBackground) {
+            setStats(null)
+            setSessions([])
+            setViolations([])
+          }
         }
       } finally {
-        if (!cancelled) setLoadingReport(false)
+        if (!cancelled && !isBackground) setLoadingReport(false)
       }
     }
 
-    loadReport()
-    const interval = window.setInterval(loadReport, 8000)
+    loadReport(false)
+    const interval = window.setInterval(() => loadReport(true), 8000)
     return () => {
       cancelled = true
       window.clearInterval(interval)
@@ -312,7 +318,7 @@ export default function TeacherReportsPage() {
             </div>
 
             {loadingExams ? (
-              <div className="rp-loading">Loading exams…</div>
+              <PageSpinner label="Loading exams…" />
             ) : allExams.length === 0 ? (
               <div className="rp-empty">No exams found. Create an exam in your classes first.</div>
             ) : (
@@ -455,7 +461,7 @@ export default function TeacherReportsPage() {
               </p>
             ) : null}
             {loadingReport && !stats ? (
-              <p className="rp-loading">Loading report data…</p>
+              <PageSpinner label="Loading report data…" />
             ) : null}
 
             {activeTab === 'summary' && (() => {

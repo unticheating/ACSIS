@@ -8,6 +8,7 @@ function mapTermRow(row) {
     academicYear: row.school_year,
     semester: row.semester,
     isArchived: Boolean(row.is_archived),
+    sortOrder: Number(row.sort_order || 0),
     classCount: Number(row.class_count || 0),
   }
 }
@@ -15,14 +16,14 @@ function mapTermRow(row) {
 export async function listTeachingTermsQuery(memberId, { includeArchived = false } = {}) {
   const pool = getPool()
   const result = await pool.query(
-    `SELECT t.term_id, t.program_code, t.section_code, t.school_year, t.semester, t.is_archived,
+    `SELECT t.term_id, t.program_code, t.section_code, t.school_year, t.semester, t.is_archived, t.sort_order,
             COUNT(c.class_id)::int AS class_count
      FROM teaching_terms t
      LEFT JOIN classes c ON c.term_id = t.term_id AND c.is_active = TRUE
      WHERE t.member_id = $1
        AND ($2::boolean OR t.is_archived = FALSE)
      GROUP BY t.term_id
-     ORDER BY t.is_archived ASC, t.school_year DESC, t.semester DESC, t.program_code, t.section_code`,
+     ORDER BY t.is_archived ASC, t.sort_order ASC, t.school_year DESC, t.semester DESC, t.program_code, t.section_code`,
     [memberId, includeArchived],
   )
   return result.rows.map(mapTermRow)
@@ -149,4 +150,25 @@ export async function listClassesByTermQuery(termId, memberId) {
     [termId, memberId],
   )
   return result.rows
+}
+
+export async function updateTermSortOrderQuery(memberId, termIds) {
+  const pool = getPool()
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    for (let i = 0; i < termIds.length; i++) {
+      await client.query(
+        'UPDATE teaching_terms SET sort_order = $1 WHERE member_id = $2 AND term_id = $3',
+        [i, memberId, termIds[i]]
+      )
+    }
+    await client.query('COMMIT')
+    return true
+  } catch (err) {
+    await client.query('ROLLBACK')
+    throw err
+  } finally {
+    client.release()
+  }
 }

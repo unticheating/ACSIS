@@ -13,7 +13,7 @@
   --acsis-immersive-input-border: rgba(74, 222, 128, 0.45);
   --acsis-immersive-panel: rgba(0, 24, 8, 0.35);
   /* Auth: gap below subtitle before form (increase to move form lower) */
-  --acsis-auth-brand-gap: clamp(56px, 9vh, 88px);
+  --acsis-auth-brand-gap: clamp(32px, 5vh, 48px);
 
   min-height: 100vh;
   min-height: 100dvh;
@@ -280,27 +280,27 @@
 
 @media (max-width: 767px) {
   .acsis-immersive {
-    --acsis-auth-brand-gap: clamp(44px, 7vh, 72px);
+    --acsis-auth-brand-gap: clamp(24px, 4vh, 40px);
   }
 
   .acsis-immersive__brand-row {
-    gap: clamp(12px, 4vw, 20px);
-    margin-bottom: 10px;
+    gap: clamp(10px, 3vw, 16px);
+    margin-bottom: 8px;
   }
 
   .acsis-immersive__brand .acsis-immersive__title--brand {
-    font-size: clamp(3.55rem, 12.5vw, 5rem);
+    font-size: clamp(2.5rem, 9vw, 3.5rem);
   }
 
   .acsis-immersive__brand-logo {
-    width: clamp(52px, 15vw, 66px) !important;
-    height: clamp(52px, 15vw, 66px) !important;
-    min-width: clamp(52px, 15vw, 66px) !important;
-    min-height: clamp(52px, 15vw, 66px) !important;
+    width: clamp(36px, 10vw, 48px) !important;
+    height: clamp(36px, 10vw, 48px) !important;
+    min-width: clamp(36px, 10vw, 48px) !important;
+    min-height: clamp(36px, 10vw, 48px) !important;
   }
 
   .acsis-immersive__brand .acsis-immersive__subtitle {
-    font-size: 0.74rem;
+    font-size: 0.65rem;
     letter-spacing: 0.1em;
   }
 }

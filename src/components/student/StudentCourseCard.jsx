@@ -34,7 +34,7 @@ export default function StudentCourseCard({ course, delay = 0, provided, isDragg
 
   return (
     <li
-      className={`stu-course-card-wrap flex ${isDragging ? 'opacity-90 scale-105 z-50 relative' : ''}`}
+      className={`stu-course-card-wrap flex ${isDragging ? 'stu-course-card-wrap--dragging opacity-90 scale-105 z-50 relative shadow-2xl' : ''}`}
       ref={provided?.innerRef}
       {...provided?.draggableProps}
       {...provided?.dragHandleProps}

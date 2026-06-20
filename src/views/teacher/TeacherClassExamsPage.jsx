@@ -9,7 +9,7 @@ import {
   PG_EXAM_STATUS,
   normalizeExamStatus,
 } from '@/lib/examFlowUi.js'
-import { Copy, MoreVertical, Palette, Pencil, Play, Send, Trash2, UserMinus, Search } from 'lucide-react'
+import { Copy, ChevronDown, ClipboardList, MoreVertical, Palette, Pencil, Play, Send, Trash2, UserMinus, Users, Search } from 'lucide-react'
 import ClassCourseHeader from '@/components/classes/ClassCourseHeader.jsx'
 import ClassHeaderAppearancePicker from '@/components/classes/ClassHeaderAppearancePicker.jsx'
 import { normalizeHeaderPattern } from '@/lib/classCardPatterns.js'
@@ -33,6 +33,7 @@ import TeacherCourseFieldsWithSuggest, {
   useTeacherCourseCatalogHint,
 } from '@/components/teacher/TeacherCourseFieldsWithSuggest.jsx'
 import FadeIn from '@/components/ui/fade-in.jsx'
+import PageSpinner from '@/components/ui/page-spinner.jsx'
 import { coerceDisplayString, coerceRouteParam } from '@/lib/coerceDisplay.js'
 import { formatCourseBreadcrumbLabel, formatCourseDisplayLabels } from '@/lib/sectionLabel.js'
 import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
@@ -190,7 +191,7 @@ export default function TeacherClassExamsPage() {
   if (loading) {
     return (
       <div className="acsis-mc-view acsis-view">
-        <div className="acsis-mc-loading">Loading exams…</div>
+        <PageSpinner label="Loading exams…" />
       </div>
     )
   }
@@ -388,6 +389,11 @@ export default function TeacherClassExamsPage() {
               <DropdownMenuActionItem icon={Pencil} onSelect={openEditCourse}>
                 Edit course
               </DropdownMenuActionItem>
+              {cls.accessCode ? (
+                <DropdownMenuActionItem icon={Copy} onSelect={() => void copyToClipboard(cls.accessCode, { successMessage: 'Class code copied.' })}>
+                  Copy class code
+                </DropdownMenuActionItem>
+              ) : null}
               <DropdownMenuSeparator />
               <DropdownMenuActionItem icon={Trash2} variant="destructive" onSelect={deleteCourse}>
                 Delete course
@@ -397,7 +403,7 @@ export default function TeacherClassExamsPage() {
         }
         extra={
           cls.accessCode ? (
-            <div className="acsis-course-banner__code-block">
+            <div className="acsis-course-banner__code-block acsis-course-banner__code-block--desktop-only">
               <span className="acsis-course-banner__code-label">Class code</span>
               <button
                 type="button"
@@ -417,7 +423,7 @@ export default function TeacherClassExamsPage() {
       <div className="acsis-class-toolbar">
         <div className="acsis-class-toolbar__filters">
           {pageView === 'exams' ? (
-            <label className="acsis-class-toolbar__field">
+            <label className="acsis-class-toolbar__field acsis-class-toolbar__field--select">
               <span className="acsis-sr-only">Filter exams</span>
               <select
                 className="acsis-class-toolbar__select"
@@ -431,6 +437,7 @@ export default function TeacherClassExamsPage() {
                   </option>
                 ))}
               </select>
+              <ChevronDown size={14} strokeWidth={2.5} className="acsis-class-toolbar__select-chevron" aria-hidden />
             </label>
           ) : null}
 
@@ -440,6 +447,7 @@ export default function TeacherClassExamsPage() {
             onClick={() => setPageView((v) => (v === 'students' ? 'exams' : 'students'))}
             aria-pressed={pageView === 'students'}
           >
+            <Users size={15} strokeWidth={2} aria-hidden />
             Enrolled students ({enrollmentCount})
           </button>
 
@@ -533,18 +541,23 @@ export default function TeacherClassExamsPage() {
             </ul>
           )
         ) : filtered.length === 0 ? (
-          <div className="acsis-mc-empty">
+          <div className="acsis-mc-empty acsis-mc-empty--exams">
+            <div className="acsis-mc-empty__icon" aria-hidden>
+              <ClipboardList size={40} strokeWidth={1.5} />
+            </div>
             <h2 className="acsis-mc-empty__title">
               {filter === 'all' ? 'No exams yet' : 'No exams in this filter'}
             </h2>
-            {!cls.isArchived && (
+            {filter === 'all' && !cls.isArchived ? (
               <>
-                <p className="acsis-mc-empty__text">Create an exam for this course.</p>
+                <p className="acsis-mc-empty__text">Create your first exam for this course and share it with students.</p>
                 <Link to={createHref} className="acsis-mc-create-btn">
                   Create exam
                 </Link>
               </>
-            )}
+            ) : filter !== 'all' ? (
+              <p className="acsis-mc-empty__text">Try switching the filter to see all exams.</p>
+            ) : null}
           </div>
         ) : (
           <div className="acsis-mc-stream">

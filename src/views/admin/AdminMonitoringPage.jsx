@@ -7,12 +7,14 @@ import {
   fetchAdminViolations,
   formatViolationDate,
   violationStatusClass,
+  issueViolationTicket,
 } from '@/lib/adminViolationsApi.js'
 import FadeIn from '@/components/ui/fade-in.jsx'
 import { Download } from 'lucide-react'
-import { acsisToastError } from '@/lib/acsisToast.js'
+import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
 import { resolveMaxWarnings } from '@/lib/examAntiCheat.js'
 import { useInstitutionTheme } from '@/context/InstitutionThemeContext.jsx'
+import { useAcsisConfirm } from '@/hooks/useAcsisConfirm.jsx'
 import AdminDetectedStudentList from '@/components/admin/AdminDetectedStudentList.jsx'
 import ViolationDetailModal from '@/views/admin/ViolationDetailModal.jsx'
 import '../../pages/admin-ui/style.css'
@@ -98,6 +100,7 @@ function ActivityFeedItems({ activities, loading, startDelay = 0.25 }) {
 
 export default function AdminMonitoringPage() {
   const { acronym } = useInstitutionTheme()
+  const { confirm, ConfirmDialog } = useAcsisConfirm()
   const [searchParams] = useSearchParams()
   const showAllActivity = searchParams.get('view') === 'activity'
 
@@ -110,14 +113,18 @@ export default function AdminMonitoringPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
+  const [ticketingId, setTicketingId] = useState(null)
+
   const [detailOpen, setDetailOpen] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState(null)
   const [detail, setDetail] = useState(null)
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    setError(null)
+  const load = useCallback(async (isBackground = false) => {
+    if (!isBackground) {
+      setLoading(true)
+      setError(null)
+    }
     try {
       const [monitorData, violationData] = await Promise.all([
         fetchAdminMonitoring(
@@ -125,6 +132,7 @@ export default function AdminMonitoringPage() {
         ),
         fetchAdminViolations(),
       ])
+      if (isBackground) setError(null)
       setStats(monitorData.stats || {})
       setActivities(monitorData.activities || [])
       setHasMoreActivity(Boolean(monitorData.hasMoreActivity))
@@ -132,13 +140,15 @@ export default function AdminMonitoringPage() {
       setViolationsCount(violationData.count ?? violationData.violations?.length ?? 0)
       setMaxWarnings(violationData.maxWarnings ?? 3)
     } catch (err) {
-      setActivities([])
-      setViolations([])
+      if (!isBackground) {
+        setActivities([])
+        setViolations([])
+      }
       const msg = err instanceof Error ? err.message : 'Failed to load monitoring data.'
       setError(msg)
-      acsisToastError(msg)
+      if (!isBackground) acsisToastError(msg)
     } finally {
-      setLoading(false)
+      if (!isBackground) setLoading(false)
     }
   }, [showAllActivity])
 
@@ -160,9 +170,33 @@ export default function AdminMonitoringPage() {
     }
   }
 
+  async function ticketViolation(sessionId, alreadyTicketed) {
+    if (alreadyTicketed) {
+      viewViolation(sessionId)
+      return
+    }
+    const ok = await confirm({
+      title: 'Issue violation ticket?',
+      description: 'This will create an official violation ticket for this student session.',
+      confirmLabel: 'Issue ticket',
+    })
+    if (!ok) return
+
+    setTicketingId(sessionId)
+    try {
+      await issueViolationTicket(sessionId)
+      acsisToastSuccess('Violation ticket issued.')
+      await load(false)
+    } catch (err) {
+      acsisToastError(err instanceof Error ? err.message : 'Failed to issue ticket.')
+    } finally {
+      setTicketingId(null)
+    }
+  }
+
   useEffect(() => {
-    load()
-    const interval = setInterval(load, 30000)
+    load(false)
+    const interval = setInterval(() => load(true), 30000)
     return () => clearInterval(interval)
   }, [load])
 
@@ -235,7 +269,13 @@ export default function AdminMonitoringPage() {
             const max = resolveMaxWarnings(maxWarnings)
             const displayViolations = violations.filter(
               (v) => v.status === 'ticketed' || (v.strikes && v.strikes >= max)
-            )
+            ).sort((a, b) => {
+              const aIsUnticketed = a.status !== 'ticketed';
+              const bIsUnticketed = b.status !== 'ticketed';
+              if (aIsUnticketed && !bIsUnticketed) return -1;
+              if (!aIsUnticketed && bIsUnticketed) return 1;
+              return 0;
+            })
 
             return loading ? (
               <p className="um-loading">Loading violation records…</p>
@@ -250,11 +290,11 @@ export default function AdminMonitoringPage() {
                     examTitle: v.exam,
                     strikes: v.strikes,
                     status: v.status,
-                    ticketIssued: v.status === 'ticketed',
+                    ticketIssued: String(v.status || '').toLowerCase() === 'ticketed',
                   }))}
                   maxWarnings={maxWarnings}
-                  ticketingId={detailLoading && detailOpen ? null : null}
-                  onIssueTicket={viewViolation}
+                  ticketingId={ticketingId}
+                  onIssueTicket={ticketViolation}
                 />
               </div>
             )
@@ -273,7 +313,7 @@ export default function AdminMonitoringPage() {
                 Show less
               </Link>
             ) : (
-              <button type="button" className="panel-view-all" onClick={load} disabled={loading}>
+              <button type="button" className="panel-view-all" onClick={() => load(false)} disabled={loading}>
                 Refresh
               </button>
             )}
@@ -289,6 +329,7 @@ export default function AdminMonitoringPage() {
         </FadeIn>
       </div>
 
+      {ConfirmDialog}
       <ViolationDetailModal
         open={detailOpen}
         onOpenChange={setDetailOpen}

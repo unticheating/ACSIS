@@ -1095,6 +1095,11 @@ html.dark .panel:hover {
     flex-shrink: 0;
 }
 
+.strikes-badge--ongoing { background: #f0fdf4; color: #16a34a; }
+.strikes-badge--warn1 { background: #ecfccb; color: #4d7c0f; }
+.strikes-badge--warn2 { background: #fef3c7; color: #b45309; }
+.strikes-badge--warn3, .strikes-badge--done-warn3, .strikes-badge--ticketed { background: #fde8e8; color: #c0392b; }
+
 .strikes-count {
     font-size: 20px;
     font-weight: 700;

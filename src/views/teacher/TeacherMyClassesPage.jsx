@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useLocation } from 'react-router-dom'
 import { Archive, ArchiveRestore, ChevronDown, MoreVertical, Plus, Trash2, Pencil } from 'lucide-react'
 import AnimatedHoverIcon from '@/components/icons/AnimatedHoverIcon.jsx'
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import { UserPlusIcon } from '@/components/icons/hoverIcons.js'
 import {
   DropdownMenu,
@@ -28,6 +29,7 @@ import {
 import { Input } from '@/components/ui/input.jsx'
 import { Label } from '@/components/ui/label.jsx'
 import FadeIn from '@/components/ui/fade-in.jsx'
+import PageSpinner from '@/components/ui/page-spinner.jsx'
 import '../../pages/teacher-ui/my_classes.css'
 import '../../styles/class-card-patterns.css'
 import '../../styles/scrollbars.css'
@@ -46,7 +48,7 @@ import '../../pages/student-ui/enrolled_classes.css'
  *   dimmed?: boolean,
  * }} props
  */
-function SectionCardItem({ group, isOpen, onToggle, onAddCourse, onEdit, onArchive, onRestore, onDelete, dimmed = false, delay = 0 }) {
+function SectionCardItem({ group, isOpen, onToggle, onAddCourse, onEdit, onArchive, onRestore, onDelete, dimmed = false, delay = 0, provided, isDragging }) {
   const { term, courses, isOrphan } = group
   const title = isOrphan ? 'Other courses' : formatSectionTitle(term)
   const period = isOrphan ? 'Not linked to a section' : formatTermPeriod(term)
@@ -60,24 +62,34 @@ function SectionCardItem({ group, isOpen, onToggle, onAddCourse, onEdit, onArchi
   }, [isOpen])
 
   return (
-    <FadeIn as="article" delay={delay}
-      className={`acsis-section-card${isOpen ? ' acsis-section-card--open' : ''}${term.isArchived || dimmed ? ' acsis-section-card--archived' : ''}${dimmed ? ' acsis-section-card--dimmed' : ''}`}
+    <div
+      ref={provided?.innerRef}
+      {...provided?.draggableProps}
+      style={{
+        ...provided?.draggableProps.style,
+        ...(isDragging ? { zIndex: 100 } : {})
+      }}
+      className={isDragging ? 'opacity-90 scale-[1.02] shadow-2xl z-50' : ''}
     >
-      <div
-        className="acsis-section-card__surface"
-        role="button"
-        tabIndex={0}
-        aria-expanded={isOpen}
-        aria-controls={panelId}
-        id={`section-trigger-${term.id}`}
-        onClick={onToggle}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault()
-            onToggle()
-          }
-        }}
+      <FadeIn as="article" delay={delay}
+        className={`acsis-section-card${isOpen ? ' acsis-section-card--open' : ''}${term.isArchived || dimmed ? ' acsis-section-card--archived' : ''}${dimmed ? ' acsis-section-card--dimmed' : ''}`}
       >
+        <div
+          className="acsis-section-card__surface"
+          role="button"
+          tabIndex={0}
+          aria-expanded={isOpen}
+          aria-controls={panelId}
+          id={`section-trigger-${term.id}`}
+          onClick={onToggle}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              onToggle()
+            }
+          }}
+          {...provided?.dragHandleProps}
+        >
         {canManage ? (
           <div className="acsis-section-card__menu">
             <DropdownMenu>
@@ -179,6 +191,7 @@ function SectionCardItem({ group, isOpen, onToggle, onAddCourse, onEdit, onArchi
         </div>
       </div>
     </FadeIn>
+    </div>
   )
 }
 
@@ -223,6 +236,7 @@ export default function TeacherMyClassesPage() {
   const [createAy, setCreateAy] = useState('2025-2026')
   const [createSem, setCreateSem] = useState('1st')
   const [creating, setCreating] = useState(false)
+  const [draggingId, setDraggingId] = useState(null)
 
   const [editTerm, setEditTerm] = useState(null)
   const [editProgram, setEditProgram] = useState('')
@@ -347,10 +361,6 @@ export default function TeacherMyClassesPage() {
       seen.add(termId)
     }
 
-    groups.sort((a, b) =>
-      formatSectionTitle(a.term).localeCompare(formatSectionTitle(b.term), undefined, { sensitivity: 'base' }),
-    )
-
     if (coursesByTermId.orphans.length > 0) {
       groups.push({
         term: { id: '_other', programCode: '', sectionCode: 'Other', academicYear: '', semester: '' },
@@ -369,9 +379,6 @@ export default function TeacherMyClassesPage() {
         term,
         courses: coursesByTermId.byTerm.get(String(term.id)) || [],
       }))
-    groups.sort((a, b) =>
-      formatSectionTitle(a.term).localeCompare(formatSectionTitle(b.term), undefined, { sensitivity: 'base' }),
-    )
     return groups
   }, [sections, coursesByTermId])
 
@@ -394,6 +401,42 @@ export default function TeacherMyClassesPage() {
   function toggleArchivedSection(id) {
     const key = String(id)
     setOpenArchivedSectionId((prev) => (prev === key ? null : key))
+  }
+
+  async function handleDragEnd(result) {
+    setDraggingId(null)
+    if (!result.destination) return
+
+    const sourceIndex = result.source.index
+    const destinationIndex = result.destination.index
+
+    if (sourceIndex === destinationIndex) return
+
+    const activeTerms = activeSectionGroups.map(g => g.term)
+    const [reorderedItem] = activeTerms.splice(sourceIndex, 1)
+    activeTerms.splice(destinationIndex, 0, reorderedItem)
+
+    const newSections = []
+    const activeIds = new Set(activeTerms.map(t => String(t.id)))
+    for (const t of activeTerms) {
+      if (t.id !== '_other') newSections.push(t)
+    }
+    for (const t of sections) {
+      if (!activeIds.has(String(t.id))) newSections.push(t)
+    }
+    setSections(newSections)
+
+    try {
+      const termIds = activeTerms.filter(t => t.id !== '_other').map(t => t.id)
+      await apiFetch('/api/teacher/terms/sort', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ termIds })
+      })
+    } catch (err) {
+      console.error('Failed to save sort order:', err)
+      acsisToastError('Failed to save section order.')
+    }
   }
 
   async function patchSection(id, body) {
@@ -502,7 +545,7 @@ export default function TeacherMyClassesPage() {
 
       <div className="acsis-mc-content">
         {loading ? (
-          <div className="acsis-mc-loading">Loading sections and courses…</div>
+          <PageSpinner label="Loading sections and courses…" />
         ) : activeSectionGroups.length === 0 ? (
           <div className="acsis-mc-empty">
             <h2 className="acsis-mc-empty__title">No sections yet</h2>
@@ -511,22 +554,41 @@ export default function TeacherMyClassesPage() {
           </div>
         ) : (
           <>
-            <div ref={listRef} className="acsis-section-card-list">
-              {activeSectionGroups.map((group, index) => (
-                <SectionCardItem
-                  key={group.term.id}
-                  group={group}
-                  isOpen={openSectionId === String(group.term.id)}
-                  onToggle={() => toggleSection(group.term.id)}
-                  onAddCourse={(term) => setAddCourseTerm(term)}
-                  onEdit={handleOpenEdit}
-                  onArchive={handleArchiveSection}
-                  onRestore={handleRestoreSection}
-                  onDelete={handleDeleteSection}
-                  delay={index * 0.05}
-                />
-              ))}
-            </div>
+            <DragDropContext
+              onDragStart={(start) => setDraggingId(start.draggableId)}
+              onDragEnd={handleDragEnd}
+            >
+              <Droppable droppableId="teacher-sections" direction="horizontal">
+                {(provided) => (
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
+                    className="acsis-section-card-list"
+                  >
+                    {activeSectionGroups.map((group, index) => (
+                      <Draggable key={group.term.id} draggableId={String(group.term.id)} index={index} isDragDisabled={group.isOrphan}>
+                        {(dragProvided, dragSnapshot) => (
+                          <SectionCardItem
+                            group={group}
+                            isOpen={openSectionId === String(group.term.id)}
+                            onToggle={() => toggleSection(group.term.id)}
+                            onAddCourse={(term) => setAddCourseTerm(term)}
+                            onEdit={handleOpenEdit}
+                            onArchive={handleArchiveSection}
+                            onRestore={handleRestoreSection}
+                            onDelete={handleDeleteSection}
+                            delay={index * 0.05}
+                            provided={dragProvided}
+                            isDragging={dragSnapshot.isDragging}
+                          />
+                        )}
+                      </Draggable>
+                    ))}
+                    {provided.placeholder}
+                  </div>
+                )}
+              </Droppable>
+            </DragDropContext>
 
             {archivedSections.length > 0 ? (
               <div className="acsis-archived-reveal">

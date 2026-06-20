@@ -6,6 +6,7 @@ import {
   getTeacherClassEnrollments,
   updateTeacherClass,
   deleteTeacherClass,
+  getTeacherClass,
 } from '../controllers/classController.js';
 import {
   createTeacherExam,
@@ -55,6 +56,7 @@ router.get('/', getTeacherClasses);
 router.post('/', createTeacherClass);
 
 // Single class (before /:classId/exams)
+router.get('/:classId', getTeacherClass);
 router.get('/:classId/enrollments', getTeacherClassEnrollments);
 router.patch('/:classId', updateTeacherClass);
 router.delete('/:classId', deleteTeacherClass);

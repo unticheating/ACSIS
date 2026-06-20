@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import TeacherPageHeader from '@/components/teacher/TeacherPageHeader.jsx'
+import PageSpinner from '@/components/ui/page-spinner.jsx'
 import StudentCourseCard from '@/components/student/StudentCourseCard.jsx'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import {
@@ -100,7 +101,10 @@ export default function StudentExamsPage() {
     }
   }
 
+  const [draggingId, setDraggingId] = useState(null)
+
   async function handleDragEnd(result) {
+    setDraggingId(null)
     if (!result.destination) return
 
     const items = Array.from(enrolled)
@@ -127,7 +131,7 @@ export default function StudentExamsPage() {
     : `${enrolled.length} ${enrolled.length === 1 ? 'class' : 'classes'}`
 
   return (
-    <div className={`acsis-mc-view acsis-view stu-my-classes${showJoinModal ? ' stu-my-classes--first-visit' : ''}`}>
+    <div className={`acsis-mc-view acsis-view stu-my-classes${showJoinModal ? ' stu-my-classes--first-visit' : ''}${draggingId ? ' stu-my-classes--dragging' : ''}`}>
       <div className="stu-my-classes__content" aria-hidden={showJoinModal || isManualOpen}>
         <TeacherPageHeader
           title="Enrolled classes"
@@ -141,7 +145,7 @@ export default function StudentExamsPage() {
 
         <div className="acsis-mc-content">
           {loading ? (
-            <div className="acsis-mc-loading">Loading enrolled classes…</div>
+            <PageSpinner label="Loading enrolled classes…" />
           ) : enrolled.length === 0 ? (
             <div className="acsis-mc-empty">
               <h2 className="acsis-mc-empty__title">No classes yet</h2>
@@ -153,7 +157,10 @@ export default function StudentExamsPage() {
               </button>
             </div>
           ) : (
-            <DragDropContext onDragEnd={handleDragEnd}>
+            <DragDropContext 
+              onDragStart={(start) => setDraggingId(start.draggableId)}
+              onDragEnd={handleDragEnd}
+            >
               <Droppable droppableId="enrolled-classes" direction="horizontal">
                 {(provided) => (
                   <ul
@@ -161,18 +168,26 @@ export default function StudentExamsPage() {
                     {...provided.droppableProps}
                     ref={provided.innerRef}
                   >
-                    {enrolled.map((c, index) => (
-                      <Draggable key={c.id} draggableId={String(c.id)} index={index}>
-                        {(dragProvided, dragSnapshot) => (
-                          <StudentCourseCard 
-                            course={c} 
-                            delay={index * 0.05} 
-                            provided={dragProvided}
-                            isDragging={dragSnapshot.isDragging}
-                          />
-                        )}
-                      </Draggable>
-                    ))}
+                    {enrolled.map((c, index) => {
+                      const isDraggingThis = draggingId === String(c.id)
+                      return [
+                        <li 
+                          key={`ph-${c.id}`}
+                          className="stu-course-card-wrap border-2 border-dashed border-gray-300 bg-gray-50 rounded-[14px] dark:border-gray-700 dark:bg-[#1a1a1a]" 
+                          style={{ display: isDraggingThis ? 'flex' : 'none', minHeight: '240px' }} 
+                        />,
+                        <Draggable key={c.id} draggableId={String(c.id)} index={index}>
+                          {(dragProvided, dragSnapshot) => (
+                            <StudentCourseCard 
+                              course={c} 
+                              delay={index * 0.05} 
+                              provided={dragProvided}
+                              isDragging={dragSnapshot.isDragging}
+                            />
+                          )}
+                        </Draggable>
+                      ]
+                    })}
                     {provided.placeholder}
                   </ul>
                 )}

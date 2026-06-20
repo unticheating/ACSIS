@@ -51,6 +51,7 @@ import {
 } from '@/components/ui/dropdown-menu.jsx'
 import { DropdownMenuActionItem } from '@/components/ui/dropdown-menu-action-item.jsx'
 import FadeIn from '@/components/ui/fade-in.jsx'
+import PageSpinner from '@/components/ui/page-spinner.jsx'
 import {
   Dialog,
   DialogContent,
@@ -340,7 +341,7 @@ export default function TeacherExamDetailPage() {
       try {
         const [examRes, classRes] = await Promise.all([
           apiFetch(`/api/teacher/classes/${classId}/exams/${examId}`),
-          apiFetch(`/api/teacher/classes/${classId}/exams`),
+          apiFetch(`/api/teacher/classes/${classId}`),
         ])
         if (!examRes.ok) {
           throw new Error('Exam not found or you do not have permission.')
@@ -379,25 +380,26 @@ export default function TeacherExamDetailPage() {
 
   useEffect(() => {
     if (!classId || !examId) return undefined
+    if (tab !== 'overview' && tab !== 'results') return undefined
     let cancelled = false
-    async function loadResults() {
-      setResultsLoading(true)
+    async function loadResults(isBackground = false) {
+      if (!isBackground) setResultsLoading(true)
       try {
         const data = await fetchTeacherExamResults(classId, examId)
         if (!cancelled) setResults(data)
       } catch {
-        if (!cancelled) setResults(null)
+        if (!cancelled && !isBackground) setResults(null)
       } finally {
-        if (!cancelled) setResultsLoading(false)
+        if (!cancelled && !isBackground) setResultsLoading(false)
       }
     }
-    loadResults()
-    const interval = window.setInterval(loadResults, 6000)
+    loadResults(false)
+    const interval = window.setInterval(() => loadResults(true), 6000)
     return () => {
       cancelled = true
       window.clearInterval(interval)
     }
-  }, [classId, examId, refreshTick])
+  }, [classId, examId, refreshTick, tab])
 
   const filteredSessions = useMemo(() => {
     let list = [...(results?.sessions || [])]
@@ -464,7 +466,7 @@ export default function TeacherExamDetailPage() {
   if (loading) {
     return (
       <div className="acsis-mc-view acsis-view acsis-exam-detail">
-        <div className="acsis-mc-loading">Loading exam details…</div>
+        <PageSpinner label="Loading exam details…" />
       </div>
     )
   }
@@ -886,7 +888,7 @@ export default function TeacherExamDetailPage() {
         </div>
         <div className="acsis-exam-detail__hero-tools">
           {exam.code ? (
-            <div className="acsis-exam-detail__code-wrap">
+            <div className="acsis-exam-detail__code-wrap acsis-exam-detail__code-wrap--desktop-only">
               <span className="acsis-exam-detail__code-label">Exam password</span>
               <div className="acsis-exam-detail__code-pill">
                 {examCodeEditing ? (

@@ -5,6 +5,7 @@ import {
   listClassesByTermQuery,
   listTeachingTermsQuery,
   updateTeachingTermQuery,
+  updateTermSortOrderQuery,
 } from '../repositories/teachingTermRepository.js'
 
 const SEMESTERS = new Set(['1st', '2nd', 'Summer'])
@@ -104,6 +105,16 @@ export async function deleteTeachingTermService(termId, memberId) {
     return { ok: true }
   } catch (err) {
     console.error('[teachingTermService.delete]', err)
+    return { ok: false, error: 'Database error.' }
+  }
+}
+
+export async function updateTeachingTermsSortOrderService(memberId, termIds) {
+  try {
+    await updateTermSortOrderQuery(memberId, termIds)
+    return { ok: true }
+  } catch (err) {
+    console.error('[teachingTermService.updateSortOrder]', err)
     return { ok: false, error: 'Database error.' }
   }
 }

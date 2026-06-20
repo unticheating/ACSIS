@@ -1119,6 +1119,17 @@ export default function StudentExamSessionPage() {
         )
       : null
 
+  const studentCode = activeAccount?.id ? btoa(activeAccount.id).replace(/=/g, '') : 'UNKNOWN';
+  const watermarkPositions = [
+    { top: '10px', left: '10px' },
+    { top: '10px', right: '10px' },
+    { bottom: '10px', left: '10px' },
+    { bottom: '10px', right: '10px' },
+    { top: '45%', right: '10px' },
+    { top: '45%', left: '10px' },
+  ];
+  const watermarkPos = watermarkPositions[currentQuestionIndex % watermarkPositions.length];
+
   return (
     <div className="acsis-student-exam min-h-screen flex flex-col">
       <ExamSessionHeader
@@ -1170,7 +1181,22 @@ export default function StudentExamSessionPage() {
 
       <div className="flex-1 flex flex-col lg:flex-row w-full max-w-[1600px] mx-auto items-stretch">
         <div className="hidden lg:block lg:w-80 shrink-0" />
-        <main className="exam-stage flex-1 flex flex-col min-w-0">
+        <main className="exam-stage flex-1 flex flex-col min-w-0 relative">
+          <div
+            style={{
+              position: 'absolute',
+              opacity: 0.04,
+              pointerEvents: 'none',
+              fontSize: '11px',
+              fontFamily: 'monospace',
+              zIndex: 9999,
+              userSelect: 'none',
+              ...watermarkPos
+            }}
+            aria-hidden="true"
+          >
+            Ref: {studentCode}
+          </div>
           {currentQ ? (
             <div className={`flex-1 flex flex-col w-full mx-auto max-w-3xl`}>
               {examLocked ? (

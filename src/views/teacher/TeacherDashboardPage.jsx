@@ -5,6 +5,7 @@ import { BookOpen, Activity, Users, MoreVertical, Copy, Send, Trash2 } from 'luc
 import { apiFetch } from '@/lib/apiFetch.js'
 import { copyToClipboard } from '@/lib/copyToClipboard.js'
 import FadeIn from '@/components/ui/fade-in.jsx'
+import PageSpinner from '@/components/ui/page-spinner.jsx'
 import { formatSectionTitle } from '@/lib/sectionLabel.js'
 import { useAcsisConfirm } from '@/hooks/useAcsisConfirm.jsx'
 import {
@@ -204,7 +205,7 @@ export default function TeacherDashboardPage() {
         .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }))
     : []
   const canContinue = selectedClassIds.length > 0
-  const visibleExams = exams.filter((exam) => normalizeExamStatus(exam.status) !== PG_EXAM_STATUS.CLOSED)
+  const visibleExams = exams
 
   useEffect(() => {
     if (multiSectionCourseOptions.length === 0) {
@@ -253,15 +254,20 @@ export default function TeacherDashboardPage() {
       </SummaryStatGrid>
       {/* Exams strip */}
       <div className="mt-8">
-        <div className="flex items-center justify-between gap-4 mb-6">
-          <h3 className="text-2xl font-semibold tracking-tight text-foreground">My Exams</h3>
-          <div className="flex items-center gap-3 shrink-0">
-            <Link to="/teacher/my-classes" className="panel-view-all">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xl sm:text-2xl font-semibold tracking-tight text-foreground">My Exams</h3>
+            <Link to="/teacher/my-classes" className="panel-view-all sm:hidden">
+              {visibleExams.length > 8 ? `View All (${visibleExams.length})` : 'View All'}
+            </Link>
+          </div>
+          <div className="flex items-center gap-3 shrink-0 w-full sm:w-auto">
+            <Link to="/teacher/my-classes" className="panel-view-all hidden sm:block">
               {visibleExams.length > 8 ? `View All (${visibleExams.length})` : 'View All'}
             </Link>
             <button
               type="button"
-              className="acsis-mc-create-btn"
+              className="acsis-mc-create-btn w-full sm:w-auto justify-center"
               onClick={() => {
                 resetCreateExamModal()
                 setCreateModalOpen(true)
@@ -274,10 +280,15 @@ export default function TeacherDashboardPage() {
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {loadingExams && (
-            <div className="text-sm text-muted-foreground col-span-full">Loading exams…</div>
+            <div className="col-span-full py-8">
+              <PageSpinner label="Loading exams…" />
+            </div>
           )}
           {!loadingExams && visibleExams.length === 0 && (
-            <div className="text-sm text-muted-foreground col-span-full">No exams yet. Create one to get started.</div>
+            <div className="col-span-full border border-dashed border-border rounded-xl p-10 text-center flex flex-col items-center justify-center bg-muted/30">
+              <BookOpen className="h-10 w-10 text-muted-foreground/30 mb-4" strokeWidth={1.5} />
+              <p className="text-[14px] text-muted-foreground font-medium">No exams yet. Create one to get started.</p>
+            </div>
           )}
           {visibleExams.slice(0, 8).map((ex) => {
             const title = ex.title || ex.name || 'Untitled Exam'
@@ -288,7 +299,8 @@ export default function TeacherDashboardPage() {
             const courseCode = classMeta?.courseCode || classMeta?.course_code || ''
             const courseName = classMeta?.name || ''
             const courseLabel = [courseCode, courseName].filter(Boolean).join(' - ') || 'Course'
-            const displayTitle = sectionLabel ? `${sectionLabel} ${title}` : title
+            const displaySubtitle = [sectionLabel, courseLabel].filter(Boolean).join(' • ')
+            const displayTitle = title
             const lastEdited = ex.updated_at || ex.last_edited_at || ex.created_at || null
             const status = normalizeExamStatus(ex.status)
             const draft = isExamDraft(status)
@@ -317,7 +329,7 @@ export default function TeacherDashboardPage() {
                 >
                   <CardHeader className="pb-3 pr-10">
                     <CardTitle className="text-lg leading-tight line-clamp-2">{displayTitle}</CardTitle>
-                    <CardDescription className="line-clamp-1 mt-1.5">{courseLabel}</CardDescription>
+                    <CardDescription className="line-clamp-1 mt-1.5">{displaySubtitle}</CardDescription>
                   </CardHeader>
                   <CardContent className="flex-1 pb-3">
                     <p className="text-sm text-muted-foreground">

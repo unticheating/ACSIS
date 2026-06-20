@@ -95,6 +95,19 @@ export async function getTeacherClassEnrollmentsService(memberId, classId) {
   }
 }
 
+export async function getTeacherClassByIdService(memberId, classId) {
+  try {
+    const cls = await getTeacherClassByIdQuery(classId, memberId);
+    if (!cls) {
+      return { ok: false, status: 404, error: 'Class not found.' };
+    }
+    return { ok: true, classData: cls };
+  } catch (err) {
+    console.error('[classService.getTeacherClassByIdService]', err);
+    return { ok: false, error: 'Database error.' };
+  }
+}
+
 export async function updateTeacherClassService(memberId, classId, body) {
   /** @type {{ courseCode?: string, name?: string, headerPattern?: string, headerColor?: string | null }} */
   const patch = {};

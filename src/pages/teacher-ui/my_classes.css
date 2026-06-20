@@ -84,6 +84,29 @@
   margin: 0 auto;
 }
 
+/* Exams-specific empty state — richer visual, no bluish tint */
+.acsis-mc-empty--exams {
+  border-style: solid;
+  border-color: var(--border-default, #e2e8f0);
+  padding: 3rem 2rem 2.5rem;
+  background: var(--bg-surface, #ffffff);
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.04), 0 4px 16px rgba(15, 23, 42, 0.04);
+}
+
+.acsis-mc-empty__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 20px;
+  background: var(--bg-surface-muted, #f8fafc);
+  border: 1px solid var(--border-default, #e2e8f0);
+  color: var(--fg-subtle, #94a3b8);
+  margin: 0 auto 1.25rem;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 2px 6px rgba(15, 23, 42, 0.06);
+}
+
 .acsis-mc-empty__title {
   margin: 0 0 8px;
 }
@@ -144,6 +167,14 @@
   background: var(--bg-surface-muted, #f3f4f6);
   border-color: var(--border-default, #e5e7eb);
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  opacity: 0.65;
+  filter: grayscale(80%);
+  transition: opacity 0.2s, filter 0.2s;
+}
+
+.acsis-section-card--dimmed .acsis-section-card__surface:hover {
+  opacity: 0.9;
+  filter: grayscale(40%);
 }
 
 .acsis-section-card--dimmed .acsis-section-card__eyebrow,
@@ -956,22 +987,38 @@
   min-width: 0;
 }
 
-.acsis-class-toolbar__field {
-  margin: 0;
+.acsis-class-toolbar__field--select {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
 }
 
 .acsis-class-toolbar__select {
   min-height: 40px;
-  padding: 8px 36px 8px 14px;
+  padding: 8px 34px 8px 14px;
   border: 1px solid var(--border-default, #e5e7eb);
   border-radius: 10px;
-  background: var(--bg-surface, #fff) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 12px center;
+  background: var(--bg-surface, #fff);
   color: var(--fg-default, #111827);
   cursor: pointer;
   appearance: none;
+  width: 100%;
+}
+
+.acsis-class-toolbar__select-chevron {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--fg-muted, #6b7280);
+  flex-shrink: 0;
 }
 
 .acsis-class-toolbar__students-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   min-height: 40px;
   padding: 8px 14px;
   border: 1px solid var(--border-default, #e5e7eb);
@@ -980,6 +1027,7 @@
   color: var(--fg-default, #374151);
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
+  white-space: nowrap;
 }
 
 .acsis-class-toolbar__students-btn:hover {
@@ -3024,6 +3072,12 @@ select.acsis-mc-input {
 
 /* Mobile responsive enhancements for Exam Detail View */
 @media (max-width: 640px) {
+  .acsis-exam-detail__hero {
+    flex-wrap: nowrap;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
   .acsis-exam-detail__tabs-row {
     flex-wrap: wrap;
   }
@@ -3035,8 +3089,10 @@ select.acsis-mc-input {
   }
 
   .acsis-exam-detail__hero-tools {
-    width: 100%;
-    justify-content: stretch;
+    width: auto;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
   }
   
   .acsis-exam-detail__code-wrap {
@@ -3046,6 +3102,23 @@ select.acsis-mc-input {
   
   .acsis-exam-detail__table-wrap {
     box-shadow: inset 0 0 10px rgba(0,0,0,0.02);
+  }
+  
+  .acsis-exam-detail__questions-head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+  
+  .acsis-exam-detail__questions-actions {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+  
+  .acsis-exam-detail__questions-actions > * {
+    width: 100%;
+    justify-content: center;
   }
 }
 
@@ -3118,3 +3191,102 @@ select.acsis-mc-input {
     transform: scale(2.5);
   }
 }
+
+/* ── Teacher Dashboard: My Exams section header ── */
+.acsis-dashboard-exams-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 479px) {
+  .acsis-dashboard-exams-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .acsis-dashboard-exams-header > div {
+    align-self: stretch;
+    justify-content: space-between;
+  }
+}
+
+/* ── Mobile: section card drop panel – flow layout instead of absolute ── */
+@media (max-width: 767px) {
+  .acsis-section-card__drop {
+    position: relative;
+    top: auto;
+    left: auto;
+    right: auto;
+    margin-top: 0;
+    border-radius: 0 0 14px 14px;
+    max-height: none;
+  }
+
+  .acsis-section-card__drop--open {
+    overflow: visible;
+    max-height: none;
+  }
+
+  /* Open card stays in normal flow, no extra z-index stacking needed */
+  .acsis-section-card--open {
+    z-index: 1;
+  }
+
+  /* Tighten aside panel on narrow phones */
+  .acsis-teacher-course-card__aside {
+    min-width: 5.5rem;
+  }
+}
+
+/* ── Very small screens (≤ 380px) ── */
+@media (max-width: 380px) {
+  .acsis-mc-page-header__actions .acsis-mc-create-btn {
+    font-size: 0.75rem;
+    padding: 0 0.875rem;
+    min-height: 38px;
+  }
+
+  /* Hide aside stats column; just show course name on tiny screens */
+  .acsis-teacher-course-card__aside {
+    display: none;
+  }
+
+  .acsis-teacher-course-card__main {
+    padding: 10px;
+  }
+}
+
+/* ── Exam Detail: hide password/code widget on mobile (accessible via 3-dots menu) ── */
+@media (max-width: 640px) {
+  .acsis-exam-detail__code-wrap--desktop-only {
+    display: none;
+  }
+
+  /* Class page: hide banner class code on mobile (accessible via 3-dots menu) */
+  .acsis-course-banner__code-block--desktop-only {
+    display: none;
+  }
+}
+
+/* ── Class toolbar filters: always stay on one row, no wrapping ── */
+.acsis-class-toolbar__filters {
+  flex-wrap: nowrap !important;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  /* Prevent filter row from growing and pushing Create exam button off-screen */
+  min-width: 0;
+}
+
+.acsis-class-toolbar__filters::-webkit-scrollbar {
+  display: none;
+}
+
+.acsis-class-toolbar__filters > * {
+  flex-shrink: 0;
+}
+

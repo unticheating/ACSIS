@@ -5,6 +5,7 @@ import {
   getTeacherTerm,
   listTeacherTerms,
   patchTeacherTerm,
+  updateTeacherTermsSort,
 } from '../controllers/teachingTermController.js'
 import { requireAuth, resolveTeacherInstitution } from '../lib/sessionAuth.js'
 
@@ -21,6 +22,7 @@ router.use(resolveTeacherInstitution)
 
 router.get('/', listTeacherTerms)
 router.post('/', createTeacherTerm)
+router.put('/sort', updateTeacherTermsSort)
 router.get('/:termId', getTeacherTerm)
 router.patch('/:termId', patchTeacherTerm)
 router.delete('/:termId', deleteTeacherTerm)
