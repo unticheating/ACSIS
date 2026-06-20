@@ -561,7 +561,10 @@ export default function TeacherMyClassesPage() {
               <Droppable droppableId="teacher-sections" direction="horizontal">
                 {(provided) => (
                   <div
-                    ref={provided.innerRef}
+                    ref={(node) => {
+                      provided.innerRef(node)
+                      listRef.current = node
+                    }}
                     {...provided.droppableProps}
                     className="acsis-section-card-list"
                   >
