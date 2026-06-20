@@ -3,14 +3,25 @@
 .acsis-summary-stats-wrap {
   position: relative;
   width: 100%;
-  max-width: 100%;
   margin-bottom: 22px;
   box-sizing: border-box;
 }
 
+/* Teacher dashboard: bleed cards edge-to-edge past the acsis-main side padding */
+.teacher-dash-stats {
+  margin-left: calc(-1 * var(--acsis-main-pad-x, 28px)) !important;
+  margin-right: calc(-1 * var(--acsis-main-pad-x, 28px)) !important;
+  width: calc(100% + 2 * var(--acsis-main-pad-x, 28px)) !important;
+  max-width: calc(100% + 2 * var(--acsis-main-pad-x, 28px)) !important;
+  padding-left: var(--acsis-main-pad-x, 28px) !important;
+  padding-right: var(--acsis-main-pad-x, 28px) !important;
+  box-sizing: border-box;
+}
+
+
 .acsis-summary-stats {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 16px;
   width: 100%;
   max-width: 100%;
@@ -18,7 +29,7 @@
 }
 
 .acsis-summary-stats--4 {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 }
 
 .acsis-summary-stats-fade {
@@ -32,13 +43,17 @@
 }
 
 @media (max-width: 767px) {
-  .acsis-summary-stats-wrap {
+  .acsis-summary-stats-wrap,
+  .teacher-dash-stats {
     position: relative;
-    width: calc(100% + 2 * var(--acsis-main-pad-x, 14px));
+    width: calc(100% + 2 * var(--acsis-main-pad-x, 14px)) !important;
+    max-width: none !important;
     left: 50%;
     transform: translateX(-50%);
-    margin-left: 0;
-    margin-right: 0;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
   }
 
   .acsis-summary-stats,

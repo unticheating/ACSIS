@@ -3290,3 +3290,40 @@ select.acsis-mc-input {
   flex-shrink: 0;
 }
 
+@media (max-width: 639px) {
+  .acsis-class-toolbar__filters {
+    gap: 6px;
+    width: 100%;
+  }
+  .acsis-class-toolbar__filters > * {
+    flex: 1;
+    min-width: 0;
+  }
+  .acsis-class-toolbar__field--select {
+    width: 100%;
+  }
+  .acsis-class-toolbar__select {
+    padding: 6px 28px 6px 10px;
+    font-size: 0.8125rem;
+    min-height: 36px;
+    width: 100%;
+  }
+  .acsis-class-toolbar__select-chevron {
+    right: 8px;
+  }
+  .acsis-class-toolbar__students-btn {
+    padding: 6px 4px;
+    font-size: 0.8125rem;
+    min-height: 36px;
+    gap: 5px;
+    justify-content: center;
+  }
+  .acsis-class-toolbar__back-exams {
+    padding: 6px 8px;
+    font-size: 0.8125rem;
+    min-height: 36px;
+    width: 100%;
+    justify-content: center;
+  }
+}
+

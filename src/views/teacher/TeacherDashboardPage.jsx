@@ -229,7 +229,7 @@ export default function TeacherDashboardPage() {
 
   return (
     <div className="acsis-view">
-      <SummaryStatGrid>
+      <SummaryStatGrid className="teacher-dash-stats">
         <SummaryStatCard
           label="My Classes"
           value={totalClasses}
