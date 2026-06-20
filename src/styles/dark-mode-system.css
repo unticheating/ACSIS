@@ -298,6 +298,22 @@ html.dark textarea:focus {
   box-shadow: 0 0 0 2px var(--acsis-brand-subtle, color-mix(in srgb, var(--acsis-brand) 20%, transparent));
 }
 
+/* Admin settings input — dark idle vs active */
+html.dark .admin-settings-input {
+  background: var(--bg-elevated, #1e1e1e) !important;
+  border-color: var(--border-default, #2a2a2a) !important;
+  color: var(--fg-default, #f5f5f5) !important;
+  border-radius: 8px;
+}
+
+html.dark .admin-settings-input:focus {
+  background: var(--bg-surface, #252525) !important;
+  border-color: var(--acsis-brand, #4ade80) !important;
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--acsis-brand, #4ade80) 18%, transparent),
+    0 1px 4px rgba(0, 0, 0, 0.3) !important;
+}
+
 /* ── Breadcrumb ── */
 html.dark .breadcrumb .brand-plp,
 html.dark .breadcrumb .brand-acsis,

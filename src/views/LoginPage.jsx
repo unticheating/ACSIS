@@ -31,6 +31,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [forgotPasswordSubmitting, setForgotPasswordSubmitting] = useState(false)
+  const [isLoggingIn, setIsLoggingIn] = useState(false)
   const [googleDomainBanner, setGoogleDomainBanner] = useState(false)
   const noMembershipToastUidRef = useRef(null)
 
@@ -134,6 +135,8 @@ export default function LoginPage() {
       'student@plpasig.edu.ph'
     ];
 
+    setIsLoggingIn(true)
+
     if (demoAccounts.includes(trimmed.toLowerCase())) {
       try {
         await loginWithPassword(trimmed, password)
@@ -147,6 +150,8 @@ export default function LoginPage() {
         }
       } catch (err) {
         acsisToastError(err instanceof Error ? err.message : 'Sign-in failed.')
+      } finally {
+        setIsLoggingIn(false)
       }
       return
     }
@@ -165,6 +170,8 @@ export default function LoginPage() {
       navigate(`/verify?email=${encodeURIComponent(trimmed)}`, { replace: true })
     } catch (err) {
       acsisToastError(err instanceof Error ? err.message : 'Could not send verification code.')
+    } finally {
+      setIsLoggingIn(false)
     }
   }
 
@@ -275,8 +282,20 @@ export default function LoginPage() {
           >
             {forgotPasswordSubmitting ? 'Sending temporary password…' : 'Forgot password?'}
           </button>
-          <button type="submit" className="acsis-immersive__btn-primary">
-            Continue
+          <button
+            type="submit"
+            className="acsis-immersive__btn-primary"
+            disabled={isLoggingIn}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+          >
+            {isLoggingIn ? (
+              <>
+                <div className="acsis-immersive__spinner" style={{ width: '16px', height: '16px', borderWidth: '2px' }} />
+                Logging in…
+              </>
+            ) : (
+              'Continue'
+            )}
           </button>
         </form>
         </div>

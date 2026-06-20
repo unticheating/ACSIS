@@ -20,21 +20,23 @@ export async function getInstitutionMaxWarnings(institutionId) {
 export async function getAdminDashboardStatsQuery(institutionId) {
   const pool = getPool()
   const { rows } = await pool.query(
-    `SELECT
-      (SELECT COUNT(*)
-       FROM exams e
-       JOIN classes c ON e.class_id = c.class_id
-       WHERE c.institution_id = $1 AND c.is_active = TRUE
-         AND e.is_archived = FALSE AND e.status IN ('open', 'waiting')) AS "ongoingExams",
-      (SELECT COUNT(*)
-       FROM exams e
-       JOIN classes c ON e.class_id = c.class_id
-       WHERE c.institution_id = $1 AND c.is_active = TRUE AND e.is_archived = FALSE) AS "totalExams",
-      (SELECT COUNT(DISTINCT es.session_id)
-       FROM exam_sessions es
-       JOIN exams e ON es.exam_id = e.exam_id
-       JOIN classes c ON e.class_id = c.class_id
-       WHERE c.institution_id = $1 AND c.is_active = TRUE AND es.warning_count > 0) AS "detectedStudents"`,
+    `WITH stats AS (
+      SELECT 
+        COUNT(*)::int AS "totalExams",
+        COUNT(*) FILTER (WHERE e.status IN ('open', 'waiting'))::int AS "ongoingExams"
+      FROM exams e
+      JOIN classes c ON e.class_id = c.class_id
+      WHERE c.institution_id = $1 AND c.is_active = TRUE AND e.is_archived = FALSE
+    ),
+    detected AS (
+      SELECT COUNT(DISTINCT es.session_id)::int AS "detectedStudents"
+      FROM exam_sessions es
+      JOIN exams e ON es.exam_id = e.exam_id
+      JOIN classes c ON e.class_id = c.class_id
+      WHERE c.institution_id = $1 AND c.is_active = TRUE AND es.warning_count > 0
+    )
+    SELECT stats."totalExams", stats."ongoingExams", detected."detectedStudents"
+    FROM stats, detected`,
     [institutionId],
   )
   return rows[0]

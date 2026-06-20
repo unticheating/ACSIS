@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ImagePlus, Trash2 } from 'lucide-react'
+import { ImagePlus, Trash2, Info, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Slider } from '@/components/ui/slider'
 import InstitutionLogo from '@/components/brand/InstitutionLogo.jsx'
 import { useInstitutionTheme } from '@/context/InstitutionThemeContext.jsx'
 import {
@@ -40,6 +47,8 @@ export default function AdminSettingsPage({ basePath = '/admin' }) {
   const [loading, setLoading] = useState(!isPlatform)
   const [savingProfile, setSavingProfile] = useState(false)
   const [savingId, setSavingId] = useState(null)
+  const [isLogoModalOpen, setIsLogoModalOpen] = useState(false)
+  const [focusedField, setFocusedField] = useState(null)
 
   const [institutionName, setInstitutionName] = useState(institution.institutionName)
   const [acronym, setAcronym] = useState(institution.acronym)
@@ -117,18 +126,26 @@ export default function AdminSettingsPage({ basePath = '/admin' }) {
     try {
       const dataUrl = await readImageFile(file)
       setLogo(dataUrl)
+      // Automatically save when logo is changed
+      onSaveProfile({ logo: dataUrl })
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not load image.')
     }
-  }, [])
+  }, []) // Will add onSaveProfile to dependencies below
 
-  const onSaveProfile = useCallback(async () => {
-    const warnings = Number(maxWarnings)
-    if (!institutionName.trim()) {
+  const onSaveProfile = useCallback(async (overrides = {}) => {
+    const currentName = overrides.institutionName !== undefined ? overrides.institutionName : institutionName
+    const currentAcronym = overrides.acronym !== undefined ? overrides.acronym : acronym
+    const currentWarningsStr = overrides.maxWarnings !== undefined ? overrides.maxWarnings : maxWarnings
+    const currentDomain = overrides.emailDomain !== undefined ? overrides.emailDomain : emailDomain
+    const currentLogo = overrides.logo !== undefined ? overrides.logo : logo
+
+    const warnings = Number(currentWarningsStr)
+    if (!currentName.trim()) {
       toast.error('Institution name is required.')
       return
     }
-    if (!acronym.trim()) {
+    if (!currentAcronym.trim()) {
       toast.error('Acronym is required.')
       return
     }
@@ -139,18 +156,18 @@ export default function AdminSettingsPage({ basePath = '/admin' }) {
 
     setSavingProfile(true)
     try {
-      const domainTrimmed = emailDomain.trim().toLowerCase().replace(/^@+/, '')
+      const domainTrimmed = currentDomain.trim().toLowerCase().replace(/^@+/, '')
       if (domainTrimmed && !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(domainTrimmed)) {
         toast.error('Enter a valid email domain (example: school.edu.ph), without @.')
         return
       }
 
       const payload = {
-        institutionName: institutionName.trim(),
-        acronym: acronym.trim().toUpperCase(),
+        institutionName: currentName.trim(),
+        acronym: currentAcronym.trim().toUpperCase(),
         maxWarnings: warnings,
         emailDomain: domainTrimmed || null,
-        logo,
+        logo: currentLogo,
       }
 
       if (sessionMode === 'demo') {
@@ -264,7 +281,7 @@ export default function AdminSettingsPage({ basePath = '/admin' }) {
           <div className="panel-header">
             <span className="panel-title">Institution profile</span>
           </div>
-          <p className="admin-settings-lead">
+          <p className="admin-settings-lead" style={{ width: '100%', maxWidth: 'none', margin: '0 0 8px 0' }}>
             Name, logo, and exam defaults for your school. Shown in the sidebar and mobile header for
             all users at your institution.
           </p>
@@ -273,105 +290,138 @@ export default function AdminSettingsPage({ basePath = '/admin' }) {
             <p className="admin-settings-lead">Loading…</p>
           ) : (
             <>
-              <div className="admin-settings-logo-row">
-                <div className="admin-settings-logo-preview">
-                  <InstitutionLogo logo={logo} width={56} height={56} alt="" />
-                </div>
-                <div className="admin-settings-logo-actions">
-                  <input
-                    ref={fileRef}
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp"
-                    className="admin-settings-logo-input"
-                    onChange={onLogoPick}
-                  />
-                  <button
+              <div className="admin-settings-logo-row" style={{ display: 'flex', alignItems: 'flex-start', gap: '24px', marginBottom: '32px', marginTop: '16px', flexWrap: 'wrap' }}>
+                <div style={{ position: 'relative', flexShrink: 0 }}>
+                  <div className="admin-settings-logo-preview" style={{ width: '80px', height: '80px', borderRadius: '12px', border: '1px solid var(--border-default)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', background: 'var(--bg-surface-muted)' }}>
+                    <InstitutionLogo logo={logo} width={64} height={64} alt="" />
+                  </div>
+                  <button 
                     type="button"
-                    className="admin-settings-logo-btn"
-                    onClick={() => fileRef.current?.click()}
+                    onClick={() => setIsLogoModalOpen(true)}
+                    style={{ position: 'absolute', bottom: '-6px', right: '-6px', width: '28px', height: '28px', borderRadius: '50%', background: 'var(--bg-surface)', border: '1px solid var(--border-default)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 2px 5px rgba(0,0,0,0.1)', color: 'var(--fg-default)' }}
+                    title="Edit logo"
                   >
-                    <ImagePlus size={16} strokeWidth={2} aria-hidden />
-                    Upload logo
+                    <Pencil size={14} />
                   </button>
-                  {logo ? (
-                    <button
-                      type="button"
-                      className="admin-settings-logo-btn admin-settings-logo-btn--muted"
-                      onClick={() => setLogo(null)}
-                    >
-                      <Trash2 size={16} strokeWidth={2} aria-hidden />
-                      Remove
-                    </button>
-                  ) : null}
-                  <p className="admin-settings-logo-hint">PNG, JPEG, or WebP · max 500 KB</p>
+                </div>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', flex: 1, minWidth: '280px' }}>
+                  <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+                    <label className="admin-settings-field" style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 2, minWidth: '200px' }}>
+                      <span className="admin-settings-label" style={{ fontSize: '12px', fontWeight: '600', letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--fg-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        Institution name
+                      </span>
+                      <div className={`inline-field-wrap${focusedField === 'name' ? ' is-active' : ''}`}>
+                        <input
+                          type="text"
+                          value={institutionName}
+                          onChange={(e) => setInstitutionName(e.target.value)}
+                          onFocus={() => setFocusedField('name')}
+                          onKeyDown={(e) => { if (e.key === 'Enter') { onSaveProfile(); e.target.blur() } if (e.key === 'Escape') e.target.blur() }}
+                          onBlur={() => setFocusedField(null)}
+                          maxLength={100}
+                          placeholder="Institution name"
+                          className="inline-field-input"
+                        />
+                        {focusedField === 'name'
+                          ? <span className="inline-field-hint">↵ to save &nbsp;·&nbsp; Esc to cancel</span>
+                          : <span className="inline-field-hint">Click to edit</span>
+                        }
+                      </div>
+                    </label>
+                    <label className="admin-settings-field" style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1, minWidth: '120px' }}>
+                      <span className="admin-settings-label" style={{ fontSize: '12px', fontWeight: '600', letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--fg-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        Acronym
+                        <span 
+                          title={`Shown as "${acronym.trim() || 'PLP'} ACSIS" in the app`}
+                          onClick={() => toast(`Shown as "${acronym.trim() || 'PLP'} ACSIS" in the app`)}
+                          style={{ cursor: 'pointer', display: 'inline-flex' }}
+                        >
+                          <Info size={13} color="var(--fg-muted)" />
+                        </span>
+                      </span>
+                      <div className={`inline-field-wrap${focusedField === 'acronym' ? ' is-active' : ''}`}>
+                        <input
+                          type="text"
+                          value={acronym}
+                          onChange={(e) => setAcronym(e.target.value.toUpperCase())}
+                          onFocus={() => setFocusedField('acronym')}
+                          onKeyDown={(e) => { if (e.key === 'Enter') { onSaveProfile(); e.target.blur() } if (e.key === 'Escape') e.target.blur() }}
+                          onBlur={() => setFocusedField(null)}
+                          maxLength={20}
+                          placeholder="PLP"
+                          autoCapitalize="characters"
+                          className="inline-field-input"
+                        />
+                        {focusedField === 'acronym'
+                          ? <span className="inline-field-hint">↵ to save &nbsp;·&nbsp; Esc to cancel</span>
+                          : <span className="inline-field-hint">Click to edit</span>
+                        }
+                      </div>
+                    </label>
+                  </div>
                 </div>
               </div>
 
-              <div className="admin-settings-fields">
-                <label className="admin-settings-field">
-                  <span className="admin-settings-label">Institution name</span>
-                  <input
-                    type="text"
-                    value={institutionName}
-                    onChange={(e) => setInstitutionName(e.target.value)}
-                    maxLength={100}
-                    placeholder="Pamantasan ng Lungsod ng Pasig"
-                  />
-                </label>
-                <label className="admin-settings-field">
-                  <span className="admin-settings-label">Acronym</span>
-                  <input
-                    type="text"
-                    value={acronym}
-                    onChange={(e) => setAcronym(e.target.value.toUpperCase())}
-                    maxLength={20}
-                    placeholder="PLP"
-                    autoCapitalize="characters"
-                  />
-                  <span className="admin-settings-hint">Shown as “{acronym.trim() || 'PLP'} ACSIS” in the app</span>
-                </label>
-                <label className="admin-settings-field">
-                  <span className="admin-settings-label">Sign-in email domain</span>
-                  <input
-                    type="text"
-                    value={emailDomain}
-                    onChange={(e) => setEmailDomain(e.target.value)}
-                    maxLength={255}
-                    placeholder="plpasig.edu.ph"
-                    autoCapitalize="none"
-                    autoCorrect="off"
-                    spellCheck={false}
-                  />
-                  <span className="admin-settings-hint">
-                    Used for student sign-in (example: @plpasig.edu.ph). Sign in with Google only
-                    works for accounts whose domain is registered in your organization&apos;s Google
-                    Workspace.
+              <div className="admin-settings-fields" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px' }}>
+                <label className="admin-settings-field" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <span className="admin-settings-label" style={{ fontSize: '12px', fontWeight: '600', letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--fg-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    Sign-in email domain
+                    <span 
+                      title="Used for student sign-in (example: @plpasig.edu.ph). Sign in with Google only works for accounts whose domain is registered in your organization's Google Workspace."
+                      onClick={() => toast("Used for student sign-in (example: @plpasig.edu.ph). Sign in with Google only works for accounts whose domain is registered in your organization's Google Workspace.", { duration: 6000 })}
+                      style={{ cursor: 'pointer', display: 'inline-flex' }}
+                    >
+                      <Info size={13} color="var(--fg-muted)" />
+                    </span>
                   </span>
+                  <div className={`inline-field-wrap${focusedField === 'domain' ? ' is-active' : ''}`}>
+                    <input
+                      type="text"
+                      value={emailDomain}
+                      onChange={(e) => setEmailDomain(e.target.value)}
+                      onFocus={() => setFocusedField('domain')}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { onSaveProfile(); e.target.blur() } if (e.key === 'Escape') e.target.blur() }}
+                      onBlur={() => setFocusedField(null)}
+                      maxLength={255}
+                      placeholder="plpasig.edu.ph"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      className="inline-field-input"
+                    />
+                    {focusedField === 'domain'
+                      ? <span className="inline-field-hint">↵ to save &nbsp;·&nbsp; Esc to cancel</span>
+                      : <span className="inline-field-hint">Click to edit</span>
+                    }
+                  </div>
                 </label>
-                <label className="admin-settings-field">
-                  <span className="admin-settings-label">Max warnings (per exam)</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={20}
-                    value={maxWarnings}
-                    onChange={(e) => setMaxWarnings(e.target.value)}
-                  />
-                  <span className="admin-settings-hint">
-                    Students are flagged or removed after this many proctoring warnings
+                <label className="admin-settings-field" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <span className="admin-settings-label" style={{ fontSize: '13px', fontWeight: '600', color: 'var(--fg-default)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    Max warnings (per exam)
+                    <span 
+                      title="Students are flagged or removed after this many proctoring warnings"
+                      onClick={() => toast("Students are flagged or removed after this many proctoring warnings")}
+                      style={{ cursor: 'pointer', display: 'inline-flex' }}
+                    >
+                      <Info size={14} color="var(--fg-muted)" />
+                    </span>
                   </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '8px 0' }}>
+                    <Slider
+                      min={1}
+                      max={10}
+                      step={1}
+                      value={[maxWarnings]}
+                      onValueChange={(vals) => setMaxWarnings(vals[0])}
+                      onValueCommit={() => onSaveProfile()}
+                      className="flex-1 cursor-pointer"
+                    />
+                    <span style={{ fontSize: '15px', fontWeight: '600', color: 'var(--fg-default)', minWidth: '2ch', textAlign: 'right' }}>
+                      {maxWarnings}
+                    </span>
+                  </div>
                 </label>
-              </div>
-
-              <div className="admin-settings-form-actions">
-                <button
-                  type="button"
-                  className="btn btn--primary"
-                  disabled={savingProfile}
-                  onClick={onSaveProfile}
-                >
-                  {savingProfile ? 'Saving…' : 'Save institution settings'}
-                </button>
               </div>
             </>
           )}
@@ -381,7 +431,7 @@ export default function AdminSettingsPage({ basePath = '/admin' }) {
           <div className="panel-header">
             <span className="panel-title">Institution colors</span>
           </div>
-          <p className="admin-settings-lead">
+          <p className="admin-settings-lead" style={{ width: '100%', maxWidth: 'none', margin: '0 0 8px 0' }}>
             Brand palette for the app shell (sidebar, accents, and background tint). Applies immediately
             for everyone at your school.
           </p>
@@ -425,6 +475,57 @@ export default function AdminSettingsPage({ basePath = '/admin' }) {
           <Link to={basePath}>← Back to dashboard</Link>
         </p>
       </div>
+      
+      <Dialog open={isLogoModalOpen} onOpenChange={setIsLogoModalOpen}>
+        <DialogContent className="sm:max-w-[380px]">
+          <DialogHeader>
+            <DialogTitle>Institution Logo</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col items-center gap-6 py-4">
+            <div className="w-[120px] h-[120px] rounded-2xl border border-border flex items-center justify-center overflow-hidden bg-muted">
+              <InstitutionLogo logo={logo} width={96} height={96} alt="" />
+            </div>
+            <div className="flex flex-col gap-3 w-full items-center">
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={(e) => {
+                  onLogoPick(e)
+                  setIsLogoModalOpen(false)
+                }}
+                className="hidden"
+                style={{ display: 'none' }}
+              />
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-md border border-border bg-background cursor-pointer text-sm font-medium text-foreground shadow-sm w-full hover:bg-accent"
+              >
+                <ImagePlus size={18} strokeWidth={2} />
+                Upload new logo
+              </button>
+              {logo ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLogo(null)
+                    onSaveProfile({ logo: null })
+                    setIsLogoModalOpen(false)
+                  }}
+                  className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-md border border-destructive/30 bg-destructive/10 text-destructive cursor-pointer text-sm font-medium w-full hover:bg-destructive/20"
+                >
+                  <Trash2 size={18} strokeWidth={2} />
+                  Remove logo
+                </button>
+              ) : null}
+            </div>
+            <p className="text-sm text-muted-foreground text-center leading-relaxed m-0">
+              Supported formats: PNG, JPEG, WebP.<br />Maximum size: 500 KB.
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
