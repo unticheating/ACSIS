@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { SummaryStatCard, SummaryStatGrid } from '@/components/dashboard/SummaryStatCard.jsx'
-import { BookOpen, Activity, Users, MoreVertical, Copy, Send, Trash2 } from 'lucide-react'
+import { BookOpen, Activity, Users, MoreVertical, Copy, Send, Trash2, Play, StopCircle, RotateCcw } from 'lucide-react'
 import { apiFetch } from '@/lib/apiFetch.js'
 import { copyToClipboard } from '@/lib/copyToClipboard.js'
+import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
+import RestartExamDialog from '@/components/teacher/RestartExamDialog.jsx'
 import FadeIn from '@/components/ui/fade-in.jsx'
 import PageSpinner from '@/components/ui/page-spinner.jsx'
 import { formatSectionTitle } from '@/lib/sectionLabel.js'
@@ -51,10 +53,92 @@ export default function TeacherDashboardPage() {
   const [selectedCourse, setSelectedCourse] = useState('')
   const [selectedSections, setSelectedSections] = useState([])
 
+  const [restartExamId, setRestartExamId] = useState(null)
+  const [restartClassId, setRestartClassId] = useState(null)
+  const [restartDialogOpen, setRestartDialogOpen] = useState(false)
+  const [isRestarting, setIsRestarting] = useState(false)
+
   const resetCreateExamModal = () => {
     setSelectedClassIds([])
     setSelectedCourse('')
     setSelectedSections([])
+  }
+
+  const activeExamCount = exams.filter(e => normalizeExamStatus(e.status) === PG_EXAM_STATUS.WAITING || normalizeExamStatus(e.status) === PG_EXAM_STATUS.OPEN).length
+
+  async function handleStartSession(classId, examId) {
+    if (activeExamCount > 0) {
+      acsisToastError("Only one exam can be active or live at a time.")
+      return
+    }
+    try {
+      const res = await apiFetch(`/api/teacher/classes/${classId}/exams/${examId}/start`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Failed to start exam.')
+      }
+      acsisToastSuccess('Exam is now live.')
+      fetchExams()
+      apiFetch('/api/teacher/classes/dashboard').then(r => r.json()).then(d => { if (!d.error) setStats(d) })
+    } catch (err) {
+      acsisToastError(err.message)
+    }
+  }
+
+  async function handleCloseExam(classId, examId) {
+    const ok = await confirm({
+      title: 'End this exam?',
+      description: 'Students will no longer be able to enter or submit.',
+      confirmLabel: 'Close exam',
+      destructive: true,
+    })
+    if (!ok) return
+    try {
+      const res = await apiFetch(`/api/teacher/classes/${classId}/exams/${examId}/close`, {
+        method: 'PUT',
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Failed to end exam.')
+      }
+      acsisToastSuccess('Exam ended.')
+      fetchExams()
+      apiFetch('/api/teacher/classes/dashboard').then(r => r.json()).then(d => { if (!d.error) setStats(d) })
+    } catch (err) {
+      acsisToastError(err.message)
+    }
+  }
+
+  async function handleRestart(payload) {
+    if (!restartExamId || !restartClassId) return
+    setIsRestarting(true)
+    const body = {
+      newScheduledStart: payload.newScheduledStart ? new Date(payload.newScheduledStart).toISOString() : null,
+      newScheduledEnd: payload.newScheduledEnd ? new Date(payload.newScheduledEnd).toISOString() : null,
+    }
+    try {
+      const res = await apiFetch(`/api/teacher/classes/${restartClassId}/exams/${restartExamId}/restart`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Failed to restart exam.')
+      }
+      acsisToastSuccess('Exam restarted and is now in the lobby.')
+      setRestartDialogOpen(false)
+      fetchExams()
+      apiFetch('/api/teacher/classes/dashboard').then(r => r.json()).then(d => { if (!d.error) setStats(d) })
+    } catch (err) {
+      acsisToastError(err.message)
+    } finally {
+      setIsRestarting(false)
+    }
   }
 
   useEffect(() => {
@@ -360,14 +444,51 @@ export default function TeacherDashboardPage() {
                             variant="success"
                             onSelect={async () => {
                               try {
-                                await apiFetch(`/api/teacher/classes/${ex.classId}/exams/${ex.id}`, { method: 'PUT' })
+                                const res = await apiFetch(`/api/teacher/classes/${ex.classId}/exams/${ex.id}`, { method: 'PUT' })
+                                const data = await res.json()
+                                if (!res.ok) throw new Error(data.error || 'Failed to publish exam.')
+                                if (data.code) {
+                                  acsisToastSuccess(`Exam published. Share this code with students: ${data.code}`)
+                                } else {
+                                  acsisToastSuccess('Exam published.')
+                                }
                                 fetchExams()
-                              } catch (error) {
-                                console.error(error)
+                              } catch (err) {
+                                acsisToastError(err.message)
                               }
                             }}
                           >
                             Publish exam (share code)
+                          </DropdownMenuActionItem>
+                        )}
+                        {normalizeExamStatus(status) === PG_EXAM_STATUS.WAITING && (
+                          <DropdownMenuActionItem
+                            icon={Play}
+                            variant="success"
+                            onSelect={() => handleStartSession(ex.classId, ex.id)}
+                          >
+                            Start session
+                          </DropdownMenuActionItem>
+                        )}
+                        {normalizeExamStatus(status) === PG_EXAM_STATUS.OPEN && (
+                          <DropdownMenuActionItem
+                            icon={StopCircle}
+                            variant="warning"
+                            onSelect={() => void handleCloseExam(ex.classId, ex.id)}
+                          >
+                            Close exam
+                          </DropdownMenuActionItem>
+                        )}
+                        {normalizeExamStatus(status) === PG_EXAM_STATUS.CLOSED && !isExamDraft(status) && (
+                          <DropdownMenuActionItem
+                            icon={RotateCcw}
+                            onSelect={() => {
+                              setRestartClassId(ex.classId)
+                              setRestartExamId(ex.id)
+                              setRestartDialogOpen(true)
+                            }}
+                          >
+                            Restart exam
                           </DropdownMenuActionItem>
                         )}
                         <DropdownMenuActionItem
@@ -548,6 +669,12 @@ export default function TeacherDashboardPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <RestartExamDialog
+        open={restartDialogOpen}
+        onOpenChange={setRestartDialogOpen}
+        onRestart={handleRestart}
+        isSaving={isRestarting}
+      />
       {ConfirmDialog}
     </div>
   )

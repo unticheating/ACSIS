@@ -1,11 +1,10 @@
 import { getPool } from '../db.js'
 import { ensureCheatingLogDismissedColumns } from '../lib/ensureCheatingLogDismissedSchema.js'
-import { getExamSessionUserColumn } from '../lib/schemaCompat.js'
+import { getExamSessionJoinCondition } from '../lib/schemaCompat.js'
 import { SQL_JOIN_STUDENTS, SQL_MEMBER_SCHOOL_ID } from '../lib/memberSql.js'
 
 async function sessionMemberJoin(esAlias = 'es', imAlias = 'im') {
-  const col = await getExamSessionUserColumn(getPool())
-  return `${esAlias}.${col} = ${imAlias}.member_id`
+  return await getExamSessionJoinCondition(getPool(), esAlias, imAlias)
 }
 
 function formatStudentName(row) {

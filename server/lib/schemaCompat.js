@@ -42,11 +42,6 @@ export async function ensureExamSessionSchemaCompat(pool) {
   }
 }
 
-/**
- * ACSIS v2 uses exam_sessions.member_id; some DBs still have student_id.
- * @param {import('pg').Pool} pool
- * @returns {Promise<'member_id' | 'student_id'>}
- */
 export async function getExamSessionUserColumn(pool) {
   if (examSessionUserColumn) return examSessionUserColumn
 
@@ -62,4 +57,40 @@ export async function getExamSessionUserColumn(pool) {
   const names = new Set(rows.map((r) => r.column_name))
   examSessionUserColumn = names.has('member_id') ? 'member_id' : 'student_id'
   return examSessionUserColumn
+}
+
+let examSessionJoinCondition = null
+
+/**
+ * Returns a robust JOIN condition for exam_sessions to institution_members.
+ * Handles DBs in transition where both member_id and student_id exist.
+ * @param {import('pg').Pool} pool
+ * @param {string} esAlias Alias for exam_sessions table
+ * @param {string} imAlias Alias for institution_members table
+ */
+export async function getExamSessionJoinCondition(pool, esAlias = 'es', imAlias = 'im') {
+  if (examSessionJoinCondition) {
+    return examSessionJoinCondition.replace(/ES_ALIAS/g, esAlias).replace(/IM_ALIAS/g, imAlias)
+  }
+
+  await ensureExamSessionSchemaCompat(pool)
+
+  const { rows } = await pool.query(
+    `SELECT column_name
+     FROM information_schema.columns
+     WHERE table_schema = 'public'
+       AND table_name = 'exam_sessions'
+       AND column_name IN ('member_id', 'student_id')`,
+  )
+  const names = new Set(rows.map((r) => r.column_name))
+  
+  if (names.has('member_id') && names.has('student_id')) {
+    examSessionJoinCondition = `COALESCE(ES_ALIAS.member_id, ES_ALIAS.student_id) = IM_ALIAS.member_id`
+  } else if (names.has('member_id')) {
+    examSessionJoinCondition = `ES_ALIAS.member_id = IM_ALIAS.member_id`
+  } else {
+    examSessionJoinCondition = `ES_ALIAS.student_id = IM_ALIAS.member_id`
+  }
+  
+  return examSessionJoinCondition.replace(/ES_ALIAS/g, esAlias).replace(/IM_ALIAS/g, imAlias)
 }
