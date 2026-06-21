@@ -13,6 +13,15 @@ import './styles/dark-mode-system.css'
 import './styles/scrollbars.css'
 import './styles/light-mode-system.css'
 import './styles/acsis-toast.css'
+
+/* Critical Shell & Layout CSS */
+import './pages/admin-ui/style.css'
+import './styles/sidebar-extras.css'
+import './styles/mobile-shell.css'
+import './styles/shell-dark.css'
+import './styles/route-fallback.css'
+import './styles/summary-stat-cards.css'
+
 import App from './App.jsx'
 import { DOCUMENT_LOGO_SRC } from './config/brandAssets.js'
 import { setDocumentFavicon } from './lib/setDocumentFavicon.js'

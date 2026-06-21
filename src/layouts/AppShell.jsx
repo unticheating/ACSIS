@@ -10,15 +10,11 @@ import ShellBreadcrumb from '../components/layout/ShellBreadcrumb.jsx'
 import { DetectionsToolbarProvider } from '../context/DetectionsToolbarContext.jsx'
 import { TeacherShellBreadcrumbProvider } from '../context/TeacherShellBreadcrumbContext.jsx'
 import { shellConfig } from '../config/shellConfig.js'
-import '../pages/admin-ui/style.css'
-import '../styles/sidebar-extras.css'
-import '../styles/mobile-shell.css'
 import '../styles/summary-stat-cards.css'
 import '../styles/shell-dark.css'
 import '../styles/dark-mode-system.css'
 import '../styles/scrollbars.css'
 import '../styles/light-mode-system.css'
-import '../styles/route-fallback.css'
 
 /**
  * Shared chrome: fixed sidebar + padded main column (all roles).

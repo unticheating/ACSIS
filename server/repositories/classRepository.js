@@ -283,7 +283,7 @@ export async function getTeacherDashboardStatsQuery(memberId) {
   const pool = getPool();
   const result = await pool.query(
     `SELECT
-      (SELECT COUNT(*) FROM classes WHERE member_id = $1 AND is_active = TRUE) as "totalClasses",
+      (SELECT COUNT(*) FROM teaching_terms WHERE member_id = $1 AND is_archived = FALSE) as "totalClasses",
       (SELECT COUNT(*) 
        FROM exams e 
        JOIN classes c ON e.class_id = c.class_id 

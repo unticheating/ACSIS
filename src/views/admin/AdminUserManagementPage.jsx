@@ -514,14 +514,19 @@ export default function AdminUserManagementPage() {
                     {showStudentNumber ? <th>Student no.</th> : null}
                     <th>Status</th>
                     <th className="um-col-hide-md">Role</th>
-                    <th className="um-col-hide-lg">Created</th>
+                    <th className="um-col-hide-lg">Date created</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {Array.from({ length: 6 }, (_, i) => (
                     <tr key={i} className="um-skeleton-row">
-                      <td><span className="um-skeleton um-skeleton--name" /></td>
+                      <td>
+                        <div className="um-user-cell">
+                          <span className="um-avatar" style={{ background: '#e5e7eb', color: 'transparent' }} />
+                          <span className="um-skeleton um-skeleton--name" />
+                        </div>
+                      </td>
                       <td><span className="um-skeleton um-skeleton--email" /></td>
                       {showStudentNumber ? (
                         <td><span className="um-skeleton um-skeleton--short" /></td>
