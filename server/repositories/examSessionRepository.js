@@ -292,37 +292,56 @@ export async function gradeSessionAnswersQuery(sessionId) {
   const pool = getPool()
   await pool.query(
     `UPDATE student_answers sa
-     SET is_correct = CASE
-       WHEN sa.manually_checked = TRUE THEN sa.is_correct
-       WHEN q.question_type IN ('mcq', 'true_false') THEN (
-         SELECT c.is_correct FROM choices c WHERE c.choice_id = sa.choice_id
-       )
-       WHEN q.question_type = 'identification' THEN (
-         EXISTS (
-           SELECT 1 FROM choices c
-           WHERE c.question_id = sa.question_id AND c.is_correct = TRUE
-             AND UPPER(TRIM(c.choice_text)) = UPPER(TRIM(COALESCE(sa.answer_text, '')))
+     SET 
+       is_correct = CASE
+         WHEN q.question_type = 'identification' AND EXISTS (
+             SELECT 1 FROM choices c
+             WHERE c.question_id = sa.question_id AND c.is_correct = TRUE
+               AND UPPER(TRIM(c.choice_text)) = UPPER(TRIM(COALESCE(sa.answer_text, '')))
+         ) THEN TRUE
+         WHEN q.question_type = 'coding' AND EXISTS (
+             SELECT 1 FROM choices c
+             WHERE c.question_id = sa.question_id AND c.is_correct = TRUE
+               AND TRIM(c.choice_text) = TRIM(COALESCE(sa.answer_text, ''))
+         ) THEN TRUE
+         WHEN sa.manually_checked = TRUE THEN sa.is_correct
+         WHEN q.question_type = 'mcq' THEN (
+           SELECT c.is_correct FROM choices c WHERE c.choice_id = sa.choice_id
          )
-       )
-       WHEN q.question_type = 'coding' THEN (
-         EXISTS (
-           SELECT 1 FROM choices c
-           WHERE c.question_id = sa.question_id AND c.is_correct = TRUE
-             AND TRIM(c.choice_text) = TRIM(COALESCE(sa.answer_text, ''))
+         WHEN q.question_type = 'true_false' THEN (
+           EXISTS (
+             SELECT 1 FROM choices c
+             WHERE c.question_id = sa.question_id AND c.is_correct = TRUE
+               AND UPPER(TRIM(c.choice_text)) = UPPER(TRIM(COALESCE(sa.answer_text, '')))
+           )
          )
-       )
-       WHEN q.question_type = 'matching' THEN (
-         COALESCE(TRIM(sa.answer_text), '') <> ''
-         AND NOT EXISTS (
-           SELECT 1 FROM choices c
-           WHERE c.question_id = sa.question_id AND c.is_correct = TRUE
-             AND COALESCE(sa.answer_text::jsonb ->> split_part(c.choice_text, E'\x1e', 1), '')
-               IS DISTINCT FROM split_part(c.choice_text, E'\x1e', 2)
+         WHEN q.question_type = 'identification' THEN FALSE
+         WHEN q.question_type = 'coding' THEN FALSE
+         WHEN q.question_type = 'matching' THEN (
+           COALESCE(TRIM(sa.answer_text), '') <> ''
+           AND NOT EXISTS (
+             SELECT 1 FROM choices c
+             WHERE c.question_id = sa.question_id AND c.is_correct = TRUE
+               AND COALESCE(NULLIF(TRIM(sa.answer_text), '')::jsonb ->> split_part(c.choice_text, E'\x1e', 1), '')
+                 IS DISTINCT FROM split_part(c.choice_text, E'\x1e', 2)
+           )
          )
-       )
-       WHEN q.question_type IN ('essay', 'diagramming') THEN NULL
-       ELSE NULL
-     END
+         WHEN q.question_type IN ('essay', 'diagramming') THEN NULL
+         ELSE NULL
+       END,
+       manually_checked = CASE
+         WHEN q.question_type = 'identification' AND EXISTS (
+             SELECT 1 FROM choices c
+             WHERE c.question_id = sa.question_id AND c.is_correct = TRUE
+               AND UPPER(TRIM(c.choice_text)) = UPPER(TRIM(COALESCE(sa.answer_text, '')))
+         ) THEN FALSE
+         WHEN q.question_type = 'coding' AND EXISTS (
+             SELECT 1 FROM choices c
+             WHERE c.question_id = sa.question_id AND c.is_correct = TRUE
+               AND TRIM(c.choice_text) = TRIM(COALESCE(sa.answer_text, ''))
+         ) THEN FALSE
+         ELSE sa.manually_checked
+       END
      FROM questions q
      WHERE sa.question_id = q.question_id AND sa.session_id = $1`,
     [sessionId],
@@ -467,4 +486,13 @@ export async function unlockExamSessionsQuery(examId) {
      WHERE exam_id = $1 AND status <> 'submitted'`,
     [examId]
   )
+}
+
+export async function deleteExamSessionQuery(sessionId, examId) {
+  const pool = getPool()
+  const { rowCount } = await pool.query(
+    `DELETE FROM exam_sessions WHERE session_id = $1 AND exam_id = $2 AND status = 'in_progress'`,
+    [sessionId, examId]
+  )
+  return rowCount > 0
 }

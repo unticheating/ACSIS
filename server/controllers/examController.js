@@ -737,3 +737,18 @@ export async function postExportExamReport(req, res) {
     return res.status(500).json({ error: 'Failed to export report.' });
   }
 }
+
+export async function deleteTeacherExamSession(req, res) {
+  const { classId, examId, sessionId } = req.params;
+  try {
+    const { deleteTeacherExamSessionService } = await import('../services/examSessionService.js');
+    const result = await deleteTeacherExamSessionService(classId, examId, sessionId, req.memberId);
+    if (!result.ok) {
+      return res.status(result.status || 500).json({ error: result.error });
+    }
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('[examController.deleteTeacherExamSession]', err);
+    return res.status(500).json({ error: 'Failed to kick student.' });
+  }
+}

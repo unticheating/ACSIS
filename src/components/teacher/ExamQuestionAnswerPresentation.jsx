@@ -197,6 +197,13 @@ export function presentAnswerTextFromQuestion(question) {
     return q.correctAnswer || '—'
   }
 
+  if (type === 'matching') {
+    const pairs = Array.isArray(q.matchingPairs) && q.matchingPairs.length ? q.matchingPairs : []
+    if (pairs.length > 0) {
+      return pairs.map(p => `${p.left} → ${p.right}`).join('\n')
+    }
+  }
+
   return q.correctAnswer || '—'
 }
 

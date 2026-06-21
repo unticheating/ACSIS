@@ -117,5 +117,26 @@ export function formatReviewAnswerText(questionType, text) {
   if (String(questionType || '').toLowerCase() === 'identification') {
     return normalizeIdentificationAnswer(t)
   }
+  if (String(questionType || '').toLowerCase() === 'matching') {
+    // Try the delimiter-separated format used by DB choice_text: "Left\x1eRight"
+    const PAIR_DELIMITER = '\x1e'
+    if (t.includes(PAIR_DELIMITER)) {
+      const idx = t.indexOf(PAIR_DELIMITER)
+      const left = t.slice(0, idx).trim()
+      const right = t.slice(idx + 1).trim()
+      if (left && right) return `${left} → ${right}`
+    }
+    // Try JSON format used by student answer_text: {"Left":"Right",...}
+    try {
+      const parsed = JSON.parse(t)
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return Object.entries(parsed)
+          .map(([k, v]) => `${k} → ${v}`)
+          .join('\n')
+      }
+    } catch {
+      // not JSON, fall through
+    }
+  }
   return t
 }

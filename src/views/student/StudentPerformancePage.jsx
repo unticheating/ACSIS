@@ -65,8 +65,8 @@ export default function StudentPerformancePage() {
             hint={submitted.length ? `From ${submitted.length} submitted exam(s)` : 'No graded attempts yet.'}
             tone="success"
           />
-          <SummaryStatCard label="Exams completed" value={data?.examsCompleted ?? 0} tone="success" />
-          <SummaryStatCard label="Integrity warnings" value={data?.totalWarnings ?? 0} tone="danger" />
+          <SummaryStatCard label="Exams completed" value={data?.examsCompleted ?? 0} hint={"\u00A0"} tone="success" />
+          <SummaryStatCard label="Tickets" value={data?.totalTickets ?? 0} hint={"\u00A0"} tone="danger" />
         </SummaryStatGrid>
       </FadeIn>
 

@@ -16,6 +16,15 @@ function formatStudentName(row) {
     .trim()
 }
 
+export async function listSubmittedSessionIdsForExamQuery(examId) {
+  const pool = getPool()
+  const { rows } = await pool.query(
+    `SELECT session_id FROM exam_sessions WHERE exam_id = $1 AND status = 'submitted'`,
+    [examId],
+  )
+  return rows.map((r) => Number(r.session_id))
+}
+
 export async function listExamSessionsForExamQuery(classId, examId) {
   const pool = getPool()
   const memberJoin = await sessionMemberJoin('es', 'im')
@@ -93,9 +102,8 @@ export async function listStudentAnswersForSessionQuery(sessionId) {
        sa.manually_checked AS "manuallyChecked",
        sa.checked_by AS "checkedBy",
        sa.checked_at AS "checkedAt",
-       (SELECT c2.choice_text FROM choices c2
-        WHERE c2.question_id = q.question_id AND c2.is_correct = TRUE
-        LIMIT 1) AS "expectedAnswer"
+       (SELECT json_agg(c2.choice_text ORDER BY COALESCE(c2.order_num, 9999) ASC) FROM choices c2
+        WHERE c2.question_id = q.question_id AND c2.is_correct = TRUE) AS "correctChoices"
      FROM student_answers sa
      JOIN questions q ON q.question_id = sa.question_id
      LEFT JOIN exam_sections s ON s.section_id = q.section_id
@@ -114,7 +122,8 @@ export async function listStudentAnswersForSessionQuery(sessionId) {
     manuallyChecked: Boolean(r.manuallyChecked),
     checkedBy: r.checkedBy,
     checkedAt: r.checkedAt,
-    expectedAnswer: r.expectedAnswer || null,
+    expectedAnswer: Array.isArray(r.correctChoices) && r.correctChoices.length > 0 ? r.correctChoices[0] : null,
+    possibleAnswers: Array.isArray(r.correctChoices) && r.correctChoices.length > 1 ? r.correctChoices.slice(1) : [],
   }))
 }
 
@@ -381,7 +390,8 @@ export async function listStudentPerformanceQuery(studentMemberId) {
        er.raw_score AS "rawScore",
        er.total_points AS "totalPoints",
        er.percentage,
-       es.warning_count AS "warningCount"
+       es.warning_count AS "warningCount",
+       es.ticket_issued_at AS "ticketIssuedAt"
      FROM exam_sessions es
      JOIN exams e ON es.exam_id = e.exam_id
      JOIN classes c ON e.class_id = c.class_id

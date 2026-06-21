@@ -283,6 +283,7 @@
   letter-spacing: -0.02em;
   color: var(--acsis-brand-muted-text, var(--acsis-brand, #15803d));
   word-break: break-word;
+  white-space: pre-wrap;
   text-align: center;
 }
 
@@ -343,7 +344,7 @@
 .exam-present-explanation-text {
   margin: 0 auto;
   max-width: 48ch;
-  font-size: clamp(0.8125rem, 2vmin, 0.9375rem);
+  font-size: clamp(1rem, 2.5vmin, 1.125rem);
   line-height: 1.55;
   color: var(--fg-default, #374151);
   white-space: pre-wrap;
@@ -647,7 +648,7 @@
   .exam-present-shell.is-fullscreen .exam-present-explanation-text,
   .exam-present-shell:fullscreen .exam-present-explanation-text {
     max-width: 100%;
-    font-size: clamp(1rem, 1.5vw, 1.25rem);
+    font-size: clamp(1.25rem, 2vw, 1.5rem);
     line-height: 1.6;
   }
 

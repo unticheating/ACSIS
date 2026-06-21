@@ -42,20 +42,20 @@ export default function VerifyEmailPage() {
 
   useEffect(() => {
     let cancelled = false
-    ;(async () => {
-      try {
-        const data = await fetchVerificationPending()
-        if (cancelled) return
-        if (!data.pending) {
-          navigate('/', { replace: true })
-          return
+      ; (async () => {
+        try {
+          const data = await fetchVerificationPending()
+          if (cancelled) return
+          if (!data.pending) {
+            navigate('/', { replace: true })
+            return
+          }
+          setEmail(data.email || email)
+          if (data.devHint) setDevHint(data.devHint)
+        } catch {
+          if (!cancelled) navigate('/', { replace: true })
         }
-        setEmail(data.email || email)
-        if (data.devHint) setDevHint(data.devHint)
-      } catch {
-        if (!cancelled) navigate('/', { replace: true })
-      }
-    })()
+      })()
     return () => {
       cancelled = true
     }
@@ -210,7 +210,7 @@ export default function VerifyEmailPage() {
         </p>
       </div>
 
-      <Dialog open={showSuccess} onOpenChange={() => {}}>
+      <Dialog open={showSuccess} onOpenChange={() => { }}>
         <DialogContent
           className="stu-join-dialog"
           onInteractOutside={(e) => e.preventDefault()}

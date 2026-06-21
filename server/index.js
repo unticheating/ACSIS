@@ -64,7 +64,7 @@ export default app
 
 // Only start the server if not running in a serverless environment
 if (!process.env.VERCEL) {
-  app.listen(config.port, async () => {
+  const server = app.listen(config.port, async () => {
     if (config.databaseUrl) {
       try {
         await ensurePasswordResetSchema()
@@ -93,4 +93,24 @@ if (!process.env.VERCEL) {
       await logSmtpStatus()
     }
   })
+
+  // Graceful shutdown to prevent DB connection leaks on nodemon/watch restart
+  const gracefulShutdown = async () => {
+    console.log('Shutting down API server gracefully...')
+    server.close()
+    try {
+      const { getPool } = await import('./db.js')
+      const pool = getPool()
+      if (pool) {
+        await pool.end()
+        console.log('Database pool closed.')
+      }
+    } catch (err) {
+      console.error('Error closing database pool:', err)
+    }
+    process.exit(0)
+  }
+
+  process.on('SIGINT', gracefulShutdown)
+  process.on('SIGTERM', gracefulShutdown)
 }

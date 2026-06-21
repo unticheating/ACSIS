@@ -34,6 +34,7 @@ import {
   patchManualGrade,
   postExportExamReport,
   postReleaseExamScores,
+  deleteTeacherExamSession,
 } from '../controllers/examController.js';
 import { requireAuth } from '../lib/sessionAuth.js';
 
@@ -88,6 +89,7 @@ router.put('/:classId/exams/:examId/start', startTeacherExam);
 router.post('/:classId/exams/:examId/copy', copyTeacherExam);
 router.put('/:classId/exams/:examId/restart', restartTeacherExam);
 router.put('/:classId/exams/:examId/close', closeTeacherExam);
+router.delete('/:classId/exams/:examId/sessions/:sessionId', deleteTeacherExamSession);
 router.delete('/:classId/exams/:examId', deleteTeacherExam);
 
 export default router;

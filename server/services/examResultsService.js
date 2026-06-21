@@ -401,7 +401,7 @@ export async function getStudentPerformanceService(studentMemberId) {
       ok: true,
       averagePercentage: average,
       examsCompleted: submitted.length,
-      totalWarnings: rows.reduce((sum, r) => sum + Number(r.warningCount || 0), 0),
+      totalTickets: rows.filter((r) => r.ticketIssuedAt).length,
       attempts: rows.map((r) => ({
         sessionId: r.sessionId,
         examId: r.examId,
@@ -414,6 +414,7 @@ export async function getStudentPerformanceService(studentMemberId) {
         totalPoints: r.totalPoints != null ? Number(r.totalPoints) : null,
         percentage: r.percentage != null ? Number(r.percentage) : null,
         warningCount: Number(r.warningCount || 0),
+        ticketIssuedAt: r.ticketIssuedAt,
       })),
     }
   } catch (err) {

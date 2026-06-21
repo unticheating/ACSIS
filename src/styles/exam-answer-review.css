@@ -215,6 +215,14 @@
   border: 1px solid var(--border-default, #e5e7eb);
 }
 
+button.exam-review-status {
+  cursor: pointer;
+}
+
+button.exam-review-status:hover:not(:disabled) {
+  opacity: 1 !important;
+}
+
 .exam-review-q-text {
   font-size: 0.8125rem;
   font-weight: 600;

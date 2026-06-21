@@ -6,6 +6,7 @@ import {
   Copy,
   Eye,
   EyeOff,
+  FileText,
   MoreVertical,
   Pencil,
   Play,
@@ -17,6 +18,14 @@ import {
   StopCircle,
   Trash2,
   UsersRound,
+  Maximize2,
+  ListChecks,
+  Type,
+  CheckSquare,
+  Code,
+  ArrowLeftRight,
+  AlignLeft,
+  Shapes,
 } from 'lucide-react'
 import { useTeacherShellBreadcrumbTrail } from '@/context/TeacherShellBreadcrumbContext.jsx'
 import TeacherMcTabs from '@/components/teacher/TeacherMcTabs.jsx'
@@ -26,6 +35,7 @@ import { releaseExamScores } from '@/lib/teacherExamGradingApi.js'
 import ExamAnswerReviewModal from '@/components/teacher/ExamAnswerReviewModal.jsx'
 import ReleaseScoresDialog from '@/components/teacher/ReleaseScoresDialog.jsx'
 import AssignExamStudentsDialog from '@/components/teacher/AssignExamStudentsDialog.jsx'
+import UserAvatar from '@/components/admin/UserAvatar.jsx'
 import RestartExamDialog from '@/components/teacher/RestartExamDialog.jsx'
 import CopyExamDialog from '@/components/teacher/CopyExamDialog.jsx'
 import {
@@ -77,6 +87,19 @@ const EXAM_TABS = [
   { id: 'results', label: 'Results' },
   { id: 'settings', label: 'Settings' },
 ]
+
+function getIconForType(label) {
+  switch (label) {
+    case 'Multiple choice': return <ListChecks size={14} style={{ marginRight: '4px' }} />;
+    case 'Identification': return <Type size={14} style={{ marginRight: '4px' }} />;
+    case 'True / False': return <CheckSquare size={14} style={{ marginRight: '4px' }} />;
+    case 'Coding': return <Code size={14} style={{ marginRight: '4px' }} />;
+    case 'Matching': return <ArrowLeftRight size={14} style={{ marginRight: '4px' }} />;
+    case 'Essay / Paragraph': return <AlignLeft size={14} style={{ marginRight: '4px' }} />;
+    case 'Diagramming': return <Shapes size={14} style={{ marginRight: '4px' }} />;
+    default: return null;
+  }
+}
 
 function SettingsForm({ hit, classId, examId, onSaved, onChanges }) {
   const [password, setPassword] = useState('')
@@ -329,6 +352,7 @@ export default function TeacherExamDetailPage() {
   
   // Results Tab States
   const [topScoreVisible, setTopScoreVisible] = useState(false)
+  const [topScoreModalOpen, setTopScoreModalOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterMode, setFilterMode] = useState('Surname A-Z')
   
@@ -394,12 +418,15 @@ export default function TeacherExamDetailPage() {
       }
     }
     loadResults(false)
-    const interval = window.setInterval(() => loadResults(true), 6000)
+    // Poll faster (3s) when exam is live so lobby/session counts update quickly
+    const isLive = normalizeExamStatus(hit?.status) === PG_EXAM_STATUS.WAITING ||
+                   normalizeExamStatus(hit?.status) === PG_EXAM_STATUS.OPEN
+    const interval = window.setInterval(() => loadResults(true), isLive ? 3000 : 6000)
     return () => {
       cancelled = true
       window.clearInterval(interval)
     }
-  }, [classId, examId, refreshTick, tab])
+  }, [classId, examId, refreshTick, tab, hit?.status])
 
   const filteredSessions = useMemo(() => {
     let list = [...(results?.sessions || [])]
@@ -453,13 +480,11 @@ export default function TeacherExamDetailPage() {
     const isViolations = filterMode === 'Violations (highest to lowest)'
     return {
       rank: isScoreRank,
-      review: isSurname || isScoreRank || isSubmissionTime,
       score: isScoreRank,
       submissionTime: isSubmissionTime,
-      released: !isViolations,
       warnings: true,
       falsePositives: isViolations,
-      action: !isViolations,
+      actions: !isViolations,
     }
   }, [filterMode])
 
@@ -501,6 +526,7 @@ export default function TeacherExamDetailPage() {
   const streamHref = `/teacher/my-classes/${coerceRouteParam(classId)}`
   const questionCount = exam.questions ? exam.questions.length : exam.questionCount || 0
   const durationMins = computeDurationMinutes(exam)
+  const totalPoints = exam.questions?.reduce((acc, q) => acc + Number(q.points ?? 1), 0) ?? 0
   const typeSummary = summarizeQuestionTypes(exam.questions)
   const typeLabels = uniqueQuestionTypeLabels(exam.questions)
   const overviewDesc = overviewDescription(exam)
@@ -547,13 +573,7 @@ export default function TeacherExamDetailPage() {
       if (!res.ok) {
         throw new Error(data.error || 'Failed to end exam.')
       }
-      if (data.topStudent) {
-        acsisToastSuccess(
-          `Exam ended. Top 1: ${data.topStudent.studentName} (${data.topStudent.percentage}%).`,
-        )
-      } else {
-        acsisToastSuccess('Exam ended. Ranks computed.')
-      }
+      acsisToastSuccess('Exam ended.')
       setRefreshTick((t) => t + 1)
     } catch (err) {
       acsisToastError(err.message)
@@ -808,6 +828,29 @@ export default function TeacherExamDetailPage() {
       }
       acsisToastSuccess('Exam deleted.')
       navigate(streamHref)
+    } catch (err) {
+      acsisToastError(err.message)
+    }
+  }
+
+  async function handleKick(sessionId) {
+    const ok = await confirm({
+      title: 'Remove student from lobby?',
+      description: 'They will be kicked out of the exam session. They can rejoin with the exam code if needed.',
+      confirmLabel: 'Remove student',
+      destructive: true,
+    })
+    if (!ok) return
+    try {
+      const res = await apiFetch(`/api/teacher/classes/${classId}/exams/${examId}/sessions/${sessionId}`, {
+        method: 'DELETE',
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Failed to remove student from lobby.')
+      }
+      acsisToastSuccess('Student removed from lobby.')
+      setRefreshTick((t) => t + 1)
     } catch (err) {
       acsisToastError(err.message)
     }
@@ -1156,19 +1199,17 @@ export default function TeacherExamDetailPage() {
             <section className="acsis-exam-detail__panel-section">
               <div
                 className={`acsis-summary-stats acsis-exam-detail__stats${
-                  (subjectLabel ? 1 : 0) + (waiting ? 1 : 0) + 2 >= 4
+                  1 + (waiting ? 1 : 0) + 2 >= 4
                     ? ' acsis-summary-stats--4'
                     : ''
                 }`}
               >
-                {subjectLabel ? (
-                  <div className="acsis-summary-stat acsis-card-surface">
-                    <div className="acsis-summary-stat__body">
-                      <span className="acsis-summary-stat__label">Subject</span>
-                      <span className="acsis-exam-detail__stat-text">{subjectLabel}</span>
-                    </div>
+                <div className="acsis-summary-stat acsis-card-surface">
+                  <div className="acsis-summary-stat__body">
+                    <span className="acsis-summary-stat__label">Total points</span>
+                    <span className="acsis-exam-detail__stat-text">{totalPoints}</span>
                   </div>
-                ) : null}
+                </div>
                 <div className="acsis-summary-stat acsis-card-surface">
                   <div className="acsis-summary-stat__body">
                     <span className="acsis-summary-stat__label">Items</span>
@@ -1213,7 +1254,8 @@ export default function TeacherExamDetailPage() {
                 {typeLabels.length ? (
                   <div className="acsis-exam-detail__type-badges">
                     {typeLabels.map((label) => (
-                      <span key={label} className="acsis-exam-detail__type-badge">
+                      <span key={label} className="acsis-exam-detail__type-badge" style={{ display: 'inline-flex', alignItems: 'center' }}>
+                        {getIconForType(label)}
                         {label}
                       </span>
                     ))}
@@ -1379,57 +1421,31 @@ export default function TeacherExamDetailPage() {
                 <div className="acsis-summary-stat acsis-card-surface">
                   <div className="acsis-summary-stat__body">
                     <span className="acsis-summary-stat__label">Joined and still answering</span>
-                    <span className="acsis-summary-stat__value">{stats.joined}</span>
+                    <span className="acsis-summary-stat__value">{Math.max(0, stats.joined - stats.submitted)}</span>
                   </div>
                 </div>
                 {results?.topStudent ? (
-                  <div className="acsis-summary-stat acsis-card-surface">
+                  <div className="acsis-summary-stat acsis-card-surface" style={{ position: 'relative' }}>
+                    <button
+                      type="button"
+                      style={{ position: 'absolute', top: '10px', right: '10px', padding: '4px', border: 'none', background: 'transparent', cursor: 'pointer', color: '#6b7280' }}
+                      onClick={() => {
+                        confetti({ particleCount: 150, spread: 90, origin: { x: 0.5, y: 0.5 }, zIndex: 9999 })
+                        setTopScoreModalOpen(true)
+                      }}
+                      aria-label="Expand top score"
+                      title="Reveal Top Score"
+                    >
+                      <Maximize2 size={16} strokeWidth={2} />
+                    </button>
                     <div className="acsis-summary-stat__body">
-                      <span className="acsis-summary-stat__label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        Top score
-                        <button
-                          type="button"
-                          style={{ padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', display: 'inline-flex', color: 'inherit' }}
-                          onClick={(e) => {
-                            const rect = e.currentTarget.getBoundingClientRect()
-                            const x = (rect.left + rect.width / 2) / window.innerWidth
-                            const y = (rect.top + rect.height / 2) / window.innerHeight
-                            setTopScoreVisible((v) => {
-                              const next = !v
-                              if (next) {
-                                confetti({ particleCount: 100, spread: 70, origin: { x, y }, zIndex: 9999 })
-                              }
-                              return next
-                            })
-                          }}
-                          aria-label={topScoreVisible ? 'Hide top score' : 'Show top score'}
-                        >
-                          {topScoreVisible ? (
-                            <EyeOff size={14} strokeWidth={2} aria-hidden />
-                          ) : (
-                            <Eye size={14} strokeWidth={2} aria-hidden />
-                          )}
-                        </button>
-                      </span>
+                      <span className="acsis-summary-stat__label">Top score</span>
                       <span className="acsis-exam-detail__stat-text">
-                        {topScoreVisible ? (
-                          <>
-                            {results.topStudent.studentName}
-                            {results.topStudent.rawScore != null && results.topStudent.totalPoints != null ? (
-                              <span className="acsis-exam-detail__top-score-pct">
-                                {' '}
-                                · {results.topStudent.rawScore}/{results.topStudent.totalPoints}
-                              </span>
-                            ) : results.topStudent.percentage != null ? (
-                              <span className="acsis-exam-detail__top-score-pct">
-                                {' '}
-                                · {results.topStudent.percentage}%
-                              </span>
-                            ) : null}
-                          </>
-                        ) : (
-                          '?'
-                        )}
+                        {results.topStudent.rawScore != null && results.topStudent.totalPoints != null
+                          ? `${results.topStudent.rawScore}/${results.topStudent.totalPoints} pts`
+                          : results.topStudent.percentage != null
+                          ? `${results.topStudent.percentage}%`
+                          : '?'}
                       </span>
                     </div>
                   </div>
@@ -1457,16 +1473,20 @@ export default function TeacherExamDetailPage() {
                       className="acsis-mc-input acsis-exam-detail__search-input"
                     />
                   </div>
-                  <select
-                    value={filterMode}
-                    onChange={(e) => setFilterMode(e.target.value)}
-                    className="acsis-mc-input acsis-exam-detail__filter-select"
-                  >
-                    <option value="Surname A-Z">Surname A-Z</option>
-                    <option value="Score rank">Score rank</option>
-                    <option value="Violations (highest to lowest)">Violations (highest to lowest)</option>
-                    <option value="Submission time (Oldest to Newest)">Submission time (Oldest to Newest)</option>
-                  </select>
+                  <div className="acsis-exam-detail__filter-wrap" style={{ position: 'relative' }}>
+                    <select
+                      value={filterMode}
+                      onChange={(e) => setFilterMode(e.target.value)}
+                      className="acsis-mc-input acsis-exam-detail__filter-select"
+                      style={{ paddingRight: '2rem', appearance: 'none' }}
+                    >
+                      <option value="Surname A-Z">Surname A-Z</option>
+                      <option value="Score rank">Score rank</option>
+                      <option value="Violations (highest to lowest)">Violations (highest to lowest)</option>
+                      <option value="Submission time (Oldest to Newest)">Submission time (Oldest to Newest)</option>
+                    </select>
+                    <ChevronDown size={14} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#6b7280' }} />
+                  </div>
                 </div>
                 <div className="acsis-exam-detail__table-wrap">
                   <table className="acsis-exam-detail__table">
@@ -1477,22 +1497,20 @@ export default function TeacherExamDetailPage() {
                       ) : null}
                       <th>Student</th>
                       <th>Status</th>
-                      {resultsTableColumns.review ? <th>Review</th> : null}
                       {resultsTableColumns.submissionTime ? (
                         <th>Submission time</th>
                       ) : null}
                       {resultsTableColumns.score ? (
                         <th className="acsis-exam-detail__table-col-num">Score</th>
                       ) : null}
-                      {resultsTableColumns.released ? <th>Released</th> : null}
                       {resultsTableColumns.warnings ? (
                         <th className="acsis-exam-detail__table-col-num">Warnings</th>
                       ) : null}
                       {resultsTableColumns.falsePositives ? (
                         <th className="acsis-exam-detail__table-col-num">Flagged false positives</th>
                       ) : null}
-                      {resultsTableColumns.action ? (
-                        <th className="acsis-exam-detail__table-col-action" />
+                      {resultsTableColumns.actions ? (
+                        <th className="acsis-exam-detail__table-col-action">Actions</th>
                       ) : null}
                     </tr>
                   </thead>
@@ -1505,12 +1523,17 @@ export default function TeacherExamDetailPage() {
                           </td>
                         ) : null}
                         <td>
-                          <span className="acsis-exam-detail__table-student-name">
-                            {[s.lastName, s.firstName].filter(Boolean).join(', ') || s.studentName}
-                          </span>
-                          {s.schoolId ? (
-                            <span className="acsis-exam-detail__table-student-id">{s.schoolId}</span>
-                          ) : null}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <UserAvatar user={{ name: s.studentName, avatarUrl: s.avatarUrl }} />
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                              <span className="acsis-exam-detail__table-student-name">
+                                {[s.lastName, s.firstName].filter(Boolean).join(', ') || s.studentName}
+                              </span>
+                              {s.schoolId ? (
+                                <span className="acsis-exam-detail__table-student-id" style={{ fontSize: '0.75rem', color: '#6b7280' }}>{s.schoolId}</span>
+                              ) : null}
+                            </div>
+                          </div>
                         </td>
                         <td>
                           {s.status ? (
@@ -1521,17 +1544,6 @@ export default function TeacherExamDetailPage() {
                             '—'
                           )}
                         </td>
-                        {resultsTableColumns.review ? (
-                          <td className="acsis-exam-detail__table-review">
-                            {s.status === 'submitted'
-                              ? s.reviewComplete
-                                ? 'Reviewed'
-                                : (s.uncheckedCount ?? 0) > 0
-                                  ? `Optional (${s.uncheckedCount})`
-                                  : 'Auto-graded'
-                              : '—'}
-                          </td>
-                        ) : null}
                         {resultsTableColumns.submissionTime ? (
                           <td className="acsis-exam-detail__table-submission-time">
                             {formatSubmissionTime(s.submittedAt)}
@@ -1539,26 +1551,10 @@ export default function TeacherExamDetailPage() {
                         ) : null}
                         {resultsTableColumns.score ? (
                           <td className="acsis-exam-detail__table-col-num acsis-exam-detail__table-score">
-                            {s.status === 'submitted' && s.percentage != null
-                              ? `${s.percentage}% (${s.rawScore}/${s.totalPoints})`
-                              : '—'}
-                          </td>
-                        ) : null}
-                        {resultsTableColumns.released ? (
-                          <td>
-                            {s.status === 'submitted' ? (
-                              s.scoreReleased ? (
-                                <span className="acsis-exam-detail__released-yes">Released</span>
-                              ) : (
-                                <button
-                                  type="button"
-                                  className="acsis-exam-detail__table-action"
-                                  disabled={releasing}
-                                  onClick={() => void handleReleaseOneStudent(s.sessionId)}
-                                >
-                                  Release
-                                </button>
-                              )
+                            {s.status === 'submitted' && s.percentage != null ? (
+                              <>
+                                <span style={{ fontWeight: 'bold' }}>{s.rawScore}/{s.totalPoints}</span> ({s.percentage}%)
+                              </>
                             ) : (
                               '—'
                             )}
@@ -1574,19 +1570,38 @@ export default function TeacherExamDetailPage() {
                             {falsePositiveCountBySession.get(s.sessionId) ?? 0}
                           </td>
                         ) : null}
-                        {resultsTableColumns.action ? (
+                        {resultsTableColumns.actions ? (
                           <td className="acsis-exam-detail__table-col-action">
                             {s.status === 'submitted' && s.sessionId ? (
-                              <button
-                                type="button"
-                                className="acsis-exam-detail__table-action"
-                                onClick={() => {
-                                  setReviewInitialSessionId(s.sessionId)
-                                  setReviewOpen(true)
-                                }}
-                              >
-                                Review
-                              </button>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'flex-end' }}>
+                                <button
+                                  type="button"
+                                  className="acsis-btn-outline"
+                                  style={{ padding: '6px 12px', fontSize: '0.8125rem', height: 'auto', minHeight: 'auto', display: 'flex', alignItems: 'center', gap: '6px' }}
+                                  onClick={() => {
+                                    setReviewInitialSessionId(s.sessionId)
+                                    setReviewOpen(true)
+                                  }}
+                                >
+                                  <FileText size={14} strokeWidth={2} />
+                                  Review
+                                </button>
+                                <div style={{ width: '90px', display: 'flex' }}>
+                                  {s.scoreReleased ? (
+                                    <span className="acsis-exam-detail__released-yes" style={{ padding: '6px 12px', fontSize: '0.8125rem', width: '100%', textAlign: 'center', boxSizing: 'border-box' }}>Released</span>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      className="acsis-btn-primary"
+                                      style={{ padding: '6px 12px', fontSize: '0.8125rem', height: 'auto', minHeight: 'auto', width: '100%', boxSizing: 'border-box' }}
+                                      disabled={releasing}
+                                      onClick={() => void handleReleaseOneStudent(s.sessionId)}
+                                    >
+                                      Release
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
                             ) : null}
                           </td>
                         ) : null}
@@ -1658,6 +1673,29 @@ export default function TeacherExamDetailPage() {
         onRelease={(opts) => void handleReleaseScores(opts)}
       />
 
+      <Dialog open={topScoreModalOpen} onOpenChange={setTopScoreModalOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle style={{ textAlign: 'center' }}>Top Score Revealed!</DialogTitle>
+          </DialogHeader>
+          {results?.topStudent ? (
+            <div style={{ textAlign: 'center', padding: '1rem 0' }}>
+              <div style={{ fontSize: '3.5rem', marginBottom: '1rem' }}>🏆</div>
+              <h3 style={{ fontSize: '1.75rem', fontWeight: 700, margin: '0 0 0.5rem 0' }}>
+                {results.topStudent.studentName}
+              </h3>
+              <p style={{ fontSize: '1.25rem', color: '#16a34a', fontWeight: 600, margin: 0 }}>
+                {results.topStudent.rawScore != null && results.topStudent.totalPoints != null
+                  ? `${results.topStudent.rawScore} / ${results.topStudent.totalPoints} pts`
+                  : results.topStudent.percentage != null
+                  ? `${results.topStudent.percentage}%`
+                  : ''}
+              </p>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={lobbyModalOpen} onOpenChange={setLobbyModalOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -1671,13 +1709,32 @@ export default function TeacherExamDetailPage() {
           ) : (
             <ul className="acsis-exam-detail__lobby-list">
               {lobbyStudents.map((s) => (
-                <li key={s.sessionId}>
-                  <span className="acsis-exam-detail__lobby-name">
-                    {[s.lastName, s.firstName].filter(Boolean).join(', ') || s.studentName}
-                  </span>
-                  {s.schoolId ? (
-                    <span className="acsis-exam-detail__lobby-id">{s.schoolId}</span>
-                  ) : null}
+                <li key={s.sessionId} className="acsis-exam-detail__lobby-item">
+                  <div className="acsis-exam-detail__lobby-student-info">
+                    <UserAvatar
+                      user={{
+                        name: s.studentName,
+                        avatarUrl: s.avatarUrl,
+                      }}
+                      size="md"
+                    />
+                    <div className="acsis-exam-detail__lobby-student-text">
+                      <span className="acsis-exam-detail__lobby-name">
+                        {[s.lastName, s.firstName].filter(Boolean).join(', ') || s.studentName}
+                      </span>
+                      {s.schoolId ? (
+                        <span className="acsis-exam-detail__lobby-id">{s.schoolId}</span>
+                      ) : null}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="acsis-btn-ghost acsis-exam-detail__lobby-kick"
+                    onClick={() => void handleKick(s.sessionId)}
+                    title="Remove from lobby"
+                  >
+                    Kick
+                  </button>
                 </li>
               ))}
             </ul>

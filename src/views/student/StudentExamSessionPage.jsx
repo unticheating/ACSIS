@@ -208,6 +208,27 @@ export default function StudentExamSessionPage() {
     const interval = window.setInterval(async () => {
       try {
         const data = await fetchStudentExamSession(classId, examId)
+        const examSt = normalizeExamStatus(data.exam?.status)
+
+        // Check exam status FIRST — if teacher closed the exam while student is answering,
+        // lock them in-place immediately so they can submit (like timeout).
+        if (examSt === PG_EXAM_STATUS.CLOSED) {
+          if (!examLockedRef.current) {
+            setExamLocked(true)
+            setLockReason('teacher_closed')
+            examLockedRef.current = true
+          }
+          // Keep questions/hit alive so the UI stays on the question scene
+          setHit((prev) => ({
+            exam: {
+              ...(prev?.exam || {}),
+              ...data.exam,
+              questions: prev?.exam?.questions || data.questions || [],
+            },
+          }))
+          return
+        }
+
         if (!data.joined) {
           setNeedsPassword(true)
           setExamLocked(false)
@@ -218,7 +239,6 @@ export default function StudentExamSessionPage() {
           return
         }
         if (data.sessionStatus === 'submitted') return
-        const examSt = normalizeExamStatus(data.exam?.status)
         if (examSt !== PG_EXAM_STATUS.OPEN) {
           setExamLocked(false)
           setLockReason(null)
@@ -245,12 +265,12 @@ export default function StudentExamSessionPage() {
         setHit((prev) =>
           prev
             ? {
-                exam: {
-                  ...prev.exam,
-                  ...data.exam,
-                  questions: data.questions?.length ? data.questions : prev.exam?.questions || [],
-                },
-              }
+              exam: {
+                ...prev.exam,
+                ...data.exam,
+                questions: data.questions?.length ? data.questions : prev.exam?.questions || [],
+              },
+            }
             : { exam: { ...data.exam, questions: data.questions || [] } },
         )
       } catch {
@@ -333,7 +353,7 @@ export default function StudentExamSessionPage() {
   const requestExamFullscreen = useCallback(() => {
     const el = document.documentElement
     if (!document.fullscreenElement && el.requestFullscreen) {
-      el.requestFullscreen().catch(() => {})
+      el.requestFullscreen().catch(() => { })
     }
   }, [])
 
@@ -386,9 +406,9 @@ export default function StudentExamSessionPage() {
     const payload = examLocked
       ? []
       : questions.map((q) => ({
-          questionId: q.id,
-          answerText: answers[q.id] != null ? String(answers[q.id]) : '',
-        }))
+        questionId: q.id,
+        answerText: answers[q.id] != null ? String(answers[q.id]) : '',
+      }))
     setSubmitError(null)
     try {
       const result = await submitExamAnswers(classId, examId, payload)
@@ -416,6 +436,20 @@ export default function StudentExamSessionPage() {
   useEffect(() => {
     if (!hit?.exam) return
     const st = normalizeExamStatus(hit.exam.status)
+    if (st === PG_EXAM_STATUS.CLOSED) {
+      if (scene === 'question' && !examLocked) {
+        // Student was actively answering — lock in-place so they can submit, like timeout
+        setExamLocked(true)
+        setLockReason('teacher_closed')
+        examLockedRef.current = true
+      } else if (scene !== 'question' && scene !== 'submitted' && !needsPassword) {
+        // Student was in lobby/countdown — send to password entry
+        setNeedsPassword(true)
+        setHit(null)
+        setScene('lobby')
+      }
+      return
+    }
     if (st !== PG_EXAM_STATUS.OPEN) {
       if (scene === 'countdown' || scene === 'question') {
         setScene('lobby')
@@ -425,7 +459,7 @@ export default function StudentExamSessionPage() {
     if (questions.length > 0 && scene === 'lobby') {
       setScene('countdown')
     }
-  }, [hit?.exam?.status, questions.length, scene])
+  }, [hit?.exam?.status, questions.length, scene, needsPassword, examLocked])
 
   const [detectionOpen, setDetectionOpen] = useState(false)
   const [detectionReturn, setDetectionReturn] = useState(DETECTION_RETURN_SEC)
@@ -533,7 +567,7 @@ export default function StudentExamSessionPage() {
         showViolationOverlay(sceneRef.current, {
           restoreFullscreenAfter: Boolean(opts.restoreFullscreenAfter) && !isFinalStrike,
         })
-        
+
         setWarningCount(nextStrike)
         warningCountRef.current = nextStrike
         if (nextStrike >= strikeMax) {
@@ -833,7 +867,7 @@ export default function StudentExamSessionPage() {
     return () => {
       window.clearInterval(guard)
       if (document.fullscreenElement && document.exitFullscreen) {
-        document.exitFullscreen().catch(() => {})
+        document.exitFullscreen().catch(() => { })
       }
     }
   }, [scene, requestExamFullscreen])
@@ -876,8 +910,7 @@ export default function StudentExamSessionPage() {
               Enter exam code
             </CardTitle>
             <CardDescription className="text-foreground/70">
-              Type the code your instructor shared after publishing the exam. After you join once, use
-              Continue exam from your class - the code step will not appear again.
+              Enter the exam code from your instructor.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -978,7 +1011,7 @@ export default function StudentExamSessionPage() {
               </div>
             </div>
           </div>
-          
+
           <div className="mt-auto flex flex-col items-center pb-4">
             <div className="lobby-footer !pb-2">
               <div className="lobby-spinner" aria-hidden />
@@ -1050,12 +1083,7 @@ export default function StudentExamSessionPage() {
                 Your score will appear after your instructor releases results.
               </p>
             ) : null}
-            {lockReason === 'max_warnings' ? (
-              <p className="text-sm font-medium text-amber-300">
-                Your exam was locked after reaching the maximum integrity warnings, then submitted
-                when you sent it.
-              </p>
-            ) : null}
+
             <Button className="w-full" asChild>
               <Link to={`/student/my-classes/${classId}`}>Return to class</Link>
             </Button>
@@ -1073,50 +1101,49 @@ export default function StudentExamSessionPage() {
   const detectionOverlay =
     typeof document !== 'undefined'
       ? createPortal(
-          <div
-            className={`detection-overlay text-white ${detectionOpen ? ' is-active' : ''}${
-              overlayIsFinalStrike ? ' detection-overlay--final' : ''
+        <div
+          className={`detection-overlay text-white ${detectionOpen ? ' is-active' : ''}${overlayIsFinalStrike ? ' detection-overlay--final' : ''
             }`}
-            role="alertdialog"
-            aria-modal="true"
-            aria-live="assertive"
-          >
-            <AlertTriangle className="detection-overlay__icon text-white" aria-hidden />
-            <h2 className="detection-title text-white">
-              {overlayIsFinalStrike
-                ? 'Final Warning: Maximum Strikes Reached'
-                : 'Warning: Suspicious Activity!'}
-            </h2>
-            <p className="detection-sub text-white">
-              {overlayIsFinalStrike ? (
-                <>
-                  You have reached <strong>{maxWarnings} of {maxWarnings}</strong> integrity warnings.
-                  Your exam is now <strong>locked</strong>: you cannot change answers or switch questions.
-                  Click <strong>Send exam</strong> when you are ready to submit.
-                </>
-              ) : (
-                <>
-                  {lastViolationLabel || 'A proctoring rule was violated.'} This incident was logged for
-                  your instructor and administrator.
-                </>
-              )}
-            </p>
-            <p className="detection-strikes text-white">
-              Strike {overlayStrikes} of {maxWarnings}
-              {overlayIsFinalStrike
-                ? ' - no further warnings remain'
-                : overlayStrikes >= maxWarnings - 1 && overlayStrikes < maxWarnings
-                  ? ' - one more locks your exam'
-                  : ''}
-            </p>
-            <p className="detection-countdown text-white">
-              {overlayIsFinalStrike
-                ? `Returning to your locked exam in ${detectionReturn} seconds…`
-                : `Returning to exam in ${detectionReturn} seconds…`}
-            </p>
-          </div>,
-          document.body,
-        )
+          role="alertdialog"
+          aria-modal="true"
+          aria-live="assertive"
+        >
+          <AlertTriangle className="detection-overlay__icon text-white" aria-hidden />
+          <h2 className="detection-title text-white">
+            {overlayIsFinalStrike
+              ? 'Final Warning: Maximum Strikes Reached'
+              : 'Warning: Suspicious Activity!'}
+          </h2>
+          <p className="detection-sub text-white">
+            {overlayIsFinalStrike ? (
+              <>
+                You have reached <strong>{maxWarnings} of {maxWarnings}</strong> integrity warnings.
+                Your exam is now <strong>locked</strong>: you cannot change answers or switch questions.
+                Click <strong>Send exam</strong> when you are ready to submit.
+              </>
+            ) : (
+              <>
+                {lastViolationLabel || 'A proctoring rule was violated.'} This incident was logged for
+                your instructor and administrator.
+              </>
+            )}
+          </p>
+          <p className="detection-strikes text-white">
+            Strike {overlayStrikes} of {maxWarnings}
+            {overlayIsFinalStrike
+              ? ' - no further warnings remain'
+              : overlayStrikes >= maxWarnings - 1 && overlayStrikes < maxWarnings
+                ? ' - one more locks your exam'
+                : ''}
+          </p>
+          <p className="detection-countdown text-white">
+            {overlayIsFinalStrike
+              ? `Returning to your locked exam in ${detectionReturn} seconds…`
+              : `Returning to exam in ${detectionReturn} seconds…`}
+          </p>
+        </div>,
+        document.body,
+      )
       : null
 
   const studentCode = activeAccount?.id ? btoa(activeAccount.id).replace(/=/g, '') : 'UNKNOWN';
@@ -1200,13 +1227,15 @@ export default function StudentExamSessionPage() {
           {currentQ ? (
             <div className={`flex-1 flex flex-col w-full mx-auto max-w-3xl`}>
               {examLocked ? (
-                  <div
-                    className="mb-6 rounded-xl border border-amber-500/40 bg-amber-100 dark:bg-amber-950/40 px-4 py-3 text-sm text-amber-900 dark:text-amber-100"
-                    role="status"
-                  >
+                <div
+                  className="mb-6 rounded-xl border border-amber-500/40 bg-amber-100 dark:bg-amber-950/40 px-4 py-3 text-sm text-amber-900 dark:text-amber-100"
+                  role="status"
+                >
                   {lockReason === 'max_warnings'
                     ? 'Maximum warnings reached. You cannot change answers or switch questions. Click Send exam when ready.'
-                    : 'Time is up. You cannot change answers or switch questions. Click Send exam when ready.'}
+                    : lockReason === 'teacher_closed'
+                      ? 'The exam has been ended by your teacher. Please submit your answers now.'
+                      : 'Time is up. You cannot change answers or switch questions. Click Send exam when ready.'}
                 </div>
               ) : null}
               <div
@@ -1227,9 +1256,9 @@ export default function StudentExamSessionPage() {
                     </span>
                     <span className="exam-type-badge">{questionTypeLabel(currentQ.type)}</span>
                   </div>
-                  <CollapsibleQuestion 
-                    text={currentQ.question} 
-                    className="question-box question-box--prompt whitespace-pre-wrap" 
+                  <CollapsibleQuestion
+                    text={currentQ.question}
+                    className="question-box question-box--prompt whitespace-pre-wrap"
                   />
                   {currentQ.imageUrl && (
                     <div className="mt-6">
@@ -1244,153 +1273,153 @@ export default function StudentExamSessionPage() {
 
                 {/* Question Inputs */}
                 <div className="flex-1">
-                {currentQ.type === 'multiple-choice' && (
-                  <div className="options-list">
-                    {(currentQ.options || []).map((opt, i) => {
-                      const isSelected = answers[currentQ.id] === opt
-                      return (
-                        <button
-                          key={i}
-                          type="button"
-                          disabled={examLocked}
-                          onClick={() =>
-                            !examLocked &&
-                            setAnswers((prev) => ({ ...prev, [currentQ.id]: opt }))
-                          }
-                          className={`option-row${isSelected ? ' is-selected' : ''}`}
-                        >
-                          <span className="option-radio" aria-hidden />
-                          <span>{opt}</span>
-                        </button>
-                      )
-                    })}
-                  </div>
-                )}
-
-                {currentQ.type === 'truefalse' && (
-                  <div className="tf-grid">
-                    {['True', 'False'].map((v) => {
-                      const isSelected = answers[currentQ.id] === v
-                      return (
-                        <button
-                          key={v}
-                          type="button"
-                          disabled={examLocked}
-                          onClick={() =>
-                            !examLocked && setAnswers((prev) => ({ ...prev, [currentQ.id]: v }))
-                          }
-                          className={`option-row${isSelected ? ' is-selected' : ''}`}
-                        >
-                          <span className="option-radio" aria-hidden />
-                          <span>{v}</span>
-                        </button>
-                      )
-                    })}
-                  </div>
-                )}
-
-                {currentQ.type === 'identification' && (
-                  <div className="w-full">
-                    <div className="mb-2">
-                      <p className="exam-type-hint m-0 text-left">
-                        Type your answer below
-                      </p>
+                  {currentQ.type === 'multiple-choice' && (
+                    <div className="options-list">
+                      {(currentQ.options || []).map((opt, i) => {
+                        const isSelected = answers[currentQ.id] === opt
+                        return (
+                          <button
+                            key={i}
+                            type="button"
+                            disabled={examLocked}
+                            onClick={() =>
+                              !examLocked &&
+                              setAnswers((prev) => ({ ...prev, [currentQ.id]: opt }))
+                            }
+                            className={`option-row${isSelected ? ' is-selected' : ''}`}
+                          >
+                            <span className="option-radio" aria-hidden />
+                            <span>{opt}</span>
+                          </button>
+                        )
+                      })}
                     </div>
-                    <input
-                      id="id-answer"
-                      type="text"
-                      className="id-input"
-                      value={answers[currentQ.id] || ''}
-                      readOnly={examLocked}
-                      onChange={(e) =>
-                        !examLocked &&
-                        setAnswers((prev) => ({ ...prev, [currentQ.id]: e.target.value.toUpperCase() }))
-                      }
-                      placeholder="Your answer..."
-                      autoComplete="off"
-                      spellCheck="false"
-                    />
-                  </div>
-                )}
+                  )}
 
-                {currentQ.type === 'coding' && (
-                  <div className="code-editor-wrap max-w-3xl w-full">
-                    <div className="mb-2">
-                      <p className="exam-type-hint m-0 text-left">
-                        Language: {normalizeCodingLanguage(currentQ.language || currentQ.options?.[0])}
-                      </p>
+                  {currentQ.type === 'truefalse' && (
+                    <div className="tf-grid">
+                      {['True', 'False'].map((v) => {
+                        const isSelected = answers[currentQ.id] === v
+                        return (
+                          <button
+                            key={v}
+                            type="button"
+                            disabled={examLocked}
+                            onClick={() =>
+                              !examLocked && setAnswers((prev) => ({ ...prev, [currentQ.id]: v }))
+                            }
+                            className={`option-row${isSelected ? ' is-selected' : ''}`}
+                          >
+                            <span className="option-radio" aria-hidden />
+                            <span>{v}</span>
+                          </button>
+                        )
+                      })}
                     </div>
-                    <Editor
-                      height="min(42vh, 360px)"
-                      language={normalizeCodingLanguage(currentQ.language || currentQ.options?.[0])}
-                      theme={monacoThemeForApp(theme)}
-                      value={answers[currentQ.id] || ''}
-                      onChange={(val) =>
-                        !examLocked && setAnswers((prev) => ({ ...prev, [currentQ.id]: val ?? '' }))
-                      }
-                      onMount={(editor) => { monacoEditorRef.current = editor }}
-                      options={{
-                        ...MONACO_EXAM_EDITOR_OPTIONS,
-                        readOnly: examLocked,
-                      }}
-                    />
-                  </div>
-                )}
+                  )}
 
-                {currentQ.type === 'matching' && (
-                  <div>
-                    <p className="exam-type-hint mb-3 text-left">Match each item on the left to the correct option.</p>
-                    <MatchingQuestionInput
-                      pairs={matchingPairsFromQuestion(currentQ)}
-                      rightOptions={matchingRightOptions}
-                      value={parseMatchingStudentAnswer(answers[currentQ.id])}
-                      disabled={examLocked}
-                      onChange={(map) =>
-                        !examLocked &&
-                        setAnswers((prev) => ({
-                          ...prev,
-                          [currentQ.id]: stringifyMatchingStudentAnswer(map),
-                        }))
-                      }
-                    />
-                  </div>
-                )}
+                  {currentQ.type === 'identification' && (
+                    <div className="w-full">
+                      <div className="mb-2">
+                        <p className="exam-type-hint m-0 text-left">
+                          Type your answer below
+                        </p>
+                      </div>
+                      <input
+                        id="id-answer"
+                        type="text"
+                        className="id-input"
+                        value={answers[currentQ.id] || ''}
+                        readOnly={examLocked}
+                        onChange={(e) =>
+                          !examLocked &&
+                          setAnswers((prev) => ({ ...prev, [currentQ.id]: e.target.value.toUpperCase() }))
+                        }
+                        placeholder="Your answer..."
+                        autoComplete="off"
+                        spellCheck="false"
+                      />
+                    </div>
+                  )}
 
-                {currentQ.type === 'essay' && (
-                  <div className="max-w-3xl">
-                    <p className="exam-type-hint mb-2 text-left">Write your answer in the box below.</p>
-                    <textarea
-                      rows={10}
-                      className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[220px]"
-                      placeholder="Type your essay response..."
-                      value={answers[currentQ.id] || ''}
-                      readOnly={examLocked}
-                      onChange={(e) =>
-                        !examLocked &&
-                        setAnswers((prev) => ({ ...prev, [currentQ.id]: e.target.value }))
-                      }
-                    />
-                  </div>
-                )}
+                  {currentQ.type === 'coding' && (
+                    <div className="code-editor-wrap max-w-3xl w-full">
+                      <div className="mb-2">
+                        <p className="exam-type-hint m-0 text-left">
+                          Language: {normalizeCodingLanguage(currentQ.language || currentQ.options?.[0])}
+                        </p>
+                      </div>
+                      <Editor
+                        height="min(42vh, 360px)"
+                        language={normalizeCodingLanguage(currentQ.language || currentQ.options?.[0])}
+                        theme={monacoThemeForApp(theme)}
+                        value={answers[currentQ.id] || ''}
+                        onChange={(val) =>
+                          !examLocked && setAnswers((prev) => ({ ...prev, [currentQ.id]: val ?? '' }))
+                        }
+                        onMount={(editor) => { monacoEditorRef.current = editor }}
+                        options={{
+                          ...MONACO_EXAM_EDITOR_OPTIONS,
+                          readOnly: examLocked,
+                        }}
+                      />
+                    </div>
+                  )}
 
-                {currentQ.type === 'diagramming' && (
-                  <div className="w-full">
-                    <p className="exam-type-hint mb-2 text-left">
-                      Build a {diagramVariantFromQuestion(currentQ) === 'erd' ? 'entity relationship diagram' : 'flowchart'}.
-                      Drag shapes from the toolbox, connect handles, and click a node to edit its label.
-                    </p>
-                    <DiagramEditor
-                      key={currentQ.id}
-                      variant={diagramVariantFromQuestion(currentQ)}
-                      value={answers[currentQ.id] || emptyDiagramData()}
-                      readOnly={examLocked}
-                      onChange={(json) =>
-                        !examLocked && setAnswers((prev) => ({ ...prev, [currentQ.id]: json }))
-                      }
-                      height="min(50vh, 400px)"
-                    />
-                  </div>
-                )}
+                  {currentQ.type === 'matching' && (
+                    <div>
+                      <p className="exam-type-hint mb-3 text-left">Match each item on the left to the correct option.</p>
+                      <MatchingQuestionInput
+                        pairs={matchingPairsFromQuestion(currentQ)}
+                        rightOptions={matchingRightOptions}
+                        value={parseMatchingStudentAnswer(answers[currentQ.id])}
+                        disabled={examLocked}
+                        onChange={(map) =>
+                          !examLocked &&
+                          setAnswers((prev) => ({
+                            ...prev,
+                            [currentQ.id]: stringifyMatchingStudentAnswer(map),
+                          }))
+                        }
+                      />
+                    </div>
+                  )}
+
+                  {currentQ.type === 'essay' && (
+                    <div className="max-w-3xl">
+                      <p className="exam-type-hint mb-2 text-left">Write your answer in the box below.</p>
+                      <textarea
+                        rows={10}
+                        className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[220px]"
+                        placeholder="Type your essay response..."
+                        value={answers[currentQ.id] || ''}
+                        readOnly={examLocked}
+                        onChange={(e) =>
+                          !examLocked &&
+                          setAnswers((prev) => ({ ...prev, [currentQ.id]: e.target.value }))
+                        }
+                      />
+                    </div>
+                  )}
+
+                  {currentQ.type === 'diagramming' && (
+                    <div className="w-full">
+                      <p className="exam-type-hint mb-2 text-left">
+                        Build a {diagramVariantFromQuestion(currentQ) === 'erd' ? 'entity relationship diagram' : 'flowchart'}.
+                        Drag shapes from the toolbox, connect handles, and click a node to edit its label.
+                      </p>
+                      <DiagramEditor
+                        key={currentQ.id}
+                        variant={diagramVariantFromQuestion(currentQ)}
+                        value={answers[currentQ.id] || emptyDiagramData()}
+                        readOnly={examLocked}
+                        onChange={(json) =>
+                          !examLocked && setAnswers((prev) => ({ ...prev, [currentQ.id]: json }))
+                        }
+                        height="min(50vh, 400px)"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1516,9 +1545,9 @@ export default function StudentExamSessionPage() {
                 {questions.length}
               </span>
             </div>
-              <button type="button" onClick={() => setIsSubmitDialogOpen(true)} className="btn-next w-full justify-center">
-                {examLocked ? 'Send exam' : 'Submit exam'}
-              </button>
+            <button type="button" onClick={() => setIsSubmitDialogOpen(true)} className="btn-next w-full justify-center">
+              {examLocked ? 'Send exam' : 'Submit exam'}
+            </button>
           </div>
         </aside>
 
@@ -1547,7 +1576,9 @@ export default function StudentExamSessionPage() {
           <DialogHeader>
             <DialogTitle>Submit Exam</DialogTitle>
             <DialogDescription>
-              Are you sure you want to submit your exam? Once submitted, you cannot change your answers.
+              Are you sure you're ready to submit? You won't be able to change your answers afterwards.
+              <br /><br />
+              If you encounter any issues or have concerns, please speak with your instructor before submitting.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex gap-2 sm:justify-end mt-4">

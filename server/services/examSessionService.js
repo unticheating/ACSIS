@@ -19,6 +19,7 @@ import {
   updateExamStatusByIdQuery,
   resetExamSessionsQuery,
   upsertStudentAnswerQuery,
+  deleteExamSessionQuery,
 } from '../repositories/examSessionRepository.js'
 
 /** Students only receive numeric scores after faculty releases them. */
@@ -541,4 +542,26 @@ export async function submitExamService(classId, examId, studentMemberId, answer
     ok: true,
     ...(await buildStudentSubmitPayload(gate.session.session_id, scores)),
   }
+}
+
+export async function deleteTeacherExamSessionService(classId, examId, sessionId, teacherMemberId) {
+  const { getTeacherClassByIdQuery } = await import('../repositories/classRepository.js');
+  const cls = await getTeacherClassByIdQuery(classId, teacherMemberId);
+  if (!cls) {
+    return { ok: false, status: 403, error: 'Access denied.' };
+  }
+
+  const exam = await getExamForJoinQuery(classId, examId)
+  if (!exam) {
+    return { ok: false, status: 404, error: 'Exam not found.' }
+  }
+
+  const deleted = await deleteExamSessionQuery(sessionId, examId)
+  if (!deleted) {
+    return { ok: false, status: 400, error: 'Cannot kick student. Session might not be in progress.' }
+  }
+  
+  notifyMonitoringUpdate(classId, examId)
+  
+  return { ok: true }
 }

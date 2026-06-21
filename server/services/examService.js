@@ -10,7 +10,8 @@ import {
   verifyExamPasswordQuery,
   updateExamPasswordByTeacherQuery,
 } from '../repositories/examRepository.js';
-import { closeOtherTeacherOngoingExamsQuery } from '../repositories/examResultsRepository.js';
+import { closeOtherTeacherOngoingExamsQuery, listSubmittedSessionIdsForExamQuery } from '../repositories/examResultsRepository.js';
+import { gradeSessionAnswersQuery } from '../repositories/examSessionRepository.js';
 import { finalizeExamResultsService } from './examReleaseService.js';
 import { 
   getClassByIdQuery, 
@@ -138,6 +139,20 @@ export async function updateExamDraftService(memberId, classId, examId, payload)
     }
 
     await client.query('COMMIT');
+
+    // Re-grade all submitted sessions in the background so any newly added
+    // identification possible answers are auto-corrected without delay.
+    ;(async () => {
+      try {
+        const sessionIds = await listSubmittedSessionIdsForExamQuery(examId)
+        for (const sid of sessionIds) {
+          await gradeSessionAnswersQuery(sid)
+        }
+      } catch (err) {
+        console.error('[examService.updateExamDraft] background re-grade failed:', err)
+      }
+    })()
+
     return { ok: true };
   } catch (err) {
     await client.query('ROLLBACK');
