@@ -67,7 +67,12 @@ export default function TeacherDashboardPage() {
   const activeExamCount = exams.filter(e => normalizeExamStatus(e.status) === PG_EXAM_STATUS.WAITING || normalizeExamStatus(e.status) === PG_EXAM_STATUS.OPEN).length
 
   async function handleStartSession(classId, examId) {
-    if (activeExamCount > 0) {
+    const otherActive = exams.filter(e => 
+      String(e.id ?? e.exam_id) !== String(examId) && 
+      (normalizeExamStatus(e.status) === PG_EXAM_STATUS.WAITING || normalizeExamStatus(e.status) === PG_EXAM_STATUS.OPEN)
+    ).length;
+
+    if (otherActive > 0) {
       acsisToastError("Only one exam can be active or live at a time.")
       return
     }
