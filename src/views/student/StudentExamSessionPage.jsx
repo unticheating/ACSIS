@@ -1146,7 +1146,8 @@ export default function StudentExamSessionPage() {
       )
       : null
 
-  const studentCode = activeAccount?.id ? btoa(activeAccount.id).replace(/=/g, '') : 'UNKNOWN';
+  const rawCode = activeAccount?.studentNumber || activeAccount?.id;
+  const studentCode = rawCode ? btoa(String(rawCode)).replace(/=/g, '') : 'UNKNOWN';
   const watermarkPositions = [
     { top: '10px', left: '10px' },
     { top: '10px', right: '10px' },
@@ -1212,7 +1213,7 @@ export default function StudentExamSessionPage() {
           <div
             style={{
               position: 'absolute',
-              opacity: 0.04,
+              opacity: 0.08,
               pointerEvents: 'none',
               fontSize: '11px',
               fontFamily: 'monospace',
