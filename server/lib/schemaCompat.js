@@ -91,11 +91,11 @@ export async function getExamSessionJoinCondition(pool, esAlias = 'es', imAlias 
         const names = new Set(rows.map((r) => r.column_name))
         
         if (names.has('member_id') && names.has('student_id')) {
-          return `COALESCE(ES_ALIAS.member_id, ES_ALIAS.student_id) = IM_ALIAS.member_id`
+          return \`COALESCE(ES_ALIAS.member_id, ES_ALIAS.student_id) = IM_ALIAS.member_id\`
         } else if (names.has('member_id')) {
-          return `ES_ALIAS.member_id = IM_ALIAS.member_id`
+          return \`ES_ALIAS.member_id = IM_ALIAS.member_id\`
         } else {
-          return `ES_ALIAS.student_id = IM_ALIAS.member_id`
+          return \`ES_ALIAS.student_id = IM_ALIAS.member_id\`
         }
       } catch (err) {
         examSessionJoinConditionPromise = null
