@@ -445,6 +445,45 @@ async function requireOpenSession(classId, examId, studentMemberId) {
   return { ok: true, exam, session }
 }
 
+/**
+ * Like requireOpenSession but also permits submission when the exam has been
+ * closed by the teacher — students who already joined must still be able to
+ * submit their answers.
+ */
+async function requireSubmittableSession(classId, examId, studentMemberId) {
+  const enrolled = await checkEnrollment(studentMemberId, classId)
+  if (!enrolled) {
+    return { ok: false, status: 403, error: 'NOT_ENROLLED' }
+  }
+
+  const accessGate = await ensureStudentCanJoinExam(examId, studentMemberId)
+  if (!accessGate.ok) return accessGate
+
+  const exam = await getExamForJoinQuery(classId, examId)
+  if (!exam) {
+    return { ok: false, status: 404, error: 'Exam not found.' }
+  }
+
+  await autoCloseExams(classId, [exam])
+
+  const examStatus = (exam.status || '').toLowerCase()
+  // Allow submission when the exam is live (open) OR when the teacher just
+  // closed it — students who already joined need to submit their work.
+  if (examStatus !== EXAM_STATUS.OPEN && examStatus !== EXAM_STATUS.CLOSED) {
+    return { ok: false, status: 403, error: 'Exam is not live yet.' }
+  }
+
+  const session = await getSessionForStudentQuery(examId, studentMemberId)
+  if (!session) {
+    return { ok: false, status: 403, error: 'Join the exam with your exam code first.' }
+  }
+  if (session.status === 'submitted') {
+    return { ok: false, status: 400, error: 'You already submitted this exam.' }
+  }
+
+  return { ok: true, exam, session }
+}
+
 export async function logCheatingEventService(classId, examId, studentMemberId, eventType, details) {
   if (!isValidCheatEvent(eventType)) {
     return { ok: false, status: 400, error: 'Invalid event type.' }
@@ -494,7 +533,9 @@ export async function logCheatingEventService(classId, examId, studentMemberId, 
 }
 
 export async function submitExamService(classId, examId, studentMemberId, answersPayload) {
-  const gate = await requireOpenSession(classId, examId, studentMemberId)
+  // Use requireSubmittableSession so students can still submit after the
+  // teacher closes the exam (status = 'closed').
+  const gate = await requireSubmittableSession(classId, examId, studentMemberId)
   if (!gate.ok) return gate
 
   if (!gate.session.locked_at) {

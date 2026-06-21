@@ -66,6 +66,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog.jsx'
@@ -110,6 +111,11 @@ function SettingsForm({ hit, classId, examId, onSaved, onChanges }) {
   const [shuffleChoices, setShuffleChoices] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
 
+  // Schedule modal state
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false)
+  const [modalStart, setModalStart] = useState(null)
+  const [modalEnd, setModalEnd] = useState(null)
+
   // Track original values to detect changes
   const [origScheduledStart, setOrigScheduledStart] = useState('')
   const [origScheduledEnd, setOrigScheduledEnd] = useState('')
@@ -153,6 +159,36 @@ function SettingsForm({ hit, classId, examId, onSaved, onChanges }) {
     }
   }, [hasChanges, onChanges])
 
+  function openScheduleModal() {
+    setModalStart(scheduledStart ? new Date(scheduledStart) : null)
+    setModalEnd(scheduledEnd ? new Date(scheduledEnd) : null)
+    setScheduleModalOpen(true)
+  }
+
+  function applySchedule() {
+    setScheduledStart(modalStart ? modalStart.toISOString() : '')
+    setScheduledEnd(modalEnd ? modalEnd.toISOString() : '')
+    setScheduleModalOpen(false)
+  }
+
+  function clearSchedule() {
+    setModalStart(null)
+    setModalEnd(null)
+    setScheduledStart('')
+    setScheduledEnd('')
+    setScheduleModalOpen(false)
+  }
+
+  function formatDateShort(iso) {
+    if (!iso) return null
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return null
+    return d.toLocaleString([], { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  }
+
+  const startLabel = formatDateShort(scheduledStart)
+  const endLabel = formatDateShort(scheduledEnd)
+
   async function handleSave(e) {
     e.preventDefault()
     if (!hasChanges) return
@@ -191,65 +227,134 @@ function SettingsForm({ hit, classId, examId, onSaved, onChanges }) {
   }
 
   return (
-    <form id="exam-settings-form" onSubmit={handleSave} className="space-y-6 max-w-2xl">
-      <div className="space-y-2">
-        <Label className="text-sm font-semibold">Exam Scheduling</Label>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '1rem', alignItems: 'end' }} className="pt-2">
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Start Time</Label>
-            <DateTimePicker
-              value={scheduledStart ? new Date(scheduledStart) : undefined}
-              onChange={(d) => setScheduledStart(d ? d.toISOString() : null)}
-            />
+    <>
+      <form id="exam-settings-form" onSubmit={handleSave} className="space-y-6 max-w-2xl">
+        <div className="space-y-2">
+          <Label className="text-sm font-semibold">Exam Scheduling</Label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }} className="pt-2">
+            <button
+              type="button"
+              className="acsis-btn-ghost"
+              title="Set or change exam schedule"
+              style={{ padding: '8px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+              onClick={openScheduleModal}
+            >
+              <RotateCcw size={16} strokeWidth={2.5} />
+            </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              {startLabel || endLabel ? (
+                <>
+                  {startLabel && (
+                    <span style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)' }}>
+                      <span style={{ fontWeight: 600 }}>Start:</span> {startLabel}
+                    </span>
+                  )}
+                  {endLabel && (
+                    <span style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)' }}>
+                      <span style={{ fontWeight: 600 }}>Deadline:</span> {endLabel}
+                    </span>
+                  )}
+                </>
+              ) : (
+                <span
+                  style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)', cursor: 'pointer', textDecoration: 'underline dotted' }}
+                  onClick={openScheduleModal}
+                >
+                  No schedule set — click to set dates
+                </span>
+              )}
+            </div>
           </div>
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">End Time</Label>
-            <DateTimePicker
-              value={scheduledEnd ? new Date(scheduledEnd) : undefined}
-              onChange={(d) => setScheduledEnd(d ? d.toISOString() : null)}
-            />
-          </div>
-          <button
-            type="button"
-            className="acsis-btn-ghost"
-            title="Reset scheduling"
-            style={{ padding: '8px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-            onClick={() => { setScheduledStart(''); setScheduledEnd(''); }}
-          >
-            <RotateCcw size={16} strokeWidth={2.5} />
-          </button>
         </div>
-      </div>
-      <div className="space-y-4 pt-4 border-t">
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            className="w-4 h-4 text-primary"
-            checked={isAutoPublish}
-            onChange={(e) => setIsAutoPublish(e.target.checked)}
-          />
-          <span className="text-sm">Auto-publish on start time</span>
-        </label>
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            className="w-4 h-4 text-primary"
-            checked={shuffleQuestions}
-            onChange={(e) => setShuffleQuestions(e.target.checked)}
-          />
-          <span className="text-sm">Shuffle questions for each student</span>
-        </label>
-        <label className="flex items-center gap-2 cursor-pointer">
-          <input
-            type="checkbox"
-            className="w-4 h-4 text-primary"
-            checked={shuffleChoices}
-            onChange={(e) => setShuffleChoices(e.target.checked)}
-          />
-          <span className="text-sm">Shuffle multiple-choice options</span>
-        </label>
-      </div>
-    </form>
+        <div className="space-y-4 pt-4 border-t">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              className="w-4 h-4 text-primary"
+              checked={isAutoPublish}
+              onChange={(e) => setIsAutoPublish(e.target.checked)}
+            />
+            <span className="text-sm">Auto-publish on start time</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              className="w-4 h-4 text-primary"
+              checked={shuffleQuestions}
+              onChange={(e) => setShuffleQuestions(e.target.checked)}
+            />
+            <span className="text-sm">Shuffle questions for each student</span>
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              className="w-4 h-4 text-primary"
+              checked={shuffleChoices}
+              onChange={(e) => setShuffleChoices(e.target.checked)}
+            />
+            <span className="text-sm">Shuffle multiple-choice options</span>
+          </label>
+        </div>
+      </form>
+
+      {/* Schedule picker modal */}
+      <Dialog open={scheduleModalOpen} onOpenChange={setScheduleModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Set Exam Schedule</DialogTitle>
+            <DialogDescription>
+              Set the start and deadline for this exam. Leave blank for no fixed schedule.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Start Time</label>
+              <DateTimePicker
+                value={modalStart}
+                onChange={setModalStart}
+                placeholder="No fixed start"
+                disablePortal={true}
+              />
+            </div>
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">Exam deadline (optional)</label>
+              <DateTimePicker
+                value={modalEnd}
+                onChange={setModalEnd}
+                placeholder="No fixed deadline"
+                disablePortal={true}
+                minDateTime={modalStart}
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <button
+              type="button"
+              className="acsis-btn-ghost"
+              onClick={clearSchedule}
+              style={{ marginRight: 'auto' }}
+            >
+              Clear schedule
+            </button>
+            <button
+              type="button"
+              className="acsis-btn-ghost"
+              onClick={() => setScheduleModalOpen(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="acsis-mc-create-btn"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
+              onClick={applySchedule}
+            >
+              Apply
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 

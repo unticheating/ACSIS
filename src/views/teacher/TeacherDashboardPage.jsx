@@ -57,6 +57,8 @@ export default function TeacherDashboardPage() {
   const [restartClassId, setRestartClassId] = useState(null)
   const [restartDialogOpen, setRestartDialogOpen] = useState(false)
   const [isRestarting, setIsRestarting] = useState(false)
+  const [restartDefaultStart, setRestartDefaultStart] = useState(null)
+  const [restartDefaultEnd, setRestartDefaultEnd] = useState(null)
 
   const resetCreateExamModal = () => {
     setSelectedClassIds([])
@@ -399,6 +401,10 @@ export default function TeacherDashboardPage() {
             const detailPath = ex.classId != null && ex.id != null
               ? `/teacher/my-classes/${encodeURIComponent(ex.classId)}/exams/${encodeURIComponent(ex.id)}`
               : null
+            const deadlineDate = ex.scheduledEnd ? new Date(ex.scheduledEnd) : null
+            const deadlineLabel = deadlineDate && !Number.isNaN(deadlineDate.getTime())
+              ? deadlineDate.toLocaleString([], { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+              : null
             return (
               <FadeIn as="div" key={ex.id || ex.exam_id} delay={0.05}>
                 <Card
@@ -428,6 +434,11 @@ export default function TeacherDashboardPage() {
                   <CardFooter className="pt-0 border-t border-border mt-auto px-6 py-3 bg-muted/20">
                     <div className="flex items-center justify-between w-full">
                       <span className={`text-sm ${statusClass}`}>{statusLabel || 'Draft'}</span>
+                      {deadlineLabel && (
+                        <span className="text-xs text-muted-foreground" title="Exam deadline">
+                          Deadline: {deadlineLabel}
+                        </span>
+                      )}
                     </div>
                   </CardFooter>
 
@@ -490,6 +501,8 @@ export default function TeacherDashboardPage() {
                             onSelect={() => {
                               setRestartClassId(ex.classId)
                               setRestartExamId(ex.id)
+                              setRestartDefaultStart(ex.scheduledStart || null)
+                              setRestartDefaultEnd(ex.scheduledEnd || null)
                               setRestartDialogOpen(true)
                             }}
                           >
@@ -679,6 +692,8 @@ export default function TeacherDashboardPage() {
         onOpenChange={setRestartDialogOpen}
         onRestart={handleRestart}
         isSaving={isRestarting}
+        defaultStart={restartDefaultStart}
+        defaultEnd={restartDefaultEnd}
       />
       {ConfirmDialog}
     </div>
