@@ -674,10 +674,9 @@ html.dark .reports-page {
 }
 
 .rp-barchart-bucket-item {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
   gap: 8px 16px;
   padding: 8px 10px;
   border-radius: 8px;
@@ -688,11 +687,17 @@ html.dark .reports-page {
   font-size: 0.875rem;
   font-weight: 600;
   color: var(--fg-default, #111827);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .rp-barchart-bucket-item__meta {
   font-size: 0.8rem;
   color: var(--fg-muted, #6b7280);
+  white-space: nowrap;
+  text-align: right;
 }
 
 /* ── Violations ───────────────────────────────── */

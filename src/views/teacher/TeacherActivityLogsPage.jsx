@@ -29,13 +29,10 @@ const EVENT_TYPE_LABELS = Object.fromEntries(
 function formatTime(iso) {
   if (!iso) return '—'
   try {
-    return new Date(iso).toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
+    return new Date(iso).toLocaleDateString('en-US', {
+      month: '2-digit',
+      day: '2-digit',
       year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
     })
   } catch {
     return '—'
@@ -216,6 +213,8 @@ export default function TeacherActivityLogsPage() {
         dateTo,
         examTitle: examOptions.find((exam) => exam.id === examId)?.title || '',
         sectionLabel: sectionOptions.find((section) => section.key === sectionKey)?.label || '',
+        teacherLogoBase64: localStorage.getItem('acsis_teacher_logo') || undefined,
+        departmentName: localStorage.getItem('acsis_department_name') || undefined,
       })
     } catch (err) {
       acsisToastError(err instanceof Error ? err.message : 'Failed to export audit logs.')
@@ -387,7 +386,7 @@ export default function TeacherActivityLogsPage() {
                 <table className="exam-audit-logs__table">
                   <thead>
                     <tr>
-                      <th scope="col">Time</th>
+                      <th scope="col">Date</th>
                       <th scope="col">Action</th>
                       <th scope="col">Quiz</th>
                       <th scope="col">Section</th>

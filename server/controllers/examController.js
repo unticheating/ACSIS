@@ -186,6 +186,8 @@ const exportActivityLogsSchema = z.object({
   dateTo: z.string().optional(),
   examTitle: z.string().optional(),
   sectionLabel: z.string().optional(),
+  teacherLogoBase64: z.string().optional(),
+  departmentName: z.string().optional(),
 });
 
 export async function getTeacherExamsCatalog(req, res) {
@@ -638,6 +640,8 @@ export async function postExportTeacherActivityLogs(req, res) {
       dateTo: payload.dateTo || '',
       examTitle: payload.examTitle || '',
       sectionLabel: payload.sectionLabel || '',
+      teacherLogoBase64: payload.teacherLogoBase64,
+      departmentName: payload.departmentName,
     })
     if (!result.ok) {
       return res.status(result.status || 500).json({ error: result.error })

@@ -315,6 +315,45 @@
   text-align: center;
 }
 
+.acsis-immersive__trust-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  max-width: 28rem;
+}
+
+.acsis-immersive__trust-footer-brand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--acsis-immersive-fg-dim);
+}
+
+.acsis-immersive__trust-footer-brand .acsis-immersive__trust-footer-logo {
+  flex-shrink: 0;
+  width: 18px !important;
+  height: 18px !important;
+  border-radius: 50%;
+  object-fit: contain;
+  display: block;
+}
+
+.acsis-immersive__trust-note {
+  margin: 0;
+  max-width: 28rem;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--acsis-immersive-fg-muted);
+  text-align: center;
+}
+
 .acsis-immersive__email-intro {
   margin: 0 0 16px;
   font-size: 0.8125rem;

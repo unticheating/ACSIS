@@ -45,6 +45,22 @@ app.get('/api/health', (_req, res) => {
   res.json({ ok: true })
 })
 
+app.get('/api', (_req, res) => {
+  res.json({
+    service: 'ACSIS API',
+    institution: 'Pamantasan ng Lungsod ng Pasig',
+    health: '/api/health',
+  })
+})
+
+app.get('/api/auth', (_req, res) => {
+  res.json({
+    service: 'ACSIS Auth API',
+    signIn: '/api/auth/google',
+    status: 'ok',
+  })
+})
+
 app.use('/api/auth', authRouter)
 app.use('/api/admin/users', adminUsersRouter)
 app.use('/api/admin/classes', adminClassesRouter)
