@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Clock, AlertTriangle, Search, ShieldAlert, X } from 'lucide-react'
+import { Clock, AlertTriangle, Search, ShieldAlert, X, Maximize, Minimize, Play, Pause } from 'lucide-react'
 import { useDetectionsToolbar } from '@/context/DetectionsToolbarContext.jsx'
 import {
   dismissTeacherViolation,
@@ -57,10 +57,6 @@ function violationsBySession(violations) {
   return map
 }
 
-/**
- * Seat color: absent | ongoing | warn1 | warn2 | warn3 | submitted
- * Max warnings locks the exam for manual submit (no auto-submit).
- */
 function resolveSeatTone(entry) {
   if (!entry.joined) return 'absent'
   if (entry.status === 'submitted') return 'submitted'
@@ -126,7 +122,6 @@ function studentMatchesListSearch(student, query) {
 }
 
 function rosterEntryToSeat(entry, violationLabels = []) {
-  // Use separate fields if available; fall back to splitting the full name
   const firstName = entry.firstName || splitName(entry.studentName).firstName
   const lastName = entry.lastName || splitName(entry.studentName).lastName
   const strikes = Number(entry.warningCount || 0)
@@ -181,13 +176,17 @@ const ExamTimer = React.memo(function ExamTimer({ activeExam }) {
   return (
     <FadeIn
       delay={0.35}
-      className={`acsis-detections-stat acsis-detections-stat--timer${examTime?.isLow ? ' acsis-detections-stat--timer-low' : ''}`}
+      className={`flex flex-col items-center justify-center min-w-[90px] px-3 py-1.5 rounded-lg border shadow-sm transition-colors ${
+        examTime?.isLow 
+          ? 'bg-destructive/10 border-destructive/30 text-destructive animate-pulse' 
+          : 'bg-primary/10 border-primary/20 text-primary'
+      }`}
     >
-      <span className="acsis-detections-stat__value acsis-detections-stat__timer">
-        <Clock className="acsis-detections-stat__clock" aria-hidden />
+      <span className="flex items-center gap-1.5 text-lg font-bold tracking-tight">
+        <Clock className="w-4 h-4 opacity-80" aria-hidden />
         {examTime?.display ?? '--:--'}
       </span>
-      <span className="acsis-detections-stat__label">{examTime?.label ?? 'Time'}</span>
+      <span className="text-[10px] uppercase tracking-wider font-bold opacity-75">{examTime?.label ?? 'Time'}</span>
     </FadeIn>
   )
 })
@@ -208,6 +207,79 @@ export default function TeacherDetectionsPage() {
   const [listSearchQuery, setListSearchQuery] = useState('')
   const dragMovedRef = useRef(false)
   const monitoringRef = useRef(null)
+
+  // Native Browser Full Screen States
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const [isAutoScrolling, setIsAutoScrolling] = useState(false)
+  const pageContainerRef = useRef(null)
+
+  // Handle browser native fullscreen change triggers (e.g. hitting ESC key)
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const nativeActive = !!document.fullscreenElement
+      setIsFullscreen(nativeActive)
+      if (!nativeActive) {
+        setIsAutoScrolling(false)
+      }
+    }
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
+  }, [])
+
+  // Native Full Screen Request Toggle
+  const toggleNativeFullscreen = async () => {
+    if (!document.fullscreenElement) {
+      try {
+        if (pageContainerRef.current) {
+          await pageContainerRef.current.requestFullscreen()
+        }
+      } catch (err) {
+        console.error('[Fullscreen Error]', err)
+      }
+    } else {
+      document.exitFullscreen()
+    }
+  }
+
+  // Smooth Auto Scroll Animation Logic
+  useEffect(() => {
+    if (!isFullscreen || !isAutoScrolling || !pageContainerRef.current) return
+
+    let animationFrameId
+    let direction = 1
+    let lastTimestamp = 0
+    const pixelsPerSecond = 30 
+    let fractionalScroll = 0
+
+    const scrollStep = (timestamp) => {
+      if (!lastTimestamp) lastTimestamp = timestamp
+      const delta = timestamp - lastTimestamp
+      lastTimestamp = timestamp
+
+      const element = pageContainerRef.current
+      if (!element) return
+
+      fractionalScroll += (pixelsPerSecond * delta) / 1000
+      
+      if (fractionalScroll >= 1) {
+        const pixelsToMove = Math.floor(fractionalScroll)
+        fractionalScroll -= pixelsToMove
+        
+        element.scrollTop += (pixelsToMove * direction)
+
+        if (direction === 1 && element.scrollTop + element.clientHeight >= element.scrollHeight - 2) {
+          direction = -1
+        } else if (direction === -1 && element.scrollTop <= 2) {
+          direction = 1
+        }
+      }
+
+      animationFrameId = requestAnimationFrame(scrollStep)
+    }
+
+    animationFrameId = requestAnimationFrame(scrollStep)
+    return () => cancelAnimationFrame(animationFrameId)
+  }, [isFullscreen, isAutoScrolling])
 
   const applySettingsLayout = useCallback(
     (settings, exam = activeExam) => {
@@ -529,188 +601,261 @@ export default function TeacherDetectionsPage() {
 
   const statValue = (n) => String(n)
 
-  return (
-    <div className="acsis-detections-live acsis-view" aria-busy={!monitoringReady}>
-      <div className="container" style={{ padding: 0 }}>
-        {activeExam ? (
-        <div className="panel acsis-detections-panel">
-          <div className="acsis-detections-panel__row">
-            <div className="acsis-detections-panel__intro">
-              <div className="acsis-detections-header__title-row">
-                <span
-                  className={`acsis-detections-live-dot${isLive ? ' acsis-detections-live-dot--live' : ' acsis-detections-live-dot--idle'}`}
-                  aria-hidden
-                />
-                <h1 className="acsis-detections-header__title">Live Monitoring</h1>
+  // Reusable node renderer to safely display seats without duplicating the entire JSX block
+  const renderSeatNode = (student, idx, isWalkwayCol) => {
+    const isEmpty = student.tone === 'empty'
+    const initials = !isEmpty ? seatInitials(student) : ''
+    const tone = student.tone
+    const isDragging = dragSourceIdx === idx
+    const isDropTarget = dragOverIdx === idx && dragSourceIdx != null && dragSourceIdx !== idx
+
+    return (
+      <React.Fragment key={`seat-${idx}-${student.id}`}>
+        {isWalkwayCol ? <div className="acsis-detections-walkway" aria-hidden /> : null}
+        <div
+          role={isEmpty ? undefined : 'button'}
+          tabIndex={isEmpty ? undefined : 0}
+          draggable={!isEmpty}
+          style={{ animationDelay: `${0.1 + (idx % 20) * 0.02}s` }}
+          className={`acsis-animate-seat acsis-detections-seat ${seatModifier(tone)}${isDragging ? ' acsis-detections-seat--dragging' : ''}${isDropTarget ? ' acsis-detections-seat--drop-target' : ''}${!isEmpty ? ' acsis-detections-seat--draggable' : ''}`}
+          title={
+            isEmpty
+              ? 'Drop student here'
+              : `${statusLabelForTone(tone)} — drag to move seat`
+          }
+          onDragStart={(e) => {
+            if (isEmpty) return
+            e.dataTransfer.setData('text/plain', String(idx))
+            e.dataTransfer.effectAllowed = 'move'
+            setDragSourceIdx(idx)
+          }}
+          onDragEnd={() => {
+            setDragSourceIdx(null)
+            setDragOverIdx(null)
+          }}
+          onDragOver={(e) => {
+            e.preventDefault()
+            e.dataTransfer.dropEffect = 'move'
+            if (dragSourceIdx !== idx) setDragOverIdx(idx)
+          }}
+          onDragLeave={() => {
+            setDragOverIdx((prev) => (prev === idx ? null : prev))
+          }}
+          onDrop={(e) => {
+            e.preventDefault()
+            const from = Number(e.dataTransfer.getData('text/plain'))
+            if (!Number.isNaN(from)) handleSeatDrop(from, idx)
+          }}
+          onClick={() => {
+            if (dragMovedRef.current) {
+              dragMovedRef.current = false
+              return
+            }
+            if (!isEmpty) openStudentDetail(student)
+          }}
+          onKeyDown={(e) => {
+            if (!isEmpty && (e.key === 'Enter' || e.key === ' ')) {
+              e.preventDefault()
+              openStudentDetail(student)
+            }
+          }}
+        >
+          {!isEmpty ? (
+            <>
+              <div className="acsis-detections-seat__top">
+                <div className={`acsis-detections-seat__avatar acsis-detections-seat__avatar--${tone}`}>
+                  {student.avatarUrl ? (
+                    <img src={student.avatarUrl} alt={initials} className="w-full h-full object-cover rounded-full" />
+                  ) : (
+                    initials
+                  )}
+                </div>
+                {student.strikes > 0 ? (
+                  <span
+                    className="acsis-detections-seat__strikes"
+                    title={`${student.strikes} / ${MAX_EXAM_WARNINGS} warnings`}
+                  >
+                    {student.strikes}/{MAX_EXAM_WARNINGS}
+                  </span>
+                ) : null}
               </div>
-              <p className="acsis-detections-header__exam">{examSubtitle}</p>
-            </div>
-
-            <div className="acsis-detections-header__stats">
-              <FadeIn delay={0.05} className="acsis-detections-stat acsis-detections-stat--absent">
-                <span className="acsis-detections-stat__value">{statValue(countByTone('absent'))}</span>
-                <span className="acsis-detections-stat__label">Not joined</span>
-              </FadeIn>
-              <FadeIn delay={0.1} className="acsis-detections-stat acsis-detections-stat--ongoing">
-                <span className="acsis-detections-stat__value">{statValue(countByTone('ongoing'))}</span>
-                <span className="acsis-detections-stat__label">Active</span>
-              </FadeIn>
-              <FadeIn delay={0.15} className="acsis-detections-stat acsis-detections-stat--warn1">
-                <span className="acsis-detections-stat__value">{statValue(countByTone('warn1'))}</span>
-                <span className="acsis-detections-stat__label">1 warn</span>
-              </FadeIn>
-              <FadeIn delay={0.2} className="acsis-detections-stat acsis-detections-stat--warn2">
-                <span className="acsis-detections-stat__value">{statValue(countByTone('warn2'))}</span>
-                <span className="acsis-detections-stat__label">2 warns</span>
-              </FadeIn>
-              <FadeIn delay={0.25} className="acsis-detections-stat acsis-detections-stat--warn3">
-                <span className="acsis-detections-stat__value">{statValue(countByTone('warn3'))}</span>
-                <span className="acsis-detections-stat__label">3 warns</span>
-              </FadeIn>
-              <FadeIn delay={0.3} className="acsis-detections-stat acsis-detections-stat--submitted">
-                <span className="acsis-detections-stat__value">{statValue(countDone())}</span>
-                <span className="acsis-detections-stat__label">Done</span>
-              </FadeIn>
-              <ExamTimer activeExam={activeExam} />
-            </div>
-          </div>
+              <div className="acsis-detections-seat__identity min-w-0">
+                {student.lastName ? (
+                  <div className="acsis-detections-seat__last">{student.lastName}</div>
+                ) : null}
+                <div className="acsis-detections-seat__name">
+                  {student.firstName || 'Student'}
+                </div>
+              </div>
+              {tone === 'submitted' && student.strikes > 0 ? (
+                <span
+                  className="acsis-detections-seat__badge acsis-detections-seat__badge--submitted-warn"
+                  title="Submitted with warnings"
+                >
+                  {student.strikes} warning{student.strikes === 1 ? '' : 's'}
+                </span>
+              ) : null}
+            </>
+          ) : (
+            <span className="acsis-detections-seat__empty-label">Empty</span>
+          )}
         </div>
-        ) : null}
+      </React.Fragment>
+    )
+  }
 
-        {!monitoringReady ? (
-          <PageSpinner label="Loading monitoring…" />
-        ) : !activeExam ? (
-          <div className="panel acsis-detections-empty-panel text-center">
-            <ShieldAlert className="w-14 h-14 sm:w-16 sm:h-16 text-muted-foreground/50 mx-auto mb-4 sm:mb-6" aria-hidden />
-            <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-3 sm:mb-4">No Active Exams</h2>
-            <p className="text-muted-foreground text-base sm:text-lg px-2 m-0">
-              Activate an exam from the &apos;My Classes&apos; page to begin live monitoring your students.
-            </p>
+  return (
+    <div 
+      ref={pageContainerRef}
+      className={`acsis-detections-live acsis-view bg-background ${isFullscreen ? 'w-screen h-screen overflow-auto p-6 sm:p-10 select-none' : ''}`} 
+      aria-busy={!monitoringReady}
+    >
+      
+      {/* Unclipped, Fixed Floating Controller Panel exclusively for True Fullscreen mode */}
+      {isFullscreen && (
+        <div 
+          className="fixed top-6 left-1/2 -translate-x-1/2 z-[9999] flex items-center gap-4 bg-background/95 dark:bg-zinc-900/95 backdrop-blur-md px-5 py-2.5 rounded-full shadow-2xl border border-border"
+          style={{ zoom: 1 }}
+        >
+          <button 
+            onClick={() => setIsAutoScrolling(!isAutoScrolling)}
+            className={`flex items-center gap-2 px-4 py-1.5 font-semibold rounded-full transition-all text-xs uppercase tracking-wider shadow-sm ${
+              isAutoScrolling 
+                ? 'bg-emerald-500 hover:bg-emerald-600 text-white' 
+                : 'bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-foreground'
+            }`}
+          >
+            {isAutoScrolling ? <Pause className="w-3.5 h-3.5"/> : <Play className="w-3.5 h-3.5"/>}
+            {isAutoScrolling ? 'Pause Scroll' : 'Auto-Scroll'}
+          </button>
+          
+          <div className="w-px h-5 bg-border" />
+          
+          <button 
+            onClick={toggleNativeFullscreen}
+            className="flex items-center gap-2 px-4 py-1.5 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-full transition-all text-xs uppercase tracking-wider shadow-sm"
+          >
+            <Minimize className="w-3.5 h-3.5" />
+            Exit Full Screen
+          </button>
+        </div>
+      )}
+
+      {/* Top Details Panel (only rendered when NOT in native full screen) */}
+      {!isFullscreen && (
+        <div className="container" style={{ padding: 0 }}>
+          {activeExam ? (
+          <div className="panel acsis-detections-panel">
+            <div className="acsis-detections-panel__row">
+              <div className="acsis-detections-panel__intro">
+                <div className="acsis-detections-header__title-row">
+                  <span
+                    className={`acsis-detections-live-dot${isLive ? ' acsis-detections-live-dot--live' : ' acsis-detections-live-dot--idle'}`}
+                    aria-hidden
+                  />
+                  <h1 className="acsis-detections-header__title">Live Monitoring</h1>
+                </div>
+                <p className="acsis-detections-header__exam">{examSubtitle}</p>
+              </div>
+
+              <div className="acsis-detections-header__stats">
+                <FadeIn delay={0.05} className="acsis-detections-stat acsis-detections-stat--absent">
+                  <span className="acsis-detections-stat__value">{statValue(countByTone('absent'))}</span>
+                  <span className="acsis-detections-stat__label">Not joined</span>
+                </FadeIn>
+                <FadeIn delay={0.1} className="acsis-detections-stat acsis-detections-stat--ongoing">
+                  <span className="acsis-detections-stat__value">{statValue(countByTone('ongoing'))}</span>
+                  <span className="acsis-detections-stat__label">Active</span>
+                </FadeIn>
+                <FadeIn delay={0.15} className="acsis-detections-stat acsis-detections-stat--warn1">
+                  <span className="acsis-detections-stat__value">{statValue(countByTone('warn1'))}</span>
+                  <span className="acsis-detections-stat__label">1 warning</span>
+                </FadeIn>
+                <FadeIn delay={0.2} className="acsis-detections-stat acsis-detections-stat--warn2">
+                  <span className="acsis-detections-stat__value">{statValue(countByTone('warn2'))}</span>
+                  <span className="acsis-detections-stat__label">2 warnings</span>
+                </FadeIn>
+                <FadeIn delay={0.25} className="acsis-detections-stat acsis-detections-stat--warn3">
+                  <span className="acsis-detections-stat__value">{statValue(countByTone('warn3'))}</span>
+                  <span className="acsis-detections-stat__label">3 warnings</span>
+                </FadeIn>
+                <FadeIn delay={0.3} className="acsis-detections-stat acsis-detections-stat--submitted">
+                  <span className="acsis-detections-stat__value">{statValue(countDone())}</span>
+                  <span className="acsis-detections-stat__label">Done</span>
+                </FadeIn>
+                <ExamTimer activeExam={activeExam} />
+                
+                <FadeIn delay={0.4} className="flex items-center ml-2">
+                  <button
+                    onClick={toggleNativeFullscreen}
+                    className="group flex items-center gap-2 px-4 py-2 sm:px-5 sm:py-2.5 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-400 dark:bg-emerald-500/20 dark:hover:bg-emerald-500/30 font-bold rounded-full transition-all border border-emerald-500/30 shadow-sm hover:shadow-md active:scale-95"
+                  >
+                    <Maximize className="w-4 h-4" />
+                    <span className="text-[10px] sm:text-xs tracking-wider uppercase">Full Screen</span>
+                  </button>
+                </FadeIn>
+              </div>
+            </div>
           </div>
-        ) : null}
-      </div>
+          ) : null}
+
+          {!monitoringReady ? (
+            <PageSpinner label="Loading monitoring…" />
+          ) : !activeExam ? (
+            <div className="panel acsis-detections-empty-panel text-center">
+              <ShieldAlert className="w-14 h-14 sm:w-16 sm:h-16 text-muted-foreground/50 mx-auto mb-4 sm:mb-6" aria-hidden />
+              <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-3 sm:mb-4">No Active Exams</h2>
+              <p className="text-muted-foreground text-base sm:text-lg px-2 m-0">
+                Activate an exam from the &apos;My Classes&apos; page to begin live monitoring your students.
+              </p>
+            </div>
+          ) : null}
+        </div>
+      )}
 
       {isLive ? (
       <div className={`acsis-detections-body${!isClassroomView ? ' acsis-detections-body--list' : ''}`}>
         {isClassroomView ? (
-          <>
-        <div className="acsis-detections-board w-full flex items-start justify-center relative box-border pt-1 sm:pt-2">
-          <div className="absolute top-full w-full h-4 flex justify-around px-8 opacity-20 pointer-events-none" aria-hidden>
-            <div className="w-2 h-full bg-muted-foreground/40" />
-            <div className="w-2 h-full bg-muted-foreground/40" />
-          </div>
-          <h2 className="text-sm sm:text-xl md:text-2xl font-bold text-muted-foreground tracking-wide sm:tracking-widest uppercase text-center px-2 py-3">
-            Front of Classroom
-          </h2>
-        </div>
-
-        <p className="acsis-detections-drag-hint">Drag a student to another seat to match your classroom layout.</p>
-
-        <div className="acsis-detections-seating">
-          {students.map((student, idx) => {
-            const isWalkwayCol = idx % 8 === 4
-            const isEmpty = student.tone === 'empty'
-            const initials = !isEmpty ? seatInitials(student) : ''
-            const tone = student.tone
-            const isDragging = dragSourceIdx === idx
-            const isDropTarget = dragOverIdx === idx && dragSourceIdx != null && dragSourceIdx !== idx
-
-            return (
-              <React.Fragment key={`seat-${idx}-${student.id}`}>
-                {isWalkwayCol ? <div className="acsis-detections-walkway" aria-hidden /> : null}
-                <div
-                  role={isEmpty ? undefined : 'button'}
-                  tabIndex={isEmpty ? undefined : 0}
-                  draggable={!isEmpty}
-                  style={{ animationDelay: `${0.1 + idx * 0.02}s` }}
-                  className={`acsis-animate-seat acsis-detections-seat ${seatModifier(tone)}${isDragging ? ' acsis-detections-seat--dragging' : ''}${isDropTarget ? ' acsis-detections-seat--drop-target' : ''}${!isEmpty ? ' acsis-detections-seat--draggable' : ''}`}
-                  title={
-                    isEmpty
-                      ? 'Drop student here'
-                      : `${statusLabelForTone(tone)} — drag to move seat`
-                  }
-                  onDragStart={(e) => {
-                    if (isEmpty) return
-                    e.dataTransfer.setData('text/plain', String(idx))
-                    e.dataTransfer.effectAllowed = 'move'
-                    setDragSourceIdx(idx)
-                  }}
-                  onDragEnd={() => {
-                    setDragSourceIdx(null)
-                    setDragOverIdx(null)
-                  }}
-                  onDragOver={(e) => {
-                    e.preventDefault()
-                    e.dataTransfer.dropEffect = 'move'
-                    if (dragSourceIdx !== idx) setDragOverIdx(idx)
-                  }}
-                  onDragLeave={() => {
-                    setDragOverIdx((prev) => (prev === idx ? null : prev))
-                  }}
-                  onDrop={(e) => {
-                    e.preventDefault()
-                    const from = Number(e.dataTransfer.getData('text/plain'))
-                    if (!Number.isNaN(from)) handleSeatDrop(from, idx)
-                  }}
-                  onClick={() => {
-                    if (dragMovedRef.current) {
-                      dragMovedRef.current = false
-                      return
-                    }
-                    if (!isEmpty) openStudentDetail(student)
-                  }}
-                  onKeyDown={(e) => {
-                    if (!isEmpty && (e.key === 'Enter' || e.key === ' ')) {
-                      e.preventDefault()
-                      openStudentDetail(student)
-                    }
-                  }}
+          <div 
+            style={{ 
+              zoom: isFullscreen ? 1.15 : 1, 
+              transformOrigin: 'top center' 
+            }} 
+            className={`w-full transition-all flex justify-center overflow-visible ${isFullscreen ? 'pt-28 pb-48' : 'pt-6 pb-12'}`}
+          >
+            {isFullscreen ? (
+              <div className="flex flex-col gap-14 w-full max-w-[1200px] items-center">
+                {/* Top Stack: Left 4 Columns */}
+                <div 
+                  className="acsis-detections-seating"
+                  style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.85rem', width: '100%' }}
                 >
-                  {!isEmpty ? (
-                    <>
-                      <div className="acsis-detections-seat__top">
-                        <div className={`acsis-detections-seat__avatar acsis-detections-seat__avatar--${tone}`}>
-                          {student.avatarUrl ? (
-                            <img src={student.avatarUrl} alt={initials} className="w-full h-full object-cover rounded-full" />
-                          ) : (
-                            initials
-                          )}
-                        </div>
-                        {student.strikes > 0 ? (
-                          <span
-                            className="acsis-detections-seat__strikes"
-                            title={`${student.strikes} / ${MAX_EXAM_WARNINGS} warnings`}
-                          >
-                            {student.strikes}/{MAX_EXAM_WARNINGS}
-                          </span>
-                        ) : null}
-                      </div>
-                      <div className="acsis-detections-seat__identity min-w-0">
-                        {student.lastName ? (
-                          <div className="acsis-detections-seat__last">{student.lastName}</div>
-                        ) : null}
-                        <div className="acsis-detections-seat__name">
-                          {student.firstName || 'Student'}
-                        </div>
-                      </div>
-                      {tone === 'submitted' && student.strikes > 0 ? (
-                        <span
-                          className="acsis-detections-seat__badge acsis-detections-seat__badge--submitted-warn"
-                          title="Submitted with warnings"
-                        >
-                          {student.strikes} warn{student.strikes === 1 ? '' : 's'}
-                        </span>
-                      ) : null}
-                    </>
-                  ) : (
-                    <span className="acsis-detections-seat__empty-label">Empty</span>
-                  )}
+                  {students.map((student, idx) => {
+                    if (idx % 8 >= 4) return null // Skip right-side columns to render left first
+                    return renderSeatNode(student, idx, false)
+                  })}
                 </div>
-              </React.Fragment>
-            )
-          })}
-        </div>
-          </>
+
+                {/* Bottom Stack: Right 4 Columns */}
+                <div 
+                  className="acsis-detections-seating"
+                  style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.85rem', width: '100%' }}
+                >
+                  {students.map((student, idx) => {
+                    if (idx % 8 < 4) return null // Skip left-side columns
+                    return renderSeatNode(student, idx, false)
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="acsis-detections-seating">
+                {students.map((student, idx) => {
+                  const isWalkwayCol = idx % 8 === 4
+                  return renderSeatNode(student, idx, isWalkwayCol)
+                })}
+              </div>
+            )}
+          </div>
         ) : (
           <div className="acsis-detections-list-view">
             <div className="acsis-detections-list-view__toolbar">
@@ -867,7 +1012,7 @@ export default function TeacherDetectionsPage() {
                   </div>
                 </div>
                 <div className="acsis-detections-modal__strikes-block">
-                  <div className="acsis-detections-modal__label">Strikes</div>
+                  <div className="acsis-detections-modal__label">Warnings</div>
                   <div className="acsis-detections-modal__strikes-value">
                     {selectedStudent.strikes} / {MAX_EXAM_WARNINGS}
                   </div>
@@ -877,7 +1022,7 @@ export default function TeacherDetectionsPage() {
               <div className="acsis-detections-modal__violations">
                 <h4 className="acsis-detections-modal__violations-title">Violation log</h4>
                 <p className="acsis-detections-modal__violations-hint">
-                  Mark a detection as false positive to remove one strike and unlock the student if they
+                  Mark a detection as false positive to remove one warning and unlock the student if they
                   were locked for max warnings.
                 </p>
                 {dismissError ? (
@@ -940,9 +1085,3 @@ export default function TeacherDetectionsPage() {
     </div>
   )
 }
-
-
-
-
-
-
