@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import AuthImmersiveShell from '@/components/auth/AuthImmersiveShell.jsx'
+import PlpLogo from '@/components/brand/PlpLogo.jsx'
 import { useSession } from '@/context/SessionContext.jsx'
 import {
   AUTH_ERROR_MESSAGES,
@@ -176,7 +177,7 @@ export default function LoginPage() {
   }
 
   return (
-    <AuthImmersiveShell>
+    <AuthImmersiveShell showInstitutionHeader={false}>
       <div className="acsis-immersive__auth-stack">
         <div className="acsis-immersive__auth-card">
         {googleDomainBanner ? (
@@ -299,10 +300,16 @@ export default function LoginPage() {
           </button>
         </form>
         </div>
-        <p className="acsis-immersive__trust-note">
-          Official secure login for Pamantasan ng Lungsod ng Pasig faculty and students.
-          Google sign-in uses your school Google account on Google&apos;s own sign-in page.
-        </p>
+        <footer className="acsis-immersive__trust-footer">
+          <div className="acsis-immersive__trust-footer-brand">
+            <PlpLogo className="acsis-logo-img" width={22} height={22} alt="" aria-hidden />
+            <span>Pamantasan ng Lungsod ng Pasig</span>
+          </div>
+          <p className="acsis-immersive__trust-note">
+            Official secure login for Pamantasan ng Lungsod ng Pasig faculty and students.
+            Google sign-in uses your school Google account on Google&apos;s own sign-in page.
+          </p>
+        </footer>
       </div>
     </AuthImmersiveShell>
   )
