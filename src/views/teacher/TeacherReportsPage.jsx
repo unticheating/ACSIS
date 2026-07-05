@@ -45,6 +45,18 @@ function sortSessionsByRank(sessions) {
   })
 }
 
+function sortSessionsByScoreDesc(sessions) {
+  return [...sessions].sort((a, b) => {
+    const pa = a.percentage != null ? Number(a.percentage) : -1
+    const pb = b.percentage != null ? Number(b.percentage) : -1
+    if (pa !== pb) return pb - pa
+    const ra = a.rawScore != null ? Number(a.rawScore) : -1
+    const rb = b.rawScore != null ? Number(b.rawScore) : -1
+    if (ra !== rb) return rb - ra
+    return String(a.studentName || '').localeCompare(String(b.studentName || ''))
+  })
+}
+
 function sortSessionsBySurname(sessions) {
   return [...sessions].sort((a, b) => {
     const lastCmp = String(a.lastName || a.studentName || '').localeCompare(
@@ -276,7 +288,7 @@ function buildScoreDistributionBuckets(sessions) {
       name: b.label,
       count: bucketStudents.length,
       passed: b.passed,
-      students: sortSessionsBySurname(bucketStudents),
+      students: sortSessionsByScoreDesc(bucketStudents),
     }
   })
 

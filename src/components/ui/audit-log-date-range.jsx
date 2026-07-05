@@ -18,23 +18,20 @@ function parseInputDate(value) {
   return Number.isNaN(date.getTime()) ? null : date
 }
 
+function formatDisplayDate(date) {
+  return date.toLocaleDateString('en-US', {
+    month: '2-digit',
+    day: '2-digit',
+    year: 'numeric',
+  })
+}
+
 function formatRangeLabel(start, end) {
   if (start && end) {
-    const sameYear = start.getFullYear() === end.getFullYear()
-    const startFmt = start.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: sameYear ? undefined : 'numeric',
-    })
-    const endFmt = end.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    })
-    return `${startFmt} – ${endFmt}`
+    return `${formatDisplayDate(start)} – ${formatDisplayDate(end)}`
   }
   if (start) {
-    return `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} – …`
+    return `${formatDisplayDate(start)} – …`
   }
   return ''
 }
@@ -86,7 +83,7 @@ export default function AuditLogDateRangePicker({
         })
       }}
       isClearable
-      dateFormat="MMM d, yyyy"
+      dateFormat="MM/dd/yyyy"
       placeholderText={placeholder}
       customInput={<RangeTrigger value={displayValue} placeholder={placeholder} />}
       popperClassName="acsis-datepicker-popper"
