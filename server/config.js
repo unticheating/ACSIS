@@ -45,6 +45,11 @@ export const config = {
     process.env.EMAIL_VERIFICATION_ENABLED,
     (process.env.NODE_ENV || 'development') === 'production',
   ),
+  /** Email/password form on the public login page. Default: off in production (Google OAuth only). */
+  passwordLoginEnabled: parseEnvBool(
+    process.env.PASSWORD_LOGIN_ENABLED,
+    (process.env.NODE_ENV || 'development') !== 'production',
+  ),
   smtp: {
     host: (process.env.SMTP_HOST || '').trim(),
     port: Number(process.env.SMTP_PORT || 587),

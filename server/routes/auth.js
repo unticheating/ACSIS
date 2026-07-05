@@ -491,6 +491,7 @@ router.get('/config', async (_req, res) => {
   }
   res.json({
     googleEnabled: Boolean(config.google.clientId && config.google.clientSecret),
+    passwordLoginEnabled: config.passwordLoginEnabled,
     allowedEmailDomain: config.allowedEmailDomain,
     allowedEmailDomains,
     allowedDomainsHint: formatAllowedDomainsHint(allowedEmailDomains),

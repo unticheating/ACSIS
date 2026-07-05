@@ -26,10 +26,9 @@ export default function AboutPage() {
           <div className="acsis-immersive__about-section">
             <h3>Sign-in</h3>
             <p>
-              Use your school Google account or your ACSIS-registered email. Google sign-in continues on
-              Google&apos;s own page at{' '}
-              <span className="acsis-immersive__about-mono">accounts.google.com</span> with your
-              @plpasig.edu.ph account.
+              Use your school Google account. Sign-in continues on Google&apos;s own page at{' '}
+              <span className="acsis-immersive__about-mono">accounts.google.com</span> with the email
+              domain your institution has registered for ACSIS.
             </p>
           </div>
           <div className="acsis-immersive__about-section">
