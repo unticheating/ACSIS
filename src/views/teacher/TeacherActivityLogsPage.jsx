@@ -1,9 +1,30 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Search, ActivitySquare, AlertCircle } from 'lucide-react'
+import { FileText, Search, ScrollText, X } from 'lucide-react'
 import FadeIn from '@/components/ui/fade-in.jsx'
-import { fetchTeacherActivityLogs } from '@/lib/teacherExamResultsApi.js'
+import PageSpinner from '@/components/ui/page-spinner.jsx'
+import AuditLogDateRangePicker from '@/components/ui/audit-log-date-range.jsx'
+import { exportTeacherActivityLogs, fetchTeacherActivityLogs } from '@/lib/teacherExamResultsApi.js'
+import { acsisToastError } from '@/lib/acsisToast.js'
 import { formatSectionTitle } from '@/lib/sectionLabel.js'
 import '../../pages/teacher-ui/reports.css'
+
+const EVENT_TYPE_OPTIONS = [
+  { value: 'exam_created', label: 'Exam created', group: 'Setup' },
+  { value: 'exam_published', label: 'Exam published', group: 'Setup' },
+  { value: 'exam_assigned', label: 'Exam assigned', group: 'Setup' },
+  { value: 'exam_started', label: 'Exam started', group: 'Session' },
+  { value: 'exam_restarted', label: 'Exam restarted', group: 'Session' },
+  { value: 'exam_ended', label: 'Exam ended', group: 'Session' },
+  { value: 'scores_released', label: 'Scores released', group: 'Results' },
+  { value: 'answer_corrected', label: 'Answer corrected', group: 'Results' },
+  { value: 'exam_code_updated', label: 'Exam code updated', group: 'Changes' },
+  { value: 'exam_deleted', label: 'Exam deleted', group: 'Changes' },
+  { value: 'violation_dismissed', label: 'Violation dismissed', group: 'Changes' },
+]
+
+const EVENT_TYPE_LABELS = Object.fromEntries(
+  EVENT_TYPE_OPTIONS.map((option) => [option.value, option.label]),
+)
 
 function formatTime(iso) {
   if (!iso) return '—'
@@ -14,7 +35,7 @@ function formatTime(iso) {
       year: 'numeric',
       hour: 'numeric',
       minute: '2-digit',
-      hour12: true
+      hour12: true,
     })
   } catch {
     return '—'
@@ -22,39 +43,17 @@ function formatTime(iso) {
 }
 
 function labelForEvent(eventType) {
-  if (eventType === 'exam_created') return 'Exam created'
-  if (eventType === 'exam_published') return 'Exam published'
-  if (eventType === 'exam_started') return 'Exam started'
-  if (eventType === 'exam_restarted') return 'Exam restarted'
-  if (eventType === 'exam_ended') return 'Exam ended'
-  if (eventType === 'scores_released') return 'Scores released'
-  if (eventType === 'exam_assigned') return 'Exam assigned'
-  if (eventType === 'exam_code_updated') return 'Exam code updated'
-  if (eventType === 'exam_deleted') return 'Exam deleted'
-  if (eventType === 'answer_corrected') return 'Answer corrected'
-  if (eventType === 'violation_dismissed') return 'Violation dismissed'
+  if (EVENT_TYPE_LABELS[eventType]) return EVENT_TYPE_LABELS[eventType]
   return String(eventType || 'Activity').replace(/_/g, ' ')
 }
 
 function badgeForEvent(eventType) {
-  const label = labelForEvent(eventType);
-  let colorClasses = "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800/60 dark:text-gray-300 dark:border-gray-700/50";
-  
-  if (['exam_created', 'exam_published', 'exam_started', 'exam_assigned'].includes(eventType)) {
-    colorClasses = "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800/40";
-  } else if (['exam_ended', 'scores_released'].includes(eventType)) {
-    colorClasses = "bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800/40";
-  } else if (['exam_deleted'].includes(eventType)) {
-    colorClasses = "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800/40";
-  } else if (['exam_restarted', 'exam_code_updated', 'answer_corrected', 'violation_dismissed'].includes(eventType)) {
-    colorClasses = "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800/40";
-  }
-
+  const slug = String(eventType || 'unknown')
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${colorClasses}`}>
-      {label}
+    <span className={`exam-audit-logs__badge exam-audit-logs__badge--${slug}`}>
+      {labelForEvent(eventType)}
     </span>
-  );
+  )
 }
 
 function classSectionLabel(log) {
@@ -66,6 +65,12 @@ function classSectionLabel(log) {
   return log.className || '—'
 }
 
+function sectionFilterKey(log) {
+  const label = classSectionLabel(log)
+  if (label === '—') return log.classId ? `class:${log.classId}` : ''
+  return label
+}
+
 function detailsLabel(log) {
   const parts = []
   if (log.studentName) parts.push(log.studentName)
@@ -74,11 +79,36 @@ function detailsLabel(log) {
   return parts.join(' · ') || '—'
 }
 
+function logInDateRange(occurredAt, dateFrom, dateTo) {
+  if (!dateFrom && !dateTo) return true
+  if (!occurredAt) return false
+  const at = new Date(occurredAt)
+  if (dateFrom) {
+    const from = new Date(`${dateFrom}T00:00:00`)
+    if (at < from) return false
+  }
+  if (dateTo) {
+    const to = new Date(`${dateTo}T23:59:59.999`)
+    if (at > to) return false
+  }
+  return true
+}
+
+function hasActiveFilters({ query, eventType, examId, sectionKey, dateFrom, dateTo }) {
+  return Boolean(query.trim() || eventType || examId || sectionKey || dateFrom || dateTo)
+}
+
 export default function TeacherActivityLogsPage() {
   const [loading, setLoading] = useState(true)
+  const [exporting, setExporting] = useState(false)
   const [error, setError] = useState(null)
   const [logs, setLogs] = useState([])
   const [query, setQuery] = useState('')
+  const [eventType, setEventType] = useState('')
+  const [examId, setExamId] = useState('')
+  const [sectionKey, setSectionKey] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -107,10 +137,46 @@ export default function TeacherActivityLogsPage() {
     }
   }, [])
 
+  const examOptions = useMemo(() => {
+    const seen = new Map()
+    for (const log of logs) {
+      if (!log.examId || !log.examTitle) continue
+      seen.set(String(log.examId), log.examTitle)
+    }
+    return [...seen.entries()]
+      .map(([id, title]) => ({ id, title }))
+      .sort((a, b) => a.title.localeCompare(b.title))
+  }, [logs])
+
+  const sectionOptions = useMemo(() => {
+    const seen = new Map()
+    for (const log of logs) {
+      const key = sectionFilterKey(log)
+      if (!key) continue
+      seen.set(key, classSectionLabel(log))
+    }
+    return [...seen.entries()]
+      .map(([key, label]) => ({ key, label }))
+      .sort((a, b) => a.label.localeCompare(b.label))
+  }, [logs])
+
+  const eventTypeGroups = useMemo(() => {
+    const groups = new Map()
+    for (const option of EVENT_TYPE_OPTIONS) {
+      if (!groups.has(option.group)) groups.set(option.group, [])
+      groups.get(option.group).push(option)
+    }
+    return [...groups.entries()]
+  }, [])
+
   const filteredLogs = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return logs
     return logs.filter((log) => {
+      if (eventType && log.eventType !== eventType) return false
+      if (examId && String(log.examId) !== examId) return false
+      if (sectionKey && sectionFilterKey(log) !== sectionKey) return false
+      if (!logInDateRange(log.occurredAt, dateFrom, dateTo)) return false
+      if (!q) return true
       const haystack = [
         labelForEvent(log.eventType),
         log.details,
@@ -125,98 +191,221 @@ export default function TeacherActivityLogsPage() {
         .toLowerCase()
       return haystack.includes(q)
     })
-  }, [logs, query])
+  }, [logs, query, eventType, examId, sectionKey, dateFrom, dateTo])
+
+  const filtersActive = hasActiveFilters({ query, eventType, examId, sectionKey, dateFrom, dateTo })
+
+  const clearFilters = () => {
+    setQuery('')
+    setEventType('')
+    setExamId('')
+    setSectionKey('')
+    setDateFrom('')
+    setDateTo('')
+  }
+
+  const handleExportPdf = async () => {
+    setExporting(true)
+    try {
+      await exportTeacherActivityLogs({
+        search: query.trim(),
+        eventType,
+        examId,
+        sectionKey,
+        dateFrom,
+        dateTo,
+        examTitle: examOptions.find((exam) => exam.id === examId)?.title || '',
+        sectionLabel: sectionOptions.find((section) => section.key === sectionKey)?.label || '',
+      })
+    } catch (err) {
+      acsisToastError(err instanceof Error ? err.message : 'Failed to export audit logs.')
+    } finally {
+      setExporting(false)
+    }
+  }
 
   return (
-    <div className="acsis-view reports-page">
-      <div className="container" style={{ padding: 0 }}>
-        <FadeIn className="pb-6" delay={0.05}>
-          <div className="exam-title-row mb-6">
+    <div className="acsis-view reports-page exam-audit-logs">
+      <div className="rp-layout">
+        <FadeIn className="rp-page-header" delay={0.05}>
+          <div className="exam-audit-logs__header">
             <div>
-              <h2 className="rp-page-title">
-                Exam audit logs
-              </h2>
+              <h1 className="rp-page-title">Exam audit logs</h1>
               <p className="rp-page-sub">
                 A record of actions taken on your exams: starting, ending, restarting, releasing scores,
                 correcting answers, and other exam-level changes.
               </p>
             </div>
+            {!loading && logs.length > 0 ? (
+              <p className="exam-audit-logs__summary" aria-live="polite">
+                {filteredLogs.length === logs.length
+                  ? `${logs.length} ${logs.length === 1 ? 'entry' : 'entries'}`
+                  : `${filteredLogs.length} of ${logs.length} entries`}
+              </p>
+            ) : null}
           </div>
+        </FadeIn>
 
-          <label className="flex items-center gap-2 rounded-xl border border-input bg-background/50 px-3 py-2 text-sm cursor-text focus-within:ring-2 focus-within:ring-ring focus-within:border-primary transition-shadow">
-            <Search className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden />
+        <FadeIn delay={0.08} className="exam-audit-logs__toolbar rp-surface">
+          <div className="exam-audit-logs__search">
+            <Search className="exam-audit-logs__search-icon" aria-hidden="true" />
             <input
-              type="text"
+              type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search action, quiz, section, or student..."
-              style={{
-                appearance: 'none',
-                WebkitAppearance: 'none',
-                background: 'transparent',
-                backgroundColor: 'transparent',
-                border: 'none',
-                boxShadow: 'none',
-                outline: 'none',
-              }}
-              className="w-full p-0 m-0 placeholder:text-muted-foreground text-foreground"
+              placeholder="Search action, quiz, section, or student…"
+              className="exam-audit-logs__search-input"
+              aria-label="Search audit logs"
             />
-          </label>
+          </div>
+
+          <div className="exam-audit-logs__filters-row">
+            <div className="exam-audit-logs__filters">
+              <label className="exam-audit-logs__filter">
+                <span className="exam-audit-logs__filter-label">Action</span>
+                <select
+                  className="exam-audit-logs__select"
+                  value={eventType}
+                  onChange={(e) => setEventType(e.target.value)}
+                  aria-label="Filter by action"
+                >
+                  <option value="">All actions</option>
+                  {eventTypeGroups.map(([group, options]) => (
+                    <optgroup key={group} label={group}>
+                      {options.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </label>
+
+              <label className="exam-audit-logs__filter">
+                <span className="exam-audit-logs__filter-label">Quiz</span>
+                <select
+                  className="exam-audit-logs__select"
+                  value={examId}
+                  onChange={(e) => setExamId(e.target.value)}
+                  aria-label="Filter by quiz"
+                >
+                  <option value="">All quizzes</option>
+                  {examOptions.map((exam) => (
+                    <option key={exam.id} value={exam.id}>
+                      {exam.title}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="exam-audit-logs__filter">
+                <span className="exam-audit-logs__filter-label">Section</span>
+                <select
+                  className="exam-audit-logs__select"
+                  value={sectionKey}
+                  onChange={(e) => setSectionKey(e.target.value)}
+                  aria-label="Filter by section"
+                >
+                  <option value="">All sections</option>
+                  {sectionOptions.map((section) => (
+                    <option key={section.key} value={section.key}>
+                      {section.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <div className="exam-audit-logs__filter">
+                <span className="exam-audit-logs__filter-label">Date range</span>
+                <AuditLogDateRangePicker
+                  dateFrom={dateFrom}
+                  dateTo={dateTo}
+                  onChange={({ dateFrom: from, dateTo: to }) => {
+                    setDateFrom(from)
+                    setDateTo(to)
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="exam-audit-logs__filters-actions">
+              {filtersActive ? (
+                <button type="button" className="btn-ghost-text exam-audit-logs__clear" onClick={clearFilters}>
+                  <X aria-hidden="true" />
+                  Clear
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="btn-action btn-primary exam-audit-logs__export"
+                disabled={exporting || loading || filteredLogs.length === 0}
+                onClick={handleExportPdf}
+              >
+                <FileText aria-hidden="true" />
+                {exporting ? 'Generating…' : 'Export PDF'}
+              </button>
+            </div>
+          </div>
         </FadeIn>
 
         {error ? (
           <FadeIn delay={0.1}>
-            <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 flex items-start gap-3 dark:border-red-900/50 dark:bg-red-900/20">
-              <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5" />
-              <div>
-                <h3 className="text-sm font-semibold text-red-800 dark:text-red-300">Error loading logs</h3>
-                <p className="text-sm text-red-600 dark:text-red-400 mt-1">{error}</p>
-              </div>
-            </div>
+            <p className="rp-error rp-status-banner" role="alert">
+              {error}
+            </p>
           </FadeIn>
         ) : null}
 
         {loading && logs.length === 0 ? (
-          <div className="flex items-center gap-3 px-2 py-4">
-            <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent"></div>
-            <p className="text-sm text-muted-foreground animate-pulse">Loading exam audit logs…</p>
-          </div>
+          <PageSpinner label="Loading exam audit logs…" />
         ) : null}
 
-        {(!loading || logs.length > 0) && (!error || logs.length > 0) && (
-          <FadeIn className="panel" delay={0.1}>
+        {(!loading || logs.length > 0) && (!error || logs.length > 0) ? (
+          <FadeIn delay={0.12} className="rp-surface exam-audit-logs__panel">
             {filteredLogs.length === 0 ? (
-              <div className="py-16 text-center flex flex-col items-center justify-center">
-                <div className="h-14 w-14 rounded-full bg-muted/50 flex items-center justify-center mb-4">
-                  <Search className="h-6 w-6 text-muted-foreground opacity-60" />
+              <div className="exam-audit-logs__empty">
+                <div className="exam-audit-logs__empty-icon" aria-hidden="true">
+                  <ScrollText />
                 </div>
-                <p className="text-base font-semibold text-foreground">No audit logs found</p>
-                <p className="text-sm text-muted-foreground mt-1">Try adjusting your search query or check back later.</p>
+                <p className="exam-audit-logs__empty-title">
+                  {logs.length === 0 ? 'No audit logs yet' : 'No logs match your filters'}
+                </p>
+                <p className="exam-audit-logs__empty-sub">
+                  {logs.length === 0
+                    ? 'Actions on your exams will appear here as they happen.'
+                    : 'Try clearing filters or broadening your search.'}
+                </p>
+                {filtersActive && logs.length > 0 ? (
+                  <button type="button" className="btn-action btn-outline" onClick={clearFilters}>
+                    Clear filters
+                  </button>
+                ) : null}
               </div>
             ) : (
-              <div className="overflow-x-auto rounded-xl border border-border">
-                <table className="w-full text-left text-sm text-muted-foreground border-collapse">
-                  <thead className="bg-muted/30 text-xs font-semibold text-foreground uppercase tracking-wider border-b border-border">
+              <div className="exam-audit-logs__table-wrap">
+                <table className="exam-audit-logs__table">
+                  <thead>
                     <tr>
-                      <th className="px-5 py-3.5 whitespace-nowrap">Time</th>
-                      <th className="px-5 py-3.5 whitespace-nowrap">Action</th>
-                      <th className="px-5 py-3.5">Quiz</th>
-                      <th className="px-5 py-3.5 whitespace-nowrap">Section</th>
-                      <th className="px-5 py-3.5">Details</th>
+                      <th scope="col">Time</th>
+                      <th scope="col">Action</th>
+                      <th scope="col">Quiz</th>
+                      <th scope="col">Section</th>
+                      <th scope="col">Details</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border">
+                  <tbody>
                     {filteredLogs.map((log) => (
-                      <tr key={log.id} className="transition-colors hover:bg-muted/30 group">
-                        <td className="whitespace-nowrap px-5 py-4 text-foreground font-medium">{formatTime(log.occurredAt)}</td>
-                        <td className="px-5 py-4 whitespace-nowrap">{badgeForEvent(log.eventType)}</td>
-                        <td className="px-5 py-4 font-medium text-foreground">{log.examTitle || '—'}</td>
-                        <td className="px-5 py-4 whitespace-nowrap">
-                          <span className="inline-flex items-center px-2 py-1 rounded-md bg-secondary text-secondary-foreground text-xs font-medium">
-                            {classSectionLabel(log)}
-                          </span>
+                      <tr key={log.id}>
+                        <td className="exam-audit-logs__time">
+                          <time dateTime={log.occurredAt || undefined}>{formatTime(log.occurredAt)}</time>
                         </td>
-                        <td className="px-5 py-4 text-muted-foreground min-w-[200px]" title={detailsLabel(log)}>
+                        <td className="exam-audit-logs__action">{badgeForEvent(log.eventType)}</td>
+                        <td className="exam-audit-logs__quiz">{log.examTitle || '—'}</td>
+                        <td className="exam-audit-logs__section">
+                          <span className="exam-audit-logs__section-chip">{classSectionLabel(log)}</span>
+                        </td>
+                        <td className="exam-audit-logs__details" title={detailsLabel(log)}>
                           {detailsLabel(log)}
                         </td>
                       </tr>
@@ -226,7 +415,7 @@ export default function TeacherActivityLogsPage() {
               </div>
             )}
           </FadeIn>
-        )}
+        ) : null}
       </div>
     </div>
   )

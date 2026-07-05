@@ -34,7 +34,7 @@ export function CollapsibleQuestion({ text, className }) {
   }, [text]);
 
   return (
-    <div className="relative mb-4">
+    <div className="relative">
       <div
         ref={textRef}
         className={`${className} transition-all duration-300`}

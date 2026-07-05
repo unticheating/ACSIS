@@ -1,5 +1,89 @@
 /** Canonical display labels for question types (API, DB, and legacy form values). */
 
+/** Builder form values — one type per question set. */
+export const BUILDER_QUESTION_FORM_TYPES = [
+  { value: 'multiple', label: 'Multiple Choice' },
+  { value: 'identification', label: 'Identification' },
+  { value: 'truefalse', label: 'True / False' },
+  { value: 'coding', label: 'Coding' },
+  { value: 'matching', label: 'Matching' },
+  { value: 'essay', label: 'Essay / Paragraph' },
+  { value: 'diagramming', label: 'Diagramming' },
+]
+
+/**
+ * @param {string | null | undefined} type
+ * @returns {'multiple' | 'identification' | 'truefalse' | 'coding' | 'matching' | 'essay' | 'diagramming'}
+ */
+export function formTypeFromQuestionType(type) {
+  if (type === 'multiple-choice' || type === 'multiple' || type === 'mcq') return 'multiple'
+  if (type === 'truefalse' || type === 'true_false') return 'truefalse'
+  if (type === 'coding') return 'coding'
+  if (type === 'matching') return 'matching'
+  if (type === 'essay') return 'essay'
+  if (type === 'diagramming') return 'diagramming'
+  return 'identification'
+}
+
+/**
+ * @param {string} formType
+ * @returns {string}
+ */
+export function apiTypeFromFormType(formType) {
+  return formType === 'multiple' ? 'multiple-choice' : formType
+}
+
+/**
+ * @param {string} formType
+ * @param {number} [index]
+ * @returns {string}
+ */
+export function defaultSectionTitleForFormType(formType, index = 1) {
+  const hit = BUILDER_QUESTION_FORM_TYPES.find((t) => t.value === formType)
+  return hit?.label || `Set ${index}`
+}
+
+/**
+ * Derive set titles from question types. Duplicate types get a numeric suffix.
+ * @param {Array<{ id?: string, questionType?: string, title?: string }>} sections
+ */
+export function syncSectionTitles(sections) {
+  if (!Array.isArray(sections) || sections.length === 0) return sections
+
+  const typeIndexes = {}
+  return sections.map((sec) => {
+    const formType = sec.questionType || 'multiple'
+    const baseLabel = labelForFormType(formType)
+    const totalOfType = sections.filter((s) => (s.questionType || 'multiple') === formType).length
+
+    if (totalOfType === 1) {
+      return { ...sec, title: baseLabel }
+    }
+
+    typeIndexes[formType] = (typeIndexes[formType] || 0) + 1
+    const n = typeIndexes[formType]
+    return { ...sec, title: n === 1 ? baseLabel : `${baseLabel} (${n})` }
+  })
+}
+
+/**
+ * @param {string | null | undefined} formType
+ * @returns {string}
+ */
+export function labelForFormType(formType) {
+  const hit = BUILDER_QUESTION_FORM_TYPES.find((t) => t.value === formType)
+  return hit?.label || labelForQuestionType(formType)
+}
+
+/**
+ * @param {string | null | undefined} questionApiType
+ * @param {string | null | undefined} sectionFormType
+ */
+export function questionMatchesSectionType(questionApiType, sectionFormType) {
+  if (!sectionFormType) return true
+  return formTypeFromQuestionType(questionApiType) === sectionFormType
+}
+
 const QUESTION_TYPE_LABELS = {
   'multiple-choice': 'Multiple choice',
   multiple: 'Multiple choice',

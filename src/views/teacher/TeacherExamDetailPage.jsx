@@ -6,10 +6,12 @@ import {
   Copy,
   Eye,
   EyeOff,
+  BarChart3,
   FileText,
   MoreVertical,
   Pencil,
   Play,
+  Plus,
   Presentation,
   Radio,
   RotateCcw,
@@ -19,18 +21,15 @@ import {
   Trash2,
   UsersRound,
   Maximize2,
-  ListChecks,
-  Type,
-  CheckSquare,
-  Code,
-  ArrowLeftRight,
-  AlignLeft,
-  Shapes,
 } from 'lucide-react'
+import { QuestionTypeIcon } from '@/components/exam/QuestionTypeIcon.jsx'
 import { useTeacherShellBreadcrumbTrail } from '@/context/TeacherShellBreadcrumbContext.jsx'
 import TeacherMcTabs from '@/components/teacher/TeacherMcTabs.jsx'
 import { apiFetch } from '@/lib/apiFetch.js'
-import { fetchTeacherExamResults } from '@/lib/teacherExamResultsApi.js'
+import {
+  fetchTeacherExamResults,
+  fetchTeacherMonitoringSnapshot,
+} from '@/lib/teacherExamResultsApi.js'
 import { releaseExamScores } from '@/lib/teacherExamGradingApi.js'
 import ExamAnswerReviewModal from '@/components/teacher/ExamAnswerReviewModal.jsx'
 import ReleaseScoresDialog from '@/components/teacher/ReleaseScoresDialog.jsx'
@@ -49,13 +48,16 @@ import { coerceDisplayString, coerceRouteParam } from '@/lib/coerceDisplay.js'
 import { formatCourseBreadcrumbLabel, formatSectionTitle, formatTermPeriod } from '@/lib/sectionLabel.js'
 import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
 import { copyToClipboard } from '@/lib/copyToClipboard.js'
-import { labelForQuestionType, summarizeQuestionTypes, uniqueQuestionTypeLabels } from '@/lib/questionTypes.js'
+import { sumExamTotalPoints } from '@/lib/examPoints.js'
+import { labelForFormType, summarizeQuestionTypes, uniqueQuestionTypeLabels } from '@/lib/questionTypes.js'
 import ExamQuestionAnswerPresentation from '@/components/teacher/ExamQuestionAnswerPresentation.jsx'
 import ExamQuestionsPresentDialog from '@/components/teacher/ExamQuestionsPresentDialog.jsx'
 import { useAcsisConfirm } from '@/hooks/useAcsisConfirm.jsx'
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu.jsx'
@@ -76,7 +78,6 @@ import { DateTimePicker } from '@/components/ui/date-time-picker.jsx'
 import {
   groupExamQuestionsBySet,
   mapExamToBuilderState,
-  shouldShowQuestionSetHeader,
 } from '@/lib/mapExamToBuilder.js'
 import { buildExamSectionsPayload } from '@/lib/examContentPayload.js'
 import confetti from 'canvas-confetti'
@@ -89,17 +90,25 @@ const EXAM_TABS = [
   { id: 'settings', label: 'Settings' },
 ]
 
-function getIconForType(label) {
-  switch (label) {
-    case 'Multiple choice': return <ListChecks size={14} style={{ marginRight: '4px' }} />;
-    case 'Identification': return <Type size={14} style={{ marginRight: '4px' }} />;
-    case 'True / False': return <CheckSquare size={14} style={{ marginRight: '4px' }} />;
-    case 'Coding': return <Code size={14} style={{ marginRight: '4px' }} />;
-    case 'Matching': return <ArrowLeftRight size={14} style={{ marginRight: '4px' }} />;
-    case 'Essay / Paragraph': return <AlignLeft size={14} style={{ marginRight: '4px' }} />;
-    case 'Diagramming': return <Shapes size={14} style={{ marginRight: '4px' }} />;
-    default: return null;
-  }
+const RESULTS_SORT_OPTIONS = [
+  { id: 'Surname A-Z', label: 'Surname A–Z' },
+  { id: 'Score rank', label: 'Score rank' },
+  { id: 'Violations (highest to lowest)', label: 'Violations (high to low)' },
+  { id: 'Submission time (Oldest to Newest)', label: 'Submission time (oldest first)' },
+]
+
+function sortSessionsBySurname(sessions) {
+  return [...sessions].sort((a, b) => {
+    const lastCmp = String(a.lastName || a.studentName || '').localeCompare(
+      String(b.lastName || b.studentName || ''),
+      undefined,
+      { sensitivity: 'base' },
+    )
+    if (lastCmp !== 0) return lastCmp
+    return String(a.firstName || '').localeCompare(String(b.firstName || ''), undefined, {
+      sensitivity: 'base',
+    })
+  })
 }
 
 function SettingsForm({ hit, classId, examId, onSaved, onChanges }) {
@@ -380,6 +389,19 @@ function sessionStatusClass(status) {
   return ''
 }
 
+function scoreToneClass(percentage) {
+  if (percentage == null) return ''
+  return Number(percentage) >= 50
+    ? 'acsis-exam-detail__score-pill--pass'
+    : 'acsis-exam-detail__score-pill--fail'
+}
+
+function rankBadgeClass(rank) {
+  if (rank === 1) return 'acsis-exam-detail__rank-badge acsis-exam-detail__rank-badge--top'
+  if (rank != null && rank <= 3) return 'acsis-exam-detail__rank-badge acsis-exam-detail__rank-badge--podium'
+  return 'acsis-exam-detail__rank-badge'
+}
+
 function statusBadgeClass(status) {
   const s = normalizeExamStatus(status)
   if (s === PG_EXAM_STATUS.DRAFT) return 'acsis-exam-detail__status-badge--draft'
@@ -460,6 +482,7 @@ export default function TeacherExamDetailPage() {
   const [topScoreModalOpen, setTopScoreModalOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterMode, setFilterMode] = useState('Surname A-Z')
+  const [statusFilter, setStatusFilter] = useState('all')
   
   const { confirm, ConfirmDialog } = useAcsisConfirm()
 
@@ -511,41 +534,67 @@ export default function TeacherExamDetailPage() {
     if (!classId || !examId) return undefined
     if (tab !== 'overview' && tab !== 'results') return undefined
     let cancelled = false
+    let inFlight = false
+    const examStatus = normalizeExamStatus(hit?.status)
+    const isLive =
+      examStatus === PG_EXAM_STATUS.WAITING || examStatus === PG_EXAM_STATUS.OPEN
+
     async function loadResults(isBackground = false) {
+      if (inFlight) return
+      inFlight = true
       if (!isBackground) setResultsLoading(true)
       try {
-        const data = await fetchTeacherExamResults(classId, examId)
-        if (!cancelled) setResults(data)
+        if (isLive) {
+          const data = await fetchTeacherMonitoringSnapshot(classId, examId)
+          if (!cancelled) {
+            setResults((prev) => ({
+              ...data,
+              topStudent: prev?.topStudent ?? null,
+              questionStats: prev?.questionStats ?? [],
+            }))
+          }
+        } else {
+          const data = await fetchTeacherExamResults(classId, examId)
+          if (!cancelled) setResults(data)
+        }
       } catch {
         if (!cancelled && !isBackground) setResults(null)
       } finally {
+        inFlight = false
         if (!cancelled && !isBackground) setResultsLoading(false)
       }
     }
     loadResults(false)
-    // Poll faster (3s) when exam is live so lobby/session counts update quickly
-    const isLive = normalizeExamStatus(hit?.status) === PG_EXAM_STATUS.WAITING ||
-                   normalizeExamStatus(hit?.status) === PG_EXAM_STATUS.OPEN
-    const interval = window.setInterval(() => loadResults(true), isLive ? 3000 : 6000)
+    // Live lobby/join counts: light monitoring snapshot. Full /results only after close.
+    const interval = isLive
+      ? window.setInterval(() => loadResults(true), 5000)
+      : null
     return () => {
       cancelled = true
-      window.clearInterval(interval)
+      if (interval) window.clearInterval(interval)
     }
   }, [classId, examId, refreshTick, tab, hit?.status])
 
   const filteredSessions = useMemo(() => {
     let list = [...(results?.sessions || [])]
+    if (statusFilter === 'submitted') {
+      list = list.filter((s) => s.status === 'submitted')
+    } else if (statusFilter === 'in_progress') {
+      list = list.filter((s) => s.status === 'in_progress')
+    }
     if (searchQuery) {
       const q = searchQuery.toLowerCase()
       list = list.filter(
         (s) =>
           (s.studentName || '').toLowerCase().includes(q) ||
-          (s.schoolId || '').toLowerCase().includes(q)
+          (s.firstName || '').toLowerCase().includes(q) ||
+          (s.lastName || '').toLowerCase().includes(q) ||
+          (s.schoolId || '').toLowerCase().includes(q),
       )
     }
-    
+
     if (filterMode === 'Surname A-Z') {
-      list.sort((a, b) => (a.studentName || '').localeCompare(b.studentName || ''))
+      list = sortSessionsBySurname(list)
     } else if (filterMode === 'Score rank') {
       list.sort((a, b) => {
         const rankA = a.rank != null ? a.rank : 999999
@@ -562,7 +611,15 @@ export default function TeacherExamDetailPage() {
       })
     }
     return list
-  }, [results?.sessions, searchQuery, filterMode])
+  }, [results?.sessions, searchQuery, filterMode, statusFilter])
+
+  const totalSessions = results?.sessions?.length ?? 0
+  const resultsFiltersActive = Boolean(searchQuery.trim() || statusFilter !== 'all')
+
+  const clearResultsFilters = () => {
+    setSearchQuery('')
+    setStatusFilter('all')
+  }
 
   const falsePositiveCountBySession = useMemo(() => {
     const map = new Map()
@@ -631,7 +688,7 @@ export default function TeacherExamDetailPage() {
   const streamHref = `/teacher/my-classes/${coerceRouteParam(classId)}`
   const questionCount = exam.questions ? exam.questions.length : exam.questionCount || 0
   const durationMins = computeDurationMinutes(exam)
-  const totalPoints = exam.questions?.reduce((acc, q) => acc + Number(q.points ?? 1), 0) ?? 0
+  const totalPoints = sumExamTotalPoints(exam.questions)
   const typeSummary = summarizeQuestionTypes(exam.questions)
   const typeLabels = uniqueQuestionTypeLabels(exam.questions)
   const overviewDesc = overviewDescription(exam)
@@ -641,6 +698,7 @@ export default function TeacherExamDetailPage() {
     : []
   const lobbyCount = lobbyStudents.length
   const monitoringHref = `/teacher/detections?classId=${coerceRouteParam(classId)}&examId=${coerceRouteParam(examId)}`
+  const reportsHref = `/teacher/reports?examId=${coerceRouteParam(examId)}`
 
   async function publish() {
     try {
@@ -1104,40 +1162,57 @@ export default function TeacherExamDetailPage() {
                 <MoreVertical size={18} strokeWidth={2} />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-[11rem]">
-              <DropdownMenuActionItem
-                icon={Copy}
-                onSelect={() => void copyToClipboard(exam.code, { successMessage: 'Exam password copied.' })}
-              >
-                Copy exam password
-              </DropdownMenuActionItem>
-              {draft ? (
-                <DropdownMenuActionItem icon={Send} variant="success" onSelect={publish}>
-                  Publish exam
-                </DropdownMenuActionItem>
+            <DropdownMenuContent align="end" className="min-w-[13.5rem] p-1.5">
+              {draft || waiting || active || (closed && !draft) ? (
+                <>
+                  <DropdownMenuLabel className="acsis-exam-detail__menu-label">Session</DropdownMenuLabel>
+                  <DropdownMenuGroup>
+                    {draft ? (
+                      <DropdownMenuActionItem icon={Send} variant="success" onSelect={publish}>
+                        Publish exam
+                      </DropdownMenuActionItem>
+                    ) : null}
+                    {waiting ? (
+                      <DropdownMenuActionItem icon={Play} variant="success" onSelect={() => startExam({})}>
+                        Start session
+                      </DropdownMenuActionItem>
+                    ) : null}
+                    {active ? (
+                      <DropdownMenuActionItem icon={StopCircle} variant="warning" onSelect={() => void endExam()}>
+                        Close exam
+                      </DropdownMenuActionItem>
+                    ) : null}
+                    {closed && !draft ? (
+                      <DropdownMenuActionItem icon={RotateCcw} onSelect={() => setRestartDialogOpen(true)}>
+                        Restart exam
+                      </DropdownMenuActionItem>
+                    ) : null}
+                  </DropdownMenuGroup>
+                  <DropdownMenuSeparator />
+                </>
               ) : null}
-              {waiting ? (
-                <DropdownMenuActionItem icon={Play} variant="success" onSelect={() => startExam({})}>
-                  Start session
+
+              <DropdownMenuLabel className="acsis-exam-detail__menu-label">Students</DropdownMenuLabel>
+              <DropdownMenuGroup>
+                <DropdownMenuActionItem icon={UsersRound} onSelect={() => setAssignDialogOpen(true)}>
+                  Assign students
                 </DropdownMenuActionItem>
-              ) : null}
+              </DropdownMenuGroup>
+
               <DropdownMenuSeparator />
-              <DropdownMenuActionItem icon={UsersRound} onSelect={() => setAssignDialogOpen(true)}>
-                Assign students
-              </DropdownMenuActionItem>
-              {active ? (
-                <DropdownMenuActionItem icon={StopCircle} variant="warning" onSelect={() => void endExam()}>
-                  Close exam
+
+              <DropdownMenuLabel className="acsis-exam-detail__menu-label">Copies</DropdownMenuLabel>
+              <DropdownMenuGroup>
+                <DropdownMenuActionItem icon={Copy} onSelect={() => setCopyDialogOpen(true)}>
+                  Copy to another section
                 </DropdownMenuActionItem>
-              ) : null}
-              {closed && !draft ? (
-                <DropdownMenuActionItem icon={RotateCcw} onSelect={() => setRestartDialogOpen(true)}>
-                  Restart exam
+                <DropdownMenuActionItem icon={Plus} onSelect={() => navigate(createHref)}>
+                  New exam in this class
                 </DropdownMenuActionItem>
-              ) : null}
+              </DropdownMenuGroup>
+
               <DropdownMenuSeparator />
-              <DropdownMenuActionItem onSelect={() => setCopyDialogOpen(true)}>Copy to another section</DropdownMenuActionItem>
-              <DropdownMenuActionItem onSelect={() => navigate(createHref)}>New exam in this class</DropdownMenuActionItem>
+
               <DropdownMenuActionItem icon={Trash2} variant="destructive" onSelect={() => void remove()}>
                 Delete exam
               </DropdownMenuActionItem>
@@ -1312,7 +1387,7 @@ export default function TeacherExamDetailPage() {
                 <div className="acsis-summary-stat acsis-card-surface">
                   <div className="acsis-summary-stat__body">
                     <span className="acsis-summary-stat__label">Total points</span>
-                    <span className="acsis-exam-detail__stat-text">{totalPoints}</span>
+                    <span className="acsis-summary-stat__value">{totalPoints}</span>
                   </div>
                 </div>
                 <div className="acsis-summary-stat acsis-card-surface">
@@ -1360,7 +1435,7 @@ export default function TeacherExamDetailPage() {
                   <div className="acsis-exam-detail__type-badges">
                     {typeLabels.map((label) => (
                       <span key={label} className="acsis-exam-detail__type-badge" style={{ display: 'inline-flex', alignItems: 'center' }}>
-                        {getIconForType(label)}
+                        <QuestionTypeIcon label={label} size={14} style={{ marginRight: '4px' }} />
                         {label}
                       </span>
                     ))}
@@ -1429,25 +1504,53 @@ export default function TeacherExamDetailPage() {
                   {questionSets.map((sec, secIndex) => {
                     let qOffset = 0
                     for (let i = 0; i < secIndex; i++) qOffset += questionSets[i].questions.length
-                    const showSetHeader = shouldShowQuestionSetHeader(questionSets, sec, secIndex)
-                    const setTitle = sec.title?.trim() || `Set ${secIndex + 1}`
+                    const typeLabel = labelForFormType(sec.questionType)
+                    const customTitle = sec.title?.trim()
+                    const setTitle = customTitle || typeLabel || `Set ${secIndex + 1}`
 
                     return (
-                      <section key={sec.id} className="acsis-exam-detail__question-set">
-                        {showSetHeader ? (
-                          <header className="acsis-exam-detail__question-set-head">
-                            <div className="acsis-exam-detail__question-set-head-main">
-                              <h3 className="acsis-exam-detail__question-set-title">{setTitle}</h3>
-                              <span className="acsis-exam-detail__question-set-count">
-                                {sec.questions.length}{' '}
-                                {sec.questions.length === 1 ? 'question' : 'questions'}
+                      <section
+                        key={sec.id}
+                        className="acsis-exam-detail__question-set"
+                        aria-labelledby={`exam-set-${sec.id}-title`}
+                      >
+                        <header className="acsis-exam-detail__question-set-head">
+                          <div className="acsis-exam-detail__question-set-head-row">
+                            <div className="acsis-exam-detail__question-set-identity">
+                              {questionSets.length > 1 ? (
+                                <span
+                                  className="acsis-exam-detail__question-set-index"
+                                  aria-hidden
+                                >
+                                  {secIndex + 1}
+                                </span>
+                              ) : null}
+                              <span className="acsis-exam-detail__question-set-icon" aria-hidden>
+                                <QuestionTypeIcon formType={sec.questionType} size={18} />
                               </span>
+                              <div className="acsis-exam-detail__question-set-titles">
+                                <h3
+                                  id={`exam-set-${sec.id}-title`}
+                                  className="acsis-exam-detail__question-set-title"
+                                >
+                                  {setTitle}
+                                </h3>
+                                {questionSets.length > 1 ? (
+                                  <p className="acsis-exam-detail__question-set-meta">
+                                    Section {secIndex + 1} of {questionSets.length}
+                                  </p>
+                                ) : null}
+                              </div>
                             </div>
-                            {sec.description?.trim() ? (
-                              <p className="acsis-exam-detail__question-set-desc">{sec.description}</p>
-                            ) : null}
-                          </header>
-                        ) : null}
+                            <span className="acsis-exam-detail__question-set-count">
+                              {sec.questions.length}{' '}
+                              {sec.questions.length === 1 ? 'question' : 'questions'}
+                            </span>
+                          </div>
+                          {sec.description?.trim() ? (
+                            <p className="acsis-exam-detail__question-set-desc">{sec.description}</p>
+                          ) : null}
+                        </header>
                         <ol className="acsis-exam-detail__question-list">
                           {sec.questions.map((q, index) => (
                             <li key={q.id || `${sec.id}-${index}`} className="acsis-exam-detail__question-item">
@@ -1455,17 +1558,14 @@ export default function TeacherExamDetailPage() {
                                 {qOffset + index + 1}
                               </span>
                               <div className="acsis-exam-detail__question-body">
-                                <div className="acsis-exam-detail__question-meta">
-                                  <span className="acsis-exam-detail__type-badge">
-                                    {labelForQuestionType(q.type)}
-                                  </span>
+                                <div className="acsis-exam-detail__question-line">
+                                  <p className="acsis-exam-detail__question-text">
+                                    {q.question || q.question_text || 'Untitled question'}
+                                  </p>
                                   <span className="acsis-exam-detail__question-points">
                                     {Number(q.points || 0)} pts
                                   </span>
                                 </div>
-                                <p className="acsis-exam-detail__question-text">
-                                  {q.question || q.question_text || 'Untitled question'}
-                                </p>
                                 <ExamQuestionAnswerPresentation question={q} />
                               </div>
                             </li>
@@ -1493,14 +1593,27 @@ export default function TeacherExamDetailPage() {
 
         {tab === 'results' ? (
           <>
-            <div className="acsis-exam-detail__questions-head">
+            <div className="acsis-exam-detail__questions-head acsis-exam-detail__results-head">
               <div>
                 <h2 className="acsis-exam-detail__section-title">Results</h2>
                 {closed ? (
-                  <p className="acsis-mc-sub acsis-exam-detail__questions-sub">Exam closed. Release scores when you are ready.</p>
-                ) : null}
+                  <p className="acsis-mc-sub acsis-exam-detail__questions-sub">
+                    Exam closed. Release scores when you are ready.
+                  </p>
+                ) : (
+                  <p className="acsis-mc-sub acsis-exam-detail__questions-sub">
+                    Track submissions, scores, and per-student actions.
+                  </p>
+                )}
               </div>
               <div className="acsis-exam-detail__questions-actions">
+                <Link
+                  to={reportsHref}
+                  className="acsis-btn-ghost acsis-exam-detail__questions-edit"
+                >
+                  <BarChart3 size={16} strokeWidth={2} aria-hidden />
+                  View report
+                </Link>
                 {(closed || hasSubmissions) && !draft ? (
                   <button
                     type="button"
@@ -1516,7 +1629,17 @@ export default function TeacherExamDetailPage() {
             </div>
 
             {stats ? (
-              <div className="acsis-summary-stats acsis-exam-detail__results-stats">
+              <div
+                className={`acsis-summary-stats acsis-exam-detail__stats acsis-exam-detail__results-stats${
+                  results?.topStudent ? ' acsis-summary-stats--4' : ''
+                }`}
+              >
+                <div className="acsis-summary-stat acsis-card-surface">
+                  <div className="acsis-summary-stat__body">
+                    <span className="acsis-summary-stat__label">Enrolled</span>
+                    <span className="acsis-summary-stat__value">{stats.enrolled}</span>
+                  </div>
+                </div>
                 <div className="acsis-summary-stat acsis-card-surface">
                   <div className="acsis-summary-stat__body">
                     <span className="acsis-summary-stat__label">Submitted</span>
@@ -1525,32 +1648,39 @@ export default function TeacherExamDetailPage() {
                 </div>
                 <div className="acsis-summary-stat acsis-card-surface">
                   <div className="acsis-summary-stat__body">
-                    <span className="acsis-summary-stat__label">Joined and still answering</span>
+                    <span className="acsis-summary-stat__label">Still answering</span>
                     <span className="acsis-summary-stat__value">{Math.max(0, stats.joined - stats.submitted)}</span>
                   </div>
                 </div>
                 {results?.topStudent ? (
-                  <div className="acsis-summary-stat acsis-card-surface" style={{ position: 'relative' }}>
+                  <div className="acsis-summary-stat acsis-card-surface acsis-exam-detail__top-score-card">
                     <button
                       type="button"
-                      style={{ position: 'absolute', top: '10px', right: '10px', padding: '4px', border: 'none', background: 'transparent', cursor: 'pointer', color: '#6b7280' }}
+                      className="acsis-exam-detail__top-score-reveal"
                       onClick={() => {
                         confetti({ particleCount: 150, spread: 90, origin: { x: 0.5, y: 0.5 }, zIndex: 9999 })
                         setTopScoreModalOpen(true)
                       }}
-                      aria-label="Expand top score"
-                      title="Reveal Top Score"
+                      aria-label="Reveal top score"
+                      title="Reveal top score"
                     >
-                      <Maximize2 size={16} strokeWidth={2} />
+                      <Maximize2 size={16} strokeWidth={2} aria-hidden="true" />
                     </button>
                     <div className="acsis-summary-stat__body">
                       <span className="acsis-summary-stat__label">Top score</span>
-                      <span className="acsis-exam-detail__stat-text">
+                      <span className="acsis-summary-stat__value">
                         {results.topStudent.rawScore != null && results.topStudent.totalPoints != null
-                          ? `${results.topStudent.rawScore}/${results.topStudent.totalPoints} pts`
+                          ? `${results.topStudent.rawScore}/${results.topStudent.totalPoints}`
                           : results.topStudent.percentage != null
                           ? `${results.topStudent.percentage}%`
-                          : '?'}
+                          : '—'}
+                        {results.topStudent.percentage != null &&
+                        results.topStudent.rawScore != null &&
+                        results.topStudent.totalPoints != null ? (
+                          <span className="acsis-exam-detail__stat-unit">
+                            {results.topStudent.percentage}%
+                          </span>
+                        ) : null}
                       </span>
                     </div>
                   </div>
@@ -1559,146 +1689,209 @@ export default function TeacherExamDetailPage() {
             ) : null}
 
             {resultsLoading && !results ? (
-              <p className="acsis-mc-sub acsis-exam-detail__results-loading">Loading submissions…</p>
+              <PageSpinner label="Loading submissions…" />
             ) : null}
+
             {!resultsLoading && (!results?.sessions || results.sessions.length === 0) ? (
               <div className="acsis-exam-detail__results-empty">
-                <p className="acsis-mc-sub">No students have joined or submitted yet.</p>
+                <ClipboardList className="acsis-exam-detail__results-empty-icon" aria-hidden="true" />
+                <p className="acsis-exam-detail__results-empty-title">No submissions yet</p>
+                <p className="acsis-mc-sub">Students will appear here once they join or submit the exam.</p>
               </div>
             ) : (
-              <>
-                <div className="acsis-exam-detail__filter-row">
-                  <div className="acsis-exam-detail__search-wrap">
-                    <Search size={16} className="acsis-exam-detail__search-icon" />
-                    <input
-                      type="search"
-                      placeholder="Search students..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="acsis-mc-input acsis-exam-detail__search-input"
-                    />
+              <div className="acsis-exam-detail__results-panel">
+                <div className="acsis-exam-detail__results-toolbar">
+                  <div className="acsis-exam-detail__results-toolbar-head">
+                    <h3 className="acsis-exam-detail__results-toolbar-title">Student list</h3>
+                    <p className="acsis-exam-detail__results-count" aria-live="polite">
+                      {filteredSessions.length === totalSessions
+                        ? `${totalSessions} student${totalSessions === 1 ? '' : 's'}`
+                        : `${filteredSessions.length} of ${totalSessions} students`}
+                    </p>
                   </div>
-                  <div className="acsis-exam-detail__filter-wrap" style={{ position: 'relative' }}>
-                    <select
-                      value={filterMode}
-                      onChange={(e) => setFilterMode(e.target.value)}
-                      className="acsis-mc-input acsis-exam-detail__filter-select"
-                      style={{ paddingRight: '2rem', appearance: 'none' }}
-                    >
-                      <option value="Surname A-Z">Surname A-Z</option>
-                      <option value="Score rank">Score rank</option>
-                      <option value="Violations (highest to lowest)">Violations (highest to lowest)</option>
-                      <option value="Submission time (Oldest to Newest)">Submission time (Oldest to Newest)</option>
-                    </select>
-                    <ChevronDown size={14} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#6b7280' }} />
+
+                  <div className="acsis-exam-detail__results-filters">
+                    <div className="acsis-exam-detail__results-search">
+                      <Search size={16} className="acsis-exam-detail__results-search-icon" aria-hidden="true" />
+                      <input
+                        type="search"
+                        placeholder="Search by name or school ID…"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="acsis-exam-detail__results-search-input"
+                        aria-label="Search students"
+                      />
+                    </div>
+
+                    <div className="acsis-exam-detail__results-controls">
+                      <select
+                        className="acsis-exam-detail__results-select"
+                        value={filterMode}
+                        onChange={(e) => setFilterMode(e.target.value)}
+                        aria-label="Sort students"
+                      >
+                        {RESULTS_SORT_OPTIONS.map((option) => (
+                          <option key={option.id} value={option.id}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+
+                      <select
+                        className="acsis-exam-detail__results-select"
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                        aria-label="Filter by status"
+                      >
+                        <option value="all">All statuses</option>
+                        <option value="submitted">Submitted</option>
+                        <option value="in_progress">In progress</option>
+                      </select>
+
+                      {resultsFiltersActive ? (
+                        <button
+                          type="button"
+                          className="acsis-exam-detail__results-clear"
+                          onClick={clearResultsFilters}
+                        >
+                          Clear filters
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
-                <div className="acsis-exam-detail__table-wrap">
+
+                <div className="acsis-exam-detail__table-wrap acsis-exam-detail__results-table-wrap">
+                  {filteredSessions.length === 0 && totalSessions > 0 ? (
+                    <div className="acsis-exam-detail__results-filter-empty">
+                      <p className="acsis-exam-detail__results-filter-empty-title">No students match your filters</p>
+                      <p className="acsis-mc-sub">Try a different search or show all statuses.</p>
+                      <button
+                        type="button"
+                        className="acsis-btn-ghost acsis-exam-detail__questions-edit"
+                        onClick={clearResultsFilters}
+                      >
+                        Clear filters
+                      </button>
+                    </div>
+                  ) : (
                   <table className="acsis-exam-detail__table">
                     <thead>
-                    <tr>
-                      {resultsTableColumns.rank ? (
-                        <th className="acsis-exam-detail__table-col-rank">Score rank</th>
-                      ) : null}
-                      <th>Student</th>
-                      <th>Status</th>
-                      {resultsTableColumns.submissionTime ? (
-                        <th>Submission time</th>
-                      ) : null}
-                      {resultsTableColumns.score ? (
-                        <th className="acsis-exam-detail__table-col-num">Score</th>
-                      ) : null}
-                      {resultsTableColumns.warnings ? (
-                        <th className="acsis-exam-detail__table-col-num">Warnings</th>
-                      ) : null}
-                      {resultsTableColumns.falsePositives ? (
-                        <th className="acsis-exam-detail__table-col-num">Flagged false positives</th>
-                      ) : null}
-                      {resultsTableColumns.actions ? (
-                        <th className="acsis-exam-detail__table-col-action">Actions</th>
-                      ) : null}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredSessions.map((s) => (
-                      <tr key={s.sessionId}>
+                      <tr>
                         {resultsTableColumns.rank ? (
-                          <td className="acsis-exam-detail__table-col-rank">
-                            {s.rank != null ? `#${s.rank}` : '—'}
-                          </td>
+                          <th className="acsis-exam-detail__table-col-rank">Rank</th>
                         ) : null}
-                        <td>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <UserAvatar user={{ name: s.studentName, avatarUrl: s.avatarUrl }} />
-                            <div style={{ display: 'flex', flexDirection: 'column' }}>
-                              <span className="acsis-exam-detail__table-student-name">
-                                {[s.lastName, s.firstName].filter(Boolean).join(', ') || s.studentName}
-                              </span>
-                              {s.schoolId ? (
-                                <span className="acsis-exam-detail__table-student-id" style={{ fontSize: '0.75rem', color: '#6b7280' }}>{s.schoolId}</span>
-                              ) : null}
-                            </div>
-                          </div>
-                        </td>
-                        <td>
-                          {s.status ? (
-                            <span className={`acsis-exam-detail__session-status ${sessionStatusClass(s.status)}`}>
-                              {formatSessionStatus(s.status)}
-                            </span>
-                          ) : (
-                            '—'
-                          )}
-                        </td>
+                        <th>Student</th>
+                        <th>Status</th>
                         {resultsTableColumns.submissionTime ? (
-                          <td className="acsis-exam-detail__table-submission-time">
-                            {formatSubmissionTime(s.submittedAt)}
-                          </td>
+                          <th>Submitted</th>
                         ) : null}
                         {resultsTableColumns.score ? (
-                          <td className="acsis-exam-detail__table-col-num acsis-exam-detail__table-score">
-                            {s.status === 'submitted' && s.percentage != null ? (
-                              <>
-                                <span style={{ fontWeight: 'bold' }}>{s.rawScore}/{s.totalPoints}</span> ({s.percentage}%)
-                              </>
+                          <th className="acsis-exam-detail__table-col-num">Score</th>
+                        ) : null}
+                        {resultsTableColumns.warnings ? (
+                          <th className="acsis-exam-detail__table-col-num">Warnings</th>
+                        ) : null}
+                        {resultsTableColumns.falsePositives ? (
+                          <th className="acsis-exam-detail__table-col-num">False positives</th>
+                        ) : null}
+                        {resultsTableColumns.actions ? (
+                          <th className="acsis-exam-detail__table-col-action">Actions</th>
+                        ) : null}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredSessions.map((s) => (
+                        <tr key={s.sessionId}>
+                          {resultsTableColumns.rank ? (
+                            <td className="acsis-exam-detail__table-col-rank">
+                              {s.rank != null ? (
+                                <span className={rankBadgeClass(s.rank)}>#{s.rank}</span>
+                              ) : (
+                                '—'
+                              )}
+                            </td>
+                          ) : null}
+                          <td>
+                            <div className="acsis-exam-detail__table-student">
+                              <UserAvatar user={{ name: s.studentName, avatarUrl: s.avatarUrl }} />
+                              <div className="acsis-exam-detail__table-student-text">
+                                <span className="acsis-exam-detail__table-student-name">
+                                  {[s.lastName, s.firstName].filter(Boolean).join(', ') || s.studentName}
+                                </span>
+                                {s.schoolId ? (
+                                  <span className="acsis-exam-detail__table-student-id">{s.schoolId}</span>
+                                ) : null}
+                              </div>
+                            </div>
+                          </td>
+                          <td>
+                            {s.status ? (
+                              <span className={`acsis-exam-detail__session-status ${sessionStatusClass(s.status)}`}>
+                                {formatSessionStatus(s.status)}
+                              </span>
                             ) : (
                               '—'
                             )}
                           </td>
-                        ) : null}
-                        {resultsTableColumns.warnings ? (
-                          <td className="acsis-exam-detail__table-col-num acsis-exam-detail__table-warnings">
-                            {s.warningCount}
-                          </td>
-                        ) : null}
-                        {resultsTableColumns.falsePositives ? (
-                          <td className="acsis-exam-detail__table-col-num">
-                            {falsePositiveCountBySession.get(s.sessionId) ?? 0}
-                          </td>
-                        ) : null}
-                        {resultsTableColumns.actions ? (
-                          <td className="acsis-exam-detail__table-col-action">
-                            {s.status === 'submitted' && s.sessionId ? (
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'flex-end' }}>
-                                <button
-                                  type="button"
-                                  className="acsis-btn-outline"
-                                  style={{ padding: '6px 12px', fontSize: '0.8125rem', height: 'auto', minHeight: 'auto', display: 'flex', alignItems: 'center', gap: '6px' }}
-                                  onClick={() => {
-                                    setReviewInitialSessionId(s.sessionId)
-                                    setReviewOpen(true)
-                                  }}
-                                >
-                                  <FileText size={14} strokeWidth={2} />
-                                  Review
-                                </button>
-                                <div style={{ width: '90px', display: 'flex' }}>
+                          {resultsTableColumns.submissionTime ? (
+                            <td className="acsis-exam-detail__table-submission-time">
+                              {formatSubmissionTime(s.submittedAt)}
+                            </td>
+                          ) : null}
+                          {resultsTableColumns.score ? (
+                            <td className="acsis-exam-detail__table-col-num">
+                              {s.status === 'submitted' && s.percentage != null ? (
+                                <span className={`acsis-exam-detail__score-pill ${scoreToneClass(s.percentage)}`}>
+                                  <span className="acsis-exam-detail__score-pill-main">
+                                    {s.rawScore}/{s.totalPoints}
+                                  </span>
+                                  <span className="acsis-exam-detail__score-pill-pct">{s.percentage}%</span>
+                                </span>
+                              ) : (
+                                '—'
+                              )}
+                            </td>
+                          ) : null}
+                          {resultsTableColumns.warnings ? (
+                            <td className="acsis-exam-detail__table-col-num">
+                              <span
+                                className={`acsis-exam-detail__warning-count${
+                                  Number(s.warningCount) > 0 ? ' acsis-exam-detail__warning-count--active' : ''
+                                }`}
+                              >
+                                {s.warningCount}
+                              </span>
+                            </td>
+                          ) : null}
+                          {resultsTableColumns.falsePositives ? (
+                            <td className="acsis-exam-detail__table-col-num">
+                              {falsePositiveCountBySession.get(s.sessionId) ?? 0}
+                            </td>
+                          ) : null}
+                          {resultsTableColumns.actions ? (
+                            <td className="acsis-exam-detail__table-col-action">
+                              {s.status === 'submitted' && s.sessionId ? (
+                                <div className="acsis-exam-detail__row-actions">
+                                  <button
+                                    type="button"
+                                    className="acsis-exam-detail__review-btn"
+                                    onClick={() => {
+                                      setReviewInitialSessionId(s.sessionId)
+                                      setReviewOpen(true)
+                                    }}
+                                  >
+                                    <FileText size={14} strokeWidth={2} aria-hidden="true" />
+                                    Review
+                                  </button>
                                   {s.scoreReleased ? (
-                                    <span className="acsis-exam-detail__released-yes" style={{ padding: '6px 12px', fontSize: '0.8125rem', width: '100%', textAlign: 'center', boxSizing: 'border-box' }}>Released</span>
+                                    <span className="acsis-exam-detail__released-yes acsis-exam-detail__released-pill">
+                                      Released
+                                    </span>
                                   ) : (
                                     <button
                                       type="button"
-                                      className="acsis-btn-primary"
-                                      style={{ padding: '6px 12px', fontSize: '0.8125rem', height: 'auto', minHeight: 'auto', width: '100%', boxSizing: 'border-box' }}
+                                      className="acsis-exam-detail__release-btn"
                                       disabled={releasing}
                                       onClick={() => void handleReleaseOneStudent(s.sessionId)}
                                     >
@@ -1706,16 +1899,16 @@ export default function TeacherExamDetailPage() {
                                     </button>
                                   )}
                                 </div>
-                              </div>
-                            ) : null}
-                          </td>
-                        ) : null}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                              ) : null}
+                            </td>
+                          ) : null}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  )}
+                </div>
               </div>
-              </>
             )}
           </>
         ) : null}

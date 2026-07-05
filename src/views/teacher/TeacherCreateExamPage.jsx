@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams, useNavigate } from 'react-router-dom'
-import { Clock, Plus, Shuffle, Trash2, ArrowLeft, GripVertical, Layers, ImageIcon, X, Pencil, Copy, Calculator, Settings, Eye, EyeOff } from 'lucide-react'
+import { Clock, Plus, Shuffle, Trash2, ArrowLeft, GripVertical, Layers, ImageIcon, X, Pencil, Copy, Calculator, Settings, Eye, EyeOff, Printer } from 'lucide-react'
 import { Label } from '@/components/ui/label.jsx'
 import { Button } from '@/components/ui/button.jsx'
 import { Input } from '@/components/ui/input.jsx'
@@ -13,23 +13,40 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog.jsx'
 import { apiFetch } from '@/lib/apiFetch.js'
+import { formatSemesterLabel } from '@/lib/sectionLabel.js'
+import { sumExamTotalPoints } from '@/lib/examPoints.js'
 import { COPY } from '@/lib/examFlowUi.js'
+import {
+  getScrollableParent,
+  isDocumentScrollRoot,
+  lockPageScroll,
+  scrollElementToViewportOffset,
+} from '@/lib/preservePageScroll.js'
 import {
   buildExamSectionsPayload,
   isPersistedEntityId,
   newLocalQuestionId,
 } from '@/lib/examContentPayload.js'
-import { mapExamToBuilderState } from '@/lib/mapExamToBuilder.js'
+import { mapExamToBuilderState, newSection } from '@/lib/mapExamToBuilder.js'
 import {
+  apiTypeFromFormType,
+  formTypeFromQuestionType,
   identificationDisplayFromQuestion,
   joinIdentificationAnswersList,
+  labelForFormType,
   labelForQuestionType,
+  questionMatchesSectionType,
+  syncSectionTitles,
 } from '@/lib/questionTypes.js'
+import { boilerplateInstructionsForFormType } from '@/lib/examSectionInstructions.js'
+import SectionQuestionTypePicker from '@/components/exam/SectionQuestionTypePicker.jsx'
+import { QuestionTypeIcon } from '@/components/exam/QuestionTypeIcon.jsx'
 import ExamQuestionAnswerPresentation, {
   buildAnswerExplanationField,
   buildIdentificationQuestionFields,
 } from '@/components/teacher/ExamQuestionAnswerPresentation.jsx'
 import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
+import { exportExamPaper } from '@/lib/teacherExamGradingApi.js'
 import { useAcsisConfirm } from '@/hooks/useAcsisConfirm.jsx'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import Editor from '@monaco-editor/react'
@@ -52,15 +69,6 @@ function emptyMatchingPairsState() {
 
 function emptyMc() {
   return { opt1: '', opt2: '', opt3: '', opt4: '', correct: '' }
-}
-
-function newSection(index = 1) {
-  return {
-    id: `sec-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-    title: `Set ${index}`,
-    description: '',
-    questions: [],
-  }
 }
 
 const INITIAL_EXAM_SECTION = newSection(1)
@@ -116,6 +124,15 @@ export default function TeacherCreateExamPage() {
         setExamDescription(description)
         setSections(loadedSections)
         setActiveSectionId(loadedSections[0]?.id || INITIAL_EXAM_SECTION.id)
+        const initialSection = loadedSections[0]
+        if (initialSection?.questionType) {
+          setQuestionType(initialSection.questionType)
+        } else {
+          const lastQuestion = loadedSections.flatMap((s) => s.questions).at(-1)
+          if (lastQuestion) {
+            setQuestionType(formTypeFromQuestionType(lastQuestion.type))
+          }
+        }
         setShuffleQuestions(!!exam.shuffleQuestions)
         setShuffleChoices(!!exam.shuffleChoices)
         setScheduledStart(exam.scheduledStart || '')
@@ -188,10 +205,15 @@ export default function TeacherCreateExamPage() {
   const [loadingEditExam, setLoadingEditExam] = useState(Boolean(editExamIdParam))
   const [isSaving, setIsSaving] = useState(false)
   const [lastSaved, setLastSaved] = useState(null)
-  const [showQuestionForm, setShowQuestionForm] = useState(false)
+  const [composingQuestionSectionId, setComposingQuestionSectionId] = useState(null)
   const [editingQuestion, setEditingQuestion] = useState(/** @type {{ sectionId: string, questionId: string } | null} */ (null))
   const editPanelRef = useRef(null)
+  const scrollSpyPausedRef = useRef(false)
+  const scrollSpyPauseTimerRef = useRef(null)
+  const scrollSpyRafRef = useRef(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [isPrintingPaper, setIsPrintingPaper] = useState(false)
+  const [draggingQuestionType, setDraggingQuestionType] = useState(/** @type {string | null} */ (null))
 
   // Bulk Points Modal States
   const [bulkPointsOpen, setBulkPointsOpen] = useState(false)
@@ -216,7 +238,6 @@ export default function TeacherCreateExamPage() {
 
   const resetQuestionForm = useCallback(() => {
     setQuestionText('')
-    setQuestionType('multiple')
     setQuestionPoints(1)
     resetAnswerFields()
     setQuestionImage(null)
@@ -224,20 +245,25 @@ export default function TeacherCreateExamPage() {
     if (imageInputRef.current) imageInputRef.current.value = ''
   }, [resetAnswerFields])
 
-  function formTypeFromQuestionType(type) {
-    if (type === 'multiple-choice' || type === 'multiple' || type === 'mcq') return 'multiple'
-    if (type === 'truefalse' || type === 'true_false') return 'truefalse'
-    if (type === 'coding') return 'coding'
-    if (type === 'matching') return 'matching'
-    if (type === 'essay') return 'essay'
-    if (type === 'diagramming') return 'diagramming'
-    return 'identification'
+  function cancelComposeQuestion() {
+    setComposingQuestionSectionId(null)
+    resetQuestionForm()
+  }
+
+  function beginAddQuestion(sectionId) {
+    pauseScrollSpy()
+    setActiveSectionId(sectionId)
+    const section = sections.find((sec) => sec.id === sectionId)
+    if (section?.questionType) setQuestionType(section.questionType)
+    setEditingQuestion(null)
+    resetQuestionForm()
+    setComposingQuestionSectionId(sectionId)
   }
 
   function beginEditQuestion(sectionId, q) {
     const formType = formTypeFromQuestionType(q.type)
     setActiveSectionId(sectionId)
-    setShowQuestionForm(false)
+    setComposingQuestionSectionId(null)
     setEditingQuestion({ sectionId, questionId: String(q.id) })
     setQuestionType(formType)
     setQuestionText(q.question || '')
@@ -350,7 +376,7 @@ export default function TeacherCreateExamPage() {
 
   function cancelEditQuestion() {
     resetQuestionForm()
-    setShowQuestionForm(false)
+    setComposingQuestionSectionId(null)
   }
 
   function saveQuestion() {
@@ -360,10 +386,19 @@ export default function TeacherCreateExamPage() {
       return
     }
 
+    const targetSectionForAdd =
+      sections.find((sec) => sec.id === composingQuestionSectionId) ||
+      sections.find((sec) => sec.id === activeSectionId) ||
+      sections[sections.length - 1] ||
+      null
+    const effectiveQuestionType = editingQuestion
+      ? questionType
+      : targetSectionForAdd?.questionType || questionType
+
     let correctAnswer = ''
     let options = []
 
-    if (questionType === 'multiple') {
+    if (effectiveQuestionType === 'multiple') {
       const opts = [mc.opt1, mc.opt2, mc.opt3, mc.opt4].map((o) => o.trim())
       if (opts.some((o) => !o)) {
         acsisToastError('Please fill in all multiple-choice options.')
@@ -375,7 +410,7 @@ export default function TeacherCreateExamPage() {
       }
       correctAnswer = opts[Number(mc.correct) - 1]
       options = opts
-    } else if (questionType === 'identification') {
+    } else if (effectiveQuestionType === 'identification') {
       const identFields = buildIdentificationQuestionFields(
         identAcceptableAnswers,
         identPresentationAnswer,
@@ -386,13 +421,13 @@ export default function TeacherCreateExamPage() {
         return
       }
       correctAnswer = identFields.correctAnswer
-    } else if (questionType === 'truefalse') {
+    } else if (effectiveQuestionType === 'truefalse') {
       if (!tfAnswer) {
         acsisToastError('Please select True or False.')
         return
       }
       correctAnswer = tfAnswer === 'true' ? 'True' : 'False'
-    } else if (questionType === 'coding') {
+    } else if (effectiveQuestionType === 'coding') {
       const code = codingAnswer.trim()
       if (!code) {
         acsisToastError('Please provide an expected solution or boilerplate code.')
@@ -400,7 +435,7 @@ export default function TeacherCreateExamPage() {
       }
       correctAnswer = code
       options = [codingLanguage]
-    } else if (questionType === 'matching') {
+    } else if (effectiveQuestionType === 'matching') {
       const pairs = normalizeMatchingPairs(matchingPairs)
       if (pairs.length < 2) {
         acsisToastError('Add at least two matching pairs.')
@@ -408,16 +443,17 @@ export default function TeacherCreateExamPage() {
       }
       correctAnswer = serializeMatchingPairs(pairs)
       options = []
-    } else if (questionType === 'essay') {
+    } else if (effectiveQuestionType === 'essay') {
       correctAnswer = essayRubric.trim() || 'Manual grading required'
       options = []
-    } else if (questionType === 'diagramming') {
+    } else if (effectiveQuestionType === 'diagramming') {
       correctAnswer = diagramReference
       options = [diagramVariant]
     }
 
-    const typeLabel = questionType === 'multiple' ? 'multiple-choice' : questionType
-    const normalizedMatching = questionType === 'matching' ? normalizeMatchingPairs(matchingPairs) : []
+    const typeLabel = apiTypeFromFormType(effectiveQuestionType)
+    const normalizedMatching =
+      effectiveQuestionType === 'matching' ? normalizeMatchingPairs(matchingPairs) : []
     const questionPayload = {
       type: typeLabel,
       question: text,
@@ -425,18 +461,18 @@ export default function TeacherCreateExamPage() {
       options,
       correctAnswer,
       imageUrl: questionImage || null,
-      ...(questionType === 'identification'
+      ...(effectiveQuestionType === 'identification'
         ? buildIdentificationQuestionFields(
             identAcceptableAnswers,
             identPresentationAnswer,
             answerExplanation,
           )
         : buildAnswerExplanationField(answerExplanation)),
-      ...(questionType === 'matching'
+      ...(effectiveQuestionType === 'matching'
         ? { matchingPairs: normalizedMatching, correctAnswer: serializeMatchingPairs(normalizedMatching) }
         : {}),
-      ...(questionType === 'essay' ? { correctAnswer: essayRubric.trim() || 'Manual grading required' } : {}),
-      ...(questionType === 'diagramming'
+      ...(effectiveQuestionType === 'essay' ? { correctAnswer: essayRubric.trim() || 'Manual grading required' } : {}),
+      ...(effectiveQuestionType === 'diagramming'
         ? {
             diagramVariant,
             diagramReference,
@@ -447,25 +483,77 @@ export default function TeacherCreateExamPage() {
     }
 
     if (editingQuestion) {
-      setSections((prev) =>
-        prev.map((sec) =>
-          sec.id === editingQuestion.sectionId
-            ? {
-                ...sec,
-                questions: sec.questions.map((q) =>
-                  String(q.id) === String(editingQuestion.questionId)
-                    ? { ...q, ...questionPayload }
-                    : q,
-                ),
-              }
-            : sec,
-        ),
-      )
+      const sourceSection = sections.find((sec) => sec.id === editingQuestion.sectionId)
+      const targetFormType = questionType
+
+      if (sourceSection?.questionType === targetFormType) {
+        setSections((prev) =>
+          prev.map((sec) =>
+            sec.id === editingQuestion.sectionId
+              ? {
+                  ...sec,
+                  questions: sec.questions.map((q) =>
+                    String(q.id) === String(editingQuestion.questionId)
+                      ? { ...q, ...questionPayload }
+                      : q,
+                  ),
+                }
+              : sec,
+          ),
+        )
+      } else {
+        const targetSection = findSectionForFormType(sections, targetFormType)
+        if (!targetSection) {
+          acsisToastError(`Add a ${labelForFormType(targetFormType)} set before moving this question.`)
+          return
+        }
+
+        setSections((prev) => {
+          let next = prev.map((sec) =>
+            sec.id === editingQuestion.sectionId
+              ? {
+                  ...sec,
+                  questions: sec.questions.filter(
+                    (q) => String(q.id) !== String(editingQuestion.questionId),
+                  ),
+                }
+              : sec,
+          )
+
+          next = next.map((sec) =>
+            sec.id === targetSection.id
+              ? {
+                  ...sec,
+                  questions: [
+                    ...sec.questions,
+                    {
+                      id: editingQuestion.questionId,
+                      ...questionPayload,
+                    },
+                  ],
+                }
+              : sec,
+          )
+
+          return next
+        })
+        setActiveSectionId(targetSection.id)
+      }
       acsisToastSuccess('Question updated.')
     } else {
+      const targetSection = sections.find((sec) => sec.id === activeSectionId) || sections[sections.length - 1]
+      if (!targetSection) {
+        acsisToastError('Select a question set first.')
+        return
+      }
+      if (!questionMatchesSectionType(typeLabel, targetSection.questionType)) {
+        acsisToastError(`This set only accepts ${labelForFormType(targetSection.questionType)} questions.`)
+        return
+      }
+
       setSections((prev) =>
         prev.map((sec) =>
-          sec.id === activeSectionId
+          sec.id === targetSection.id
             ? {
                 ...sec,
                 questions: [
@@ -482,7 +570,7 @@ export default function TeacherCreateExamPage() {
     }
 
     resetQuestionForm()
-    setShowQuestionForm(false)
+    setComposingQuestionSectionId(null)
   }
 
   async function deleteQuestion(sectionId, questionId) {
@@ -498,7 +586,7 @@ export default function TeacherCreateExamPage() {
     if (!ok) return
     if (editingQuestion && String(editingQuestion.questionId) === String(questionId)) {
       resetQuestionForm()
-      setShowQuestionForm(false)
+      setComposingQuestionSectionId(null)
     }
     setSections((prev) =>
       prev.map((sec) =>
@@ -576,12 +664,38 @@ export default function TeacherCreateExamPage() {
     setSections((prev) => prev.map((sec) => (sec.id === sectionId ? { ...sec, ...patch } : sec)))
   }
 
+  function findSectionForFormType(sectionList, formType) {
+    return sectionList.find((sec) => sec.questionType === formType) || null
+  }
+
+  function changeSectionQuestionType(sectionId, nextType) {
+    const section = sections.find((sec) => sec.id === sectionId)
+    if (!section) return
+    if (section.questions.length > 0) {
+      acsisToastError('Remove all questions from this set before changing its type.')
+      return
+    }
+    setSections((prev) =>
+      syncSectionTitles(
+        prev.map((sec) =>
+          sec.id === sectionId
+            ? {
+                ...sec,
+                questionType: nextType,
+                description: boilerplateInstructionsForFormType(nextType),
+              }
+            : sec,
+        ),
+      ),
+    )
+  }
+
   function addSection() {
     setSections((prev) => {
       const next = newSection(prev.length + 1)
       setActiveSectionId(next.id)
-      setShowQuestionForm(false)
-      return [...prev, next]
+      setComposingQuestionSectionId(null)
+      return syncSectionTitles([...prev, next])
     })
   }
 
@@ -598,7 +712,7 @@ export default function TeacherCreateExamPage() {
     })
     if (!ok) return
     setSections((prev) => {
-      const next = prev.filter((s) => s.id !== sectionId)
+      const next = syncSectionTitles(prev.filter((s) => s.id !== sectionId))
       if (activeSectionId === sectionId) {
         setActiveSectionId(next[0]?.id)
       }
@@ -621,7 +735,106 @@ export default function TeacherCreateExamPage() {
     [sections],
   )
 
+  const activeSection = useMemo(
+    () => sections.find((sec) => sec.id === activeSectionId) || sections[0] || null,
+    [sections, activeSectionId],
+  )
+
+  function getSectionAnchorElement(sectionId) {
+    return document.querySelector(`#set-${sectionId} .exam-builder-panel--meta`)
+      || document.getElementById(`set-${sectionId}`)
+  }
+
+  function getScrollSpyOffset() {
+    const examHeader = document.querySelector('.exam-builder-page__header')
+    if (!examHeader) return 96
+    const { top, height } = examHeader.getBoundingClientRect()
+    return top + height + 12
+  }
+
+  function pauseScrollSpy(durationMs = 1200) {
+    scrollSpyPausedRef.current = true
+    if (scrollSpyPauseTimerRef.current) {
+      window.clearTimeout(scrollSpyPauseTimerRef.current)
+    }
+    scrollSpyPauseTimerRef.current = window.setTimeout(() => {
+      scrollSpyPausedRef.current = false
+      scrollSpyPauseTimerRef.current = null
+    }, durationMs)
+  }
+
+  const syncOutlineFromScroll = useCallback(() => {
+    if (scrollSpyPausedRef.current || composingQuestionSectionId || editingQuestion) return
+    if (!sections.length) return
+
+    const offset = getScrollSpyOffset()
+    let nextId = sections[0].id
+
+    for (const sec of sections) {
+      const el = getSectionAnchorElement(sec.id)
+      if (!el) continue
+      if (el.getBoundingClientRect().top <= offset + 8) {
+        nextId = sec.id
+      } else {
+        break
+      }
+    }
+
+    setActiveSectionId((prev) => (prev === nextId ? prev : nextId))
+  }, [sections, composingQuestionSectionId, editingQuestion])
+
+  useEffect(() => {
+    const scheduleSync = () => {
+      if (scrollSpyRafRef.current != null) return
+      scrollSpyRafRef.current = window.requestAnimationFrame(() => {
+        scrollSpyRafRef.current = null
+        syncOutlineFromScroll()
+      })
+    }
+
+    const sectionEls = sections
+      .map((sec) => getSectionAnchorElement(sec.id))
+      .filter(Boolean)
+
+    const scrollRoot = sectionEls[0] ? getScrollableParent(sectionEls[0]) : document.documentElement
+    const observer =
+      sectionEls.length > 0
+        ? new IntersectionObserver(() => scheduleSync(), {
+            root: isDocumentScrollRoot(scrollRoot) ? null : scrollRoot,
+            rootMargin: `-${getScrollSpyOffset()}px 0px -50% 0px`,
+            threshold: [0, 0.1, 0.5, 1],
+          })
+        : null
+
+    sectionEls.forEach((el) => observer?.observe(el))
+    scheduleSync()
+
+    const passiveOpts = { passive: true }
+    scrollRoot.addEventListener('scroll', scheduleSync, passiveOpts)
+    window.addEventListener('resize', scheduleSync, passiveOpts)
+
+    return () => {
+      observer?.disconnect()
+      scrollRoot.removeEventListener('scroll', scheduleSync, passiveOpts)
+      window.removeEventListener('resize', scheduleSync, passiveOpts)
+      if (scrollSpyRafRef.current != null) {
+        window.cancelAnimationFrame(scrollSpyRafRef.current)
+        scrollSpyRafRef.current = null
+      }
+      if (scrollSpyPauseTimerRef.current) {
+        window.clearTimeout(scrollSpyPauseTimerRef.current)
+        scrollSpyPauseTimerRef.current = null
+      }
+    }
+  }, [syncOutlineFromScroll, sections])
+
+  useEffect(() => {
+    if (!settingsOpen) return undefined
+    return lockPageScroll()
+  }, [settingsOpen])
+
   function activateSection(sectionId) {
+    pauseScrollSpy()
     if (sectionId !== activeSectionId) {
       if (editingQuestion) {
         cancelEditQuestion()
@@ -630,7 +843,11 @@ export default function TeacherCreateExamPage() {
       }
     }
     setActiveSectionId(sectionId)
-    setShowQuestionForm(false)
+    setComposingQuestionSectionId(null)
+    const section = sections.find((sec) => sec.id === sectionId)
+    if (section?.questionType) {
+      setQuestionType(section.questionType)
+    }
   }
 
   // Autosave logic
@@ -795,19 +1012,32 @@ export default function TeacherCreateExamPage() {
     }
   }
 
+  function normalizeDroppableSectionId(droppableId) {
+    return String(droppableId).replace(/^outline-/, '')
+  }
+
+  function onDragStart(start) {
+    const sourceSectionId = normalizeDroppableSectionId(start.source.droppableId)
+    const sourceSection = sections.find((sec) => String(sec.id) === sourceSectionId)
+    const question = sourceSection?.questions[start.source.index]
+    setDraggingQuestionType(question ? formTypeFromQuestionType(question.type) : null)
+  }
+
   function onDragEnd(result) {
+    setDraggingQuestionType(null)
     if (!result.destination) return
     const sourceIndex = result.source.index
     const destinationIndex = result.destination.index
 
-    const sourceSectionId = result.source.droppableId
-    const destSectionId = result.destination.droppableId
+    const sourceSectionId = normalizeDroppableSectionId(result.source.droppableId)
+    const destSectionId = normalizeDroppableSectionId(result.destination.droppableId)
+    const isOutlineDest = String(result.destination.droppableId).startsWith('outline-')
 
-    if (sourceSectionId === destSectionId) {
+    if (sourceSectionId === destSectionId && !isOutlineDest) {
       if (sourceIndex === destinationIndex) return
       setSections((prev) =>
         prev.map((sec) => {
-          if (sec.id !== sourceSectionId) return sec
+          if (String(sec.id) !== sourceSectionId) return sec
           const newQuestions = Array.from(sec.questions)
           const [moved] = newQuestions.splice(sourceIndex, 1)
           newQuestions.splice(destinationIndex, 0, moved)
@@ -817,15 +1047,24 @@ export default function TeacherCreateExamPage() {
     } else {
       setSections((prev) => {
         const next = [...prev]
-        const sourceSecIndex = next.findIndex(s => s.id === sourceSectionId)
-        const destSecIndex = next.findIndex(s => s.id === destSectionId)
+        const sourceSecIndex = next.findIndex((s) => String(s.id) === sourceSectionId)
+        const destSecIndex = next.findIndex((s) => String(s.id) === destSectionId)
         if (sourceSecIndex === -1 || destSecIndex === -1) return prev
 
         const sourceSec = { ...next[sourceSecIndex], questions: [...next[sourceSecIndex].questions] }
         const destSec = { ...next[destSecIndex], questions: [...next[destSecIndex].questions] }
 
         const [moved] = sourceSec.questions.splice(sourceIndex, 1)
-        destSec.questions.splice(destinationIndex, 0, moved)
+        if (
+          sourceSectionId !== destSectionId &&
+          !questionMatchesSectionType(moved.type, destSec.questionType)
+        ) {
+          acsisToastError(`Move questions only between sets of the same type (${labelForFormType(destSec.questionType)}).`)
+          return prev
+        }
+
+        const destIndex = isOutlineDest ? destSec.questions.length : destinationIndex
+        destSec.questions.splice(destIndex, 0, moved)
 
         next[sourceSecIndex] = sourceSec
         next[destSecIndex] = destSec
@@ -842,45 +1081,46 @@ export default function TeacherCreateExamPage() {
         <div className="space-y-4">
           <div className="space-y-2">
             <Label>Options</Label>
+            <p className="text-xs text-muted-foreground">
+              Select the radio button next to the correct option.
+            </p>
             {['opt1', 'opt2', 'opt3', 'opt4'].map((key, idx) => {
-              const isCorrect = String(mc.correct) === String(idx + 1)
+              const optionNum = idx + 1
+              const isCorrect = String(mc.correct) === String(optionNum)
               return (
-                <Input
-                  key={key}
-                  type="text"
-                  placeholder={`Option ${idx + 1}`}
-                  value={mc[key]}
-                  onChange={(e) => setMc((m) => ({ ...m, [key]: e.target.value }))}
-                  className={
-                    isCorrect
-                      ? 'border-2 shadow-sm transition-all !border-emerald-500 !bg-emerald-50 !text-emerald-950 dark:!border-[1px] dark:!border-emerald-400 dark:!bg-emerald-900/50 dark:!text-emerald-100'
-                      : 'border border-input transition-all'
-                  }
-                  style={
-                    isCorrect
-                      ? {
-                          backgroundColor: isCorrect ? '#10b981' : undefined,
-                          boxShadow: isCorrect ? '0 0 0 1px #18af4f' : undefined,
-                        }
-                      : undefined
-                  }
-                />
+                <div key={key} className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="mc-correct"
+                    id={`mc-correct-${optionNum}`}
+                    value={String(optionNum)}
+                    checked={isCorrect}
+                    onChange={() => setMc((m) => ({ ...m, correct: String(optionNum) }))}
+                    className="h-4 w-4 shrink-0 accent-emerald-600"
+                    aria-label={`Mark option ${optionNum} as correct`}
+                  />
+                  <Input
+                    type="text"
+                    placeholder={`Option ${optionNum}`}
+                    value={mc[key]}
+                    onChange={(e) => setMc((m) => ({ ...m, [key]: e.target.value }))}
+                    className={
+                      isCorrect
+                        ? 'flex-1 border-2 shadow-sm transition-all !border-emerald-500 !bg-emerald-50 !text-emerald-950 dark:!border-[1px] dark:!border-emerald-400 dark:!bg-emerald-900/50 dark:!text-emerald-100'
+                        : 'flex-1 border border-input transition-all'
+                    }
+                    style={
+                      isCorrect
+                        ? {
+                            backgroundColor: isCorrect ? '#10b981' : undefined,
+                            boxShadow: isCorrect ? '0 0 0 1px #18af4f' : undefined,
+                          }
+                        : undefined
+                    }
+                  />
+                </div>
               )
             })}
-          </div>
-          <div className="space-y-2">
-            <Label>Correct Answer</Label>
-            <select
-              value={mc.correct}
-              onChange={(e) => setMc((m) => ({ ...m, correct: e.target.value }))}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              <option value="">Select correct answer</option>
-              <option value="1">Option 1</option>
-              <option value="2">Option 2</option>
-              <option value="3">Option 3</option>
-              <option value="4">Option 4</option>
-            </select>
           </div>
         </div>
       )
@@ -1041,30 +1281,46 @@ export default function TeacherCreateExamPage() {
     codingLanguage,
   ])
 
-  const renderQuestionForm = (isEditing) => (
+  const renderQuestionForm = (isEditing, composeSection = null) => (
     <div className={`exam-builder-panel__body space-y-6${isEditing ? ' exam-builder-inline-editor__body' : ''}`}>
       <div className="grid md:grid-cols-3 gap-6">
         <div className="space-y-6 md:col-span-2">
           <div className="grid grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <Label>Question Type</Label>
-              <select
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                value={questionType}
-                onChange={(e) => {
-                  setQuestionType(e.target.value)
-                  resetAnswerFields()
-                }}
-              >
-                <option value="multiple">Multiple Choice</option>
-                <option value="identification">Identification</option>
-                <option value="truefalse">True / False</option>
-                <option value="coding">Coding / Scripting</option>
-                <option value="matching">Matching</option>
-                <option value="essay">Essay / Paragraph</option>
-                <option value="diagramming">Diagramming</option>
-              </select>
-            </div>
+            {isEditing ? (
+              <div className="space-y-2">
+                <Label>Question Type</Label>
+                <select
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  value={questionType}
+                  onChange={(e) => {
+                    setQuestionType(e.target.value)
+                    resetAnswerFields()
+                  }}
+                >
+                  <option value="multiple">Multiple Choice</option>
+                  <option value="identification">Identification</option>
+                  <option value="truefalse">True / False</option>
+                  <option value="coding">Coding / Scripting</option>
+                  <option value="matching">Matching</option>
+                  <option value="essay">Essay / Paragraph</option>
+                  <option value="diagramming">Diagramming</option>
+                </select>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label>Question Type</Label>
+                <div className="exam-builder-set-type-locked flex h-10 items-center gap-2 rounded-md border border-input bg-muted/40 px-3 text-sm font-medium">
+                  <QuestionTypeIcon
+                    formType={composeSection?.questionType || activeSection?.questionType || questionType}
+                    size={16}
+                    className="text-primary"
+                  />
+                  <span>
+                    {labelForFormType(composeSection?.questionType || activeSection?.questionType || questionType)}
+                  </span>
+                </div>
+              </div>
+            )}
             <div className="space-y-2">
               <Label>Points</Label>
               <Input
@@ -1186,7 +1442,7 @@ export default function TeacherCreateExamPage() {
             Cancel edit
           </Button>
         ) : (
-          <Button type="button" variant="outline" onClick={() => setShowQuestionForm(false)} className="w-full md:w-auto">
+          <Button type="button" variant="outline" onClick={cancelComposeQuestion} className="w-full md:w-auto">
             Cancel
           </Button>
         )}
@@ -1200,7 +1456,7 @@ export default function TeacherCreateExamPage() {
       ? `/teacher/my-classes/${selectedClass}`
       : '/teacher/my-classes'
 
-  const handlePreview = () => {
+  function handlePreview() {
     const payload = buildExamSectionsPayload(sections)
     const flatQuestions = payload.flatMap((sec) => sec.questions.map(q => ({ ...q, sectionId: sec.id, sectionTitle: sec.title, sectionDescription: sec.description })))
     const previewData = {
@@ -1216,6 +1472,34 @@ export default function TeacherCreateExamPage() {
     window.open('/student/exam/session?classId=preview&examId=preview', '_blank')
   }
 
+  async function handlePrintPaper() {
+    if (!selectedClass) {
+      acsisToastError('Select a target class before printing.')
+      return
+    }
+    if (!examId) {
+      acsisToastError('Save the exam draft first, then print the paper.')
+      return
+    }
+    if (totalQuestions === 0) {
+      acsisToastError('Add at least one question before printing.')
+      return
+    }
+
+    setIsPrintingPaper(true)
+    try {
+      await exportExamPaper(selectedClass, examId, {
+        teacherLogoBase64: localStorage.getItem('acsis_teacher_logo') || undefined,
+        departmentName: localStorage.getItem('acsis_department_name') || undefined,
+      })
+      acsisToastSuccess('Exam paper PDF downloaded.')
+    } catch (err) {
+      acsisToastError(err instanceof Error ? err.message : 'Failed to generate exam paper PDF.')
+    } finally {
+      setIsPrintingPaper(false)
+    }
+  }
+
   if (loadingEditExam) {
     return (
       <div className="flex items-center justify-center h-full min-h-[320px] p-8 text-muted-foreground">
@@ -1225,41 +1509,49 @@ export default function TeacherCreateExamPage() {
   }
 
   return (
-    <div className="exam-builder-page acsis-create-exam flex flex-col bg-background min-h-[calc(100vh-64px)]">
+    <div className="exam-builder-page acsis-create-exam flex flex-col min-h-[calc(100vh-64px)]">
       {/* TOP HEADER */}
-      <header className="exam-builder-page__header border-b border-border bg-card px-6 py-4 flex items-center justify-between shrink-0 shadow-sm">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild className="rounded-full text-muted-foreground hover:text-foreground">
+      <header className="exam-builder-page__header border-b border-border px-6 py-4 flex items-center justify-between gap-4 shrink-0 shadow-sm">
+        <div className="flex items-center gap-4 min-w-0">
+          <Button variant="ghost" size="icon" asChild className="rounded-full text-muted-foreground hover:text-foreground shrink-0">
             <Link to={backHref}>
               <ArrowLeft size={20} />
             </Link>
           </Button>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0 flex-wrap">
             <h1 className="text-xl font-bold tracking-tight text-foreground line-clamp-1 max-w-[400px]">
               {examTitle || (isEditMode ? 'Edit exam' : 'Exam Builder')}
             </h1>
-            <div className="flex items-center gap-1">
-              <Button variant="ghost" size="icon" onClick={handlePreview} title="Preview Student View" className="rounded-full text-muted-foreground hover:text-foreground h-8 w-8">
-                <Eye size={18} />
-              </Button>
-              <Button variant="ghost" size="icon" onClick={() => setSettingsOpen(true)} className="rounded-full text-muted-foreground hover:text-foreground h-8 w-8">
-                <Settings size={18} />
-              </Button>
-            </div>
+            <p className="text-sm text-muted-foreground whitespace-nowrap">
+              {sections.length} {sections.length === 1 ? 'set' : 'sets'} · {totalQuestions}{' '}
+              {totalQuestions === 1 ? 'question' : 'questions'}
+            </p>
+            {isSaving ? (
+              <span className="text-xs font-medium text-amber-600 bg-amber-500/10 px-3 py-1.5 rounded-full animate-pulse whitespace-nowrap">Saving...</span>
+            ) : lastSaved ? (
+              <span className="text-xs font-medium text-emerald-600 bg-emerald-500/10 px-3 py-1.5 rounded-full whitespace-nowrap">
+                {isEditMode ? 'Changes saved' : 'Draft saved'}
+              </span>
+            ) : null}
           </div>
         </div>
-        <div className="flex items-center gap-4">
-          <p className="text-sm text-muted-foreground">
-            {sections.length} {sections.length === 1 ? 'set' : 'sets'} · {totalQuestions}{' '}
-            {totalQuestions === 1 ? 'question' : 'questions'}
-          </p>
-          {isSaving ? (
-            <span className="text-xs font-medium text-amber-600 bg-amber-500/10 px-3 py-1.5 rounded-full animate-pulse">Saving...</span>
-          ) : lastSaved ? (
-            <span className="text-xs font-medium text-emerald-600 bg-emerald-500/10 px-3 py-1.5 rounded-full">
-              {isEditMode ? 'Changes saved' : 'Draft saved'}
-            </span>
-          ) : null}
+        <div className="flex items-center gap-1 shrink-0">
+          <Button variant="ghost" size="icon" onClick={handlePreview} title="Preview Student View" className="rounded-full text-muted-foreground hover:text-foreground h-8 w-8">
+            <Eye size={18} />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => setSettingsOpen(true)} title="Exam Settings" className="rounded-full text-muted-foreground hover:text-foreground h-8 w-8">
+            <Settings size={18} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => void handlePrintPaper()}
+            disabled={isPrintingPaper || totalQuestions === 0}
+            title="Print exam paper (PDF)"
+            className="rounded-full text-muted-foreground hover:text-foreground h-8 w-8"
+          >
+            <Printer size={18} className={isPrintingPaper ? 'animate-pulse' : ''} />
+          </Button>
         </div>
       </header>
 
@@ -1294,7 +1586,7 @@ export default function TeacherCreateExamPage() {
                     <option value="" disabled>Select a class</option>
                     {classes.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.name} ({c.academicYear} - {c.semester})
+                        {c.name} ({c.academicYear} - {formatSemesterLabel(c.semester)})
                       </option>
                     ))}
                   </>
@@ -1449,42 +1741,78 @@ export default function TeacherCreateExamPage() {
       {settingsOpen && <div className="fixed inset-0 bg-black/20 z-[9998] backdrop-blur-sm transition-opacity" onClick={() => setSettingsOpen(false)} />}
 
       {/* MAIN CONTENT - QUESTIONS BUILDER */}
-      <div className="flex flex-1 items-start">
+      <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd}>
+      <div className="exam-builder-page__body flex flex-1 items-start">
         {/* SIDEBAR OUTLINE */}
-        <aside className="exam-builder-page__outline w-56 lg:w-64 bg-background hidden md:block shrink-0 self-start overflow-y-auto">
+        <aside className="exam-builder-page__outline w-56 lg:w-64 hidden md:block shrink-0 self-start overflow-y-auto">
           <div className="p-6">
             <h3 className="font-semibold text-xs mb-3 text-muted-foreground uppercase tracking-wider">Exam Outline</h3>
             <ul className="space-y-1">
-              {sections.map((sec, secIndex) => {
+              {sections.map((sec) => {
                 const questionCount = sec.questions.length
+                const setPoints = sumExamTotalPoints(sec.questions)
                 const isEmpty = questionCount === 0
+                const sectionFormType = sec.questionType || 'multiple'
+                const canAcceptDrag =
+                  draggingQuestionType == null || draggingQuestionType === sectionFormType
                 return (
-                <li key={sec.id}>
+                <Droppable
+                  key={sec.id}
+                  droppableId={`outline-${sec.id}`}
+                  isDropDisabled={draggingQuestionType != null && !canAcceptDrag}
+                >
+                  {(provided, snapshot) => (
+                <li
+                  ref={provided.innerRef}
+                  {...provided.droppableProps}
+                  className="list-none"
+                >
                   <a
                     href={`#set-${sec.id}`}
-                    className={`block px-3 py-2 rounded-md text-sm transition-colors ${
+                    className={`block px-3 py-2 rounded-md text-sm transition-colors duration-200 ${
                       activeSectionId === sec.id
                         ? 'bg-primary/10 text-primary font-medium'
                         : 'hover:bg-muted text-muted-foreground hover:text-foreground'
-                    }${isEmpty ? ' exam-builder-outline-item--empty' : ''}`}
+                    }${isEmpty ? ' exam-builder-outline-item--empty' : ''}${
+                      snapshot.isDraggingOver && canAcceptDrag ? ' exam-builder-outline-item--drop-target' : ''
+                    }${
+                      draggingQuestionType && !canAcceptDrag ? ' exam-builder-outline-item--drop-disabled' : ''
+                    }${
+                      draggingQuestionType && canAcceptDrag && !snapshot.isDraggingOver
+                        ? ' exam-builder-outline-item--drop-ready'
+                        : ''
+                    }`}
                     onClick={(e) => {
                       e.preventDefault()
-                      activateSection(sec.id)
-                      const el = document.getElementById(`set-${sec.id}`)
-                      if (el) {
-                        const header = document.querySelector('.exam-builder-page__header')
-                        const offset = header ? header.getBoundingClientRect().height + 12 : 100
-                        const y = el.getBoundingClientRect().top + window.scrollY - offset
-                        window.scrollTo({ top: y, behavior: 'smooth' })
-                      }
+                      const sectionId = sec.id
+                      activateSection(sectionId)
+                      window.requestAnimationFrame(() => {
+                        window.requestAnimationFrame(() => {
+                          const el = getSectionAnchorElement(sectionId)
+                          if (el) {
+                            scrollElementToViewportOffset(el, getScrollSpyOffset(), 'smooth')
+                          }
+                        })
+                      })
                     }}
                   >
-                    <span className="line-clamp-2">{sec.title || `Set ${secIndex + 1}`}</span>
+                    <span className="line-clamp-2">
+                      {sec.title || labelForFormType(sec.questionType)}
+                    </span>
                     <span className="mt-0.5 block text-[11px] font-medium opacity-80">
-                      {isEmpty ? 'No questions' : `${questionCount} ${questionCount === 1 ? 'question' : 'questions'}`}
+                      {snapshot.isDraggingOver && canAcceptDrag
+                        ? 'Release to move question here'
+                        : isEmpty
+                          ? draggingQuestionType && canAcceptDrag
+                            ? 'Drop question here'
+                            : 'No questions yet'
+                          : `${questionCount} ${questionCount === 1 ? 'question' : 'questions'} · ${setPoints} ${setPoints === 1 ? 'pt' : 'pts'}`}
                     </span>
                   </a>
+                  {provided.placeholder}
                 </li>
+                  )}
+                </Droppable>
                 )
               })}
             </ul>
@@ -1494,7 +1822,6 @@ export default function TeacherCreateExamPage() {
         <main className="exam-builder flex-1 p-6 md:p-8 lg:p-12 min-w-0">
           <div className="max-w-5xl mx-auto space-y-8">
           
-          <DragDropContext onDragEnd={onDragEnd}>
             <div className="exam-builder-sets">
               {sections.map((sec, secIndex) => {
                 let qOffset = 0
@@ -1506,8 +1833,19 @@ export default function TeacherCreateExamPage() {
                       className={`exam-builder-panel exam-builder-panel--meta${isActiveSet ? ' exam-builder-panel--active' : ''}`}
                     >
                       <div className="exam-builder-panel__head">
-                        <div>
+                        <div className="exam-builder-set-head">
                           <p className="exam-builder-panel__eyebrow">Question set {secIndex + 1}</p>
+                          <SectionQuestionTypePicker
+                            value={sec.questionType || 'multiple'}
+                            onChange={(nextType) => changeSectionQuestionType(sec.id, nextType)}
+                            disabled={sec.questions.length > 0}
+                            className="exam-builder-set-head__type"
+                          />
+                          {sec.questions.length > 0 ? (
+                            <p className="exam-builder-set-head__hint">
+                              Type is locked while this set has questions.
+                            </p>
+                          ) : null}
                         </div>
                         <div className="exam-builder-panel__actions">
                           {sections.length > 1 && (
@@ -1523,16 +1861,6 @@ export default function TeacherCreateExamPage() {
                       </div>
                       <div className="exam-builder-panel__body exam-builder-panel__body--meta">
                         <div className="space-y-1.5">
-                          <Label className="text-xs font-semibold text-muted-foreground">Set title</Label>
-                          <Input
-                            type="text"
-                            value={sec.title}
-                            onChange={(e) => updateSection(sec.id, { title: e.target.value })}
-                            placeholder={`Set ${secIndex + 1}`}
-                            className="exam-builder-field font-semibold h-10 text-base"
-                          />
-                        </div>
-                        <div className="space-y-1.5">
                           <Label className="text-xs font-semibold text-muted-foreground">
                             Instructions for students
                           </Label>
@@ -1540,7 +1868,7 @@ export default function TeacherCreateExamPage() {
                             rows={2}
                             value={sec.description}
                             onChange={(e) => updateSection(sec.id, { description: e.target.value })}
-                            placeholder="e.g. Write True or False. If False, write the correct answer."
+                            placeholder={boilerplateInstructionsForFormType(sec.questionType || 'multiple')}
                             className="exam-builder-field flex w-full rounded-md bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[72px]"
                           />
                         </div>
@@ -1556,7 +1884,7 @@ export default function TeacherCreateExamPage() {
                             {sec.questions.length === 1 ? 'question' : 'questions'} in this set
                           </p>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap justify-end">
                           {sec.questions.length > 0 && (
                             <button
                               type="button"
@@ -1576,20 +1904,43 @@ export default function TeacherCreateExamPage() {
                               Shuffle
                             </button>
                           )}
+                          {!editingQuestion && composingQuestionSectionId !== sec.id ? (
+                            <button
+                              type="button"
+                              onClick={() => beginAddQuestion(sec.id)}
+                              className="exam-builder-shuffle-btn exam-builder-shuffle-btn--primary"
+                            >
+                              <Plus size={14} />
+                              Add question
+                            </button>
+                          ) : null}
                         </div>
                       </div>
                       <div className="exam-builder-panel__body exam-builder-panel__body--questions">
-                        <Droppable droppableId={sec.id}>
-                          {(provided) => (
+                        <Droppable
+                          droppableId={String(sec.id)}
+                          isDropDisabled={
+                            draggingQuestionType != null &&
+                            draggingQuestionType !== (sec.questionType || 'multiple')
+                          }
+                        >
+                          {(provided, snapshot) => (
                             <div
                               {...provided.droppableProps}
                               ref={provided.innerRef}
-                              className="exam-builder-question-list"
+                              className={`exam-builder-question-list${
+                                sec.questions.length === 0 ? ' exam-builder-question-list--empty' : ''
+                              }${snapshot.isDraggingOver ? ' exam-builder-question-list--drop-target' : ''}`}
                             >
-                              {sec.questions.length === 0 && !isActiveSet && (
-                                <p className="exam-builder-empty-hint">
-                                  Select <span className="font-medium text-foreground">Add questions here</span>{' '}
-                                  above to build this set.
+                              {sec.questions.length === 0 && (
+                                <p
+                                  className={`exam-builder-empty-hint${
+                                    snapshot.isDraggingOver ? ' exam-builder-empty-hint--drop' : ''
+                                  }`}
+                                >
+                                  {snapshot.isDraggingOver
+                                    ? 'Release to move question to this set'
+                                    : `Drag ${labelForFormType(sec.questionType)} questions here from another set of the same type`}
                                 </p>
                               )}
                               {sec.questions.map((q, index) => {
@@ -1670,6 +2021,7 @@ export default function TeacherCreateExamPage() {
                                         )}
                                         <div className="mt-3">
                                           <span className="exam-builder-type-badge">
+                                            <QuestionTypeIcon type={q.type} size={12} className="mr-1" />
                                             {labelForQuestionType(q.type)}
                                           </span>
                                         </div>
@@ -1696,52 +2048,30 @@ export default function TeacherCreateExamPage() {
                             </div>
                           )}
                         </Droppable>
+                        {composingQuestionSectionId === sec.id && !editingQuestion ? (
+                          <section className="exam-builder-panel exam-builder-panel--composer exam-builder-panel--active mt-4">
+                            <div className="exam-builder-panel__head">
+                              <div>
+                                <p className="exam-builder-panel__title">New question</p>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={cancelComposeQuestion}
+                                className="text-muted-foreground hover:text-foreground"
+                              >
+                                <X size={16} />
+                              </Button>
+                            </div>
+                            {renderQuestionForm(false, sec)}
+                          </section>
+                        ) : null}
                       </div>
                     </section>
-
-                    {!editingQuestion && (!isActiveSet || !showQuestionForm) ? (
-                      <div 
-                        className="mt-6 border-2 border-dashed border-border rounded-xl p-6 cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all flex flex-col items-center justify-center text-center group"
-                        onClick={() => {
-                          if (sec.id !== activeSectionId) {
-                            if (editingQuestion) cancelEditQuestion();
-                            else resetQuestionForm();
-                            setActiveSectionId(sec.id);
-                          }
-                          setShowQuestionForm(true);
-                          setTimeout(() => {
-                            document.getElementById(`set-${sec.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-                          }, 50);
-                        }}
-                      >
-                        <p className="text-sm font-semibold text-foreground">New question</p>
-                        <p className="text-xs text-muted-foreground mt-1 mb-4">Adds to <span className="uppercase font-medium text-primary/80">{sec.title || `Set ${secIndex + 1}`}</span></p>
-                        <Button variant="outline" className="bg-background shadow-sm pointer-events-none group-hover:border-primary/50 text-foreground">
-                          <Plus className="mr-2" size={16} />
-                          {sec.questions.length > 0 ? 'Add another question' : 'Add first question'}
-                        </Button>
-                      </div>
-                    ) : isActiveSet && !editingQuestion ? (
-                      <section className="exam-builder-panel exam-builder-panel--composer exam-builder-panel--active mt-6">
-                        <div className="exam-builder-panel__head">
-                          <div>
-                            <p className="exam-builder-panel__title">New question</p>
-                            <p className="exam-builder-panel__subtitle">
-                              Adds to {sec.title || `Set ${secIndex + 1}`}
-                            </p>
-                          </div>
-                          <Button variant="ghost" size="icon" onClick={() => setShowQuestionForm(false)} className="text-muted-foreground hover:text-foreground">
-                            <X size={16} />
-                          </Button>
-                        </div>
-                        {renderQuestionForm(false)}
-                      </section>
-                    ) : null}
                   </div>
                 )
               })}
             </div>
-          </DragDropContext>
           
           <div className="flex justify-center mt-6">
             <Button
@@ -1757,6 +2087,7 @@ export default function TeacherCreateExamPage() {
         </div>
       </main>
       </div>
+      </DragDropContext>
 
       {ConfirmDialog}
 

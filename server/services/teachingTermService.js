@@ -39,10 +39,10 @@ export async function createTeachingTermService(institutionId, memberId, body) {
   const semester = String(body.semester || '').trim()
 
   if (!programCode || !sectionCode || !schoolYear || !semester) {
-    return { ok: false, status: 400, error: 'Program, section, academic year, and semester are required.' }
+    return { ok: false, status: 400, error: 'Program, section, academic year, and term are required.' }
   }
   if (!SEMESTERS.has(semester)) {
-    return { ok: false, status: 400, error: 'Semester must be 1st, 2nd, or Summer.' }
+    return { ok: false, status: 400, error: 'Term must be 1st, 2nd, or Summer.' }
   }
 
   try {
@@ -76,7 +76,7 @@ export async function updateTeachingTermService(termId, memberId, body) {
   }
 
   if (body.semester !== undefined && !SEMESTERS.has(body.semester)) {
-    return { ok: false, status: 400, error: 'Semester must be 1st, 2nd, or Summer.' }
+    return { ok: false, status: 400, error: 'Term must be 1st, 2nd, or Summer.' }
   }
 
   try {

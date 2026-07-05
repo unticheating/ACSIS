@@ -64,10 +64,24 @@
     @apply border-border;
   }
 
+  html {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  body {
+    height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  #root {
+    min-height: 100%;
+  }
+
   html,
   body,
   #root {
-    @apply h-full;
     background-color: var(--bg-canvas, var(--acsis-canvas, #ddeee4));
   }
 

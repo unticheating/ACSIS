@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge.jsx'
 import { fetchAdminClasses } from '@/lib/adminClassesApi.js'
 import FadeIn from '@/components/ui/fade-in.jsx'
 import { acsisToastError } from '@/lib/acsisToast.js'
+import { formatSemesterLabel } from '@/lib/sectionLabel.js'
 import { useInstitutionTheme } from '@/context/InstitutionThemeContext.jsx'
 import '../../pages/admin-ui/style.css'
 
@@ -20,7 +21,7 @@ function ClassCard({ classItem, delay = 0 }) {
       
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '20px', flex: 1, alignContent: 'flex-start' }}>
         <Badge variant="secondary" style={{ fontSize: '11.5px', fontWeight: 500 }}>{classItem.academicYear}</Badge>
-        <Badge variant="outline" style={{ fontSize: '11.5px', fontWeight: 500 }}>{classItem.semester}</Badge>
+        <Badge variant="outline" style={{ fontSize: '11.5px', fontWeight: 500 }}>{formatSemesterLabel(classItem.semester)}</Badge>
         {classItem.accessCode ? (
           <Badge variant="outline" className="font-mono" style={{ fontSize: '11.5px', letterSpacing: '0.05em', fontWeight: 500 }}>
             {classItem.accessCode}

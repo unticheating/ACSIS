@@ -20,6 +20,7 @@ export const shellConfig = {
       { to: '/teacher/my-classes', label: 'My Classes', mobileLabel: 'Classes', icon: ClipboardList },
       { to: '/teacher/detections', label: 'Detections', icon: AlertCircle },
       { to: '/teacher/logs', label: 'Audit logs', mobileLabel: 'Audit', icon: ScrollText },
+      { to: '/teacher/reports', label: 'Reports', icon: BarChart3 },
     ],
   },
   student: {

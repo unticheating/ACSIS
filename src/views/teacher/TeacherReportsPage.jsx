@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   BarChart,
   Bar,
@@ -9,8 +10,10 @@ import {
   ResponsiveContainer,
   Cell
 } from 'recharts'
+import { ChevronDown, FileSpreadsheet, FileText, ArrowLeft } from 'lucide-react'
 import { fetchTeacherExamResults, fetchTeacherReportExams } from '@/lib/teacherExamResultsApi.js'
 import { exportExamReport } from '@/lib/teacherExamGradingApi.js'
+import { labelForCheatEvent } from '@/lib/examAntiCheat.js'
 import { acsisToastError } from '@/lib/acsisToast.js'
 import FadeIn from '@/components/ui/fade-in.jsx'
 import PageSpinner from '@/components/ui/page-spinner.jsx'
@@ -42,6 +45,186 @@ function sortSessionsByRank(sessions) {
   })
 }
 
+function sortSessionsBySurname(sessions) {
+  return [...sessions].sort((a, b) => {
+    const lastCmp = String(a.lastName || a.studentName || '').localeCompare(
+      String(b.lastName || b.studentName || ''),
+      undefined,
+      { sensitivity: 'base' },
+    )
+    if (lastCmp !== 0) return lastCmp
+    return String(a.firstName || '').localeCompare(String(b.firstName || ''), undefined, {
+      sensitivity: 'base',
+    })
+  })
+}
+
+function formatSurnameFirst(student) {
+  if (student.lastName && student.firstName) {
+    return `${student.lastName}, ${student.firstName}`
+  }
+  return student.studentName || '—'
+}
+
+function studentInitials(name) {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean)
+  if (parts.length >= 2) {
+    return `${parts[0][0] || ''}${parts[parts.length - 1][0] || ''}`.toUpperCase()
+  }
+  return (parts[0]?.[0] || '?').toUpperCase()
+}
+
+function groupViolationsByStudent(violations, sessions) {
+  const sessionById = new Map(
+    (sessions || []).filter((s) => s.sessionId != null).map((s) => [s.sessionId, s]),
+  )
+  const map = new Map()
+
+  for (const violation of violations || []) {
+    const key = violation.sessionId ?? `${violation.studentName}-${violation.schoolId}`
+    const session = violation.sessionId ? sessionById.get(violation.sessionId) : null
+    if (!map.has(key)) {
+      map.set(key, {
+        key,
+        sessionId: violation.sessionId ?? null,
+        studentName: violation.studentName || 'Unknown student',
+        displayName: session ? formatSurnameFirst(session) : violation.studentName || 'Unknown student',
+        schoolId: violation.schoolId || session?.schoolId || '',
+        violations: [],
+      })
+    }
+    map.get(key).violations.push(violation)
+  }
+
+  const groups = [...map.values()]
+  for (const group of groups) {
+    group.violations.sort(
+      (a, b) => new Date(b.occurredAt || 0).getTime() - new Date(a.occurredAt || 0).getTime(),
+    )
+    group.activeCount = group.violations.filter((v) => !v.dismissedAt).length
+  }
+
+  groups.sort((a, b) => {
+    if (b.violations.length !== a.violations.length) {
+      return b.violations.length - a.violations.length
+    }
+    return String(a.displayName).localeCompare(String(b.displayName), undefined, {
+      sensitivity: 'base',
+    })
+  })
+
+  return groups
+}
+
+function ViolationsReportPanel({ violations, sessions }) {
+  const groups = useMemo(
+    () => groupViolationsByStudent(violations, sessions),
+    [violations, sessions],
+  )
+
+  const activeCount = useMemo(
+    () => (violations || []).filter((v) => !v.dismissedAt).length,
+    [violations],
+  )
+  const dismissedCount = violations.length - activeCount
+
+  if (violations.length === 0) {
+    return <p className="rp-muted">No violations logged for this exam.</p>
+  }
+
+  return (
+    <>
+      <div className="rp-violations-overview">
+        <div className="rp-summary-grid rp-violations-overview__grid">
+          <div className="rp-summary-stat">
+            <div className="rp-summary-stat__val">{violations.length}</div>
+            <div className="rp-summary-stat__lbl">Total events</div>
+          </div>
+          <div className="rp-summary-stat">
+            <div className="rp-summary-stat__val">{groups.length}</div>
+            <div className="rp-summary-stat__lbl">Students flagged</div>
+          </div>
+          <div className="rp-summary-stat">
+            <div className="rp-summary-stat__val rp-summary-stat__val--red">{activeCount}</div>
+            <div className="rp-summary-stat__lbl">Active warnings</div>
+          </div>
+          {dismissedCount > 0 ? (
+            <div className="rp-summary-stat">
+              <div className="rp-summary-stat__val rp-muted-val">{dismissedCount}</div>
+              <div className="rp-summary-stat__lbl">Dismissed</div>
+            </div>
+          ) : null}
+        </div>
+        <p className="rp-violations-overview__note">
+          Expand a student to review each logged event and timestamp.
+        </p>
+      </div>
+
+      <div className="rp-violations-groups">
+        {groups.map((group, index) => (
+          <FadeIn delay={0.08 + index * 0.04} key={group.key}>
+            <details className="rp-violations-student-group">
+              <summary className="rp-violations-student-summary">
+                <span className="rp-violations-student-summary__lead">
+                  <span className="rp-violations-student-avatar" aria-hidden="true">
+                    {studentInitials(group.displayName)}
+                  </span>
+                  <span className="rp-violations-student-summary__identity">
+                    <span className="rp-violations-student-summary__name">{group.displayName}</span>
+                    <span className="rp-violations-student-summary__meta">
+                      {group.schoolId || 'No school ID'}
+                    </span>
+                  </span>
+                </span>
+                <span className="rp-violations-student-summary__trail">
+                  {group.activeCount > 0 ? (
+                    <span className="rp-violations-count-pill rp-violations-count-pill--active">
+                      {group.activeCount} active
+                    </span>
+                  ) : null}
+                  <span className="rp-violations-count-pill">
+                    {group.violations.length} event{group.violations.length === 1 ? '' : 's'}
+                  </span>
+                  <ChevronDown className="rp-violations-chevron" aria-hidden="true" />
+                </span>
+              </summary>
+
+              <ol className="rp-violations-student-events">
+                {group.violations.map((violation) => {
+                  const dismissed = Boolean(violation.dismissedAt)
+                  return (
+                    <li
+                      key={violation.id}
+                      className={`rp-violations-event${dismissed ? ' rp-violations-event--dismissed' : ''}`}
+                    >
+                      <div className="rp-violations-event__main">
+                        <span className="rp-violations-event__type">
+                          {labelForCheatEvent(violation.eventType)}
+                        </span>
+                        {violation.details ? (
+                          <span className="rp-violations-event__details">{violation.details}</span>
+                        ) : null}
+                      </div>
+                      <div className="rp-violations-event__aside">
+                        {dismissed ? (
+                          <span className="rp-violations-event__badge">Dismissed</span>
+                        ) : null}
+                        <time className="rp-violations-event__time" dateTime={violation.occurredAt || undefined}>
+                          {formatDate(violation.occurredAt)}
+                        </time>
+                      </div>
+                    </li>
+                  )
+                })}
+              </ol>
+            </details>
+          </FadeIn>
+        ))}
+      </div>
+    </>
+  )
+}
+
 function ExamCard({ exam, onClick, index }) {
   const sectionParts = [exam.programCode, exam.sectionCode].filter(Boolean)
   const sectionLabel = sectionParts.join(' / ')
@@ -63,14 +246,56 @@ function ExamCard({ exam, onClick, index }) {
 
 const PASS_THRESHOLD = 50
 
+function buildScoreDistributionBuckets(sessions) {
+  const scored = sessions.filter(
+    (s) => s.status === 'submitted' && s.percentage != null,
+  )
+  if (scored.length === 0) return null
+
+  let totalScore = scored[0].totalPoints ? Number(scored[0].totalPoints) : 100
+  if (totalScore <= 0 || Number.isNaN(totalScore)) totalScore = 100
+
+  let bucketCount = 10
+  if (totalScore < 10) bucketCount = totalScore
+
+  const bucketSize = totalScore / bucketCount
+  const buckets = Array.from({ length: bucketCount }, (_, i) => {
+    const minRaw = Math.ceil(i * bucketSize)
+    const maxRaw = i === bucketCount - 1 ? totalScore : Math.ceil((i + 1) * bucketSize) - 1
+    const label = minRaw >= maxRaw ? `${minRaw}` : `${minRaw}-${maxRaw}`
+    const passed = maxRaw >= totalScore * (PASS_THRESHOLD / 100)
+    return { label, minRaw, maxRaw, passed }
+  })
+
+  const counts = buckets.map((b) => {
+    const bucketStudents = scored.filter((s) => {
+      const r = Number(s.rawScore)
+      return r >= b.minRaw && r <= b.maxRaw
+    })
+    return {
+      name: b.label,
+      count: bucketStudents.length,
+      passed: b.passed,
+      students: sortSessionsBySurname(bucketStudents),
+    }
+  })
+
+  const maxCount = Math.max(...counts.map((c) => c.count), 1)
+  return { counts, maxCount }
+}
+
 const CustomChartTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
+    const count = payload[0].value
     return (
       <div className="rp-barchart-tooltip">
         <p className="rp-barchart-tooltip-label">{`Score: ${label}`}</p>
         <p className="rp-barchart-tooltip-value">
-          {`${payload[0].value} Student${payload[0].value !== 1 ? 's' : ''}`}
+          {`${count} Student${count !== 1 ? 's' : ''}`}
         </p>
+        {count > 0 ? (
+          <p className="rp-barchart-tooltip-hint">Click bar to view students</p>
+        ) : null}
       </div>
     )
   }
@@ -78,83 +303,143 @@ const CustomChartTooltip = ({ active, payload, label }) => {
 }
 
 function ScoreBarChart({ sessions }) {
-  const scored = sessions.filter(
-    (s) => s.status === 'submitted' && s.percentage != null,
-  )
-  if (scored.length === 0) {
+  const [selectedBucket, setSelectedBucket] = useState(null)
+  const distribution = useMemo(() => buildScoreDistributionBuckets(sessions), [sessions])
+
+  useEffect(() => {
+    setSelectedBucket(null)
+  }, [sessions])
+
+  if (!distribution) {
     return <p className="rp-muted" style={{ marginTop: 8 }}>No score data to display yet.</p>
   }
 
-  let totalScore = scored.length > 0 && scored[0].totalPoints ? Number(scored[0].totalPoints) : 100
-  if (totalScore <= 0 || isNaN(totalScore)) totalScore = 100
+  const { counts, maxCount } = distribution
+  const selectedIndex =
+    selectedBucket != null ? counts.findIndex((c) => c.name === selectedBucket.name) : null
 
-  let bucketCount = 10
-  if (totalScore < 10) {
-    bucketCount = totalScore
+  function handleBarClick(data) {
+    setSelectedBucket(data?.payload ?? null)
   }
 
-  const bucketSize = totalScore / bucketCount
-
-  const buckets = Array.from({ length: bucketCount }, (_, i) => {
-    const minRaw = Math.ceil(i * bucketSize)
-    const maxRaw = i === bucketCount - 1 ? totalScore : Math.ceil((i + 1) * bucketSize) - 1
-    const label = minRaw >= maxRaw ? `${minRaw}` : `${minRaw}-${maxRaw}`
-    const passed = maxRaw >= (totalScore * (PASS_THRESHOLD / 100))
-    return { label, minRaw, maxRaw, passed }
-  })
-
-  const counts = buckets.map((b) => ({
-    name: b.label,
-    count: scored.filter((s) => {
-      const r = Number(s.rawScore)
-      return r >= b.minRaw && r <= b.maxRaw
-    }).length,
-    passed: b.passed,
-  }))
-
-  const maxCount = Math.max(...counts.map((c) => c.count), 1)
-
   return (
-    <div className="rp-barchart-wrap" style={{ width: '100%', height: 260 }}>
+    <div className="rp-barchart-wrap" style={{ width: '100%' }}>
       <div className="rp-barchart-legend" style={{ justifyContent: 'flex-end', marginBottom: 16 }}>
         <span className="rp-barchart-swatch rp-barchart-swatch--fail" /> Failed (&lt;50%)
         <span className="rp-barchart-swatch rp-barchart-swatch--pass" /> Passed (50%+)
       </div>
-      <div style={{ width: '100%', height: 200 }}>
+      <div className="rp-barchart-canvas" style={{ width: '100%', height: 200 }}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={counts} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" opacity={0.1} />
-            <XAxis 
-              dataKey="name" 
+            <XAxis
+              dataKey="name"
               tick={{ fontSize: 12, fill: 'currentColor', opacity: 0.6 }}
               tickLine={false}
               axisLine={{ stroke: 'currentColor', opacity: 0.2 }}
             />
-            <YAxis 
-              allowDecimals={false} 
+            <YAxis
+              allowDecimals={false}
               tick={{ fontSize: 12, fill: 'currentColor', opacity: 0.6 }}
               tickLine={false}
               axisLine={{ stroke: 'currentColor', opacity: 0.2 }}
               domain={[0, maxCount <= 5 ? 5 : 'auto']}
             />
-            <Tooltip 
+            <Tooltip
               cursor={{ fill: 'currentColor', opacity: 0.05 }}
               content={<CustomChartTooltip />}
             />
-            <Bar dataKey="count" radius={[4, 4, 0, 0]} maxBarSize={40}>
+            <Bar
+              dataKey="count"
+              radius={[4, 4, 0, 0]}
+              maxBarSize={40}
+              cursor="pointer"
+              onClick={handleBarClick}
+            >
               {counts.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={entry.passed ? '#22c55e' : '#ef4444'} />
+                <Cell
+                  key={`cell-${index}`}
+                  fill={entry.passed ? '#22c55e' : '#ef4444'}
+                  opacity={selectedIndex == null || selectedIndex === index ? 1 : 0.35}
+                  stroke={selectedIndex === index ? '#111827' : undefined}
+                  strokeWidth={selectedIndex === index ? 2 : 0}
+                />
               ))}
             </Bar>
           </BarChart>
         </ResponsiveContainer>
+      </div>
+
+      <p className="rp-barchart-hint">Click a bar to see which students scored in that range.</p>
+
+      <Dialog
+        open={selectedBucket != null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedBucket(null)
+        }}
+      >
+        <DialogContent className="sm:max-w-md rp-barchart-bucket-modal">
+          <DialogHeader>
+            <DialogTitle>Score {selectedBucket?.name ?? '—'}</DialogTitle>
+            <DialogDescription>
+              {selectedBucket?.count ?? 0} student{(selectedBucket?.count ?? 0) === 1 ? '' : 's'} in this range
+            </DialogDescription>
+          </DialogHeader>
+          {selectedBucket?.count === 0 ? (
+            <p className="rp-muted">No students in this range.</p>
+          ) : (
+            <ul className="rp-barchart-bucket-list">
+              {selectedBucket?.students.map((student) => (
+                <li key={student.sessionId} className="rp-barchart-bucket-item">
+                  <span className="rp-barchart-bucket-item__name">{formatSurnameFirst(student)}</span>
+                  <span className="rp-barchart-bucket-item__meta">
+                    {student.schoolId ? `${student.schoolId} · ` : ''}
+                    {student.rawScore}/{student.totalPoints} pts ({student.percentage}%)
+                    {student.rank != null ? ` · Rank #${student.rank}` : ''}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+function ReportExportActions({ scopeLabel, exporting, onExportExcel, onExportPdf }) {
+  return (
+    <div className="report-header__actions">
+      <div className="action-group">
+        <button
+          type="button"
+          className="btn-action btn-outline"
+          disabled={exporting}
+          title={`Export ${scopeLabel} report to Excel`}
+          onClick={onExportExcel}
+        >
+          <FileSpreadsheet aria-hidden="true" />
+          Export to Excel
+        </button>
+        <button
+          type="button"
+          className="btn-action btn-primary"
+          disabled={exporting}
+          title={`Export ${scopeLabel} report to PDF`}
+          onClick={onExportPdf}
+        >
+          <FileText aria-hidden="true" />
+          Export to PDF
+        </button>
       </div>
     </div>
   )
 }
 
 export default function TeacherReportsPage() {
-  const [selectedExamId, setSelectedExamId] = useState('')
+  const [searchParams] = useSearchParams()
+  const examIdFromUrl = searchParams.get('examId') || ''
+  const [selectedExamId, setSelectedExamId] = useState(examIdFromUrl)
   const [activeTab, setActiveTab] = useState('detailed')
   const [allExams, setAllExams] = useState([])
   const [loadingExams, setLoadingExams] = useState(true)
@@ -189,6 +474,11 @@ export default function TeacherReportsPage() {
       cancelled = true
     }
   }, [])
+
+  useEffect(() => {
+    if (!examIdFromUrl) return
+    setSelectedExamId(examIdFromUrl)
+  }, [examIdFromUrl])
 
   const currentExam = useMemo(() => {
     return allExams.find((e) => String(e.id) === String(selectedExamId))
@@ -239,6 +529,7 @@ export default function TeacherReportsPage() {
   }, [currentExam?.classId, currentExam?.id])
 
   const sessionsByRank = useMemo(() => sortSessionsByRank(sessions), [sessions])
+  const sessionsBySurname = useMemo(() => sortSessionsBySurname(sessions), [sessions])
 
   const handleExport = async () => {
     if (!currentExam?.classId || !currentExam?.id) return
@@ -303,19 +594,22 @@ export default function TeacherReportsPage() {
   const sectionParts = currentExam
     ? [currentExam.programCode, currentExam.sectionCode].filter(Boolean)
     : []
-  const sectionLabel = sectionParts.join(' — ')
+  const sectionLabel = sectionParts.join(' / ')
+
+  const exportScopeLabel =
+    activeTab === 'violations' ? 'violations' : activeTab === 'summary' ? 'summary' : 'results'
 
   return (
     <div className="acsis-view reports-page">
-      <div className="container" style={{ padding: 0 }}>
+      <div className="rp-layout">
         {!currentExam && (
-          <FadeIn delay={0.05} className="panel">
-            <div className="report-header" style={{ marginBottom: '20px' }}>
-              <h3 className="rp-page-title">Performance Report</h3>
+          <>
+            <FadeIn delay={0.05} className="rp-page-header">
+              <h1 className="rp-page-title">Performance Report</h1>
               <p className="rp-page-sub">
-                Select an exam to view scores and violations from the database.
+                Select an exam to view scores and proctoring violations.
               </p>
-            </div>
+            </FadeIn>
 
             {loadingExams ? (
               <PageSpinner label="Loading exams…" />
@@ -333,31 +627,38 @@ export default function TeacherReportsPage() {
                 ))}
               </div>
             )}
-          </FadeIn>
+          </>
         )}
 
         {currentExam && (
           <>
-            <FadeIn delay={0.1} className="panel">
-              <div className="exam-title-row">
-                <div>
-                  <h2 className="rp-exam-heading">{currentExam.title}</h2>
+            <FadeIn delay={0.06} className="rp-exam-toolbar">
+              <div className="rp-exam-toolbar__top">
+                <div className="rp-exam-toolbar__intro">
+                  <button type="button" className="rp-back-link" onClick={handleChangeExam}>
+                    <ArrowLeft aria-hidden="true" />
+                    Change exam
+                  </button>
+                  <h1 className="rp-exam-heading">{currentExam.title}</h1>
                   <p className="rp-exam-subheading">
-                    {currentExam.className}
-                    {sectionLabel ? <span className="rp-exam-section-chip">{sectionLabel}</span> : null}
-                    {' '}·{' '}
-                    {stats ? `${stats.submitted}/${stats.enrolled} submitted` : 'Loading…'}
+                    <span>{currentExam.className}</span>
+                    {sectionLabel ? (
+                      <span className="rp-exam-section-chip">{sectionLabel}</span>
+                    ) : null}
+                    <span className="rp-exam-subheading__dot" aria-hidden="true">·</span>
+                    <span>
+                      {stats ? `${stats.submitted}/${stats.enrolled} submitted` : 'Loading…'}
+                    </span>
                   </p>
                 </div>
-                <button type="button" className="btn-ghost-text" onClick={handleChangeExam}>
-                  ← Change Exam
-                </button>
               </div>
 
-              <div className="tabs-and-actions-row">
-                <div className="tabs-group">
+              <div className="rp-exam-toolbar__controls">
+                <div className="tabs-group" role="tablist" aria-label="Report views">
                   <button
                     type="button"
+                    role="tab"
+                    aria-selected={activeTab === 'summary'}
                     className={`tab-btn ${activeTab === 'summary' ? 'active' : ''}`}
                     onClick={() => setActiveTab('summary')}
                   >
@@ -365,6 +666,8 @@ export default function TeacherReportsPage() {
                   </button>
                   <button
                     type="button"
+                    role="tab"
+                    aria-selected={activeTab === 'violations'}
                     className={`tab-btn ${activeTab === 'violations' ? 'active' : ''}`}
                     onClick={() => setActiveTab('violations')}
                   >
@@ -372,29 +675,12 @@ export default function TeacherReportsPage() {
                   </button>
                   <button
                     type="button"
+                    role="tab"
+                    aria-selected={activeTab === 'detailed'}
                     className={`tab-btn ${activeTab === 'detailed' ? 'active' : ''}`}
                     onClick={() => setActiveTab('detailed')}
                   >
                     Results
-                  </button>
-                </div>
-
-                <div className="action-group">
-                  <button
-                    type="button"
-                    className="btn-action btn-blue"
-                    disabled={exporting}
-                    onClick={() => { setExportFormat('excel'); setExportModalOpen(true); }}
-                  >
-                    Download Excel
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-action btn-green"
-                    disabled={exporting}
-                    onClick={() => { setExportFormat('pdf'); setExportModalOpen(true); }}
-                  >
-                    Download PDF
                   </button>
                 </div>
               </div>
@@ -403,9 +689,11 @@ export default function TeacherReportsPage() {
             <Dialog open={exportModalOpen} onOpenChange={setExportModalOpen}>
               <DialogContent className="rp-pdf-dialog">
                 <DialogHeader>
-                  <DialogTitle>Export {exportFormat === 'excel' ? 'Excel' : 'PDF'} Report</DialogTitle>
+                  <DialogTitle>
+                    Export {exportScopeLabel} report to {exportFormat === 'excel' ? 'Excel' : 'PDF'}
+                  </DialogTitle>
                   <DialogDescription>
-                    Configure your report header before generating the document.
+                    Downloads the current {exportScopeLabel} view for this exam. Optional logo and department name appear in the report header.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="rp-pdf-settings" style={{ padding: '20px 0', display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -448,15 +736,17 @@ export default function TeacherReportsPage() {
                 </div>
                 <DialogFooter>
                   <button className="btn-ghost-text" onClick={() => setExportModalOpen(false)}>Cancel</button>
-                  <button className="btn-action btn-green" onClick={handleExport} disabled={exporting}>
-                    {exporting ? `Generating ${exportFormat === 'excel' ? 'Excel' : 'PDF'}...` : 'Confirm & Download'}
+                  <button className="btn-action btn-primary" onClick={handleExport} disabled={exporting}>
+                    {exporting
+                      ? `Generating ${exportScopeLabel} ${exportFormat === 'excel' ? 'Excel' : 'PDF'}…`
+                      : 'Download report'}
                   </button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
 
             {reportError ? (
-              <p className="rp-error" role="alert">
+              <p className="rp-error rp-status-banner" role="alert">
                 {reportError}
               </p>
             ) : null}
@@ -464,6 +754,8 @@ export default function TeacherReportsPage() {
               <PageSpinner label="Loading report data…" />
             ) : null}
 
+            <div className="rp-content-area">
+            <div className="rp-tab-stack">
             {activeTab === 'summary' && (() => {
               const scored = sessions.filter(
                 (s) => s.status === 'submitted' && s.percentage != null,
@@ -478,10 +770,18 @@ export default function TeacherReportsPage() {
               const failed = scored.filter((s) => Number(s.percentage) < PASS_THRESHOLD).length
 
               return (
-                <FadeIn delay={0.1} className="tab-panel active panel">
+                <FadeIn delay={0.1} className="tab-panel active rp-surface">
                   <div className="report-header">
-                    <h3 className="rp-section-title">Summary Report</h3>
-                    <p className="rp-section-sub">{currentExam.title}</p>
+                    <div className="report-header__text">
+                      <h2 className="rp-section-title">Summary</h2>
+                      <p className="rp-section-sub">Participation, scores, and distribution for this exam.</p>
+                    </div>
+                    <ReportExportActions
+                      scopeLabel="summary"
+                      exporting={exporting}
+                      onExportExcel={() => { setExportFormat('excel'); setExportModalOpen(true); }}
+                      onExportPdf={() => { setExportFormat('pdf'); setExportModalOpen(true); }}
+                    />
                   </div>
 
                   {/* Participation row */}
@@ -536,6 +836,38 @@ export default function TeacherReportsPage() {
                       {/* Score Distribution Bar Chart */}
                       <p className="rp-summary-group-label" style={{ marginTop: 24 }}>Score Distribution</p>
                       <ScoreBarChart sessions={sessions} />
+
+                      <p className="rp-summary-group-label" style={{ marginTop: 24 }}>Students (Surname A–Z)</p>
+                      {sessionsBySurname.length === 0 ? (
+                        <p className="rp-muted">No student sessions yet.</p>
+                      ) : (
+                        <div className="rp-summary-student-table-wrap">
+                          <table className="rp-summary-student-table">
+                            <thead>
+                              <tr>
+                                <th>Student</th>
+                                <th>School ID</th>
+                                <th>Score</th>
+                                <th>Rank</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {sessionsBySurname.map((student) => (
+                                <tr key={student.sessionId}>
+                                  <td>{formatSurnameFirst(student)}</td>
+                                  <td>{student.schoolId || '—'}</td>
+                                  <td>
+                                    {student.status === 'submitted' && student.percentage != null
+                                      ? `${student.percentage}% (${student.rawScore}/${student.totalPoints})`
+                                      : '—'}
+                                  </td>
+                                  <td>{student.rank != null ? `#${student.rank}` : '—'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
                     </>
                   ) : (
                     <p className="rp-muted">No summary data yet.</p>
@@ -545,52 +877,48 @@ export default function TeacherReportsPage() {
             })()}
 
             {activeTab === 'violations' && (
-              <FadeIn delay={0.1} className="tab-panel active panel">
+              <FadeIn delay={0.1} className="tab-panel active rp-surface">
                 <div className="report-header">
-                  <h3 className="rp-section-title">Violations Report</h3>
-                  <p className="rp-section-sub">{currentExam.title}</p>
+                  <div className="report-header__text">
+                    <h2 className="rp-section-title">Violations</h2>
+                    <p className="rp-section-sub">
+                      Proctoring events grouped by student, newest first within each group.
+                    </p>
+                  </div>
+                  <ReportExportActions
+                    scopeLabel="violations"
+                    exporting={exporting}
+                    onExportExcel={() => { setExportFormat('excel'); setExportModalOpen(true); }}
+                    onExportPdf={() => { setExportFormat('pdf'); setExportModalOpen(true); }}
+                  />
                 </div>
 
-                <div className="violation-alert-box">
-                  <div className="alert-title">Total Violations Detected</div>
-                  <div className="alert-count">{violations.length}</div>
-                  <div className="alert-sub">From proctoring logs for this exam</div>
-                </div>
-
-                {violations.length === 0 ? (
-                  <p className="rp-muted">No violations logged for this exam.</p>
-                ) : (
-                  <ul className="rp-violations-list">
-                    {violations.map((v, index) => (
-                      <FadeIn
-                        as="li"
-                        delay={0.15 + index * 0.05}
-                        key={v.id}
-                        className="rp-violation-item"
-                      >
-                        <span className="rp-violation-item__text">
-                          <strong>{v.studentName}</strong> ({v.schoolId || '—'}) — {v.eventType}
-                          {v.details ? `: ${v.details}` : ''}
-                        </span>
-                        <span className="rp-violation-item__time">{formatDate(v.occurredAt)}</span>
-                      </FadeIn>
-                    ))}
-                  </ul>
-                )}
+                <ViolationsReportPanel violations={violations} sessions={sessions} />
               </FadeIn>
             )}
 
             {activeTab === 'detailed' && (
-              <FadeIn delay={0.1} className="tab-panel active panel">
+              <FadeIn delay={0.1} className="tab-panel active rp-surface">
                 <div className="report-header">
-                  <h3 className="rp-section-title">Student results</h3>
-                  <p className="rp-section-sub">Sorted by rank — Rank #1 appears first.</p>
+                  <div className="report-header__text">
+                    <h2 className="rp-section-title">Student results</h2>
+                    <p className="rp-section-sub">Ranked by score — #1 appears first.</p>
+                  </div>
+                  <ReportExportActions
+                    scopeLabel="results"
+                    exporting={exporting}
+                    onExportExcel={() => { setExportFormat('excel'); setExportModalOpen(true); }}
+                    onExportPdf={() => { setExportFormat('pdf'); setExportModalOpen(true); }}
+                  />
                 </div>
+
+                <p className="rp-summary-group-label">Students (By Score Rank)</p>
 
                 {sessionsByRank.length === 0 ? (
                   <p className="rp-muted">No student sessions yet. Students must join and submit the exam.</p>
                 ) : (
-                  sessionsByRank.map((student, index) => (
+                  <div className="rp-results-list">
+                  {sessionsByRank.map((student, index) => (
                     <FadeIn delay={0.15 + index * 0.05} key={student.sessionId} className="student-detail-card">
                       <div className="sdc-header">
                         <div className="sdc-info">
@@ -640,10 +968,13 @@ export default function TeacherReportsPage() {
                         </div>
                       </div>
                     </FadeIn>
-                  ))
+                  ))}
+                  </div>
                 )}
               </FadeIn>
             )}
+            </div>
+            </div>
           </>
         )}
       </div>

@@ -37,6 +37,8 @@ import {
 } from '../services/examResultsService.js';
 import { manualGradeAnswerService } from '../services/examGradingService.js';
 import { exportExamReportService } from '../services/examReportService.js';
+import { exportExamPaperService } from '../services/examPaperExportService.js';
+import { exportTeacherActivityLogsService } from '../services/auditLogExportService.js';
 import { releaseExamScoresService } from '../services/examReleaseService.js';
 
 // Input validation schemas
@@ -168,6 +170,22 @@ const exportReportSchema = z.object({
   reportType: z.enum(['detailed', 'summary', 'violations']).optional(),
   teacherLogoBase64: z.string().optional(),
   departmentName: z.string().optional(),
+});
+
+const exportPaperSchema = z.object({
+  teacherLogoBase64: z.string().optional(),
+  departmentName: z.string().optional(),
+});
+
+const exportActivityLogsSchema = z.object({
+  search: z.string().optional(),
+  eventType: z.string().optional(),
+  examId: z.union([z.string(), z.number()]).optional(),
+  sectionKey: z.string().optional(),
+  dateFrom: z.string().optional(),
+  dateTo: z.string().optional(),
+  examTitle: z.string().optional(),
+  sectionLabel: z.string().optional(),
 });
 
 export async function getTeacherExamsCatalog(req, res) {
@@ -608,6 +626,34 @@ export async function getTeacherActivityLogs(req, res) {
   return res.json(result)
 }
 
+export async function postExportTeacherActivityLogs(req, res) {
+  try {
+    const payload = exportActivityLogsSchema.parse(req.body ?? {})
+    const result = await exportTeacherActivityLogsService(req.memberId, {
+      search: payload.search || '',
+      eventType: payload.eventType || '',
+      examId: payload.examId ? String(payload.examId) : '',
+      sectionKey: payload.sectionKey || '',
+      dateFrom: payload.dateFrom || '',
+      dateTo: payload.dateTo || '',
+      examTitle: payload.examTitle || '',
+      sectionLabel: payload.sectionLabel || '',
+    })
+    if (!result.ok) {
+      return res.status(result.status || 500).json({ error: result.error })
+    }
+    res.setHeader('Content-Type', result.contentType)
+    res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`)
+    return res.send(result.body)
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: err.errors[0].message })
+    }
+    console.error('[examController.postExportTeacherActivityLogs]', err)
+    return res.status(500).json({ error: 'Failed to export audit logs.' })
+  }
+}
+
 export async function getTeacherMonitoringSnapshot(req, res) {
   const { classId, examId } = req.params;
   const result = await getTeacherMonitoringSnapshotService(classId, examId, req.memberId);
@@ -735,6 +781,30 @@ export async function postExportExamReport(req, res) {
     }
     console.error('[examController.postExportExamReport]', err);
     return res.status(500).json({ error: 'Failed to export report.' });
+  }
+}
+
+export async function postExportExamPaper(req, res) {
+  const { classId, examId } = req.params;
+  try {
+    const payload = exportPaperSchema.parse(req.body ?? {});
+
+    const result = await exportExamPaperService(classId, examId, req.memberId, {
+      teacherLogoBase64: payload.teacherLogoBase64,
+      departmentName: payload.departmentName,
+    });
+    if (!result.ok) {
+      return res.status(result.status || 500).json({ error: result.error });
+    }
+    res.setHeader('Content-Type', result.contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+    return res.send(result.body);
+  } catch (err) {
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({ error: err.errors[0].message });
+    }
+    console.error('[examController.postExportExamPaper]', err);
+    return res.status(500).json({ error: 'Failed to export exam paper.' });
   }
 }
 

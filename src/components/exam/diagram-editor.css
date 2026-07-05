@@ -1,0 +1,80 @@
+/* Keep resize controls above node content so edge lines are grabbable. */
+.diagram-editor-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+@media (min-width: 768px) {
+  .diagram-editor-wrapper--with-toolbar {
+    flex-direction: row;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+}
+
+.diagram-editor-toolbar {
+  width: 100%;
+  max-height: 220px;
+}
+
+@media (min-width: 768px) {
+  .diagram-editor-toolbar {
+    width: 240px;
+    max-height: none;
+    height: 100%;
+  }
+}
+
+.diagram-editor-canvas {
+  flex: 1;
+  min-height: 0;
+}
+
+.diagram-editor-wrapper .react-flow__resize-control {
+  z-index: 20;
+}
+
+/* Larger grab targets — keep React Flow absolute positioning intact. */
+.diagram-editor-wrapper .react-flow__resize-control.handle {
+  border-radius: 4px;
+}
+
+.diagram-editor-wrapper .diagram-resize-handle {
+  box-sizing: border-box;
+}
+
+.diagram-editor-wrapper .diagram-resize-handle::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+}
+
+.diagram-editor-wrapper .diagram-resize-handle--lg::after {
+  inset: -8px;
+}
+
+.diagram-editor-wrapper .diagram-resize-handle--lg {
+  width: 12px !important;
+  height: 12px !important;
+}
+
+.diagram-editor-wrapper .diagram-editable-label__textarea {
+  field-sizing: content;
+  min-height: 1.25rem;
+  line-height: 1.25rem;
+  overflow: hidden;
+}
+
+@supports not (field-sizing: content) {
+  .diagram-editor-wrapper .diagram-editable-label__textarea {
+    overflow: hidden;
+    resize: none;
+  }
+}
+
+.diagram-editor-wrapper .diagram-text-node {
+  align-items: stretch;
+  justify-content: flex-start;
+  text-align: left;
+}

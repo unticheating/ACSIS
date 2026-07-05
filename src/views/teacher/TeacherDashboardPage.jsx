@@ -384,6 +384,7 @@ export default function TeacherDashboardPage() {
           {visibleExams.slice(0, 8).map((ex) => {
             const title = ex.title || ex.name || 'Untitled Exam'
             const questions = ex.questionCount ?? ex.questions_count ?? ex.question_count ?? 0
+            const totalPoints = Number(ex.totalPoints ?? ex.total_points ?? 0)
             const classMeta = ex.classId != null ? classById.get(String(ex.classId)) : null
             const sectionMeta = classMeta?.termId != null ? termById.get(String(classMeta.termId)) : classMeta
             const sectionLabel = sectionMeta ? formatSectionTitle(sectionMeta) : ''
@@ -429,6 +430,8 @@ export default function TeacherDashboardPage() {
                   <CardContent className="flex-1 pb-3">
                     <p className="text-sm text-muted-foreground">
                       {questions} {questions === 1 ? 'question' : 'questions'}
+                      {' · '}
+                      {totalPoints} {totalPoints === 1 ? 'pt' : 'pts'}
                     </p>
                   </CardContent>
                   <CardFooter className="pt-0 border-t border-border mt-auto px-6 py-3 bg-muted/20">

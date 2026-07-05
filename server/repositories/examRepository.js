@@ -11,6 +11,15 @@ import {
   parseMatchingPairText,
 } from '../lib/matchingAnswers.js';
 
+const EXAM_TOTAL_POINTS_SUBQUERY = `(SELECT COALESCE(SUM(
+  CASE
+    WHEN q.question_type = 'matching' THEN
+      q.points * (SELECT COUNT(*)::int FROM choices c WHERE c.question_id = q.question_id AND c.is_correct = TRUE)
+    ELSE q.points
+  END
+), 0)::int
+FROM questions q WHERE q.exam_id = e.exam_id)`;
+
 function mapQuestionTypeToDb(type) {
   if (type === 'multiple-choice' || type === 'multiple') return 'mcq';
   if (type === 'truefalse') return 'true_false';
@@ -558,7 +567,8 @@ export async function listTeacherExamsWithClassMetaQuery(memberId) {
       c.term_id AS "termId",
       t.program_code AS "programCode",
       t.section_code AS "sectionCode",
-      (SELECT COUNT(*)::int FROM questions q WHERE q.exam_id = e.exam_id) AS "questionCount"
+      (SELECT COUNT(*)::int FROM questions q WHERE q.exam_id = e.exam_id) AS "questionCount",
+      ${EXAM_TOTAL_POINTS_SUBQUERY} AS "totalPoints"
     FROM exams e
     INNER JOIN classes c ON c.class_id = e.class_id
     LEFT JOIN teaching_terms t ON t.term_id = c.term_id
@@ -580,7 +590,8 @@ export async function getExamsByClassIdQuery(classId, requireActive = false) {
       e.scheduled_start as "scheduledStart",
       e.scheduled_end as "scheduledEnd",
       e.is_auto_publish as "isAutoPublish",
-      (SELECT COUNT(*) FROM questions q WHERE q.exam_id = e.exam_id) as "questionCount"
+      (SELECT COUNT(*) FROM questions q WHERE q.exam_id = e.exam_id) as "questionCount",
+      ${EXAM_TOTAL_POINTS_SUBQUERY} AS "totalPoints"
     FROM exams e
     WHERE e.class_id = $1
   `;

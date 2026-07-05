@@ -59,3 +59,25 @@ export async function exportExamReport(classId, examId, { format = 'pdf', report
   a.click()
   URL.revokeObjectURL(url)
 }
+
+export async function exportExamPaper(classId, examId, { teacherLogoBase64, departmentName } = {}) {
+  const res = await apiFetch(`/api/teacher/classes/${classId}/exams/${examId}/paper/export`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ teacherLogoBase64, departmentName }),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error(data.error || 'Export failed')
+  }
+  const blob = await res.blob()
+  const disposition = res.headers.get('Content-Disposition') || ''
+  const match = disposition.match(/filename="([^"]+)"/)
+  const filename = match?.[1] || `acsis-exam-paper-${examId}.pdf`
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}

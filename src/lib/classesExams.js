@@ -29,7 +29,7 @@ function defaultClass(/** @type {Exam[]} */ exams = []) {
     id: 'class_default',
     name: 'Default class',
     academicYear: 'A.Y. 2025-2026',
-    semester: '1st Semester',
+    semester: '1st',
     accessCode: 'ACSIS-DEFAULT',
     exams,
   }

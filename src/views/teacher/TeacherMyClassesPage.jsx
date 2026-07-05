@@ -18,6 +18,7 @@ import TeacherPageHeader from '@/components/teacher/TeacherPageHeader.jsx'
 import TeacherCourseCard from '@/components/teacher/TeacherCourseCard.jsx'
 import TeacherAddCourseDialog from '@/components/teacher/TeacherAddCourseDialog.jsx'
 import { formatSectionTitle, formatTermPeriod } from '@/lib/sectionLabel.js'
+import { countFolderCourses, groupSectionGroupsByTermFolder } from '@/lib/termFolders.js'
 import {
   Dialog,
   DialogContent,
@@ -195,6 +196,58 @@ function SectionCardItem({ group, isOpen, onToggle, onAddCourse, onEdit, onArchi
   )
 }
 
+/**
+ * @param {{
+ *   folder: { key: string, label: string, sections: object[] },
+ *   isOpen: boolean,
+ *   onToggle: () => void,
+ *   dimmed?: boolean,
+ *   children: import('react').ReactNode,
+ * }} props
+ */
+function TermFolder({ folder, isOpen, onToggle, dimmed = false, children }) {
+  const sectionCount = folder.sections.length
+  const courseCount = countFolderCourses(folder)
+  const panelId = `term-folder-${folder.key}`
+
+  return (
+    <section
+      className={`acsis-term-folder${isOpen ? ' acsis-term-folder--open' : ''}${dimmed ? ' acsis-term-folder--dimmed' : ''}`}
+    >
+      <button
+        type="button"
+        className="acsis-term-folder__header"
+        aria-expanded={isOpen}
+        aria-controls={panelId}
+        onClick={onToggle}
+      >
+        <span className="acsis-term-folder__copy">
+          <span className="acsis-section-card__eyebrow">Archived term</span>
+          <span className="acsis-section-card__title acsis-term-folder__title">{folder.label}</span>
+          <span className="acsis-section-card__trail">
+            <span className="acsis-section-card__stat">
+              {sectionCount} {sectionCount === 1 ? 'section' : 'sections'}
+              {' · '}
+              {courseCount} {courseCount === 1 ? 'course' : 'courses'}
+            </span>
+            <span className={`acsis-section-card__chev-wrap${isOpen ? ' acsis-section-card__chev-wrap--open' : ''}`}>
+              <ChevronDown className="acsis-section-card__chev" size={18} strokeWidth={2} aria-hidden="true" />
+            </span>
+          </span>
+        </span>
+      </button>
+      <div
+        id={panelId}
+        className={`acsis-term-folder__body${isOpen ? ' acsis-term-folder__body--open' : ''}`}
+        aria-hidden={!isOpen}
+        inert={!isOpen ? true : undefined}
+      >
+        {isOpen ? children : null}
+      </div>
+    </section>
+  )
+}
+
 function AddSectionButton({ onClick, className = 'acsis-mc-create-btn' }) {
   const iconRef = useRef(null)
   return (
@@ -237,6 +290,7 @@ export default function TeacherMyClassesPage() {
   const [createSem, setCreateSem] = useState('1st')
   const [creating, setCreating] = useState(false)
   const [draggingId, setDraggingId] = useState(null)
+  const [openArchivedFolderKeys, setOpenArchivedFolderKeys] = useState(/** @type {Set<string>|null} */ (null))
 
   const [editTerm, setEditTerm] = useState(null)
   const [editProgram, setEditProgram] = useState('')
@@ -382,6 +436,11 @@ export default function TeacherMyClassesPage() {
     return groups
   }, [sections, coursesByTermId])
 
+  const archivedFolderGroups = useMemo(
+    () => groupSectionGroupsByTermFolder(archivedSectionGroups),
+    [archivedSectionGroups],
+  )
+
   const activeSections = sections.filter((s) => !s.isArchived)
   const archivedSections = sections.filter((s) => s.isArchived)
 
@@ -393,6 +452,11 @@ export default function TeacherMyClassesPage() {
     }
   }, [loading, location.state?.expandSectionId])
 
+  useEffect(() => {
+    if (loading || archivedFolderGroups.length === 0) return
+    setOpenArchivedFolderKeys((prev) => prev ?? new Set(archivedFolderGroups.map((f) => f.key)))
+  }, [loading, archivedFolderGroups])
+
   function toggleSection(id) {
     const key = String(id)
     setOpenSectionId((prev) => (prev === key ? null : key))
@@ -401,6 +465,15 @@ export default function TeacherMyClassesPage() {
   function toggleArchivedSection(id) {
     const key = String(id)
     setOpenArchivedSectionId((prev) => (prev === key ? null : key))
+  }
+
+  function toggleArchivedFolder(key) {
+    setOpenArchivedFolderKeys((prev) => {
+      const next = new Set(prev || [])
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
   }
 
   async function handleDragEnd(result) {
@@ -412,7 +485,7 @@ export default function TeacherMyClassesPage() {
 
     if (sourceIndex === destinationIndex) return
 
-    const activeTerms = activeSectionGroups.map(g => g.term)
+    const activeTerms = activeSectionGroups.map((g) => g.term)
     const [reorderedItem] = activeTerms.splice(sourceIndex, 1)
     activeTerms.splice(destinationIndex, 0, reorderedItem)
 
@@ -558,7 +631,7 @@ export default function TeacherMyClassesPage() {
               onDragStart={(start) => setDraggingId(start.draggableId)}
               onDragEnd={handleDragEnd}
             >
-              <Droppable droppableId="teacher-sections" direction="horizontal">
+              <Droppable droppableId="teacher-sections">
                 {(provided) => (
                   <div
                     ref={(node) => {
@@ -569,7 +642,12 @@ export default function TeacherMyClassesPage() {
                     className="acsis-section-card-list"
                   >
                     {activeSectionGroups.map((group, index) => (
-                      <Draggable key={group.term.id} draggableId={String(group.term.id)} index={index} isDragDisabled={group.isOrphan}>
+                      <Draggable
+                        key={group.term.id}
+                        draggableId={String(group.term.id)}
+                        index={index}
+                        isDragDisabled={group.isOrphan}
+                      >
                         {(dragProvided, dragSnapshot) => (
                           <SectionCardItem
                             group={group}
@@ -618,24 +696,33 @@ export default function TeacherMyClassesPage() {
                 </button>
 
                 {archivedOpen ? (
-                  <div
-                    ref={archivedListRef}
-                    className="acsis-section-card-list acsis-section-card-list--archived"
-                  >
-                    {archivedSectionGroups.map((group, index) => (
-                      <SectionCardItem
-                        key={group.term.id}
-                        group={group}
+                  <div ref={archivedListRef} className="acsis-term-folder-list acsis-term-folder-list--archived">
+                    {archivedFolderGroups.map((folder) => (
+                      <TermFolder
+                        key={folder.key}
+                        folder={folder}
                         dimmed
-                        isOpen={openArchivedSectionId === String(group.term.id)}
-                        onToggle={() => toggleArchivedSection(group.term.id)}
-                        onAddCourse={(term) => setAddCourseTerm(term)}
-                        onEdit={handleOpenEdit}
-                        onArchive={handleArchiveSection}
-                        onRestore={handleRestoreSection}
-                        onDelete={handleDeleteSection}
-                        delay={index * 0.05}
-                      />
+                        isOpen={openArchivedFolderKeys?.has(folder.key) ?? true}
+                        onToggle={() => toggleArchivedFolder(folder.key)}
+                      >
+                        <div className="acsis-section-card-list acsis-section-card-list--in-folder acsis-section-card-list--archived">
+                          {folder.sections.map((group, index) => (
+                            <SectionCardItem
+                              key={group.term.id}
+                              group={group}
+                              dimmed
+                              isOpen={openArchivedSectionId === String(group.term.id)}
+                              onToggle={() => toggleArchivedSection(group.term.id)}
+                              onAddCourse={(term) => setAddCourseTerm(term)}
+                              onEdit={handleOpenEdit}
+                              onArchive={handleArchiveSection}
+                              onRestore={handleRestoreSection}
+                              onDelete={handleDeleteSection}
+                              delay={index * 0.05}
+                            />
+                          ))}
+                        </div>
+                      </TermFolder>
                     ))}
                   </div>
                 ) : null}
@@ -660,7 +747,7 @@ export default function TeacherMyClassesPage() {
           <form onSubmit={handleCreateSection}>
             <DialogHeader>
               <DialogTitle>Add section</DialogTitle>
-              <DialogDescription>Program, section code, academic year, and semester.</DialogDescription>
+              <DialogDescription>Program, section code, academic year, and term.</DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-2 gap-3">
@@ -697,7 +784,7 @@ export default function TeacherMyClassesPage() {
                   />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="sec-sem">Semester</Label>
+                  <Label htmlFor="sec-sem">Term</Label>
                   <Input
                     id="sec-sem"
                     value={createSem}
@@ -725,7 +812,7 @@ export default function TeacherMyClassesPage() {
           <form onSubmit={handleEditSection}>
             <DialogHeader>
               <DialogTitle>Edit section</DialogTitle>
-              <DialogDescription>Update program, section code, academic year, and semester.</DialogDescription>
+              <DialogDescription>Update program, section code, academic year, and term.</DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-2 gap-3">
@@ -762,7 +849,7 @@ export default function TeacherMyClassesPage() {
                   />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="edit-sec-sem">Semester</Label>
+                  <Label htmlFor="edit-sec-sem">Term</Label>
                   <Input
                     id="edit-sec-sem"
                     value={editSem}

@@ -58,6 +58,28 @@ export async function fetchTeacherActivityLogs(limit = 50) {
   return parseJson(res)
 }
 
+export async function exportTeacherActivityLogs(filters = {}) {
+  const res = await apiFetch('/api/teacher/classes/activity-logs/export', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(filters),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error(data.error || 'Export failed')
+  }
+  const blob = await res.blob()
+  const disposition = res.headers.get('Content-Disposition') || ''
+  const match = disposition.match(/filename="([^"]+)"/)
+  const filename = match?.[1] || 'acsis-audit-logs.pdf'
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 /** Mark a cheating detection as false positive; reduces student strike count. */
 export async function dismissTeacherViolation(classId, examId, sessionId, logId) {
   const res = await apiFetch(

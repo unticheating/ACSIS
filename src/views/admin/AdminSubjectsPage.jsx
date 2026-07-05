@@ -10,6 +10,7 @@ import { fetchAdminClasses } from '@/lib/adminClassesApi.js'
 import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
 import FadeIn from '@/components/ui/fade-in.jsx'
 import { useInstitutionTheme } from '@/context/InstitutionThemeContext.jsx'
+import { formatSemesterLabel } from '@/lib/sectionLabel.js'
 import '../../pages/admin-ui/style.css'
 
 const ARCHIVE_KEY = 'acsis_admin_archived_classes'
@@ -34,7 +35,7 @@ function mapClassToSubject(c) {
     title: c.name || 'Untitled class',
     code: c.courseCode || '—',
     year: c.academicYear || '—',
-    section: c.semester || '—',
+    section: formatSemesterLabel(c.semester) || '—',
     professor: c.professorName || '—',
   }
 }
@@ -73,7 +74,7 @@ function SubjectFormFields({ form, onChange, idPrefix = 'sub' }) {
         />
       </div>
       <div className="admin-modal-field">
-        <label htmlFor={`${idPrefix}-section`}>Semester / section</label>
+        <label htmlFor={`${idPrefix}-section`}>Term / section</label>
         <input
           id={`${idPrefix}-section`}
           type="text"
@@ -235,7 +236,7 @@ export default function AdminSubjectsPage() {
         </div>
 
         <p className="text-sm text-muted-foreground mb-4 max-w-2xl">
-          Each card is a <strong>class instance</strong> (course + school year + semester). Filters apply to
+          Each card is a <strong>class instance</strong> (course + school year + term). Filters apply to
           the list below; archive hides instances from the default view.
         </p>
 
@@ -346,7 +347,7 @@ export default function AdminSubjectsPage() {
           <div className="admin-dialog-header">
             <DialogTitle className="admin-dialog-title">Add subject</DialogTitle>
             <DialogDescription className="admin-dialog-desc">
-              Create a new class instance (course + year + semester). Saved locally until the API is connected.
+              Create a new class instance (course + year + term). Saved locally until the API is connected.
             </DialogDescription>
           </div>
           <div className="admin-dialog-body">

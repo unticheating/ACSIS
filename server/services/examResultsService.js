@@ -133,7 +133,11 @@ export async function getTeacherMonitoringSnapshotService(classId, examId, _teac
       return { ok: false, status: 404, error: 'Exam not found.' }
     }
 
-    await computeExamRanksQuery(examId)
+    const examStatus = (exam.status || '').toLowerCase()
+    const isLiveExam = examStatus === EXAM_STATUS.OPEN || examStatus === EXAM_STATUS.WAITING
+    if (!isLiveExam) {
+      await computeExamRanksQuery(examId)
+    }
 
     const [sessions, stats, violations, enrolled] = await Promise.all([
       listExamSessionsForExamQuery(classId, examId),

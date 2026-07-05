@@ -1,3 +1,5 @@
+import { labelForFormType, syncSectionTitles } from './questionTypes.js'
+
 /** @param {unknown} id */
 export function isPersistedEntityId(id) {
   if (id == null || id === '') return false
@@ -33,9 +35,10 @@ export function mapQuestionForExamApi(q) {
 /** @param {object} sec */
 export function mapSectionForExamApi(sec) {
   const persistedId = persistedEntityIdForApi(sec.id)
+  const fallbackTitle = labelForFormType(sec.questionType) || 'Set'
   return {
     ...(persistedId != null ? { id: persistedId } : {}),
-    title: sec.title.trim() || 'Set',
+    title: sec.title?.trim() || fallbackTitle,
     description: sec.description.trim(),
     questions: (sec.questions || []).map(mapQuestionForExamApi),
   }
@@ -43,5 +46,5 @@ export function mapSectionForExamApi(sec) {
 
 /** @param {object[]} sections */
 export function buildExamSectionsPayload(sections) {
-  return sections.map(mapSectionForExamApi)
+  return syncSectionTitles(sections).map(mapSectionForExamApi)
 }

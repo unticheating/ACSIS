@@ -18,8 +18,10 @@ import {
   getSmoothStepPath,
   BaseEdge,
   EdgeLabelRenderer,
+  useUpdateNodeInternals,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
+import './diagram-editor.css'
 import { Input } from '@/components/ui/input.jsx'
 import { labelForDiagramVariant } from '@/lib/diagramQuestion.js'
 import { Trash2 } from 'lucide-react'
@@ -214,41 +216,105 @@ const UniversalHandle = ({ position, id, isConnectable }) => (
   />
 )
 
-const CustomResizer = ({ selected, minWidth, minHeight }) => (
+const CustomResizer = ({ selected, minWidth, minHeight, touchFriendly = false }) => (
   <NodeResizer
-    minWidth={minWidth} minHeight={minHeight} isVisible={selected}
+    minWidth={minWidth}
+    minHeight={minHeight}
+    isVisible={selected}
     color="#3b82f6"
-    handleStyle={{ width: 8, height: 8, borderRadius: 2, border: '1px solid #3b82f6', backgroundColor: '#fff' }}
+    handleClassName={touchFriendly ? 'diagram-resize-handle diagram-resize-handle--lg' : 'diagram-resize-handle'}
+    lineClassName="diagram-resize-line"
+    handleStyle={{
+      width: touchFriendly ? 12 : 10,
+      height: touchFriendly ? 12 : 10,
+      borderRadius: 4,
+      border: '1px solid #3b82f6',
+      backgroundColor: '#fff',
+    }}
     lineStyle={{ border: '1px dashed #3b82f6' }}
   />
 )
 
-const EditableLabel = ({ id, value, field = 'label', multiline = false, placeholder = 'Double-click', underline }) => {
+const autosizeTextarea = (el) => {
+  if (!el) return
+  el.style.height = '0px'
+  el.style.height = `${el.scrollHeight}px`
+}
+
+const estimateMultilineHeight = (text, minHeight = 28) => {
+  const lines = String(text || '').split('\n').length
+  const lineHeight = 20
+  const padding = 10
+  return Math.max(minHeight, lines * lineHeight + padding)
+}
+
+const EditableLabel = ({
+  id,
+  value,
+  field = 'label',
+  multiline = false,
+  autoGrowNode = false,
+  placeholder = 'Double-click',
+  underline,
+}) => {
   const [isEditing, setIsEditing] = useState(false)
+  const textareaRef = useRef(null)
   const { setNodes } = useReactFlow()
+
+  useEffect(() => {
+    if (!isEditing) return
+    autosizeTextarea(textareaRef.current)
+  }, [isEditing, value])
+
+  const updateValue = (val, textareaEl) => {
+    if (textareaEl) autosizeTextarea(textareaEl)
+    setNodes((nds) =>
+      nds.map((n) => {
+        if (n.id !== id) return n
+        const next = { ...n, data: { ...n.data, [field]: val } }
+        if (autoGrowNode && multiline) {
+          const nextHeight = estimateMultilineHeight(val, 28)
+          const currentHeight = Number(n.style?.height) || 0
+          next.style = { ...n.style, height: Math.max(currentHeight, nextHeight) }
+        }
+        return next
+      }),
+    )
+  }
+
   if (isEditing) {
     return (
       <textarea
+        ref={textareaRef}
         value={value || ''}
-        onChange={(e) => {
-          const val = e.target.value
-          setNodes((nds) => nds.map((n) => n.id === id ? { ...n, data: { ...n.data, [field]: val } } : n))
-        }}
+        onChange={(e) => updateValue(e.target.value, e.target)}
         onBlur={() => setIsEditing(false)}
         autoFocus
-        className="w-full bg-transparent border-none outline-none text-sm text-foreground p-0 m-0 resize-none overflow-hidden block"
-        style={{ textAlign: multiline ? 'left' : 'center', minHeight: multiline ? '3rem' : '1.5rem' }}
+        rows={1}
+        className="diagram-editable-label__textarea w-full bg-transparent border-none outline-none text-sm text-foreground p-0 m-0 resize-none block"
+        style={{ textAlign: multiline ? 'left' : 'center' }}
         onKeyDown={(e) => {
-          if (!multiline && e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); setIsEditing(false) }
+          if (!multiline && e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault()
+            setIsEditing(false)
+          }
         }}
       />
     )
   }
   return (
     <div
-      onDoubleClick={(e) => { e.stopPropagation(); setIsEditing(true) }}
-      className={`w-full min-h-[1.5rem] flex flex-col cursor-text select-none break-words ${underline ? 'underline underline-offset-2' : ''}`}
-      style={{ alignItems: multiline ? 'flex-start' : 'center', justifyContent: multiline ? 'flex-start' : 'center', whiteSpace: 'pre-wrap' }}
+      onDoubleClick={(e) => {
+        e.stopPropagation()
+        setIsEditing(true)
+      }}
+      className={`w-full min-h-[1.25rem] flex flex-col cursor-text select-none break-words ${underline ? 'underline underline-offset-2' : ''}`}
+      style={{
+        alignItems: multiline ? 'flex-start' : 'center',
+        justifyContent: multiline ? 'flex-start' : 'center',
+        whiteSpace: 'pre-wrap',
+        textAlign: multiline ? 'left' : 'center',
+      }}
       title="Double-click to edit"
     >
       {value || <span className="opacity-40 text-xs">{placeholder}</span>}
@@ -257,17 +323,17 @@ const EditableLabel = ({ id, value, field = 'label', multiline = false, placehol
 }
 
 /* ─── Flowchart Nodes ─────────────────────────────────── */
-const wrapNode = (content, minW = 80, minH = 40) => ({ id, data, selected, isConnectable }) => (
-  <>
-    <CustomResizer minWidth={minW} minHeight={minH} selected={selected} />
-    <div className={`group relative flex items-center justify-center w-full h-full text-sm font-medium ${selected ? 'ring-2 ring-primary ring-offset-2 ring-offset-background rounded' : ''}`}>
+const wrapNode = (content, minW = 80, minH = 40, resizerOpts = {}) => ({ id, data, selected, isConnectable }) => (
+  <div className={`group relative w-full h-full text-sm font-medium ${selected ? 'ring-2 ring-primary rounded-sm' : ''}`}>
+    <CustomResizer minWidth={minW} minHeight={minH} selected={selected} {...resizerOpts} />
+    <div className="relative flex items-center justify-center w-full h-full">
       {content(id, data)}
       <UniversalHandle position={Position.Top} isConnectable={isConnectable} />
       <UniversalHandle position={Position.Bottom} isConnectable={isConnectable} />
       <UniversalHandle position={Position.Right} id="right" isConnectable={isConnectable} />
       <UniversalHandle position={Position.Left} id="left" isConnectable={isConnectable} />
     </div>
-  </>
+  </div>
 )
 
 const ProcessNode = wrapNode((id, data) => (
@@ -336,19 +402,24 @@ const HexagonNode = wrapNode((id, data) => (
   </>
 ))
 
-const TextNode = wrapNode((id, data) => (
-  <div className="relative z-10 text-center w-full h-full p-1 flex items-center justify-center">
-    <EditableLabel id={id} value={data.label} />
-  </div>
-), 40, 20)
+const TextNode = wrapNode(
+  (id, data) => (
+    <div className="diagram-text-node relative z-10 w-full h-full p-1.5 flex">
+      <EditableLabel id={id} value={data.label} multiline autoGrowNode placeholder="Text" />
+    </div>
+  ),
+  60,
+  28,
+  { touchFriendly: true },
+)
 
 /* ─── ERD Entity Node ─────────────────────────────────── */
 const ErdEntityNode = ({ id, data, selected, isConnectable }) => {
   const attributes = Array.isArray(data.attributes) ? data.attributes : []
   return (
-    <>
+    <div className={`group relative flex flex-col w-full h-full bg-background drop-shadow-sm border-2 text-sm overflow-hidden ${selected ? 'border-primary shadow-lg' : 'border-foreground/80'}`}>
       <CustomResizer minWidth={150} minHeight={100} selected={selected} />
-      <div className={`group relative flex flex-col w-full h-full bg-background drop-shadow-sm border-2 border-foreground/80 text-sm overflow-hidden ${selected ? 'border-primary shadow-lg' : ''}`}>
+      <div className="relative flex flex-col w-full h-full">
         <div className="bg-muted/80 border-b-2 border-foreground/80 px-2 py-1 font-bold text-center shrink-0">
           <EditableLabel id={id} value={data.label} placeholder="Entity Name" />
         </div>
@@ -379,7 +450,7 @@ const ErdEntityNode = ({ id, data, selected, isConnectable }) => {
         <UniversalHandle position={Position.Right} id="right" isConnectable={isConnectable} />
         <UniversalHandle position={Position.Left} id="left" isConnectable={isConnectable} />
       </div>
-    </>
+    </div>
   )
 }
 
@@ -464,6 +535,7 @@ function DiagramEditorCanvas({ variant = 'flowchart', value = '', onChange, read
   const [edges, setEdges, onEdgesChange] = useEdgesState(parsed.edges)
   const reactFlowWrapper = useRef(null)
   const { screenToFlowPosition } = useReactFlow()
+  const updateNodeInternals = useUpdateNodeInternals()
 
   // Keep internal state in sync when value prop changes from outside
   useEffect(() => {
@@ -484,6 +556,19 @@ function DiagramEditorCanvas({ variant = 'flowchart', value = '', onChange, read
   const edgesRef = useRef(edges)
   useEffect(() => { nodesRef.current = nodes }, [nodes])
   useEffect(() => { edgesRef.current = edges }, [edges])
+
+  // Keep resize handles aligned when the flex canvas changes size.
+  useEffect(() => {
+    const el = reactFlowWrapper.current
+    if (!el) return undefined
+    const syncNodeInternals = () => {
+      nodesRef.current.forEach((node) => updateNodeInternals(node.id))
+    }
+    syncNodeInternals()
+    const ro = new ResizeObserver(syncNodeInternals)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [updateNodeInternals])
 
   const dataStr = useMemo(() => JSON.stringify(nodes.map(n => ({ id: n.id, data: n.data, style: n.style }))), [nodes])
   const prevDataStr = useRef(dataStr)
@@ -545,6 +630,7 @@ function DiagramEditorCanvas({ variant = 'flowchart', value = '', onChange, read
     let style = { width: 120, height: 50 }
     let extraData = {}
     if (['diamond', 'circle'].includes(type)) style = { width: 80, height: 80 }
+    if (type === 'textNode') style = { width: 140, height: 48 }
     if (type === 'erdEntity') {
       style = { width: 180, height: 140 }
       extraData.attributes = [
@@ -590,11 +676,14 @@ function DiagramEditorCanvas({ variant = 'flowchart', value = '', onChange, read
   const shapes = variant === 'erd' ? ERD_SHAPES : FLOWCHART_SHAPES
 
   return (
-    <div className="relative w-full diagram-editor-wrapper" style={{ height }}>
+    <div
+      className={`relative w-full diagram-editor-wrapper${readOnly ? '' : ' diagram-editor-wrapper--with-toolbar'}`}
+      style={{ height }}
+    >
 
       {/* ── Toolbar ── */}
       {!readOnly && (
-        <div className="absolute top-0 right-full mr-4 h-full w-[240px] shrink-0 border border-border bg-background shadow-sm rounded-md flex flex-col overflow-y-auto select-none text-sm z-10">
+        <div className="diagram-editor-toolbar shrink-0 border border-border bg-background shadow-sm rounded-md flex flex-col overflow-y-auto select-none text-sm">
 
           {/* Shape Palette */}
           <div className="p-2 border-b border-border/50">
@@ -731,7 +820,7 @@ function DiagramEditorCanvas({ variant = 'flowchart', value = '', onChange, read
       )}
 
       {/* ── Canvas ── */}
-      <div className="w-full h-full rounded-md border border-border overflow-hidden bg-background bg-dot-pattern bg-[length:20px_20px]" ref={reactFlowWrapper}>
+      <div className="diagram-editor-canvas w-full h-full min-w-0 rounded-md border border-border overflow-hidden bg-background bg-dot-pattern bg-[length:20px_20px]" ref={reactFlowWrapper}>
         <ReactFlow
           nodes={nodes}
           edges={edges}

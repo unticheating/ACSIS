@@ -53,9 +53,12 @@ export function diagramVariantFromQuestion(q) {
 }
 
 /**
- * @param {{ correctAnswer?: string | null, diagramReference?: string | null }} q
+ * @param {{ correctAnswer?: string | object | null, diagramReference?: string | object | null }} q
+ * @returns {string}
  */
 export function diagramReferenceFromQuestion(q) {
   const raw = q?.diagramReference || q?.correctAnswer || ''
-  return parseDiagramData(raw)
+  if (typeof raw === 'string') return raw
+  if (raw && typeof raw === 'object') return stringifyDiagramData(raw)
+  return ''
 }

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { apiFetch } from '@/lib/apiFetch.js'
 import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
-import { formatSectionTitle } from '@/lib/sectionLabel.js'
+import { formatSectionTitle, formatSemesterLabel } from '@/lib/sectionLabel.js'
 import TeacherCourseFieldsWithSuggest, {
   useTeacherCourseCatalogHint,
 } from '@/components/teacher/TeacherCourseFieldsWithSuggest.jsx'
@@ -85,7 +85,7 @@ export default function TeacherAddCourseDialog({
             <DialogTitle>Add course</DialogTitle>
             <DialogDescription>
               {term
-                ? `Course will belong to ${sectionLabel} (${term.academicYear}, ${term.semester}).`
+                ? `Course will belong to ${sectionLabel} (${term.academicYear}, ${formatSemesterLabel(term.semester)}).`
                 : 'Link a course to this section.'}
               {open ? catalogHint : null}
             </DialogDescription>

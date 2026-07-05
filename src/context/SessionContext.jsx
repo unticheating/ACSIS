@@ -8,6 +8,7 @@ import {
 } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { fetchAuthMe, logoutAuth } from '@/lib/authApi.js'
+import { formatSemesterLabel } from '@/lib/sectionLabel.js'
 
 const STORAGE_ACCOUNT = 'acsis.activeAccountId'
 const STORAGE_SESSION_MODE = 'acsis.sessionMode'
@@ -53,14 +54,14 @@ export const demoAccounts = [
 function loadAcademic() {
   try {
     const raw = localStorage.getItem(STORAGE_ACADEMIC)
-    if (!raw) return { yearLabel: 'A.Y. 2025-2026', semester: '1st Semester' }
+    if (!raw) return { yearLabel: 'A.Y. 2025-2026', semester: '1st Term' }
     const p = JSON.parse(raw)
     return {
       yearLabel: typeof p.yearLabel === 'string' ? p.yearLabel : 'A.Y. 2025-2026',
-      semester: typeof p.semester === 'string' ? p.semester : '1st Semester',
+      semester: formatSemesterLabel(typeof p.semester === 'string' ? p.semester : '1st'),
     }
   } catch {
-    return { yearLabel: 'A.Y. 2025-2026', semester: '1st Semester' }
+    return { yearLabel: 'A.Y. 2025-2026', semester: '1st Term' }
   }
 }
 

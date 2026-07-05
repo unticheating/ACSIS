@@ -3,7 +3,7 @@
  * Browsers cannot fully block OS-level actions (phone camera, etc.).
  */
 
-/** F11 / Esc — blocked during exam; may count as a strike up to max warnings. */
+/** F11 / Esc — used for optional fullscreen restore flows outside strike logging. */
 export function isFullscreenRestoreKey(ev) {
   if (!ev) return false
   const code = ev.code || ''

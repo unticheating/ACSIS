@@ -28,11 +28,13 @@ import {
   getTeacherExamSessionDetail,
   getTeacherActiveMonitoring,
   getTeacherActivityLogs,
+  postExportTeacherActivityLogs,
   getTeacherMonitoringSnapshot,
   streamTeacherMonitoringSnapshot,
   listTeacherReportExams,
   patchManualGrade,
   postExportExamReport,
+  postExportExamPaper,
   postReleaseExamScores,
   deleteTeacherExamSession,
 } from '../controllers/examController.js';
@@ -52,6 +54,7 @@ router.get('/dashboard', getTeacherDashboard);
 router.get('/reports/exams', listTeacherReportExams);
 router.get('/monitoring/active', getTeacherActiveMonitoring);
 router.get('/activity-logs', getTeacherActivityLogs);
+router.post('/activity-logs/export', postExportTeacherActivityLogs);
 router.get('/exams', getTeacherExamsCatalog);
 router.get('/', getTeacherClasses);
 router.post('/', createTeacherClass);
@@ -83,6 +86,7 @@ router.patch(
 );
 router.post('/:classId/exams/:examId/release-scores', postReleaseExamScores);
 router.post('/:classId/exams/:examId/reports/export', postExportExamReport);
+router.post('/:classId/exams/:examId/paper/export', postExportExamPaper);
 router.put('/:classId/exams/:examId', publishTeacherExam);
 router.patch('/:classId/exams/:examId/password', patchTeacherExamPassword);
 router.put('/:classId/exams/:examId/start', startTeacherExam);

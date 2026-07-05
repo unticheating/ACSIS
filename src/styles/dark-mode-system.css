@@ -1183,8 +1183,58 @@ html.dark .acsis-exam-detail__question-set-head {
   border-color: var(--border-default, #2a2a2a) !important;
 }
 
+html.dark .acsis-exam-detail__question-set {
+  border-color: color-mix(in srgb, var(--acsis-brand, #94a3b8) 28%, var(--border-default, #2a2a2a)) !important;
+  border-top-color: color-mix(in srgb, var(--acsis-brand, #94a3b8) 65%, var(--border-default, #3f3f46)) !important;
+}
+
+html.dark .acsis-exam-detail__question-set + .acsis-exam-detail__question-set::before {
+  background: var(--border-default, #3f3f46) !important;
+}
+
+html.dark .acsis-exam-detail__question-set-head {
+  background: color-mix(in srgb, var(--acsis-brand, #94a3b8) 16%, var(--bg-surface, #1a1a1a)) !important;
+  border-bottom-color: color-mix(in srgb, var(--acsis-brand, #94a3b8) 24%, var(--border-default, #2a2a2a)) !important;
+}
+
+html.dark .acsis-exam-detail__question-set-index {
+  background: var(--acsis-brand-muted-text, #cbd5e1) !important;
+  color: var(--bg-surface, #111827) !important;
+}
+
+html.dark .acsis-exam-detail__question-set-meta {
+  color: var(--fg-muted, #a3a3a3) !important;
+}
+
+html.dark .acsis-exam-detail__question-set-desc {
+  color: var(--fg-default, #e5e5e5) !important;
+  background: color-mix(in srgb, var(--acsis-brand, #94a3b8) 8%, var(--bg-surface, #1a1a1a)) !important;
+  border-color: color-mix(in srgb, var(--acsis-brand, #94a3b8) 16%, var(--border-default, #2a2a2a)) !important;
+}
+
+html.dark .acsis-exam-detail__question-list {
+  background: color-mix(in srgb, var(--acsis-brand, #94a3b8) 5%, var(--bg-muted, #141414)) !important;
+}
+
 html.dark .acsis-exam-detail__question-set-title {
   color: var(--fg-default, #f5f5f5) !important;
+}
+
+html.dark .acsis-exam-detail__question-set-icon {
+  background: color-mix(in srgb, var(--acsis-brand, #94a3b8) 16%, var(--bg-surface, #1a1a1a)) !important;
+  border-color: color-mix(in srgb, var(--acsis-brand, #94a3b8) 24%, var(--border-default, #2a2a2a)) !important;
+  color: var(--acsis-brand-muted-text, #cbd5e1) !important;
+}
+
+html.dark .acsis-exam-detail__question-set-type {
+  background: color-mix(in srgb, var(--acsis-brand, #94a3b8) 14%, transparent) !important;
+  color: var(--acsis-brand-muted-text, #cbd5e1) !important;
+}
+
+html.dark .acsis-exam-detail__question-set-count {
+  background: var(--bg-muted, #141414) !important;
+  border-color: var(--border-default, #2a2a2a) !important;
+  color: var(--fg-muted, #a3a3a3) !important;
 }
 
 html.dark .acsis-exam-detail__facts dt,

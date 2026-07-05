@@ -202,10 +202,10 @@ export async function updateAdminClassService(institutionId, classId, body) {
   const academicYear = String(body?.academicYear || '').trim()
   const semester = String(body?.semester || '').trim()
   if (!name || !academicYear || !semester) {
-    return { ok: false, status: 400, error: 'Class name, academic year, and semester are required.' }
+    return { ok: false, status: 400, error: 'Class name, academic year, and term are required.' }
   }
   if (!['1st', '2nd', 'Summer'].includes(semester)) {
-    return { ok: false, status: 400, error: 'Invalid semester.' }
+    return { ok: false, status: 400, error: 'Invalid term.' }
   }
   try {
     const updated = await updateClassQuery(institutionId, classId, {

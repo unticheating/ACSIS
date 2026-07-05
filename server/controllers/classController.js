@@ -164,7 +164,7 @@ export async function createTeacherClass(req, res) {
     } else {
       resolvedTermId = null;
       if (!resolvedYear || !resolvedSemester) {
-        return res.status(400).json({ error: 'Academic year and semester are required when no section is selected.' });
+        return res.status(400).json({ error: 'Academic year and term are required when no section is selected.' });
       }
     }
 

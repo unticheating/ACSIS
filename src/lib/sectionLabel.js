@@ -8,12 +8,25 @@ export function formatSectionTitle(section) {
   return program || code || 'Section'
 }
 
+/**
+ * User-facing label for a term value (DB stores 1st, 2nd, Summer).
+ * @param {unknown} semester
+ */
+export function formatSemesterLabel(semester) {
+  const raw = String(semester || '').trim()
+  if (!raw) return ''
+  const normalized = raw.replace(/\s+[Ss]emester$/i, '').trim()
+  if (normalized === 'Summer') return 'Summer Term'
+  if (/^(1st|2nd)$/i.test(normalized)) return `${normalized} Term`
+  if (/\bterm$/i.test(raw)) return raw.replace(/\b[Ss]emester\b/g, 'Term')
+  return `${normalized} Term`
+}
+
 /** @param {{ academicYear?: string, schoolYear?: string, semester?: string }} term */
 export function formatTermPeriod(term) {
   const ay = String(term?.academicYear || term?.schoolYear || '').trim()
-  const sem = String(term?.semester || '').trim()
-  if (!ay && !sem) return ''
-  const semLabel = sem === 'Summer' ? 'Summer Semester' : sem ? `${sem} Semester` : ''
+  const semLabel = formatSemesterLabel(term?.semester)
+  if (!ay && !semLabel) return ''
   if (ay && semLabel) return `AY ${ay} ${semLabel}`
   if (ay) return `AY ${ay}`
   return semLabel

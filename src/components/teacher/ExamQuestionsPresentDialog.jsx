@@ -8,7 +8,89 @@ import {
   presentExplanationFromQuestion,
 } from '@/components/teacher/ExamQuestionAnswerPresentation.jsx'
 import DiagramEditor from '@/components/exam/DiagramEditor.jsx'
+import { diagramReferenceFromQuestion } from '@/lib/diagramQuestion.js'
 import '../../styles/exam-questions-present.css'
+
+function diagramVariantFromQuestion(question) {
+  return question?.diagramVariant || question?.options?.[0] || 'flowchart'
+}
+
+function stopCardFlip(e) {
+  e.stopPropagation()
+}
+
+function PresentDiagramPanel({ question, onExpand, className = '' }) {
+  const variant = diagramVariantFromQuestion(question)
+  const value = diagramReferenceFromQuestion(question)
+
+  return (
+    <div
+      className={`exam-present-answer--diagram exam-present-no-flip ${className}`.trim()}
+      onClick={stopCardFlip}
+      onPointerDown={stopCardFlip}
+      role="presentation"
+    >
+      <button
+        type="button"
+        className="exam-present-diagram-expand-btn"
+        onClick={(e) => {
+          stopCardFlip(e)
+          onExpand?.()
+        }}
+        aria-label="Expand diagram"
+        title="Expand diagram"
+      >
+        <Maximize2 className="w-4 h-4" aria-hidden />
+      </button>
+      <DiagramEditor variant={variant} value={value || ''} readOnly height="100%" />
+    </div>
+  )
+}
+
+function PresentDiagramExpandOverlay({ question, onClose }) {
+  const variant = diagramVariantFromQuestion(question)
+  const value = diagramReferenceFromQuestion(question)
+
+  useEffect(() => {
+    function onKeyDown(e) {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        e.stopPropagation()
+        onClose()
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown, true)
+    return () => window.removeEventListener('keydown', onKeyDown, true)
+  }, [onClose])
+
+  return (
+    <div
+      className="exam-present-diagram-overlay exam-present-no-flip"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Expanded diagram"
+      onClick={onClose}
+    >
+      <div className="exam-present-diagram-overlay__panel" onClick={stopCardFlip}>
+        <header className="exam-present-diagram-overlay__header">
+          <p className="exam-present-diagram-overlay__title">Reference diagram</p>
+          <button
+            type="button"
+            className="exam-present-close"
+            onClick={onClose}
+            aria-label="Close expanded diagram"
+          >
+            <X className="w-4 h-4" aria-hidden />
+          </button>
+        </header>
+        <div className="exam-present-diagram-overlay__canvas">
+          <DiagramEditor variant={variant} value={value || ''} readOnly height="100%" />
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function formatStudentsCorrectPhrase(correctCount, submittedCount) {
   if (!submittedCount) return 'No submissions yet'
@@ -57,9 +139,18 @@ function PresentQuestionFront({ questionKey, index, total, question, questionTex
   )
 }
 
-function PresentQuestionBack({ index, total, question, answerText, explanation, isCoding, isDiagramming, isFullscreen }) {
+function PresentQuestionBack({
+  index,
+  total,
+  question,
+  answerText,
+  explanation,
+  isCoding,
+  isDiagramming,
+  onExpandDiagram,
+}) {
   return (
-    <div className="exam-present-face exam-present-face--back">
+    <div className={`exam-present-face exam-present-face--back${isDiagramming ? ' exam-present-face--diagram' : ''}`}>
       <div className="exam-present-meta">
         <span className="exam-present-meta__num">
           Question {index + 1} of {total}
@@ -72,17 +163,7 @@ function PresentQuestionBack({ index, total, question, answerText, explanation, 
           {isCoding ? (
             <pre className="exam-present-answer exam-present-answer--code">{answerText}</pre>
           ) : isDiagramming ? (
-            <div
-              className="exam-present-answer--diagram w-full rounded-md overflow-hidden border border-border/50"
-              style={{ height: isFullscreen ? 'min(55vh, 600px)' : 300 }}
-            >
-              <DiagramEditor
-                variant={question?.diagramVariant || question?.options?.[0] || 'flowchart'}
-                value={answerText}
-                readOnly={true}
-                height="100%"
-              />
-            </div>
+            <PresentDiagramPanel question={question} onExpand={onExpandDiagram} />
           ) : (
             <p className="exam-present-answer">{answerText}</p>
           )}
@@ -94,7 +175,11 @@ function PresentQuestionBack({ index, total, question, answerText, explanation, 
           </div>
         ) : null}
       </div>
-      <p className="exam-present-hint">Click or press Space to show the question again</p>
+      <p className="exam-present-hint">
+        {isDiagramming
+          ? 'Expand the diagram to pan and zoom · Use the toolbar to flip'
+          : 'Click or press Space to show the question again'}
+      </p>
     </div>
   )
 }
@@ -112,6 +197,7 @@ export default function ExamQuestionsPresentDialog({
   const [index, setIndex] = useState(0)
   const [flipped, setFlipped] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [diagramExpanded, setDiagramExpanded] = useState(false)
   const [studentsPanelOpen, setStudentsPanelOpen] = useState(false)
   const studentsPanelRef = useRef(null)
 
@@ -132,6 +218,14 @@ export default function ExamQuestionsPresentDialog({
   const toggleFlip = useCallback(() => {
     setFlipped((f) => !f)
   }, [])
+
+  const handleCardClick = useCallback(
+    (e) => {
+      if (e.target.closest('.exam-present-no-flip')) return
+      toggleFlip()
+    },
+    [toggleFlip],
+  )
 
   const exitFullscreen = useCallback(async () => {
     if (document.fullscreenElement) {
@@ -184,6 +278,7 @@ export default function ExamQuestionsPresentDialog({
   useEffect(() => {
     setFlipped(false)
     setStudentsPanelOpen(false)
+    setDiagramExpanded(false)
   }, [questionKey])
 
   useEffect(() => {
@@ -213,6 +308,14 @@ export default function ExamQuestionsPresentDialog({
     if (!open) return undefined
 
     function onKeyDown(e) {
+      if (diagramExpanded) {
+        if (e.key === 'Escape') {
+          e.preventDefault()
+          setDiagramExpanded(false)
+        }
+        return
+      }
+
       if (e.key === 'Escape') {
         e.preventDefault()
         if (studentsPanelOpen) {
@@ -232,6 +335,9 @@ export default function ExamQuestionsPresentDialog({
         return
       }
       if (e.key === ' ' || e.key === 'Enter') {
+        const onDiagramBack =
+          flipped && String(items[index]?.type || '').toLowerCase() === 'diagramming'
+        if (onDiagramBack) return
         e.preventDefault()
         toggleFlip()
         return
@@ -249,9 +355,10 @@ export default function ExamQuestionsPresentDialog({
 
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [open, goPrev, goNext, toggleFlip, toggleFullscreen, exitFullscreen, onClose, studentsPanelOpen])
+  }, [open, goPrev, goNext, toggleFlip, toggleFullscreen, exitFullscreen, onClose, studentsPanelOpen, diagramExpanded, flipped, index, items])
 
   const handleClose = useCallback(async () => {
+    setDiagramExpanded(false)
     await exitFullscreen()
     onClose?.()
   }, [exitFullscreen, onClose])
@@ -315,11 +422,13 @@ export default function ExamQuestionsPresentDialog({
           <div
             key={questionKey}
             className={`exam-present-card${flipped ? ' is-flipped' : ''}`}
-            onClick={toggleFlip}
+            onClick={handleCardClick}
             role="button"
             tabIndex={0}
             onKeyDown={(e) => {
+              if (e.target.closest('.exam-present-no-flip')) return
               if (e.key === 'Enter' || e.key === ' ') {
+                if (flipped && isDiagramming) return
                 e.preventDefault()
                 toggleFlip()
               }
@@ -343,7 +452,7 @@ export default function ExamQuestionsPresentDialog({
                 explanation={explanation}
                 isCoding={isCoding}
                 isDiagramming={isDiagramming}
-                isFullscreen={isFullscreen}
+                onExpandDiagram={() => setDiagramExpanded(true)}
               />
             </div>
           </div>
@@ -435,6 +544,12 @@ export default function ExamQuestionsPresentDialog({
             {flipped ? 'Show question' : 'Show answer'}
           </button>
         </footer>
+        {diagramExpanded && isDiagramming ? (
+          <PresentDiagramExpandOverlay
+            question={current}
+            onClose={() => setDiagramExpanded(false)}
+          />
+        ) : null}
       </div>
     </div>
   )

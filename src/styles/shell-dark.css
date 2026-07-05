@@ -472,21 +472,26 @@ html.dark .acsis-create-exam .form-group textarea {
   color: #ecfdf5;
 }
 
-html.dark .exam-builder-panel {
-  background: rgba(255, 255, 255, 0.04);
+html.dark .exam-builder-page__outline {
+  background: var(--acsis-canvas, var(--bg-canvas)) !important;
+  background-color: var(--acsis-canvas, var(--bg-canvas)) !important;
 }
 
 html.dark .exam-builder-panel--meta {
-  background: rgba(255, 255, 255, 0.06);
-}
-
-html.dark .exam-builder-panel--composer {
-  background: rgba(255, 255, 255, 0.07);
-}
-
-html.dark .exam-builder-panel:hover,
-html.dark .exam-builder-panel--active {
+  background: var(--bg-surface, var(--acsis-dark-surface, #1a1a1a));
   border-color: var(--border-default, #2a2a2a);
+  box-shadow: none;
+}
+
+html.dark .exam-builder-panel,
+html.dark .exam-builder-panel--composer {
+  background: transparent;
+}
+
+html.dark .exam-builder-panel:not(.exam-builder-panel--meta):hover,
+html.dark .exam-builder-panel:not(.exam-builder-panel--meta).exam-builder-panel--active {
+  border: none;
+  box-shadow: none;
 }
 
 html.dark .exam-builder-panel__title,
@@ -495,7 +500,8 @@ html.dark .exam-builder-question__content h3 {
 }
 
 html.dark .exam-builder-question {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--bg-surface, rgba(255, 255, 255, 0.03));
+  border-color: var(--border-default, #2a2a2a);
 }
 
 html.dark .exam-builder-question:hover {
@@ -690,6 +696,26 @@ html.dark .acsis-class-card__name {
 html.dark .acsis-class-card__meta,
 html.dark .acsis-class-card__footer {
   color: var(--fg-muted, hsl(var(--muted-foreground)));
+}
+
+html.dark .acsis-term-folder__header {
+  background: var(--bg-surface);
+  border-color: var(--border-default);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+}
+
+html.dark .acsis-term-folder--open .acsis-term-folder__header {
+  border-color: color-mix(in srgb, var(--acsis-brand) 38%, var(--border-default));
+}
+
+html.dark .acsis-term-folder__body--open {
+  background: var(--bg-elevated);
+  border-color: color-mix(in srgb, var(--acsis-brand) 28%, var(--border-default));
+  border-top-color: var(--border-default);
+}
+
+html.dark .acsis-term-folder--dimmed .acsis-term-folder__header {
+  background: var(--bg-surface-muted);
 }
 
 html.dark .acsis-section-card__surface {

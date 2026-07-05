@@ -21,6 +21,7 @@ import {
   VIEW_MODES,
 } from '@/lib/detectionsSeatLayout.js'
 import FadeIn from '@/components/ui/fade-in.jsx'
+import PageSpinner from '@/components/ui/page-spinner.jsx'
 import '../../pages/teacher-ui/reports.css'
 import '../../styles/teacher-detections-live.css'
 
@@ -522,17 +523,16 @@ export default function TeacherDetectionsPage() {
   const countDone = () =>
     isLive ? presentStudents.filter((s) => isDoneTone(s.tone)).length : null
 
-  const examSubtitle = !monitoringReady
-    ? 'Loading…'
-    : activeExam
-      ? `${activeExam.title}${activeExam.className ? ` · ${activeExam.className}` : ''}`
-      : 'No active exam — activate one from My Classes'
+  const examSubtitle = activeExam
+    ? `${activeExam.title}${activeExam.className ? ` · ${activeExam.className}` : ''}`
+    : ''
 
-  const statValue = (n) => (n == null ? '—' : String(n))
+  const statValue = (n) => String(n)
 
   return (
     <div className="acsis-detections-live acsis-view" aria-busy={!monitoringReady}>
       <div className="container" style={{ padding: 0 }}>
+        {activeExam ? (
         <div className="panel acsis-detections-panel">
           <div className="acsis-detections-panel__row">
             <div className="acsis-detections-panel__intro">
@@ -575,8 +575,11 @@ export default function TeacherDetectionsPage() {
             </div>
           </div>
         </div>
+        ) : null}
 
-        {monitoringReady && !activeExam ? (
+        {!monitoringReady ? (
+          <PageSpinner label="Loading monitoring…" />
+        ) : !activeExam ? (
           <div className="panel acsis-detections-empty-panel text-center">
             <ShieldAlert className="w-14 h-14 sm:w-16 sm:h-16 text-muted-foreground/50 mx-auto mb-4 sm:mb-6" aria-hidden />
             <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-3 sm:mb-4">No Active Exams</h2>

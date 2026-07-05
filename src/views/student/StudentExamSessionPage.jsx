@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Clock, LayoutGrid, CheckCircle2, Circle, AlertTriangle, Keyboard as KeyboardIcon, Moon, Sun, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Clock, LayoutGrid, CheckCircle2, AlertTriangle, Keyboard as KeyboardIcon, Moon, Sun, ChevronLeft, ChevronRight, ChevronUp } from 'lucide-react'
 import Editor from '@monaco-editor/react'
 import { ExamSessionHeader } from '@/components/student/ExamSessionHeader.jsx'
 import { ExamKeyboard } from '@/components/student/ExamKeyboard.jsx'
@@ -32,7 +32,7 @@ import {
   resolveMaxWarnings,
   warningCountBadgeClass,
 } from '@/lib/examAntiCheat.js'
-import { getFocusViolationFromKey, isFullscreenRestoreKey } from '@/lib/examScreenshotGuard.js'
+import { getFocusViolationFromKey } from '@/lib/examScreenshotGuard.js'
 import { useInstitutionTheme } from '@/context/InstitutionThemeContext.jsx'
 import { computeExamTimeDisplay } from '@/lib/examCountdown.js'
 import { acsisToastError } from '@/lib/acsisToast.js'
@@ -54,6 +54,7 @@ function isExamScene(name) {
 
 
 import { labelForQuestionType } from '@/lib/questionTypes.js'
+import { QuestionTypeIcon } from '@/components/exam/QuestionTypeIcon.jsx'
 import { MatchingQuestionInput } from '@/components/exam/MatchingPairEditor.jsx'
 import DiagramEditor from '@/components/exam/DiagramEditor.jsx'
 import {
@@ -66,6 +67,64 @@ import { diagramVariantFromQuestion, emptyDiagramData } from '@/lib/diagramQuest
 
 function questionTypeLabel(type) {
   return labelForQuestionType(type)
+}
+
+const ONSCREEN_KEYBOARD_TYPES = new Set(['identification', 'coding', 'essay', 'diagramming'])
+
+function supportsOnscreenKeyboard(type) {
+  return ONSCREEN_KEYBOARD_TYPES.has(String(type || '').toLowerCase())
+}
+
+function ExamQuestionNavigator({ questions, answers, currentQuestionIndex, examLocked, onSelectQuestion }) {
+  return (
+    <>
+      <div className="exam-nav-legend">
+        <span className="exam-nav-legend-item">
+          <span className="exam-nav-legend-dot exam-nav-legend-dot--empty" aria-hidden />
+          Unanswered
+        </span>
+        <span className="exam-nav-legend-item">
+          <span className="exam-nav-legend-dot exam-nav-legend-dot--answered" aria-hidden />
+          Answered
+        </span>
+      </div>
+      <div
+        className={`exam-nav-grid${examLocked ? ' is-locked' : ''}`}
+        aria-disabled={examLocked || undefined}
+      >
+        {questions.map((q, idx) => {
+          const isActive = idx === currentQuestionIndex
+          const isAnswered = isQuestionAnswered(q, answers[q.id])
+          const btnClass = [
+            'exam-nav-btn',
+            isActive ? 'is-active' : '',
+            isAnswered ? 'is-answered' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')
+          return (
+            <button
+              key={q.id || idx}
+              type="button"
+              disabled={examLocked}
+              onClick={() => {
+                if (!examLocked) onSelectQuestion(idx)
+              }}
+              className={btnClass}
+              aria-label={`Go to question ${idx + 1}`}
+              aria-current={isActive ? 'true' : undefined}
+              aria-disabled={examLocked || undefined}
+            >
+              {idx + 1}
+              {isAnswered && !isActive ? (
+                <span className="exam-nav-btn__dot" aria-hidden />
+              ) : null}
+            </button>
+          )
+        })}
+      </div>
+    </>
+  )
 }
 
 function isQuestionAnswered(question, rawAnswer) {
@@ -92,6 +151,18 @@ function formatClock(totalSec) {
   const m = Math.floor(s / 60)
   const r = s % 60
   return `${String(m).padStart(2, '0')}:${String(r).padStart(2, '0')}`
+}
+
+function questionWatermarkStyle(questionIndex, refCode) {
+  const seed = questionIndex * 997 + String(refCode).length * 13
+  const rnd = (n) => {
+    const x = Math.sin(seed * n) * 10000
+    return x - Math.floor(x)
+  }
+  return {
+    top: `${10 + rnd(1) * 58}%`,
+    left: `${6 + rnd(2) * 52}%`,
+  }
 }
 
 export default function StudentExamSessionPage() {
@@ -320,10 +391,10 @@ export default function StudentExamSessionPage() {
   const [examLocked, setExamLocked] = useState(false)
   const [lockReason, setLockReason] = useState(null)
   const [lastViolationLabel, setLastViolationLabel] = useState('')
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const lockingRef = useRef(false)
   const autosaveSkipRef = useRef(true)
   const matchingOptionsRef = useRef({})
-  const fullscreenKeyHandledUntilRef = useRef(0)
   const examLockedRef = useRef(false)
   const warningCountRef = useRef(0)
   const maxWarningsRef = useRef(resolveMaxWarnings(undefined, institutionMaxWarnings))
@@ -340,6 +411,40 @@ export default function StudentExamSessionPage() {
     return matchingOptionsRef.current[qid]
   }, [currentQ])
 
+  const rawCode = activeAccount?.studentNumber || activeAccount?.id
+  const studentCode = rawCode ? btoa(String(rawCode)).replace(/=/g, '') : 'UNKNOWN'
+  const watermarkStyle = useMemo(
+    () => questionWatermarkStyle(currentQuestionIndex, studentCode),
+    [currentQuestionIndex, studentCode],
+  )
+
+  const answeredCount = useMemo(
+    () => questions.filter((q) => isQuestionAnswered(q, answers[q.id])).length,
+    [questions, answers],
+  )
+
+  const selectQuestion = useCallback(
+    (idx) => {
+      if (examLocked) return
+      setCurrentQuestionIndex(idx)
+      setMobileNavOpen(false)
+    },
+    [examLocked],
+  )
+
+  useEffect(() => {
+    if (!mobileNavOpen) return undefined
+    const onKey = (e) => {
+      if (e.key === 'Escape') setMobileNavOpen(false)
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [mobileNavOpen])
+
+  useEffect(() => {
+    setMobileNavOpen(false)
+  }, [currentQuestionIndex])
+
   useEffect(() => {
     examLockedRef.current = examLocked
   }, [examLocked])
@@ -355,14 +460,6 @@ export default function StudentExamSessionPage() {
     if (!document.fullscreenElement && el.requestFullscreen) {
       el.requestFullscreen().catch(() => { })
     }
-  }, [])
-
-  const markFullscreenKeyHandled = useCallback(() => {
-    fullscreenKeyHandledUntilRef.current = Date.now() + 900
-  }, [])
-
-  const wasFullscreenKeyRecent = useCallback(() => {
-    return Date.now() < fullscreenKeyHandledUntilRef.current
   }, [])
 
   const applyExamLock = useCallback(
@@ -718,21 +815,7 @@ export default function StudentExamSessionPage() {
       e.preventDefault()
       e.returnValue = ''
     }
-    let lastFullscreenExitLogAt = 0
-    function onFullscreenChange() {
-      if (!isExamScene(sceneRef.current) || detectionRunningRef.current) return
-      if (!document.fullscreenElement) {
-        if (wasFullscreenKeyRecent()) return
-        const strikeMax = resolveMaxWarnings(maxWarningsRef.current, institutionMaxWarnings)
-        if (examLockedRef.current || (Number(warningCountRef.current) || 0) >= strikeMax) return
-        const now = Date.now()
-        if (now - lastFullscreenExitLogAt < 2000) return
-        lastFullscreenExitLogAt = now
-        recordViolation('window_blur', 'Exited fullscreen', { restoreFullscreenAfter: true })
-      }
-    }
     let lastFocusKeyLogAt = 0
-    let lastFullscreenKeyStrikeAt = 0
     function blockFocusKeys(ev) {
       if (detectionRunningRef.current) return false
       if (!isExamScene(sceneRef.current)) return false
@@ -746,31 +829,11 @@ export default function StudentExamSessionPage() {
       recordViolation(violation.eventType, violation.details, { skipCooldown: true })
       return true
     }
-    function blockFullscreenExitKey(ev) {
-      if (!isExamScene(sceneRef.current)) return false
-      if (!isFullscreenRestoreKey(ev)) return false
-      ev.preventDefault()
-      ev.stopPropagation()
-      if (ev.type === 'keyup') return true
-      if (ev.repeat) return true
-      const strikeMax = resolveMaxWarnings(maxWarningsRef.current, institutionMaxWarnings)
-      if (examLockedRef.current || (Number(warningCountRef.current) || 0) >= strikeMax) return true
-      if (detectionRunningRef.current) return true
-      const now = Date.now()
-      if (now - lastFullscreenKeyStrikeAt < 800) return true
-      lastFullscreenKeyStrikeAt = now
-      markFullscreenKeyHandled()
-      const label = ev.code === 'F11' ? 'Pressed F11' : 'Pressed Escape'
-      recordViolation('window_blur', label, { restoreFullscreenAfter: true, skipCooldown: true })
-      return true
-    }
     function onFocusKeyUp(ev) {
-      if (blockFullscreenExitKey(ev)) return
       blockFocusKeys(ev)
     }
     function onKey(ev) {
       if (!isExamScene(sceneRef.current)) return
-      if (blockFullscreenExitKey(ev)) return
       if (detectionRunningRef.current) return
       if (blockFocusKeys(ev)) return
       if (ev.code === 'F8') {
@@ -811,8 +874,6 @@ export default function StudentExamSessionPage() {
     window.addEventListener('popstate', onPopState)
     window.addEventListener('beforeunload', onBeforeUnload)
     document.addEventListener('visibilitychange', onVis)
-    document.addEventListener('fullscreenchange', onFullscreenChange)
-    document.addEventListener('webkitfullscreenchange', onFullscreenChange)
     document.addEventListener('keydown', onKey, true)
     document.addEventListener('keyup', onFocusKeyUp, true)
     document.addEventListener('copy', onCopy, true)
@@ -824,8 +885,6 @@ export default function StudentExamSessionPage() {
       window.removeEventListener('popstate', onPopState)
       window.removeEventListener('beforeunload', onBeforeUnload)
       document.removeEventListener('visibilitychange', onVis)
-      document.removeEventListener('fullscreenchange', onFullscreenChange)
-      document.removeEventListener('webkitfullscreenchange', onFullscreenChange)
       document.removeEventListener('keydown', onKey, true)
       document.removeEventListener('keyup', onFocusKeyUp, true)
       document.removeEventListener('copy', onCopy, true)
@@ -833,14 +892,7 @@ export default function StudentExamSessionPage() {
       document.removeEventListener('paste', onPaste, true)
       cancelTabLeave()
     }
-  }, [
-    cancelTabLeave,
-    scheduleTabLeave,
-    recordViolation,
-    markFullscreenKeyHandled,
-    wasFullscreenKeyRecent,
-    requestExamFullscreen,
-  ])
+  }, [cancelTabLeave, scheduleTabLeave, recordViolation])
 
   useEffect(() => {
     if (scene !== 'question') return undefined
@@ -989,7 +1041,7 @@ export default function StudentExamSessionPage() {
         <ExamSessionHeader title={examTitle} />
         <main className="lobby-main">
           <div className="my-auto flex flex-col items-center">
-            <h2 className="lobby-warning-title animate-pulse">Warning:</h2>
+            <h2 className="lobby-warning-title">Before you begin</h2>
             <div className="lobby-copy text-sm leading-relaxed text-foreground opacity-90">
               <p>This examination system monitors your activity to ensure academic fairness.</p>
               <p className="mt-4">
@@ -1007,7 +1059,6 @@ export default function StudentExamSessionPage() {
                 <span className="inline-flex items-center rounded-full border border-red-500/30 bg-red-500/10 px-3.5 py-1.5 text-sm font-semibold tracking-wide text-red-500">Screenshots</span>
                 <span className="inline-flex items-center rounded-full border border-red-500/30 bg-red-500/10 px-3.5 py-1.5 text-sm font-semibold tracking-wide text-red-500">Right-clicking</span>
                 <span className="inline-flex items-center rounded-full border border-red-500/30 bg-red-500/10 px-3.5 py-1.5 text-sm font-semibold tracking-wide text-red-500">Windows key</span>
-                <span className="inline-flex items-center rounded-full border border-red-500/30 bg-red-500/10 px-3.5 py-1.5 text-sm font-semibold tracking-wide text-red-500">Leaving fullscreen (F11 / Esc)</span>
               </div>
             </div>
           </div>
@@ -1146,42 +1197,34 @@ export default function StudentExamSessionPage() {
       )
       : null
 
-  const rawCode = activeAccount?.studentNumber || activeAccount?.id;
-  const studentCode = rawCode ? btoa(String(rawCode)).replace(/=/g, '') : 'UNKNOWN';
-  const watermarkPositions = [
-    { top: '10px', left: '10px' },
-    { top: '10px', right: '10px' },
-    { bottom: '10px', left: '10px' },
-    { bottom: '10px', right: '10px' },
-    { top: '45%', right: '10px' },
-    { top: '45%', left: '10px' },
-  ];
-  const watermarkPos = watermarkPositions[currentQuestionIndex % watermarkPositions.length];
-
   return (
-    <div className="acsis-student-exam min-h-screen flex flex-col">
+    <div className="acsis-student-exam acsis-student-exam--session min-h-screen flex flex-col">
       <ExamSessionHeader
         title={examTitle}
         titleClassName="hidden sm:block max-w-md"
         className="sticky top-0 z-10 shrink-0"
       >
-        <div className="flex items-center gap-2 ml-auto shrink-0">
+        <div className="exam-chrome-toolbar">
           <div
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold ${warningCountBadgeClass(
+            className={`exam-strike-badge ${warningCountBadgeClass(
               displayStrikeCount(warningCount, maxWarnings),
               maxWarnings,
             )}`}
             title={`Integrity warnings - ${maxWarnings} strikes locks your exam for manual submit`}
           >
             <AlertTriangle className="w-4 h-4 shrink-0" aria-hidden />
-            {displayStrikeCount(warningCount, maxWarnings)} / {maxWarnings} warnings
+            <span className="sm:hidden">
+              {displayStrikeCount(warningCount, maxWarnings)}/{maxWarnings}
+            </span>
+            <span className="hidden sm:inline">
+              {displayStrikeCount(warningCount, maxWarnings)} / {maxWarnings} warnings
+            </span>
           </div>
-          <div className="exam-timer flex items-center gap-2 lg:hidden">
+          <div className="exam-timer flex items-center gap-1.5 lg:hidden shrink-0">
             <Clock className="w-4 h-4 shrink-0 opacity-80" aria-hidden />
             {secondsLeft != null && secondsLeft > 0 ? formatClock(secondsLeft) : '--:--'}
           </div>
-          {/* Accessibility toolbar */}
-          <div className="flex items-center gap-1 pl-1 border-l border-white/10">
+          <div className="exam-chrome-tools">
             <button
               type="button"
               onClick={toggleTheme}
@@ -1191,7 +1234,7 @@ export default function StudentExamSessionPage() {
             >
               {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
-            {currentQ && ['identification', 'coding', 'essay', 'diagramming'].includes(currentQ.type) && (
+            {currentQ && supportsOnscreenKeyboard(currentQ.type) ? (
               <button
                 type="button"
                 onClick={() => setShowKeyboard((v) => !v)}
@@ -1202,34 +1245,23 @@ export default function StudentExamSessionPage() {
               >
                 <KeyboardIcon className="w-4 h-4" />
               </button>
-            )}
+            ) : null}
           </div>
         </div>
       </ExamSessionHeader>
 
-      <div className="flex-1 flex flex-col lg:flex-row w-full max-w-[1600px] mx-auto items-stretch">
-        <div className="hidden lg:block lg:w-80 shrink-0" />
-        <main className="exam-stage flex-1 flex flex-col min-w-0 relative">
-          <div
-            style={{
-              position: 'absolute',
-              opacity: 0.08,
-              pointerEvents: 'none',
-              fontSize: '11px',
-              fontFamily: 'monospace',
-              zIndex: 9999,
-              userSelect: 'none',
-              ...watermarkPos
-            }}
-            aria-hidden="true"
-          >
-            Ref: {studentCode}
-          </div>
+      <div className="exam-session-layout flex-1 flex flex-col lg:flex-row w-full items-stretch">
+        <main
+          className="exam-stage flex-1 flex flex-col min-w-0 relative"
+          onPointerDown={() => {
+            if (!document.fullscreenElement) requestExamFullscreen()
+          }}
+        >
           {currentQ ? (
-            <div className={`flex-1 flex flex-col w-full mx-auto max-w-3xl`}>
+            <div className="exam-question-shell flex-1 flex flex-col w-full">
               {examLocked ? (
                 <div
-                  className="mb-6 rounded-xl border border-amber-500/40 bg-amber-100 dark:bg-amber-950/40 px-4 py-3 text-sm text-amber-900 dark:text-amber-100"
+                  className="exam-lock-banner rounded-xl border border-amber-500/40 bg-amber-100 dark:bg-amber-950/40 px-4 py-3 text-sm text-amber-900 dark:text-amber-100"
                   role="status"
                 >
                   {lockReason === 'max_warnings'
@@ -1239,30 +1271,34 @@ export default function StudentExamSessionPage() {
                       : 'Time is up. You cannot change answers or switch questions. Click Send exam when ready.'}
                 </div>
               ) : null}
-              <div
-                className={maxStrikesReached ? 'exam-strike-lock-blur' : undefined}
-                aria-hidden={maxStrikesReached ? true : undefined}
-              >
-
-
-                <div className="mb-8 mt-6">
-                  <div className="exam-question-meta-row">
-                    <span className="exam-set-name flex flex-wrap items-center gap-2">
-                      <span>{currentQ.sectionTitle || 'General'}</span>
-                      {currentQ.sectionDescription ? (
-                        <span className="font-normal text-muted-foreground">
-                          - {currentQ.sectionDescription}
-                        </span>
-                      ) : null}
-                    </span>
-                    <span className="exam-type-badge">{questionTypeLabel(currentQ.type)}</span>
+              <div className="exam-question-scroll">
+                <div
+                  className={maxStrikesReached ? 'exam-strike-lock-blur' : undefined}
+                  aria-hidden={maxStrikesReached ? true : undefined}
+                >
+                  <div className="exam-question-intro">
+                  <div
+                    className="exam-question-watermark"
+                    style={watermarkStyle}
+                    aria-hidden="true"
+                  >
+                    Ref: {studentCode}
                   </div>
+                  <div className="exam-question-meta-row">
+                    <span className="exam-type-badge">
+                      <QuestionTypeIcon type={currentQ.type} size={14} className="exam-type-badge__icon" />
+                      {questionTypeLabel(currentQ.type)}
+                    </span>
+                  </div>
+                  {currentQ.sectionDescription?.trim() ? (
+                    <p className="exam-set-instructions">{currentQ.sectionDescription.trim()}</p>
+                  ) : null}
                   <CollapsibleQuestion
                     text={currentQ.question}
                     className="question-box question-box--prompt whitespace-pre-wrap"
                   />
                   {currentQ.imageUrl && (
-                    <div className="mt-6">
+                    <div className="mt-5">
                       <img
                         src={currentQ.imageUrl}
                         alt="Question illustration"
@@ -1404,7 +1440,7 @@ export default function StudentExamSessionPage() {
                   )}
 
                   {currentQ.type === 'diagramming' && (
-                    <div className="w-full">
+                    <div className="exam-diagram-answer">
                       <p className="exam-type-hint mb-2 text-left">
                         Build a {diagramVariantFromQuestion(currentQ) === 'erd' ? 'entity relationship diagram' : 'flowchart'}.
                         Drag shapes from the toolbox, connect handles, and click a node to edit its label.
@@ -1417,52 +1453,47 @@ export default function StudentExamSessionPage() {
                         onChange={(json) =>
                           !examLocked && setAnswers((prev) => ({ ...prev, [currentQ.id]: json }))
                         }
-                        height="min(50vh, 400px)"
+                        height="min(52vh, 440px)"
                       />
                     </div>
                   )}
                 </div>
               </div>
+              </div>
 
-              <div className="exam-footer-bar" style={{ marginTop: 'auto' }}>
+              <div className="exam-footer-bar">
                 {!examLocked ? (
-                  <button
-                    type="button"
-                    onClick={() => setCurrentQuestionIndex((i) => Math.max(0, i - 1))}
-                    disabled={currentQuestionIndex === 0}
-                    className="bg-transparent flex items-center justify-center gap-2 px-4 py-2 rounded-md hover:bg-muted text-sm font-medium transition-colors"
-                    style={
-                      currentQuestionIndex === 0
-                        ? { opacity: 0.45, cursor: 'not-allowed' }
-                        : undefined
-                    }
-                  >
-                    <ChevronLeft className="w-4 h-4" /> Previous
-                  </button>
-                ) : (
-                  <span className="text-xs text-muted-foreground" aria-hidden />
-                )}
-                <div className="exam-footer-right">
-                  {!examLocked && currentQuestionIndex === questions.length - 1 ? (
+                  <>
                     <button
                       type="button"
-                      onClick={() => setIsSubmitDialogOpen(true)}
-                      className="btn-next bg-primary text-primary-foreground flex items-center justify-center gap-2"
+                      onClick={() => setCurrentQuestionIndex((i) => Math.max(0, i - 1))}
+                      disabled={currentQuestionIndex === 0}
+                      className="exam-footer-btn"
                     >
-                      Submit exam
+                      <ChevronLeft className="w-4 h-4" /> Previous
                     </button>
-                  ) : !examLocked ? (
-                    <button
-                      type="button"
-                      onClick={() => setCurrentQuestionIndex((i) => Math.min(questions.length - 1, i + 1))}
-                      disabled={currentQuestionIndex >= questions.length - 1}
-                      className="bg-transparent flex items-center justify-center gap-2 px-4 py-2 rounded-md hover:bg-muted text-sm font-medium transition-colors"
-                      style={currentQuestionIndex >= questions.length - 1 ? { opacity: 0.45, cursor: 'not-allowed' } : undefined}
-                    >
-                      Next <ChevronRight className="w-4 h-4" />
-                    </button>
-                  ) : null}
-                </div>
+                    <div className="exam-footer-right">
+                      {currentQuestionIndex === questions.length - 1 ? (
+                        <button
+                          type="button"
+                          onClick={() => setIsSubmitDialogOpen(true)}
+                          className="btn-next"
+                        >
+                          Submit exam
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setCurrentQuestionIndex((i) => Math.min(questions.length - 1, i + 1))}
+                          disabled={currentQuestionIndex >= questions.length - 1}
+                          className="exam-footer-btn"
+                        >
+                          Next <ChevronRight className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </>
+                ) : null}
               </div>
             </div>
           ) : (
@@ -1470,91 +1501,104 @@ export default function StudentExamSessionPage() {
           )}
         </main>
 
-        <aside
-          className="w-full lg:w-80 lg:border-l border-border shrink-0 p-6 lg:p-8 flex flex-col lg:sticky lg:top-16 lg:h-[calc(100vh-4rem)] bg-muted/40"
-        >
-          <div className="hidden lg:block mb-8">
-            <h3 className="exam-type-label" style={{ textAlign: 'left', marginBottom: 12 }}>
-              Time remaining
-            </h3>
-            <div className="flex items-center gap-3 px-5 py-4 rounded-xl border border-border bg-muted">
-              <Clock className="w-6 h-6 opacity-70" aria-hidden />
+        <aside className="exam-sidebar hidden lg:flex">
+          <div className="exam-sidebar-section">
+            <div className="exam-sidebar-heading">
+              <Clock className="w-4 h-4 opacity-70 shrink-0" aria-hidden />
+              <h3 className="exam-type-label">Time remaining</h3>
+            </div>
+            <div className="exam-timer-block">
               <span className="exam-timer">
                 {secondsLeft != null && secondsLeft > 0 ? formatClock(secondsLeft) : '--:--'}
               </span>
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto">
-            <div className="flex items-center gap-2 mb-4">
-              <LayoutGrid className="w-5 h-5 opacity-70" aria-hidden />
-              <h3 className="exam-type-label" style={{ textAlign: 'left', marginBottom: 0 }}>
-                Question navigator
-              </h3>
+          <div className="exam-sidebar-section exam-sidebar-section--grow">
+            <div className="exam-sidebar-heading">
+              <LayoutGrid className="w-4 h-4 opacity-70 shrink-0" aria-hidden />
+              <h3 className="exam-type-label">Question navigator</h3>
             </div>
-            <div className="flex items-center gap-4 mb-6 text-xs text-muted-foreground">
-              <div className="flex items-center gap-1.5">
-                <Circle className="w-3 h-3 opacity-40" /> Unanswered
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 bg-emerald-500 rounded-full" /> Answered
-              </div>
-            </div>
-            <div
-              className={`grid grid-cols-5 gap-2.5${examLocked ? ' pointer-events-none opacity-60' : ''}`}
-              aria-disabled={examLocked || undefined}
-            >
-              {questions.map((q, idx) => {
-                const isActive = idx === currentQuestionIndex
-                const isAnswered = isQuestionAnswered(q, answers[q.id])
-                let btnClass =
-                  'relative flex items-center justify-center w-full aspect-square rounded-lg text-sm font-medium transition-all border-2 '
-                if (isActive) {
-                  btnClass += 'border-emerald-400 bg-emerald-900/50 text-white'
-                } else if (isAnswered) {
-                  btnClass += 'border-transparent bg-emerald-800/60 text-emerald-100 hover:bg-emerald-800/80'
-                } else {
-                  btnClass += 'border-border bg-muted text-muted-foreground hover:border-muted-foreground'
-                }
-                return (
-                  <button
-                    key={q.id || idx}
-                    type="button"
-                    disabled={examLocked}
-                    onClick={() => {
-                      if (!examLocked) setCurrentQuestionIndex(idx)
-                    }}
-                    className={btnClass}
-                    aria-label={`Go to question ${idx + 1}`}
-                    aria-disabled={examLocked || undefined}
-                  >
-                    {idx + 1}
-                    {isAnswered && !isActive ? (
-                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 border-2 border-[#051a0d] rounded-full" />
-                    ) : null}
-                  </button>
-                )
-              })}
-            </div>
+            <ExamQuestionNavigator
+              questions={questions}
+              answers={answers}
+              currentQuestionIndex={currentQuestionIndex}
+              examLocked={examLocked}
+              onSelectQuestion={selectQuestion}
+            />
           </div>
 
-          <div className="mt-8 pt-6 border-t border-border">
+          <div className="exam-sidebar-footer">
             <div className="progress-row mb-4">
               <span className="progress-label">Completion</span>
               <span className="progress-label">
-                {questions.filter((q) => isQuestionAnswered(q, answers[q.id])).length} /{' '}
-                {questions.length}
+                {answeredCount} / {questions.length}
               </span>
             </div>
-            <button type="button" onClick={() => setIsSubmitDialogOpen(true)} className="btn-next w-full justify-center">
+            <button type="button" onClick={() => setIsSubmitDialogOpen(true)} className="btn-next w-full">
               {examLocked ? 'Send exam' : 'Submit exam'}
             </button>
           </div>
         </aside>
 
+        <div className={`exam-mobile-nav lg:hidden${mobileNavOpen ? ' is-open' : ''}`}>
+          {mobileNavOpen ? (
+            <button
+              type="button"
+              className="exam-mobile-nav__backdrop"
+              aria-label="Close question navigator"
+              onClick={() => setMobileNavOpen(false)}
+            />
+          ) : null}
+          <div className="exam-mobile-nav__panel" role="region" aria-label="Question navigator">
+            <div
+              className="exam-mobile-nav__sheet"
+              id="exam-mobile-nav-sheet"
+            >
+              <div className="exam-mobile-nav__sheet-head">
+                <div className="exam-sidebar-heading">
+                  <LayoutGrid className="w-4 h-4 opacity-70 shrink-0" aria-hidden />
+                  <h3 className="exam-type-label">Question navigator</h3>
+                </div>
+                <div className="exam-mobile-nav__meta">
+                  <span>{answeredCount} / {questions.length} answered</span>
+                </div>
+              </div>
+              <ExamQuestionNavigator
+                questions={questions}
+                answers={answers}
+                currentQuestionIndex={currentQuestionIndex}
+                examLocked={examLocked}
+                onSelectQuestion={selectQuestion}
+              />
+              <div className="exam-mobile-nav__sheet-footer">
+                <button type="button" onClick={() => setIsSubmitDialogOpen(true)} className="btn-next w-full">
+                  {examLocked ? 'Send exam' : 'Submit exam'}
+                </button>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="exam-mobile-nav__handle"
+              aria-expanded={mobileNavOpen}
+              aria-controls="exam-mobile-nav-sheet"
+              onClick={() => setMobileNavOpen((open) => !open)}
+            >
+              <LayoutGrid className="w-4 h-4 shrink-0 opacity-80" aria-hidden />
+              <span className="exam-mobile-nav__handle-label">
+                Question {currentQuestionIndex + 1} of {questions.length}
+              </span>
+              <span className="exam-mobile-nav__handle-meta">
+                {answeredCount}/{questions.length} done
+              </span>
+              <ChevronUp className={`exam-mobile-nav__chevron${mobileNavOpen ? ' is-open' : ''}`} aria-hidden />
+            </button>
+          </div>
+        </div>
+
       </div>
 
-      {showKeyboard && currentQ && ['identification', 'coding', 'essay', 'diagramming'].includes(currentQ.type) && (
+      {showKeyboard && currentQ && supportsOnscreenKeyboard(currentQ.type) && (
         <ExamKeyboard
           value={answers[currentQ.id] || ''}
           onChange={(val) =>
