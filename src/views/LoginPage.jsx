@@ -176,7 +176,7 @@ export default function LoginPage() {
   }
 
   return (
-    <AuthImmersiveShell showInstitutionHeader={false}>
+    <AuthImmersiveShell>
       <div className="acsis-immersive__auth-stack">
         <div className="acsis-immersive__auth-card">
         {googleDomainBanner ? (
@@ -299,6 +299,10 @@ export default function LoginPage() {
           </button>
         </form>
         </div>
+        <p className="acsis-immersive__trust-note">
+          Official secure login for Pamantasan ng Lungsod ng Pasig faculty and students.
+          Google sign-in uses your school Google account on Google&apos;s own sign-in page.
+        </p>
       </div>
     </AuthImmersiveShell>
   )

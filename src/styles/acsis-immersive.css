@@ -315,6 +315,15 @@
   text-align: center;
 }
 
+.acsis-immersive__trust-note {
+  margin: 14px 0 0;
+  max-width: 28rem;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--acsis-immersive-fg-muted);
+  text-align: center;
+}
+
 .acsis-immersive__email-intro {
   margin: 0 0 16px;
   font-size: 0.8125rem;
