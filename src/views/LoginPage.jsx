@@ -6,7 +6,6 @@ import { useSession } from '@/context/SessionContext.jsx'
 import {
   AUTH_ERROR_MESSAGES,
   isAuthAwaitingSetup,
-  fetchAuthConfig,
   startGoogleSignIn,
   requestPasswordReset,
   startEmailVerification,
@@ -34,8 +33,6 @@ export default function LoginPage() {
   const [forgotPasswordSubmitting, setForgotPasswordSubmitting] = useState(false)
   const [isLoggingIn, setIsLoggingIn] = useState(false)
   const [googleDomainBanner, setGoogleDomainBanner] = useState(false)
-  const [passwordLoginEnabled, setPasswordLoginEnabled] = useState(false)
-  const [authConfigReady, setAuthConfigReady] = useState(false)
   const noMembershipToastRef = useRef(null)
 
   useLayoutEffect(() => {
@@ -89,24 +86,6 @@ export default function LoginPage() {
     noMembershipToastRef.current = authUser.uid
     acsisToastError(AUTH_ERROR_MESSAGES.no_membership)
   }, [authUser])
-
-  useEffect(() => {
-    let cancelled = false
-    fetchAuthConfig()
-      .then((config) => {
-        if (cancelled) return
-        setPasswordLoginEnabled(Boolean(config.passwordLoginEnabled))
-      })
-      .catch(() => {
-        if (!cancelled) setPasswordLoginEnabled(false)
-      })
-      .finally(() => {
-        if (!cancelled) setAuthConfigReady(true)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
 
   function onGoogle() {
     startGoogleSignIn()
@@ -181,9 +160,7 @@ export default function LoginPage() {
           </div>
         ) : null}
         <p className="acsis-immersive__hint acsis-immersive__hint--center">
-          {passwordLoginEnabled
-            ? 'Sign in with Google or your registered email.'
-            : 'Sign in with your Google account.'}
+          Sign in with your school account.
         </p>
         <button type="button" className="acsis-immersive__btn-google" onClick={onGoogle}>
           <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden>
@@ -207,102 +184,98 @@ export default function LoginPage() {
           Sign in with Google
         </button>
 
-        {authConfigReady && passwordLoginEnabled ? (
-          <>
-            <div className="acsis-immersive__or">OR</div>
+        <div className="acsis-immersive__or">OR</div>
 
-            <form
-              onSubmit={onEmailContinue}
-              className="acsis-immersive__credential-form"
-              noValidate
-            >
-              <p className="acsis-immersive__email-intro">
-                Sign in with your registered email and password.
-              </p>
-              <div className="acsis-immersive__field">
-                <label htmlFor="acsis-email">Email</label>
-                <input
-                  id="acsis-email"
-                  className="acsis-immersive__input"
-                  type="email"
-                  autoComplete="username"
-                  value={email}
-                  onChange={(ev) => setEmail(ev.target.value)}
-                  placeholder="you@institution.edu"
-                  aria-required="true"
-                />
-              </div>
-              <div className="acsis-immersive__field">
-                <label htmlFor="acsis-password">Password</label>
-                <div className="acsis-immersive__password-field">
-                  <input
-                    id="acsis-password"
-                    className="acsis-immersive__input"
-                    type={showPassword ? 'text' : 'password'}
-                    autoComplete="current-password"
-                    value={password}
-                    onChange={(ev) => setPassword(ev.target.value)}
-                    placeholder="Enter your password"
-                    aria-required="true"
-                  />
-                  <button
-                    type="button"
-                    className="acsis-immersive__password-toggle"
-                    onClick={() => setShowPassword((current) => !current)}
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    aria-pressed={showPassword}
-                  >
-                    {showPassword ? (
-                      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden>
-                        <path
-                          fill="currentColor"
-                          d="M12 5c5.5 0 9.9 4 11 7-1.1 3-5.5 7-11 7S2.1 15 1 12c1.1-3 5.5-7 11-7zm0 2C7.8 7 4.2 9.8 3.1 12 4.2 14.2 7.8 17 12 17s7.8-2.8 8.9-5C19.8 9.8 16.2 7 12 7zm0 2.25A2.75 2.75 0 1 1 12 14.75 2.75 2.75 0 0 1 12 9.25z"
-                        />
-                        <path
-                          fill="currentColor"
-                          d="M4.22 4.22 19.78 19.78l-1.06 1.06L3.16 5.28z"
-                        />
-                      </svg>
-                    ) : (
-                      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden>
-                        <path
-                          fill="currentColor"
-                          d="M12 5c5.5 0 9.9 4 11 7-1.1 3-5.5 7-11 7S2.1 15 1 12c1.1-3 5.5-7 11-7zm0 2C7.8 7 4.2 9.8 3.1 12 4.2 14.2 7.8 17 12 17s7.8-2.8 8.9-5C19.8 9.8 16.2 7 12 7zm0 1.75A3.25 3.25 0 1 1 12 15.25 3.25 3.25 0 0 1 12 8.75z"
-                        />
-                      </svg>
-                    )}
-                  </button>
-                </div>
-              </div>
+        <form
+          onSubmit={onEmailContinue}
+          className="acsis-immersive__credential-form"
+          noValidate
+        >
+          <p className="acsis-immersive__email-intro">
+            Login with your ACSIS registered email.
+          </p>
+          <div className="acsis-immersive__field">
+            <label htmlFor="acsis-email">Email</label>
+            <input
+              id="acsis-email"
+              className="acsis-immersive__input"
+              type="email"
+              autoComplete="username"
+              value={email}
+              onChange={(ev) => setEmail(ev.target.value)}
+              placeholder="you@school.edu.ph"
+              aria-required="true"
+            />
+          </div>
+          <div className="acsis-immersive__field">
+            <label htmlFor="acsis-password">Password</label>
+            <div className="acsis-immersive__password-field">
+              <input
+                id="acsis-password"
+                className="acsis-immersive__input"
+                type={showPassword ? 'text' : 'password'}
+                autoComplete="current-password"
+                value={password}
+                onChange={(ev) => setPassword(ev.target.value)}
+                placeholder="Enter your password"
+                aria-required="true"
+              />
               <button
                 type="button"
-                className="acsis-immersive__link-btn"
-                onClick={onForgotPassword}
-                disabled={forgotPasswordSubmitting}
+                className="acsis-immersive__password-toggle"
+                onClick={() => setShowPassword((current) => !current)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                aria-pressed={showPassword}
               >
-                {forgotPasswordSubmitting ? 'Sending temporary password…' : 'Forgot password?'}
-              </button>
-              <button
-                type="submit"
-                className="acsis-immersive__btn-primary"
-                disabled={isLoggingIn}
-                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-              >
-                {isLoggingIn ? (
-                  <>
-                    <div
-                      className="acsis-immersive__spinner"
-                      style={{ width: '16px', height: '16px', borderWidth: '2px' }}
+                {showPassword ? (
+                  <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden>
+                    <path
+                      fill="currentColor"
+                      d="M12 5c5.5 0 9.9 4 11 7-1.1 3-5.5 7-11 7S2.1 15 1 12c1.1-3 5.5-7 11-7zm0 2C7.8 7 4.2 9.8 3.1 12 4.2 14.2 7.8 17 12 17s7.8-2.8 8.9-5C19.8 9.8 16.2 7 12 7zm0 2.25A2.75 2.75 0 1 1 12 14.75 2.75 2.75 0 0 1 12 9.25z"
                     />
-                    Logging in…
-                  </>
+                    <path
+                      fill="currentColor"
+                      d="M4.22 4.22 19.78 19.78l-1.06 1.06L3.16 5.28z"
+                    />
+                  </svg>
                 ) : (
-                  'Continue'
+                  <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden>
+                    <path
+                      fill="currentColor"
+                      d="M12 5c5.5 0 9.9 4 11 7-1.1 3-5.5 7-11 7S2.1 15 1 12c1.1-3 5.5-7 11-7zm0 2C7.8 7 4.2 9.8 3.1 12 4.2 14.2 7.8 17 12 17s7.8-2.8 8.9-5C19.8 9.8 16.2 7 12 7zm0 1.75A3.25 3.25 0 1 1 12 15.25 3.25 3.25 0 0 1 12 8.75z"
+                    />
+                  </svg>
                 )}
               </button>
-            </form>
-          </>
-        ) : null}
+            </div>
+          </div>
+          <button
+            type="button"
+            className="acsis-immersive__link-btn"
+            onClick={onForgotPassword}
+            disabled={forgotPasswordSubmitting}
+          >
+            {forgotPasswordSubmitting ? 'Sending temporary password…' : 'Forgot password?'}
+          </button>
+          <button
+            type="submit"
+            className="acsis-immersive__btn-primary"
+            disabled={isLoggingIn}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+          >
+            {isLoggingIn ? (
+              <>
+                <div
+                  className="acsis-immersive__spinner"
+                  style={{ width: '16px', height: '16px', borderWidth: '2px' }}
+                />
+                Logging in…
+              </>
+            ) : (
+              'Continue'
+            )}
+          </button>
+        </form>
         </div>
         <AuthLoginFooter />
       </div>
