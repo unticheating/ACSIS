@@ -302,7 +302,7 @@ export default function LoginPage() {
         </div>
         <footer className="acsis-immersive__trust-footer">
           <div className="acsis-immersive__trust-footer-brand">
-            <PlpLogo className="acsis-logo-img" width={22} height={22} alt="" aria-hidden />
+            <PlpLogo className="acsis-immersive__trust-footer-logo" width={18} height={18} alt="" aria-hidden />
             <span>Pamantasan ng Lungsod ng Pasig</span>
           </div>
           <p className="acsis-immersive__trust-note">

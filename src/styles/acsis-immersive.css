@@ -336,9 +336,13 @@
   color: var(--acsis-immersive-fg-dim);
 }
 
-.acsis-immersive__trust-footer-brand .acsis-logo-img {
+.acsis-immersive__trust-footer-brand .acsis-immersive__trust-footer-logo {
   flex-shrink: 0;
+  width: 18px !important;
+  height: 18px !important;
   border-radius: 50%;
+  object-fit: contain;
+  display: block;
 }
 
 .acsis-immersive__trust-note {
