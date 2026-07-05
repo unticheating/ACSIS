@@ -176,17 +176,15 @@ const ExamTimer = React.memo(function ExamTimer({ activeExam }) {
   return (
     <FadeIn
       delay={0.35}
-      className={`flex flex-col items-center justify-center min-w-[90px] px-3 py-1.5 rounded-lg border shadow-sm transition-colors ${
-        examTime?.isLow 
-          ? 'bg-destructive/10 border-destructive/30 text-destructive animate-pulse' 
-          : 'bg-primary/10 border-primary/20 text-primary'
+      className={`acsis-detections-stat acsis-detections-stat--timer${
+        examTime?.isLow ? ' acsis-detections-stat--timer-low' : ''
       }`}
     >
-      <span className="flex items-center gap-1.5 text-lg font-bold tracking-tight">
-        <Clock className="w-4 h-4 opacity-80" aria-hidden />
-        {examTime?.display ?? '--:--'}
+      <span className="acsis-detections-stat__timer" aria-live="polite">
+        <Clock className="acsis-detections-stat__clock" aria-hidden />
+        <span className="acsis-detections-stat__timer-value">{examTime?.display ?? '--:--'}</span>
       </span>
-      <span className="text-[10px] uppercase tracking-wider font-bold opacity-75">{examTime?.label ?? 'Time'}</span>
+      <span className="acsis-detections-stat__label">{examTime?.label ?? 'Time'}</span>
     </FadeIn>
   )
 })
@@ -592,6 +590,7 @@ export default function TeacherDetectionsPage() {
     [sortedListStudents],
   )
   const countByTone = (tone) => (isLive ? presentStudents.filter((s) => s.tone === tone).length : null)
+  const countWarned = () => (isLive ? presentStudents.filter(isViolator).length : null)
   const countDone = () =>
     isLive ? presentStudents.filter((s) => isDoneTone(s.tone)).length : null
 
@@ -687,14 +686,16 @@ export default function TeacherDetectionsPage() {
                   {student.firstName || 'Student'}
                 </div>
               </div>
-              {tone === 'submitted' && student.strikes > 0 ? (
-                <span
-                  className="acsis-detections-seat__badge acsis-detections-seat__badge--submitted-warn"
-                  title="Submitted with warnings"
-                >
-                  {student.strikes} warning{student.strikes === 1 ? '' : 's'}
-                </span>
-              ) : null}
+              <div className="acsis-detections-seat__badge-slot" aria-hidden={tone !== 'submitted' || student.strikes <= 0}>
+                {tone === 'submitted' && student.strikes > 0 ? (
+                  <span
+                    className="acsis-detections-seat__badge acsis-detections-seat__badge--submitted-warn"
+                    title="Submitted with warnings"
+                  >
+                    {student.strikes} warning{student.strikes === 1 ? '' : 's'}
+                  </span>
+                ) : null}
+              </div>
             </>
           ) : (
             <span className="acsis-detections-seat__empty-label">Empty</span>
@@ -767,19 +768,11 @@ export default function TeacherDetectionsPage() {
                   <span className="acsis-detections-stat__value">{statValue(countByTone('ongoing'))}</span>
                   <span className="acsis-detections-stat__label">Active</span>
                 </FadeIn>
-                <FadeIn delay={0.15} className="acsis-detections-stat acsis-detections-stat--warn1">
-                  <span className="acsis-detections-stat__value">{statValue(countByTone('warn1'))}</span>
-                  <span className="acsis-detections-stat__label">1 warning</span>
+                <FadeIn delay={0.15} className="acsis-detections-stat acsis-detections-stat--warned">
+                  <span className="acsis-detections-stat__value">{statValue(countWarned())}</span>
+                  <span className="acsis-detections-stat__label">Warned</span>
                 </FadeIn>
-                <FadeIn delay={0.2} className="acsis-detections-stat acsis-detections-stat--warn2">
-                  <span className="acsis-detections-stat__value">{statValue(countByTone('warn2'))}</span>
-                  <span className="acsis-detections-stat__label">2 warnings</span>
-                </FadeIn>
-                <FadeIn delay={0.25} className="acsis-detections-stat acsis-detections-stat--warn3">
-                  <span className="acsis-detections-stat__value">{statValue(countByTone('warn3'))}</span>
-                  <span className="acsis-detections-stat__label">3 warnings</span>
-                </FadeIn>
-                <FadeIn delay={0.3} className="acsis-detections-stat acsis-detections-stat--submitted">
+                <FadeIn delay={0.2} className="acsis-detections-stat acsis-detections-stat--submitted">
                   <span className="acsis-detections-stat__value">{statValue(countDone())}</span>
                   <span className="acsis-detections-stat__label">Done</span>
                 </FadeIn>
@@ -823,38 +816,14 @@ export default function TeacherDetectionsPage() {
             }} 
             className={`w-full transition-all flex justify-center overflow-visible ${isFullscreen ? 'pt-28 pb-48' : 'pt-6 pb-12'}`}
           >
-            {isFullscreen ? (
-              <div className="flex flex-col gap-14 w-full max-w-[1200px] items-center">
-                {/* Top Stack: Left 4 Columns */}
-                <div 
-                  className="acsis-detections-seating"
-                  style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.85rem', width: '100%' }}
-                >
-                  {students.map((student, idx) => {
-                    if (idx % 8 >= 4) return null // Skip right-side columns to render left first
-                    return renderSeatNode(student, idx, false)
-                  })}
-                </div>
-
-                {/* Bottom Stack: Right 4 Columns */}
-                <div 
-                  className="acsis-detections-seating"
-                  style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.85rem', width: '100%' }}
-                >
-                  {students.map((student, idx) => {
-                    if (idx % 8 < 4) return null // Skip left-side columns
-                    return renderSeatNode(student, idx, false)
-                  })}
-                </div>
-              </div>
-            ) : (
-              <div className="acsis-detections-seating">
-                {students.map((student, idx) => {
-                  const isWalkwayCol = idx % 8 === 4
-                  return renderSeatNode(student, idx, isWalkwayCol)
-                })}
-              </div>
-            )}
+            <div
+              className={`acsis-detections-seating${isFullscreen ? ' acsis-detections-seating--fullscreen' : ''}`}
+            >
+              {students.map((student, idx) => {
+                const isWalkwayCol = idx % 8 === 4
+                return renderSeatNode(student, idx, isWalkwayCol)
+              })}
+            </div>
           </div>
         ) : (
           <div className="acsis-detections-list-view">
@@ -912,10 +881,9 @@ export default function TeacherDetectionsPage() {
                             aria-label={`${student.strikes} of ${MAX_EXAM_WARNINGS} warnings`}
                           >
                             <span className="acsis-detections-list-card__strikes-value">
-                              {student.strikes > 0 ? student.strikes : '—'}
-                            </span>
-                            <span className="acsis-detections-list-card__strikes-label">
-                              /{MAX_EXAM_WARNINGS}
+                              {student.strikes > 0
+                                ? `${student.strikes}/${MAX_EXAM_WARNINGS}`
+                                : '—'}
                             </span>
                           </div>
                           <div className="acsis-detections-list-card__body">

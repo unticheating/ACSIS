@@ -160,7 +160,7 @@ export default function VerifyEmailPage() {
   if (!email) return null
 
   return (
-    <AuthImmersiveShell showInstitutionHeader={false}>
+    <AuthImmersiveShell>
       <div className="acsis-immersive__auth-stack">
         <p className="acsis-immersive__verify-lead">
           A verification code was sent to your email

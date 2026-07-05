@@ -2,7 +2,7 @@ import InstitutionLogo from '@/components/brand/InstitutionLogo.jsx'
 import PlpLogo from '@/components/brand/PlpLogo.jsx'
 
 /** Full-viewport login / verify chrome (same shell as landing). */
-export default function AuthImmersiveShell({ children, showInstitutionHeader = true }) {
+export default function AuthImmersiveShell({ children, showInstitutionHeader = false }) {
   return (
     <div
       className={
