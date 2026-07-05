@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams, useNavigate } from 'react-router-dom'
-import { Clock, Plus, Shuffle, Trash2, ArrowLeft, GripVertical, Layers, ImageIcon, X, Pencil, Copy, Calculator, Settings, Eye } from 'lucide-react'
+import { Clock, Plus, Shuffle, Trash2, ArrowLeft, GripVertical, Layers, ImageIcon, X, Pencil, Copy, Calculator, Settings, Eye, EyeOff } from 'lucide-react'
 import { Label } from '@/components/ui/label.jsx'
 import { Button } from '@/components/ui/button.jsx'
 import { Input } from '@/components/ui/input.jsx'
@@ -140,6 +140,7 @@ export default function TeacherCreateExamPage() {
   const [examTitle, setExamTitle] = useState('')
   const [examDescription, setExamDescription] = useState('')
   const [examPassword, setExamPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [scheduledStart, setScheduledStart] = useState('')
   const [scheduledEnd, setScheduledEnd] = useState('')
   const [isAutoPublish, setIsAutoPublish] = useState(false)
@@ -841,15 +842,31 @@ export default function TeacherCreateExamPage() {
         <div className="space-y-4">
           <div className="space-y-2">
             <Label>Options</Label>
-            {['opt1', 'opt2', 'opt3', 'opt4'].map((key, idx) => (
-              <Input
-                key={key}
-                type="text"
-                placeholder={`Option ${idx + 1}`}
-                value={mc[key]}
-                onChange={(e) => setMc((m) => ({ ...m, [key]: e.target.value }))}
-              />
-            ))}
+            {['opt1', 'opt2', 'opt3', 'opt4'].map((key, idx) => {
+              const isCorrect = String(mc.correct) === String(idx + 1)
+              return (
+                <Input
+                  key={key}
+                  type="text"
+                  placeholder={`Option ${idx + 1}`}
+                  value={mc[key]}
+                  onChange={(e) => setMc((m) => ({ ...m, [key]: e.target.value }))}
+                  className={
+                    isCorrect
+                      ? 'border-2 shadow-sm transition-all !border-emerald-500 !bg-emerald-50 !text-emerald-950 dark:!border-[1px] dark:!border-emerald-400 dark:!bg-emerald-900/50 dark:!text-emerald-100'
+                      : 'border border-input transition-all'
+                  }
+                  style={
+                    isCorrect
+                      ? {
+                          backgroundColor: isCorrect ? '#10b981' : undefined,
+                          boxShadow: isCorrect ? '0 0 0 1px #18af4f' : undefined,
+                        }
+                      : undefined
+                  }
+                />
+              )
+            })}
           </div>
           <div className="space-y-2">
             <Label>Correct Answer</Label>
@@ -1328,15 +1345,27 @@ export default function TeacherCreateExamPage() {
               <Label htmlFor="exam-password" className="text-sm font-semibold">
                 Exam password <span className="font-normal text-muted-foreground">(optional)</span>
               </Label>
-              <Input
-                id="exam-password"
-                type="password"
-                maxLength={20}
-                autoComplete="new-password"
-                placeholder={isEditMode ? 'Leave blank to keep current password' : 'Leave blank for open lobby'}
-                value={examPassword}
-                onChange={(e) => setExamPassword(e.target.value)}
-              />
+              <div className="relative">
+                <Input
+                  id="exam-password"
+                  type={showPassword ? 'text' : 'password'}
+                  maxLength={20}
+                  autoComplete="new-password"
+                  placeholder={isEditMode ? 'Leave blank to keep current password' : 'Leave blank for open lobby'}
+                  value={examPassword}
+                  onChange={(e) => setExamPassword(e.target.value)}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  tabIndex="-1"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
               {isEditMode ? (
                 <p className="text-xs text-muted-foreground leading-relaxed">
                   Change the exam password from the exam detail page after publishing.
