@@ -81,14 +81,16 @@ export default function App() {
       <Route path="/about" element={<AboutPage />} />
       <Route path="/change-password" element={<ChangePasswordPage />} />
       <Route path="/verify" element={<VerifyEmailPage />} />
-      <Route
-        path="/dev/portals"
-        element={
-          <LazyPage>
-            <DevPortalsPage />
-          </LazyPage>
-        }
-      />
+      {import.meta.env.DEV ? (
+        <Route
+          path="/dev/portals"
+          element={
+            <LazyPage>
+              <DevPortalsPage />
+            </LazyPage>
+          }
+        />
+      ) : null}
       <Route
         path="/teacher"
         element={

@@ -20,7 +20,7 @@ export const demoUsers = [
   {
     id: 1,
     name: 'JUANITO ALVAREZ JR.',
-    email: 'alvarez_juanito@plpasig.edu.ph',
+    email: 'alvarez_juanito@example.com',
     role: 'faculty',
     status: 'active',
     schoolId: 'FAC-2019-0142',
@@ -31,7 +31,7 @@ export const demoUsers = [
   {
     id: 2,
     name: 'RICHELLE DOROTHY BENITEZ',
-    email: 'benitez_richelledorothy@plpasig.edu.ph',
+    email: 'benitez_richelledorothy@example.com',
     role: 'student',
     status: 'active',
     schoolId: '2021-00481',
@@ -42,7 +42,7 @@ export const demoUsers = [
   {
     id: 3,
     name: 'HANZEL GWEN NANEZ',
-    email: 'nanez_hanzelgwen@plpasig.edu.ph',
+    email: 'nanez_hanzelgwen@example.com',
     role: 'student',
     status: 'active',
     schoolId: '2022-01093',
@@ -53,7 +53,7 @@ export const demoUsers = [
   {
     id: 4,
     name: 'AVRIL LAVIGNE PASCUA',
-    email: 'pascua_avrillavigne@plpasig.edu.ph',
+    email: 'pascua_avrillavigne@example.com',
     role: 'student',
     status: 'active',
     schoolId: '2022-01104',
@@ -64,7 +64,7 @@ export const demoUsers = [
   {
     id: 5,
     name: 'KELLY ROWLAND LOLA',
-    email: 'lola_kellyrowland@plpasig.edu.ph',
+    email: 'lola_kellyrowland@example.com',
     role: 'student',
     status: 'inactive',
     schoolId: '2020-00762',
@@ -75,7 +75,7 @@ export const demoUsers = [
   {
     id: 6,
     name: 'RON MICHAEL LEGASPI',
-    email: 'legaspi_ronmichael@plpasig.edu.ph',
+    email: 'legaspi_ronmichael@example.com',
     role: 'student',
     status: 'active',
     schoolId: '2023-01588',
@@ -86,7 +86,7 @@ export const demoUsers = [
   {
     id: 7,
     name: 'CARL AJ JUNIO',
-    email: 'junio_carlaj@plpasig.edu.ph',
+    email: 'junio_carlaj@example.com',
     role: 'student',
     status: 'active',
     schoolId: '2021-00901',
@@ -97,7 +97,7 @@ export const demoUsers = [
   {
     id: 8,
     name: 'REX NAVARRO JR.',
-    email: 'navarrojr_rex@plpasig.edu.ph',
+    email: 'navarrojr_rex@example.com',
     role: 'student',
     status: 'active',
     schoolId: '2021-00499',
@@ -108,7 +108,7 @@ export const demoUsers = [
   {
     id: 9,
     name: 'JOHN EDRIAN MARTINEZ',
-    email: 'martinez_johnedrian@plpasig.edu.ph',
+    email: 'martinez_johnedrian@example.com',
     role: 'student',
     status: 'active',
     schoolId: '2022-01220',
@@ -119,7 +119,7 @@ export const demoUsers = [
   {
     id: 10,
     name: 'MARIA CLARA SANTOS',
-    email: 'santos_mariaclara@plpasig.edu.ph',
+    email: 'santos_mariaclara@example.com',
     role: 'faculty',
     status: 'pending',
     schoolId: 'FAC-2026-0003',
@@ -130,7 +130,7 @@ export const demoUsers = [
   {
     id: 11,
     name: 'ACSIS Administrator',
-    email: 'admin@plpasig.edu.ph',
+    email: 'admin@example.com',
     role: 'admin',
     status: 'active',
     schoolId: 'ADM-001',

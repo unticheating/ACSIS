@@ -11,9 +11,7 @@ async function seedPasswords() {
     
     console.log('✅ Passwords updated! You can now log in normally.');
     console.log('--- Accounts ---');
-    console.log('Admin:   admin@plpasig.edu.ph         / password123');
-    console.log('Teacher: teacher@plpasig.edu.ph  / password123');
-    console.log('Student: student@plpasig.edu.ph  / password123');
+    console.log('Accounts updated for admin, teacher, and student IDs.');
   } catch (err) {
     console.error('Failed:', err.message);
   } finally {

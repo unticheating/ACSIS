@@ -160,7 +160,7 @@ export default function LoginPage() {
           </div>
         ) : null}
         <p className="acsis-immersive__hint acsis-immersive__hint--center">
-          Sign in with your school account.
+          Sign in to continue.
         </p>
         <button type="button" className="acsis-immersive__btn-google" onClick={onGoogle}>
           <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden>
@@ -192,7 +192,7 @@ export default function LoginPage() {
           noValidate
         >
           <p className="acsis-immersive__email-intro">
-            Login with your ACSIS registered email.
+            Use your registered email.
           </p>
           <div className="acsis-immersive__field">
             <label htmlFor="acsis-email">Email</label>
@@ -203,7 +203,7 @@ export default function LoginPage() {
               autoComplete="username"
               value={email}
               onChange={(ev) => setEmail(ev.target.value)}
-              placeholder="you@school.edu.ph"
+              placeholder="you@example.com"
               aria-required="true"
             />
           </div>

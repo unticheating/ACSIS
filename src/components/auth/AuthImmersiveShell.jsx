@@ -1,5 +1,4 @@
 import InstitutionLogo from '@/components/brand/InstitutionLogo.jsx'
-import PlpLogo from '@/components/brand/PlpLogo.jsx'
 
 /** Full-viewport login / verify chrome (same shell as landing). */
 export default function AuthImmersiveShell({ children, showInstitutionHeader = false }) {
@@ -14,9 +13,9 @@ export default function AuthImmersiveShell({ children, showInstitutionHeader = f
       {showInstitutionHeader ? (
         <header className="acsis-immersive__institution">
           <div className="acsis-immersive__logo-mark" aria-hidden>
-            <PlpLogo className="acsis-logo-img" width={28} height={28} alt="" />
+            <InstitutionLogo className="acsis-logo-img" width={28} height={28} alt="" />
           </div>
-          <span>Pamantasan ng Lungsod ng Pasig</span>
+          <span>ACSIS Platform</span>
         </header>
       ) : null}
 

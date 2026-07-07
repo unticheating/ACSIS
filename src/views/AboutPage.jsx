@@ -14,7 +14,7 @@ export default function AboutPage() {
           <h2 className="acsis-immersive__about-title">About ACSIS</h2>
           <p className="acsis-immersive__about-lead">
             ACSIS (Anti-Cheating Student Integrity System) is an online examination platform for
-            Pamantasan ng Lungsod ng Pasig.
+            academic institutions.
           </p>
           <div className="acsis-immersive__about-section">
             <h3>Who it is for</h3>

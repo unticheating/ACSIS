@@ -15,7 +15,7 @@ const STORAGE_SESSION_MODE = 'acsis.sessionMode'
 const STORAGE_ACADEMIC = 'acsis.academic'
 
 /** @type {{ id: string, displayName: string, roleLabel: string, portal: 'admin' | 'teacher' | 'student' | 'super_admin', entryPath: string, avatarLetter: string, isSuperAdmin?: boolean }[]} */
-export const demoAccounts = [
+export const demoAccounts = import.meta.env.DEV ? [
   {
     id: 'super',
     displayName: 'ACSIS Super Admin',
@@ -49,7 +49,7 @@ export const demoAccounts = [
     entryPath: '/student/my-classes',
     avatarLetter: 'R',
   },
-]
+] : []
 
 function loadAcademic() {
   try {
@@ -66,16 +66,20 @@ function loadAcademic() {
 }
 
 function loadAccountId() {
-  // Only use sessionStorage for demo accounts. localStorage should only be for real auth.
-  const id = sessionStorage.getItem(STORAGE_ACCOUNT)
-  if (id && demoAccounts.some((a) => a.id === id)) return id
+  if (import.meta.env.DEV) {
+    // Only use sessionStorage for demo accounts. localStorage should only be for real auth.
+    const id = sessionStorage.getItem(STORAGE_ACCOUNT)
+    if (id && demoAccounts.some((a) => a.id === id)) return id
+  }
   return 'super' // default fallback if no demo account active
 }
 
 function loadSessionMode() {
   // Check sessionStorage first for demo
-  const sMode = sessionStorage.getItem(STORAGE_SESSION_MODE)
-  if (sMode === 'demo') return 'demo'
+  if (import.meta.env.DEV) {
+    const sMode = sessionStorage.getItem(STORAGE_SESSION_MODE)
+    if (sMode === 'demo') return 'demo'
+  }
 
   // Only check localStorage for real auth
   const lMode = localStorage.getItem(STORAGE_SESSION_MODE)
@@ -162,7 +166,7 @@ export function SessionProvider({ children }) {
 
   const isAuthenticated =
     (sessionMode === 'auth' && Boolean(authUser?.portal)) ||
-    (sessionMode === 'demo' && Boolean(demoAccount))
+    (import.meta.env.DEV && sessionMode === 'demo' && Boolean(demoAccount))
 
   useEffect(() => {
     if (sessionMode !== 'demo') return
