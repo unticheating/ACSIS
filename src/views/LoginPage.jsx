@@ -54,11 +54,11 @@ export default function LoginPage() {
         navigate('/change-password', { replace: true })
         return
       }
-      if (activeAccount.entryPath) {
+      if (activeAccount?.entryPath) {
         navigate(activeAccount.entryPath, { replace: true })
       }
     }
-  }, [authLoading, isAuthenticated, authUser?.mustChangePassword, activeAccount.entryPath, location.pathname, navigate])
+  }, [authLoading, isAuthenticated, authUser?.mustChangePassword, activeAccount?.entryPath, location.pathname, navigate])
 
   useEffect(() => {
     if (searchParams.get('auth') !== 'success') return

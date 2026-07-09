@@ -21,8 +21,8 @@ export default function ProtectedRoute({ children, portal }) {
     return <Navigate to="/change-password" replace />
   }
 
-  if (portal && activeAccount.portal !== portal) {
-    return <Navigate to={activeAccount.entryPath} replace />
+  if (portal && activeAccount?.portal !== portal) {
+    return <Navigate to={activeAccount?.entryPath || '/'} replace />
   }
 
   return <LazyPage>{children}</LazyPage>

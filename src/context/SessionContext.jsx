@@ -94,15 +94,26 @@ function loadSessionMode() {
   return null
 }
 
+const PORTAL_ENTRY_PATHS = {
+  super_admin: '/super-admin',
+  admin: '/admin',
+  teacher: '/teacher',
+  student: '/student/my-classes',
+}
+
 /** @param {Record<string, unknown> | null | undefined} user */
 function accountFromAuthUser(user) {
-  if (!user?.portal || !user.entryPath) return null
+  if (!user?.portal) return null
+  const entryPath =
+    (typeof user.entryPath === 'string' && user.entryPath) ||
+    PORTAL_ENTRY_PATHS[user.portal] ||
+    '/'
   return {
     id: `auth-${user.uid}`,
     displayName: user.displayName,
     roleLabel: user.roleLabel || 'User',
     portal: user.portal,
-    entryPath: user.entryPath,
+    entryPath,
     avatarLetter: user.avatarLetter,
     avatarUrl: user.avatarUrl,
     isSuperAdmin: user.isSuperAdmin,
@@ -160,9 +171,10 @@ export function SessionProvider({ children }) {
   const googleAccount = useMemo(() => accountFromAuthUser(authUser), [authUser])
 
   const activeAccount = useMemo(() => {
-    if (sessionMode === 'auth' && googleAccount) return googleAccount
-    return demoAccount
-  }, [sessionMode, googleAccount, demoAccount])
+    if (sessionMode === 'auth' && authUser?.portal) return googleAccount
+    if (import.meta.env.DEV && sessionMode === 'demo') return demoAccount ?? null
+    return null
+  }, [sessionMode, authUser?.portal, googleAccount, demoAccount])
 
   const isAuthenticated =
     (sessionMode === 'auth' && Boolean(authUser?.portal)) ||
