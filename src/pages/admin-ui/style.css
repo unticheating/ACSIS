@@ -3954,3 +3954,53 @@ body.sidebar-open {
         scroll-padding-top: var(--acsis-mobile-top-offset);
     }
 }
+
+/* ========================
+   MONITORING — AUDIT TRAIL
+======================== */
+.admin-audit-section {
+    margin-top: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    width: 100%;
+}
+
+.admin-audit-section__header {
+    width: 100%;
+}
+
+.admin-audit-section .exam-audit-logs__header {
+    align-items: flex-start;
+    gap: 1rem;
+}
+
+.admin-audit-section__title {
+    margin: 0 0 0.35rem;
+    font-size: 1.25rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--foreground, #0f172a);
+}
+
+.admin-audit-section__sub {
+    margin: 0;
+    max-width: 42rem;
+    font-size: 0.9375rem;
+    line-height: 1.5;
+    color: var(--muted-foreground, #64748b);
+}
+
+html.dark .admin-audit-section__title {
+    color: var(--foreground, #f8fafc);
+}
+
+html.dark .admin-audit-section__sub {
+    color: var(--muted-foreground, #94a3b8);
+}
+
+.admin-audit-section .exam-audit-logs__toolbar,
+.admin-audit-section .exam-audit-logs__panel {
+    width: 100%;
+    box-sizing: border-box;
+}

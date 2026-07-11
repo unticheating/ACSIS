@@ -11,6 +11,15 @@ export const EVENT_TYPE_LABELS = {
   exam_code_updated: 'Exam code updated',
   exam_deleted: 'Exam deleted',
   violation_dismissed: 'Violation dismissed',
+  class_created: 'Class created',
+  class_updated: 'Class updated',
+  class_deleted: 'Class deleted',
+  student_enrolled: 'Student enrolled',
+  teacher_login: 'Teacher login',
+  user_login: 'User login',
+  student_login: 'Student login',
+  admin_login: 'Admin login',
+  student_detected: 'Student detected',
 }
 
 export function labelForAuditEvent(eventType) {
@@ -31,6 +40,15 @@ export const AUDIT_EVENT_COLORS = {
   exam_code_updated: { text: '#334155', bg: '#f1f5f9', border: '#94a3b8' },
   exam_deleted: { text: '#b91c1c', bg: '#fef2f2', border: '#fca5a5' },
   violation_dismissed: { text: '#be185d', bg: '#fdf2f8', border: '#f9a8d4' },
+  class_created: { text: '#166534', bg: '#e8f8ed', border: '#86efac' },
+  class_updated: { text: '#334155', bg: '#f1f5f9', border: '#94a3b8' },
+  class_deleted: { text: '#b91c1c', bg: '#fef2f2', border: '#fca5a5' },
+  student_enrolled: { text: '#0e7490', bg: '#e0f7fa', border: '#67e8f9' },
+  teacher_login: { text: '#4338ca', bg: '#eef2ff', border: '#a5b4fc' },
+  user_login: { text: '#4338ca', bg: '#eef2ff', border: '#a5b4fc' },
+  student_login: { text: '#0e7490', bg: '#e0f7fa', border: '#67e8f9' },
+  admin_login: { text: '#6d28d9', bg: '#f5f3ff', border: '#c4b5fd' },
+  student_detected: { text: '#c2410c', bg: '#fff7ed', border: '#fdba74' },
 }
 
 const DEFAULT_AUDIT_EVENT_COLORS = { text: '#334155', bg: '#f1f5f9', border: '#94a3b8' }

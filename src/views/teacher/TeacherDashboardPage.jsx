@@ -222,10 +222,6 @@ export default function TeacherDashboardPage() {
       .then(data => {
         if (Array.isArray(data)) {
           setClasses(data)
-          if (!selectedCourse) {
-            const firstCourse = data.find((c) => c.course_code || c.courseCode)
-            if (firstCourse) setSelectedCourse(firstCourse.course_code || firstCourse.courseCode)
-          }
         }
       })
       .catch(err => console.error('[TeacherDashboardPage] fetch classes', err))
@@ -253,16 +249,7 @@ export default function TeacherDashboardPage() {
     classesByTermId.get(key).push(course)
   }
   const selectableTerms = terms.filter((term) => !term.isArchived && (classesByTermId.get(String(term.id)) || []).length > 0)
-  const selectedTermIds = new Set(selectedSections.map((termId) => String(termId)))
-  const selectedTermIdList = Array.from(selectedTermIds)
   const normalizeCourseText = (value) => String(value || '').trim().replace(/\s+/g, ' ').toLowerCase()
-  const selectedSectionCourses = selectedTermIdList
-    .map((termId) => (classesByTermId.get(termId) || []).map((course) => ({
-      id: String(course.id),
-      courseCode: String(course.courseCode || course.course_code || '').trim(),
-      courseName: String(course.name || '').trim(),
-    })))
-    .filter((courseList) => courseList.length > 0)
 
   const buildCourseKey = (courseCode, courseName) => {
     const normalizedName = normalizeCourseText(courseName)
@@ -270,53 +257,56 @@ export default function TeacherDashboardPage() {
     return normalizedName || normalizedCode
   }
 
-  const multiSectionCourseOptions = selectedSectionCourses.length > 0
-    ? Array.from(
-        selectedSectionCourses.reduce((shared, courseList) => {
-          courseList.forEach((course) => {
-            shared.add(buildCourseKey(course.courseCode, course.courseName))
-          })
-          return shared
-        }, new Set()),
-      )
-        .map((key) => {
-          const matchedCourse = selectedSectionCourses
-            .flat()
-            .find((course) => buildCourseKey(course.courseCode, course.courseName) === key)
-          const courseCode = matchedCourse?.courseCode || ''
-          const courseName = matchedCourse?.courseName || ''
-          return {
-            key,
-            label: courseName || courseCode || 'Course',
-            courseCode,
-            courseName,
-            matchedCourse,
-          }
-        })
-        .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }))
-    : []
-  const canContinue = selectedClassIds.length > 0
+  const allCourseOptions = Array.from(
+    classes.reduce((map, course) => {
+      if (course.isArchived) return map
+      const courseCode = String(course.courseCode || course.course_code || '').trim()
+      const courseName = String(course.name || '').trim()
+      const key = buildCourseKey(courseCode, courseName)
+      if (!key || map.has(key)) return map
+      map.set(key, {
+        key,
+        label: courseName || courseCode || 'Course',
+        courseCode,
+        courseName,
+      })
+      return map
+    }, new Map()).values(),
+  ).sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' }))
+
+  const termHasSelectedCourse = (termId) => {
+    if (!selectedCourse) return true
+    return (classesByTermId.get(String(termId)) || []).some(
+      (course) =>
+        buildCourseKey(
+          String(course.courseCode || course.course_code || '').trim(),
+          String(course.name || '').trim(),
+        ) === selectedCourse,
+    )
+  }
+
+  const canContinue = selectedCourse && selectedClassIds.length > 0
   const visibleExams = exams
 
   useEffect(() => {
-    if (multiSectionCourseOptions.length === 0) {
-      if (selectedCourse) setSelectedCourse('')
+    if (!selectedCourse) {
       if (selectedClassIds.length) setSelectedClassIds([])
       return
     }
-    const currentExists = multiSectionCourseOptions.some((course) => course.key === selectedCourse)
-    if (!currentExists) {
-      if (selectedCourse) setSelectedCourse('')
-      if (selectedClassIds.length) setSelectedClassIds([])
-      return
-    }
-    const ids = selectedSections.flatMap((sid) => classesByTermId.get(String(sid)) || [])
-      .filter((c) => buildCourseKey(String(c.courseCode || c.course_code || '').trim(), String(c.name || '').trim()) === selectedCourse)
-      .map((c) => String(c.id))
+    const ids = selectedSections
+      .flatMap((sid) => classesByTermId.get(String(sid)) || [])
+      .filter(
+        (course) =>
+          buildCourseKey(
+            String(course.courseCode || course.course_code || '').trim(),
+            String(course.name || '').trim(),
+          ) === selectedCourse,
+      )
+      .map((course) => String(course.id))
     if (ids.join(',') !== selectedClassIds.join(',')) {
       setSelectedClassIds(ids)
     }
-  }, [selectedClassIds, classes, selectedSections, selectedCourse, multiSectionCourseOptions])
+  }, [selectedClassIds, classes, selectedSections, selectedCourse])
 
   return (
     <div className="acsis-view">
@@ -564,100 +554,89 @@ export default function TeacherDashboardPage() {
           <DialogHeader>
             <DialogTitle>Create exam — select classes</DialogTitle>
             <DialogDescription>
-              Select one or more sections, then choose the course to create this exam in.
+              Choose a course, then select the section(s) where you teach it.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 overflow-y-auto py-1 pr-1">
+            <div className="grid gap-2">
+              <Label htmlFor="create-exam-course">Course</Label>
+              {allCourseOptions.length === 0 ? (
+                <select
+                  id="create-exam-course"
+                  disabled
+                  className="acsis-class-toolbar__select w-full text-muted-foreground"
+                >
+                  <option>No courses available</option>
+                </select>
+              ) : (
+                <select
+                  id="create-exam-course"
+                  value={selectedCourse || ''}
+                  onChange={(e) => {
+                    const key = e.target.value
+                    setSelectedCourse(key)
+                    setSelectedSections((prev) =>
+                      prev.filter((sectionId) =>
+                        (classesByTermId.get(String(sectionId)) || []).some(
+                          (course) =>
+                            buildCourseKey(
+                              String(course.courseCode || course.course_code || '').trim(),
+                              String(course.name || '').trim(),
+                            ) === key,
+                        ),
+                      ),
+                    )
+                    setSelectedClassIds([])
+                  }}
+                  className="acsis-class-toolbar__select w-full"
+                >
+                  <option value="" disabled hidden>
+                    Select course
+                  </option>
+                  {allCourseOptions.map((course) => (
+                    <option key={course.key} value={course.key}>
+                      {course.label}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
             <div className="grid gap-2">
               <Label>Sections</Label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {selectableTerms.map((term) => {
                   const id = String(term.id)
                   const checked = selectedSections.includes(id)
+                  const sectionDisabled = Boolean(selectedCourse) && !termHasSelectedCourse(id)
                   return (
                     <label
                       key={id}
-                      className="flex items-center gap-2 p-2 border border-border rounded-md hover:bg-muted/50 cursor-pointer"
+                      className={`flex items-center gap-2 p-2 border border-border rounded-md ${
+                        sectionDisabled
+                          ? 'opacity-50 cursor-not-allowed bg-muted/30'
+                          : 'hover:bg-muted/50 cursor-pointer'
+                      }`}
                     >
                       <input
                         type="checkbox"
                         checked={checked}
+                        disabled={sectionDisabled}
                         onChange={(e) => {
                           const next = e.target.checked
                             ? Array.from(new Set([...selectedSections, id]))
                             : selectedSections.filter((s) => s !== id)
                           setSelectedSections(next)
-                          setSelectedCourse('')
-                          setSelectedClassIds([])
                         }}
-                        className="h-4 w-4 rounded border-input"
+                        className="h-4 w-4 rounded border-input disabled:cursor-not-allowed"
                       />
                       <span className="text-sm font-medium">{formatSectionTitle(term)}</span>
                     </label>
                   )
                 })}
               </div>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="create-exam-course">Course</Label>
-              {(() => {
-                const available = selectedSections.flatMap((sid) => classesByTermId.get(String(sid)) || [])
-                
-                if (selectedSections.length === 0) {
-                  return (
-                    <select
-                      id="create-exam-course"
-                      disabled
-                      className="acsis-class-toolbar__select w-full text-muted-foreground"
-                    >
-                      <option>Select section(s) first</option>
-                    </select>
-                  )
-                }
-
-                if (multiSectionCourseOptions.length === 0) {
-                  return (
-                    <select
-                      id="create-exam-course"
-                      disabled
-                      className="acsis-class-toolbar__select w-full text-muted-foreground"
-                    >
-                      <option>No courses available for selected section(s)</option>
-                    </select>
-                  )
-                }
-
-                return (
-                  <select
-                    id="create-exam-course"
-                    value={selectedCourse || ''}
-                    onChange={(e) => {
-                      const key = e.target.value
-                      setSelectedCourse(key)
-                      const ids = available
-                        .filter(
-                          (c) =>
-                            buildCourseKey(
-                              String(c.courseCode || c.course_code || '').trim(),
-                              String(c.name || '').trim(),
-                            ) === key,
-                        )
-                        .map((c) => String(c.id))
-                      setSelectedClassIds(ids)
-                    }}
-                    className="acsis-class-toolbar__select w-full"
-                  >
-                    <option value="" disabled hidden>
-                      Select course
-                    </option>
-                    {multiSectionCourseOptions.map((course) => (
-                      <option key={course.key} value={course.key}>
-                        {course.label}
-                      </option>
-                    ))}
-                  </select>
-                )
-              })()}
+              {!selectedCourse ? (
+                <p className="text-xs text-muted-foreground">Select a course to see which sections are available.</p>
+              ) : null}
             </div>
           </div>
           <DialogFooter>

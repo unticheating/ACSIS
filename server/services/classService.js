@@ -10,6 +10,7 @@ import {
   updateTeacherClassQuery,
   deactivateTeacherClassQuery,
 } from '../repositories/classRepository.js';
+import { checkEnrollment, unenrollStudent } from '../repositories/studentRepository.js';
 import { recordTeacherActivityQuery } from '../repositories/teacherActivityRepository.js'
 
 const CLASS_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -92,6 +93,24 @@ export async function getTeacherClassEnrollmentsService(memberId, classId) {
   } catch (err) {
     console.error('[classService.getTeacherClassEnrollments]', err);
     return { ok: false, error: 'Database error.' };
+  }
+}
+
+export async function removeTeacherClassEnrollmentService(teacherMemberId, classId, studentMemberId) {
+  try {
+    const cls = await getTeacherClassByIdQuery(classId, teacherMemberId);
+    if (!cls) {
+      return { ok: false, status: 404, error: 'Class not found.' };
+    }
+    const enrolled = await checkEnrollment(studentMemberId, classId);
+    if (!enrolled) {
+      return { ok: false, status: 404, error: 'Student is not enrolled in this class.' };
+    }
+    await unenrollStudent(studentMemberId, classId);
+    return { ok: true };
+  } catch (err) {
+    console.error('[classService.removeTeacherClassEnrollment]', err);
+    return { ok: false, error: 'Failed to remove student from class.' };
   }
 }
 

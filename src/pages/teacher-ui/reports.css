@@ -1700,6 +1700,13 @@ html.dark .reports-page.exam-audit-logs .exam-audit-logs__search-input:focus-vis
   border-color: color-mix(in srgb, #ec4899 36%, transparent);
 }
 
+.reports-page.exam-audit-logs .exam-audit-logs__badge--user_login,
+.reports-page.exam-audit-logs .exam-audit-logs__badge--teacher_login {
+  color: #4338ca;
+  background: color-mix(in srgb, #6366f1 14%, var(--rp-surface-muted));
+  border-color: color-mix(in srgb, #6366f1 34%, transparent);
+}
+
 .reports-page.exam-audit-logs .exam-audit-logs__empty {
   display: flex;
   flex-direction: column;

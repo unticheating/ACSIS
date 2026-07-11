@@ -1,32 +1,21 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
-import { Activity, AlertTriangle, Eye } from 'lucide-react'
-import { fetchAdminMonitoring, formatRelativeTime } from '@/lib/adminMonitoringApi.js'
+import { Activity, AlertTriangle, Download, Eye } from 'lucide-react'
+import { fetchAdminMonitoring } from '@/lib/adminMonitoringApi.js'
 import {
   fetchAdminViolationDetail,
   fetchAdminViolations,
   formatViolationDate,
-  violationStatusClass,
   issueViolationTicket,
 } from '@/lib/adminViolationsApi.js'
 import FadeIn from '@/components/ui/fade-in.jsx'
-import { Download } from 'lucide-react'
 import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
 import { resolveMaxWarnings } from '@/lib/examAntiCheat.js'
 import { useInstitutionTheme } from '@/context/InstitutionThemeContext.jsx'
 import { useAcsisConfirm } from '@/hooks/useAcsisConfirm.jsx'
 import AdminDetectedStudentList from '@/components/admin/AdminDetectedStudentList.jsx'
+import AdminAuditTrailPanel from '@/components/admin/AdminAuditTrailPanel.jsx'
 import ViolationDetailModal from '@/views/admin/ViolationDetailModal.jsx'
 import '../../pages/admin-ui/style.css'
-
-const ACTIVITY_FULL_LIMIT = 50
-
-function getOrdinal(n) {
-  if (n <= 0) return ''
-  const s = ['th', 'st', 'nd', 'rd']
-  const v = n % 100
-  return n + (s[(v - 20) % 10] || s[v] || s[0])
-}
 
 function exportViolationsCsv(violations) {
   const headers = ['Student', 'Exam', 'Date', 'Strikes', 'Status']
@@ -48,65 +37,11 @@ function exportViolationsCsv(violations) {
   document.body.removeChild(link)
 }
 
-function ActivityFeedItems({ activities, loading, startDelay = 0.25 }) {
-  if (loading) {
-    return <p className="um-loading">Loading activity…</p>
-  }
-  if (activities.length === 0) {
-    return <p className="admin-placeholder-lead">No recent exam activity.</p>
-  }
-  return (
-    <div className="activity-feed">
-      {activities.map((act, index) => (
-        <FadeIn
-          key={`${act.status}-${act.id}`}
-          delay={startDelay + index * 0.05}
-          className={`activity-item${act.dismissed ? ' activity-item--dismissed' : ''}`}
-        >
-          <div className="activity-left">
-            <div className={`activity-avatar-ring ring-${act.status}`}>
-              {act.avatarUrl ? (
-                <img src={act.avatarUrl} alt="" className="activity-avatar" />
-              ) : (
-                <span className="activity-avatar activity-avatar--placeholder">
-                  {(act.name || '?')[0]}
-                </span>
-              )}
-            </div>
-            <div className="activity-info">
-              <div className="activity-name">
-                {act.name}
-                {act.dismissed ? <span className="activity-dismissed-badge">Dismissed</span> : null}
-              </div>
-              <div className="activity-sub">
-                {act.warningOrdinal > 0 ? `${getOrdinal(act.warningOrdinal)} warning` : 'Activity recorded'}
-              </div>
-              <div className="activity-meta">
-                {act.exam}
-                {act.className ? ` · ${act.className}` : ''}
-                {act.professorName ? ` · Prof. ${act.professorName}` : ''}
-              </div>
-            </div>
-          </div>
-          <div className="activity-right">
-            <span className="activity-action-chip">{act.event}</span>
-            <span className="activity-time">{formatRelativeTime(act.time) || 'now'}</span>
-          </div>
-        </FadeIn>
-      ))}
-    </div>
-  )
-}
-
 export default function AdminMonitoringPage() {
   const { acronym } = useInstitutionTheme()
   const { confirm, ConfirmDialog } = useAcsisConfirm()
-  const [searchParams] = useSearchParams()
-  const showAllActivity = searchParams.get('view') === 'activity'
 
   const [stats, setStats] = useState({ activeSessions: 0, beingMonitored: 0, recentAlerts: 0 })
-  const [activities, setActivities] = useState([])
-  const [hasMoreActivity, setHasMoreActivity] = useState(false)
   const [violations, setViolations] = useState([])
   const [violationsCount, setViolationsCount] = useState(0)
   const [maxWarnings, setMaxWarnings] = useState(3)
@@ -127,21 +62,16 @@ export default function AdminMonitoringPage() {
     }
     try {
       const [monitorData, violationData] = await Promise.all([
-        fetchAdminMonitoring(
-          showAllActivity ? { activityLimit: ACTIVITY_FULL_LIMIT } : undefined,
-        ),
+        fetchAdminMonitoring(),
         fetchAdminViolations(),
       ])
       if (isBackground) setError(null)
       setStats(monitorData.stats || {})
-      setActivities(monitorData.activities || [])
-      setHasMoreActivity(Boolean(monitorData.hasMoreActivity))
       setViolations(violationData.violations || [])
       setViolationsCount(violationData.count ?? violationData.violations?.length ?? 0)
       setMaxWarnings(violationData.maxWarnings ?? 3)
     } catch (err) {
       if (!isBackground) {
-        setActivities([])
         setViolations([])
       }
       const msg = err instanceof Error ? err.message : 'Failed to load monitoring data.'
@@ -150,7 +80,7 @@ export default function AdminMonitoringPage() {
     } finally {
       if (!isBackground) setLoading(false)
     }
-  }, [showAllActivity])
+  }, [])
 
   async function viewViolation(sessionId) {
     setDetailOpen(true)
@@ -207,7 +137,7 @@ export default function AdminMonitoringPage() {
           <span className="brand-plp">{acronym || 'PLP'}</span>
           <span className="brand-acsis"> ACSIS</span>
           <span className="sep">/</span>
-          <span className="page-name">Monitoring</span>
+          <span className="page-name">Monitoring and Audit</span>
         </div>
       </div>
 
@@ -301,32 +231,7 @@ export default function AdminMonitoringPage() {
           })()}
         </FadeIn>
 
-        <FadeIn delay={0.3} className="panel" id="admin-activity-feed">
-          <div className="panel-header">
-            <span className="panel-title">Live activity feed across all classes</span>
-            {!showAllActivity && hasMoreActivity ? (
-              <Link to="/admin/monitoring?view=activity" className="panel-view-all">
-                View All
-              </Link>
-            ) : showAllActivity ? (
-              <Link to="/admin/monitoring" className="panel-view-all">
-                Show less
-              </Link>
-            ) : (
-              <button type="button" className="panel-view-all" onClick={() => load(false)} disabled={loading}>
-                Refresh
-              </button>
-            )}
-          </div>
-          <ActivityFeedItems activities={activities} loading={loading} startDelay={0.35} />
-          {!loading && !showAllActivity && hasMoreActivity ? (
-            <div className="panel-footer-link">
-              <Link to="/admin/monitoring?view=activity" className="panel-view-all panel-view-all--footer">
-                View All
-              </Link>
-            </div>
-          ) : null}
-        </FadeIn>
+        <AdminAuditTrailPanel />
       </div>
 
       {ConfirmDialog}

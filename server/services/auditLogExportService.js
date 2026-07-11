@@ -1,6 +1,7 @@
 import PDFDocument from 'pdfkit'
-import { listExamAuditLogsFilteredQuery } from '../repositories/teacherActivityRepository.js'
+import { listExamAuditLogsFilteredQuery, listInstitutionAuditLogsFilteredQuery } from '../repositories/teacherActivityRepository.js'
 import { getMemberDisplayNameQuery } from '../repositories/examResultsRepository.js'
+import { getPool } from '../db.js'
 import {
   formatAuditDetails,
   formatAuditSectionLabel,
@@ -48,6 +49,7 @@ function formatFilterDate(value) {
 function describeFilters(filters = {}) {
   const parts = []
   if (filters.eventType) parts.push(`Action: ${labelForAuditEvent(filters.eventType)}`)
+  if (filters.teacherName) parts.push(`User: ${filters.teacherName}`)
   if (filters.examTitle) parts.push(`Quiz: ${filters.examTitle}`)
   if (filters.sectionLabel) parts.push(`Section: ${filters.sectionLabel}`)
   if (filters.dateFrom || filters.dateTo) {
@@ -59,8 +61,10 @@ function describeFilters(filters = {}) {
   return parts.length ? parts.join(' · ') : 'All entries (no filters applied)'
 }
 
-function auditColWidths() {
-  const fractions = [0.14, 0.19, 0.18, 0.14, 0.35]
+function auditColWidths(includeTeacher = false) {
+  const fractions = includeTeacher
+    ? [0.11, 0.15, 0.13, 0.15, 0.12, 0.34]
+    : [0.14, 0.19, 0.18, 0.14, 0.35]
   const widths = fractions.map((f) => Math.floor(CONTENT_WIDTH * f))
   const remainder = CONTENT_WIDTH - widths.reduce((sum, w) => sum + w, 0)
   widths[widths.length - 1] += remainder
@@ -166,6 +170,8 @@ async function buildAuditLogsPdfBuffer({
   generatedAt = new Date(),
   teacherLogoBase64,
   departmentName,
+  title = 'Exam audit logs',
+  includeTeacher = false,
 }) {
   const doc = new PDFDocument({ size: 'A4', margin: MARGIN, bufferPages: true })
   const chunks = []
@@ -177,7 +183,7 @@ async function buildAuditLogsPdfBuffer({
   })
 
   drawReportHeader(doc, {
-    exam: { title: 'Exam audit logs' },
+    exam: { title },
     cls: {},
     generatorName,
     generatedAt,
@@ -189,8 +195,10 @@ async function buildAuditLogsPdfBuffer({
     ],
   })
 
-  const colWidths = auditColWidths()
-  const headers = ['Date', 'Action', 'Quiz', 'Section', 'Details']
+  const colWidths = auditColWidths(includeTeacher)
+  const headers = includeTeacher
+    ? ['Date', 'Action', 'User', 'Quiz', 'Section', 'Details']
+    : ['Date', 'Action', 'Quiz', 'Section', 'Details']
   drawTableHeader(doc, colWidths, headers)
 
   if (logs.length === 0) {
@@ -199,18 +207,23 @@ async function buildAuditLogsPdfBuffer({
     doc.text('No audit log entries match the current filters.', MARGIN, doc.y)
   } else {
     for (const log of logs) {
-      drawTableRow(
-        doc,
-        colWidths,
-        [
-          formatPdfDate(log.occurredAt),
-          labelForAuditEvent(log.eventType),
-          log.examTitle || '—',
-          formatAuditSectionLabel(log),
-          formatAuditDetails(log),
-        ],
-        log.eventType,
-      )
+      const cells = includeTeacher
+        ? [
+            formatPdfDate(log.occurredAt),
+            labelForAuditEvent(log.eventType),
+            log.teacherName || '—',
+            log.examTitle || '—',
+            formatAuditSectionLabel(log),
+            formatAuditDetails(log),
+          ]
+        : [
+            formatPdfDate(log.occurredAt),
+            labelForAuditEvent(log.eventType),
+            log.examTitle || '—',
+            formatAuditSectionLabel(log),
+            formatAuditDetails(log),
+          ]
+      drawTableRow(doc, colWidths, cells, log.eventType)
     }
   }
 
@@ -252,5 +265,51 @@ export async function exportTeacherActivityLogsService(teacherMemberId, filters 
   } catch (err) {
     console.error('[auditLogExportService.exportTeacherActivityLogs]', err)
     return { ok: false, status: 500, error: 'Failed to export audit logs.' }
+  }
+}
+
+async function getInstitutionName(institutionId) {
+  const pool = getPool()
+  const { rows } = await pool.query(
+    `SELECT institution_name FROM institutions WHERE institution_id = $1 LIMIT 1`,
+    [institutionId],
+  )
+  return rows[0]?.institution_name || 'Institution'
+}
+
+export async function exportAdminActivityLogsService(institutionId, filters = {}) {
+  try {
+    const logs = await listInstitutionAuditLogsFilteredQuery(institutionId, {
+      limit: 500,
+      eventType: filters.eventType || '',
+      examId: filters.examId || '',
+      sectionKey: filters.sectionKey || '',
+      teacherMemberId: filters.teacherMemberId || '',
+      search: filters.search || '',
+      dateFrom: filters.dateFrom || '',
+      dateTo: filters.dateTo || '',
+    })
+
+    const institutionName = await getInstitutionName(institutionId)
+    const pdf = await buildAuditLogsPdfBuffer({
+      logs,
+      generatorName: institutionName,
+      filters,
+      generatedAt: new Date(),
+      title: 'Institution audit trail',
+      includeTeacher: true,
+    })
+
+    const stamp = new Date().toISOString().slice(0, 10)
+    return {
+      ok: true,
+      contentType: 'application/pdf',
+      filename: `acsis-institution-audit-${stamp}.pdf`,
+      body: pdf,
+      count: logs.length,
+    }
+  } catch (err) {
+    console.error('[auditLogExportService.exportAdminActivityLogs]', err)
+    return { ok: false, status: 500, error: 'Failed to export audit trail.' }
   }
 }

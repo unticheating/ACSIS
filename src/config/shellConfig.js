@@ -32,7 +32,7 @@ export const shellConfig = {
   admin: {
     nav: [
       { to: '/admin', label: 'Dashboard', end: true, icon: LayoutDashboard },
-      { to: '/admin/monitoring', label: 'Monitoring', icon: Radio },
+      { to: '/admin/monitoring', label: 'Monitoring and Audit', icon: Radio },
       { to: '/admin/violations', label: 'Violation Records', mobileLabel: 'Violations', icon: Shield },
       { to: '/admin/users', label: 'User Management', mobileLabel: 'Users', icon: UsersRound },
       { to: '/admin/settings', label: 'Institution settings', mobileLabel: 'Settings', icon: Settings },

@@ -4,6 +4,7 @@ import {
   getTeacherClasses,
   getTeacherDashboard,
   getTeacherClassEnrollments,
+  deleteTeacherClassEnrollment,
   updateTeacherClass,
   deleteTeacherClass,
   getTeacherClass,
@@ -62,6 +63,7 @@ router.post('/', createTeacherClass);
 // Single class (before /:classId/exams)
 router.get('/:classId', getTeacherClass);
 router.get('/:classId/enrollments', getTeacherClassEnrollments);
+router.delete('/:classId/enrollments/:memberId', deleteTeacherClassEnrollment);
 router.patch('/:classId', updateTeacherClass);
 router.delete('/:classId', deleteTeacherClass);
 

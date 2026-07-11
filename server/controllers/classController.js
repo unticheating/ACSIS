@@ -4,6 +4,7 @@ import {
   getTeacherClassesService,
   getTeacherDashboardStatsService,
   getTeacherClassEnrollmentsService,
+  removeTeacherClassEnrollmentService,
   updateTeacherClassService,
   deleteTeacherClassService,
   getTeacherClassByIdService,
@@ -86,6 +87,19 @@ export async function getTeacherClassEnrollments(req, res) {
     return res.status(result.status || 500).json({ error: result.error });
   }
   return res.json(result.students);
+}
+
+export async function deleteTeacherClassEnrollment(req, res) {
+  const classId = Number(req.params.classId);
+  const studentMemberId = Number(req.params.memberId);
+  if (!Number.isFinite(classId) || !Number.isFinite(studentMemberId)) {
+    return res.status(400).json({ error: 'Invalid class or student id.' });
+  }
+  const result = await removeTeacherClassEnrollmentService(req.memberId, classId, studentMemberId);
+  if (!result.ok) {
+    return res.status(result.status || 500).json({ error: result.error });
+  }
+  return res.json({ ok: true });
 }
 
 export async function getTeacherClass(req, res) {

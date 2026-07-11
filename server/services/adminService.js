@@ -3,11 +3,9 @@ import {
   getAdminDashboardStatsQuery,
   getInstitutionMaxWarnings,
   getMonitoringStatsQuery,
-  listActiveMonitoringSessionsQuery,
   listAdminReportsQuery,
   listDetectedStudentsQuery,
   listExamsForInstitutionQuery,
-  listMonitoringActivityQuery,
   listOngoingExamsQuery,
   getViolationSessionDetailQuery,
   issueViolationTicketQuery,
@@ -15,15 +13,10 @@ import {
   updateClassQuery,
 } from '../repositories/adminRepository.js'
 import { listAdminClassesQuery } from '../repositories/classRepository.js'
+import { listInstitutionAuditLogsFilteredQuery } from '../repositories/teacherActivityRepository.js'
 
 /** Max rows shown per list on the admin dashboard preview. */
 export const ADMIN_DASHBOARD_PREVIEW_LIMIT = 5
-
-/** Live activity feed preview on the monitoring page. */
-export const ADMIN_ACTIVITY_PREVIEW_LIMIT = 6
-
-/** Full activity feed when admin opens "View all". */
-export const ADMIN_ACTIVITY_FULL_LIMIT = 50
 
 export async function getAdminDashboardService(institutionId) {
   try {
@@ -111,32 +104,9 @@ export async function getViolationSessionDetailService(institutionId, sessionId)
   }
 }
 
-export async function getMonitoringService(institutionId, { activityLimit } = {}) {
+export async function getMonitoringService(institutionId) {
   try {
-    const fullLimit = ADMIN_ACTIVITY_FULL_LIMIT
-    const previewLimit = ADMIN_ACTIVITY_PREVIEW_LIMIT
-    const requested =
-      activityLimit != null && Number.isFinite(Number(activityLimit))
-        ? Math.min(Math.max(1, Math.floor(Number(activityLimit))), fullLimit)
-        : previewLimit
-
-    const [stats, cheatFeed, activeSessions] = await Promise.all([
-      getMonitoringStatsQuery(institutionId),
-      listMonitoringActivityQuery(institutionId, fullLimit),
-      listActiveMonitoringSessionsQuery(institutionId),
-    ])
-
-    const seen = new Set(cheatFeed.map((a) => `log-${a.id}`))
-    const merged = [...cheatFeed]
-    for (const session of activeSessions) {
-      if (!seen.has(`session-${session.id}`) && merged.length < fullLimit) {
-        merged.unshift(session)
-      }
-    }
-
-    const allActivities = merged.slice(0, fullLimit)
-    const activities = allActivities.slice(0, requested)
-
+    const stats = await getMonitoringStatsQuery(institutionId)
     return {
       ok: true,
       stats: {
@@ -144,14 +114,29 @@ export async function getMonitoringService(institutionId, { activityLimit } = {}
         beingMonitored: Number(stats?.beingMonitored || 0),
         recentAlerts: Number(stats?.recentAlerts || 0),
       },
-      activities,
-      activityTotal: allActivities.length,
-      hasMoreActivity: allActivities.length > previewLimit,
-      activityPreviewLimit: previewLimit,
     }
   } catch (err) {
     console.error('[adminService.getMonitoring]', err)
     return { ok: false, error: 'Database error.' }
+  }
+}
+
+export async function getAdminActivityLogsService(institutionId, query = {}) {
+  try {
+    const logs = await listInstitutionAuditLogsFilteredQuery(institutionId, {
+      limit: query.limit,
+      eventType: query.eventType || '',
+      examId: query.examId || '',
+      sectionKey: query.sectionKey || '',
+      teacherMemberId: query.teacherMemberId || '',
+      search: query.search || '',
+      dateFrom: query.dateFrom || '',
+      dateTo: query.dateTo || '',
+    })
+    return { ok: true, logs }
+  } catch (err) {
+    console.error('[adminService.getAdminActivityLogs]', err)
+    return { ok: false, status: 500, error: 'Failed to load audit trail.' }
   }
 }
 

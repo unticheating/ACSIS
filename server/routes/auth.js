@@ -40,7 +40,7 @@ import {
   sessionAllowsLogin,
 } from '../lib/users.js'
 import { requireAuth } from '../lib/sessionAuth.js'
-import { recordTeacherActivityQuery } from '../repositories/teacherActivityRepository.js'
+import { recordUserLogin } from '../lib/userLoginAudit.js'
 
 const router = Router()
 
@@ -93,27 +93,12 @@ async function finishLoginWithoutVerification(pool, uid, res, opts = {}) {
   }
   setSessionCookie(res, session)
   clearPendingVerifyCookie(res)
-  if (session.portal === 'teacher' && session.memberId) {
-    void recordTeacherActivityQuery({
-      teacherMemberId: session.memberId,
-      eventType: 'teacher_login',
-      details: 'Signed in',
-    }).catch((err) => {
-      console.error('[auth/teacher-login-log]', err)
-    })
-  }
+  recordUserLogin(session, 'Signed in')
   return { ok: true, session }
 }
 
-function recordTeacherLogin(session, details) {
-  if (session?.portal !== 'teacher' || !session?.memberId) return
-  void recordTeacherActivityQuery({
-    teacherMemberId: session.memberId,
-    eventType: 'teacher_login',
-    details,
-  }).catch((err) => {
-    console.error('[auth/teacher-login-log]', err)
-  })
+function recordSessionLogin(session, method) {
+  recordUserLogin(session, method)
 }
 
 router.get('/google', async (_req, res) => {
@@ -215,16 +200,6 @@ router.post('/start-verification', async (req, res) => {
     const result = await authenticateAdministrator(pool, email, password)
     if (!result.ok) {
       return res.status(result.status).json({ error: result.error })
-    }
-
-    if (result.session.portal === 'teacher' && result.session.memberId) {
-      void recordTeacherActivityQuery({
-        teacherMemberId: result.session.memberId,
-        eventType: 'teacher_login',
-        details: 'Signed in with password',
-      }).catch((err) => {
-        console.error('[auth/teacher-login-log]', err)
-      })
     }
 
     if (!result.session.entryPath && !sessionAllowsLogin(result.session)) {
@@ -334,7 +309,7 @@ router.post('/verify-email', async (req, res) => {
 
     setSessionCookie(res, session)
     clearPendingVerifyCookie(res)
-    recordTeacherLogin(session, 'Verified email and signed in')
+    recordSessionLogin(session, 'Verified email and signed in')
 
     return res.json({
       ok: true,
@@ -368,7 +343,7 @@ router.post('/login', async (req, res) => {
 
     setSessionCookie(res, fullSession)
     clearPendingVerifyCookie(res)
-    recordTeacherLogin(fullSession, 'Signed in with password')
+    recordSessionLogin(fullSession, 'Signed in with password')
     return res.json({ ok: true, user: fullSession })
   } catch (err) {
     console.error('[auth/login]', err)
