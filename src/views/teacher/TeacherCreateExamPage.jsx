@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams, useNavigate } from 'react-router-dom'
-import { Clock, Plus, Shuffle, Trash2, ArrowLeft, GripVertical, Layers, ImageIcon, X, Pencil, Copy, Calculator, Settings, Eye, EyeOff, Printer } from 'lucide-react'
+import { Clock, Plus, Shuffle, Trash2, ArrowLeft, GripVertical, Layers, ImageIcon, X, Pencil, Copy, Settings, Eye, EyeOff, Printer } from 'lucide-react'
 import { Label } from '@/components/ui/label.jsx'
 import { Button } from '@/components/ui/button.jsx'
 import { Input } from '@/components/ui/input.jsx'
@@ -13,9 +13,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog.jsx'
 import { apiFetch } from '@/lib/apiFetch.js'
-import { formatSemesterLabel } from '@/lib/sectionLabel.js'
+import { formatSectionTitle } from '@/lib/sectionLabel.js'
+import { copyToClipboard } from '@/lib/copyToClipboard.js'
 import { sumExamTotalPoints } from '@/lib/examPoints.js'
-import { COPY } from '@/lib/examFlowUi.js'
 import {
   getScrollableParent,
   isDocumentScrollRoot,
@@ -62,6 +62,7 @@ import {
 } from '@/lib/matchingQuestion.js'
 import { DEFAULT_DIAGRAM_VARIANT, emptyDiagramData } from '@/lib/diagramQuestion.js'
 import '../../pages/teacher-ui/create_exam.css'
+import '../../pages/teacher-ui/my_classes.css'
 
 function emptyMatchingPairsState() {
   return [emptyMatchingPair()]
@@ -83,21 +84,44 @@ export default function TeacherCreateExamPage() {
   const classesQuery = searchParams.get('classes') || ''
   const editExamIdParam = searchParams.get('examId') || ''
   const isEditMode = Boolean(editExamIdParam)
-  const [selectedClass, setSelectedClass] = useState(searchParams.get('classId') || (classesQuery ? classesQuery.split(',')[0] : ''))
-  const [createForClasses, setCreateForClasses] = useState(classesQuery ? classesQuery.split(',') : [])
+  const initialClassIds = useMemo(() => {
+    const fromQuery = classesQuery ? classesQuery.split(',').map((id) => id.trim()).filter(Boolean) : []
+    const fromClassId = searchParams.get('classId')?.trim()
+    if (fromQuery.length) return fromQuery
+    if (fromClassId) return [fromClassId]
+    return []
+  }, [classesQuery, searchParams])
+  const [selectedClassIds, setSelectedClassIds] = useState(initialClassIds)
+  const selectedClass = selectedClassIds[0] || ''
   const preselectedCourse = searchParams.get('course') || ''
+  const [selectedCourse, setSelectedCourse] = useState(preselectedCourse)
+  const [selectedSections, setSelectedSections] = useState([])
+  const [terms, setTerms] = useState([])
 
   useEffect(() => {
-    apiFetch('/api/teacher/classes')
-      .then((res) => res.json())
-      .then(data => {
-        setClasses(data)
+    Promise.all([
+      apiFetch('/api/teacher/classes').then((res) => res.json()),
+      apiFetch('/api/teacher/terms?archived=true').then((res) => res.json()),
+    ])
+      .then(([classData, termData]) => {
+        const loadedClasses = Array.isArray(classData) ? classData : []
+        setClasses(loadedClasses)
+        setTerms(Array.isArray(termData) ? termData : [])
         setLoadingClasses(false)
-        if (!selectedClass && data.length > 0) {
-          setSelectedClass(String(data[0].id))
+        if (!initialClassIds.length && loadedClasses.length > 0) {
+          const first = loadedClasses[0]
+          const key =
+            String(first.name || '').trim().toLowerCase() ||
+            String(first.courseCode || first.course_code || '').trim().toLowerCase()
+          if (key) {
+            setSelectedCourse((prev) => prev || key)
+          }
+          if (first.termId != null) {
+            setSelectedSections((prev) => (prev.length ? prev : [String(first.termId)]))
+          }
         }
       })
-      .catch(err => {
+      .catch((err) => {
         console.error(err)
         setLoadingClasses(false)
       })
@@ -138,6 +162,9 @@ export default function TeacherCreateExamPage() {
         setScheduledStart(exam.scheduledStart || '')
         setScheduledEnd(exam.scheduledEnd || '')
         setIsAutoPublish(!!exam.isAutoPublish)
+        setExamCode(exam.code || '')
+        primaryClassIdRef.current = selectedClass
+        mirroredExamIdsRef.current = { [String(selectedClass)]: String(exam.id) }
         setLastSaved(new Date())
       } catch (err) {
         if (!cancelled) {
@@ -156,8 +183,11 @@ export default function TeacherCreateExamPage() {
 
   const [examTitle, setExamTitle] = useState('')
   const [examDescription, setExamDescription] = useState('')
-  const [examPassword, setExamPassword] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
+  const [examCode, setExamCode] = useState('')
+  const [examCodeVisible, setExamCodeVisible] = useState(false)
+  const [examCodeEditing, setExamCodeEditing] = useState(false)
+  const [examCodeDraft, setExamCodeDraft] = useState('')
+  const [examCodeSaving, setExamCodeSaving] = useState(false)
   const [scheduledStart, setScheduledStart] = useState('')
   const [scheduledEnd, setScheduledEnd] = useState('')
   const [isAutoPublish, setIsAutoPublish] = useState(false)
@@ -213,6 +243,11 @@ export default function TeacherCreateExamPage() {
   const scrollSpyRafRef = useRef(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [isPrintingPaper, setIsPrintingPaper] = useState(false)
+  const saveInFlightRef = useRef(/** @type {Promise<{ ok: boolean, examId: string | null, error?: string }> | null} */ (null))
+  /** Class that owns `examId` — stays fixed after first create so reordering sections does not break updates. */
+  const primaryClassIdRef = useRef(/** @type {string | null} */ (editExamIdParam ? (searchParams.get('classId') || initialClassIds[0] || null) : null))
+  /** Other section class IDs → their duplicated exam IDs (new exams only). */
+  const mirroredExamIdsRef = useRef(/** @type {Record<string, string>} */ ({}))
   const [draggingQuestionType, setDraggingQuestionType] = useState(/** @type {string | null} */ (null))
 
   // Bulk Points Modal States
@@ -725,6 +760,116 @@ export default function TeacherCreateExamPage() {
     [sections],
   )
 
+  const normalizeCourseText = useCallback(
+    (value) => String(value || '').trim().replace(/\s+/g, ' ').toLowerCase(),
+    [],
+  )
+
+  const buildCourseKey = useCallback(
+    (courseCode, courseName) => {
+      const normalizedName = normalizeCourseText(courseName)
+      const normalizedCode = normalizeCourseText(courseCode)
+      return normalizedName || normalizedCode
+    },
+    [normalizeCourseText],
+  )
+
+  const classesByTermId = useMemo(() => {
+    const map = new Map()
+    for (const course of classes) {
+      if (course.termId == null) continue
+      const key = String(course.termId)
+      if (!map.has(key)) map.set(key, [])
+      map.get(key).push(course)
+    }
+    return map
+  }, [classes])
+
+  const selectableTerms = useMemo(
+    () => terms.filter((term) => !term.isArchived && (classesByTermId.get(String(term.id)) || []).length > 0),
+    [terms, classesByTermId],
+  )
+
+  const allCourseOptions = useMemo(
+    () =>
+      Array.from(
+        classes.reduce((map, course) => {
+          if (course.isArchived) return map
+          const courseCode = String(course.courseCode || course.course_code || '').trim()
+          const courseName = String(course.name || '').trim()
+          const key = buildCourseKey(courseCode, courseName)
+          if (!key || map.has(key)) return map
+          map.set(key, {
+            key,
+            label: courseName || courseCode || 'Course',
+            courseCode,
+            courseName,
+          })
+          return map
+        }, new Map()).values(),
+      ).sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' })),
+    [classes, buildCourseKey],
+  )
+
+  const termHasSelectedCourse = useCallback(
+    (termId) => {
+      if (!selectedCourse) return true
+      return (classesByTermId.get(String(termId)) || []).some(
+        (course) =>
+          buildCourseKey(
+            String(course.courseCode || course.course_code || '').trim(),
+            String(course.name || '').trim(),
+          ) === selectedCourse,
+      )
+    },
+    [selectedCourse, classesByTermId, buildCourseKey],
+  )
+
+  useEffect(() => {
+    if (!classes.length || !initialClassIds.length || selectedSections.length) return
+    const termIds = [
+      ...new Set(
+        initialClassIds
+          .map((id) => classes.find((course) => String(course.id) === String(id))?.termId)
+          .filter((termId) => termId != null)
+          .map(String),
+      ),
+    ]
+    if (termIds.length) {
+      setSelectedSections(termIds)
+    }
+    if (!preselectedCourse && initialClassIds.length) {
+      const first = classes.find((course) => String(course.id) === String(initialClassIds[0]))
+      if (first) {
+        const key = buildCourseKey(
+          String(first.courseCode || first.course_code || '').trim(),
+          String(first.name || '').trim(),
+        )
+        if (key) setSelectedCourse(key)
+      }
+    }
+  }, [classes, initialClassIds, preselectedCourse, selectedSections.length, buildCourseKey])
+
+  useEffect(() => {
+    if (!selectedCourse) {
+      if (selectedClassIds.length) setSelectedClassIds([])
+      return
+    }
+    const ids = selectedSections
+      .flatMap((sid) => classesByTermId.get(String(sid)) || [])
+      .filter(
+        (course) =>
+          buildCourseKey(
+            String(course.courseCode || course.course_code || '').trim(),
+            String(course.name || '').trim(),
+          ) === selectedCourse,
+      )
+      .map((course) => String(course.id))
+    if (ids.join(',') !== selectedClassIds.join(',')) {
+      setSelectedClassIds(ids)
+    }
+  }, [selectedClassIds, classesByTermId, selectedSections, selectedCourse, buildCourseKey])
+
   const totalPoints = useMemo(
     () =>
       sections.reduce(
@@ -850,71 +995,232 @@ export default function TeacherCreateExamPage() {
     }
   }
 
-  // Autosave logic
-  useEffect(() => {
-    const title = examTitle.trim()
-    const totalQ = sections.reduce((n, s) => n + s.questions.length, 0)
-    if (!title || totalQ === 0) return
+  function beginExamCodeEdit() {
+    if (examCodeSaving) return
+    setExamCodeDraft(examCode || '')
+    setExamCodeEditing(true)
+  }
 
-    const timer = setTimeout(async () => {
+  function cancelExamCodeEdit() {
+    setExamCodeEditing(false)
+    setExamCodeDraft('')
+  }
+
+  async function saveExamCode() {
+    const next = examCodeDraft.trim().toUpperCase()
+    if (!next) {
+      acsisToastError('Exam password cannot be empty.')
+      return
+    }
+    if (next === String(examCode || '').toUpperCase()) {
+      setExamCodeEditing(false)
+      return
+    }
+    if (!examId) {
+      setExamCode(next)
+      setExamCodeEditing(false)
+      return
+    }
+    if (!selectedClass) {
+      acsisToastError('Select a target class before updating the exam password.')
+      return
+    }
+    setExamCodeSaving(true)
+    try {
+      const res = await apiFetch(`/api/teacher/classes/${selectedClass}/exams/${examId}/password`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: next }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Failed to update exam password.')
+      }
+      const data = await res.json()
+      setExamCode(typeof data.code === 'string' ? data.code : next)
+      setExamCodeEditing(false)
+      acsisToastSuccess('Exam password updated.')
+    } catch (err) {
+      acsisToastError(err instanceof Error ? err.message : 'Failed to update exam password.')
+    } finally {
+      setExamCodeSaving(false)
+    }
+  }
+
+  const persistExamDraft = useCallback(async () => {
+    if (saveInFlightRef.current) {
+      return saveInFlightRef.current
+    }
+
+    const run = (async () => {
+      const title = examTitle.trim()
+      if (!selectedClassIds.length) {
+        return { ok: false, examId: null, error: 'Select a course and at least one section.' }
+      }
+      if (!title) {
+        return { ok: false, examId: null, error: 'Please enter an exam title.' }
+      }
+      if (totalQuestions === 0) {
+        return { ok: false, examId: null, error: 'Please add at least one question.' }
+      }
+
+      const payload = {
+        title,
+        description: examDescription.trim(),
+        sections: buildExamSectionsPayload(sections),
+        shuffleQuestions,
+        shuffleChoices,
+        scheduledStart: scheduledStart ? new Date(scheduledStart).toISOString() : null,
+        scheduledEnd: scheduledEnd ? new Date(scheduledEnd).toISOString() : null,
+        isAutoPublish,
+      }
+
+      if (examCode.trim()) {
+        payload.password = examCode.trim()
+      }
+
       setIsSaving(true)
       try {
-        const payload = {
-          title,
-          description: examDescription.trim(),
-          sections: buildExamSectionsPayload(sections),
-          shuffleQuestions,
-          shuffleChoices,
-          scheduledStart: scheduledStart ? new Date(scheduledStart).toISOString() : null,
-          scheduledEnd: scheduledEnd ? new Date(scheduledEnd).toISOString() : null,
-          isAutoPublish,
+        const primaryClassId = primaryClassIdRef.current || selectedClass
+        if (!primaryClassId) {
+          return { ok: false, examId: null, error: 'Select a course and at least one section.' }
         }
 
-        if (examPassword.trim()) {
-          payload.password = examPassword.trim()
-        }
-
-        if (!examId) {
-          const res = await apiFetch(`/api/teacher/classes/${selectedClass}/exams`, {
+        let currentExamId = examId
+        if (!currentExamId) {
+          const res = await apiFetch(`/api/teacher/classes/${primaryClassId}/exams`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
           })
-          if (res.ok) {
-            const data = await res.json()
-            setExamId(data.examId)
-            setLastSaved(new Date())
+          const data = await res.json().catch(() => ({}))
+          if (!res.ok) {
+            return { ok: false, examId: null, error: data.error || 'Could not save exam draft.' }
           }
+          currentExamId = data.examId
+          primaryClassIdRef.current = String(primaryClassId)
+          mirroredExamIdsRef.current[String(primaryClassId)] = String(currentExamId)
+          setExamId(currentExamId)
+          if (data.code) setExamCode(data.code)
         } else {
-          const res = await apiFetch(`/api/teacher/classes/${selectedClass}/exams/${examId}/content`, {
+          const res = await apiFetch(`/api/teacher/classes/${primaryClassId}/exams/${currentExamId}/content`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
           })
-          if (res.ok) {
-            setLastSaved(new Date())
-            // Removed refresh from server: fetching and setting sections here
-            // caused infinite autosave loops and unmounted the inline editor
-            // for newly added questions because local IDs were replaced.
-          } else {
-            const data = await res.json().catch(() => ({}))
-            acsisToastError(data.error || 'Could not save exam changes.')
+          const data = await res.json().catch(() => ({}))
+          if (!res.ok) {
+            return { ok: false, examId: currentExamId, error: data.error || 'Could not save exam changes.' }
           }
         }
+
+        if (!isEditMode) {
+          const mirrorTargets = selectedClassIds.filter((id) => String(id) !== String(primaryClassId))
+          const mirrorFailures = []
+          for (const clsId of mirrorTargets) {
+            const classKey = String(clsId)
+            let mirrorExamId = mirroredExamIdsRef.current[classKey]
+            try {
+              if (!mirrorExamId) {
+                const res = await apiFetch(`/api/teacher/classes/${clsId}/exams`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(payload),
+                })
+                const data = await res.json().catch(() => ({}))
+                if (!res.ok) {
+                  throw new Error(data.error || `Could not post exam to class ${clsId}`)
+                }
+                mirrorExamId = data.examId
+                mirroredExamIdsRef.current[classKey] = String(mirrorExamId)
+              } else {
+                const res = await apiFetch(`/api/teacher/classes/${clsId}/exams/${mirrorExamId}/content`, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(payload),
+                })
+                const data = await res.json().catch(() => ({}))
+                if (!res.ok) {
+                  throw new Error(data.error || `Could not update exam in class ${clsId}`)
+                }
+              }
+            } catch (mirrorErr) {
+              console.error('[exam mirror]', classKey, mirrorErr)
+              mirrorFailures.push(classKey)
+            }
+          }
+          if (mirrorFailures.length > 0) {
+            acsisToastError('Exam saved for the primary section, but some other sections failed to sync.')
+          }
+        }
+
+        setLastSaved(new Date())
+        return { ok: true, examId: currentExamId, error: undefined }
       } catch (err) {
-        console.error('Autosave failed:', err)
+        console.error('Exam draft save failed:', err)
+        return {
+          ok: false,
+          examId: examId ?? null,
+          error: err instanceof Error ? err.message : 'Could not save exam draft.',
+        }
       } finally {
         setIsSaving(false)
+        saveInFlightRef.current = null
       }
+    })()
+
+    saveInFlightRef.current = run
+    return run
+  }, [
+    examTitle,
+    examDescription,
+    sections,
+    shuffleQuestions,
+    shuffleChoices,
+    selectedClassIds,
+    examCode,
+    examId,
+    scheduledStart,
+    scheduledEnd,
+    isAutoPublish,
+    totalQuestions,
+    isEditMode,
+  ])
+
+  // Autosave logic
+  useEffect(() => {
+    const title = examTitle.trim()
+    if (!selectedClassIds.length || !title || totalQuestions === 0) return
+
+    const timer = setTimeout(() => {
+      void persistExamDraft().then((result) => {
+        if (!result.ok && result.error) {
+          acsisToastError(result.error)
+        }
+      })
     }, 1500)
 
     return () => clearTimeout(timer)
-  }, [examTitle, examDescription, sections, shuffleQuestions, shuffleChoices, selectedClass, examPassword, examId, scheduledStart, scheduledEnd, isAutoPublish])
+  }, [
+    examTitle,
+    examDescription,
+    sections,
+    shuffleQuestions,
+    shuffleChoices,
+    selectedClassIds,
+    examCode,
+    examId,
+    scheduledStart,
+    scheduledEnd,
+    isAutoPublish,
+    totalQuestions,
+    persistExamDraft,
+  ])
 
   async function createExam() {
     const title = examTitle.trim()
-    if (!selectedClass) {
-      acsisToastError('No class is available.')
+    if (!selectedClassIds.length) {
+      acsisToastError('Select a course and at least one section.')
       return
     }
     if (!title) {
@@ -937,13 +1243,13 @@ export default function TeacherCreateExamPage() {
       isAutoPublish,
       status: 'draft',
     }
-    const pw = examPassword.trim()
+    const pw = examCode.trim()
     if (pw) payload.password = pw
 
     setIsSubmitting(true)
     try {
       let mainExamId = examId
-      let examCode = ''
+      let generatedCode = ''
       if (!mainExamId) {
         const res = await apiFetch(`/api/teacher/classes/${selectedClass}/exams`, {
           method: 'POST',
@@ -953,7 +1259,8 @@ export default function TeacherCreateExamPage() {
         const data = await res.json()
         if (!res.ok) throw new Error(data.error || 'Failed to create exam.')
         mainExamId = data.examId
-        examCode = data.code
+        generatedCode = data.code
+        if (generatedCode) setExamCode(generatedCode)
       } else {
         const res = await apiFetch(`/api/teacher/classes/${selectedClass}/exams/${mainExamId}/content`, {
           method: 'PUT',
@@ -968,7 +1275,7 @@ export default function TeacherCreateExamPage() {
       
       const createdIds = [mainExamId]
 
-      const other = isEditMode ? [] : createForClasses.filter((id) => String(id) !== String(selectedClass))
+      const other = isEditMode ? [] : selectedClassIds.filter((id) => String(id) !== String(selectedClass))
       const copyResults = await Promise.allSettled(
         other.map(async (clsId) => {
           const r = await apiFetch(`/api/teacher/classes/${clsId}/exams`, {
@@ -994,7 +1301,7 @@ export default function TeacherCreateExamPage() {
         console.error('Failed to duplicate exam for classes:', failedCopies)
       }
 
-      const codeMsg = examCode ? ` Exam password: ${examCode}.` : ''
+      const codeMsg = (generatedCode || examCode) ? ` Exam password: ${generatedCode || examCode}.` : ''
       acsisToastSuccess(
         isEditMode
           ? `Exam "${title}" updated (${totalQuestions} questions, ${sections.length} set(s)).${codeMsg}`
@@ -1473,22 +1780,28 @@ export default function TeacherCreateExamPage() {
   }
 
   async function handlePrintPaper() {
-    if (!selectedClass) {
-      acsisToastError('Select a target class before printing.')
-      return
-    }
-    if (!examId) {
-      acsisToastError('Save the exam draft first, then print the paper.')
+    if (!selectedClassIds.length) {
+      acsisToastError('Select a course and at least one section before printing.')
       return
     }
     if (totalQuestions === 0) {
       acsisToastError('Add at least one question before printing.')
       return
     }
+    if (!examTitle.trim()) {
+      acsisToastError('Please enter an exam title before printing.')
+      return
+    }
 
     setIsPrintingPaper(true)
     try {
-      await exportExamPaper(selectedClass, examId, {
+      const saved = await persistExamDraft()
+      if (!saved.ok || !saved.examId) {
+        acsisToastError(saved.error || 'Could not save exam draft before printing.')
+        return
+      }
+
+      await exportExamPaper(selectedClass, saved.examId, {
         teacherLogoBase64: localStorage.getItem('acsis_teacher_logo') || undefined,
         departmentName: localStorage.getItem('acsis_department_name') || undefined,
       })
@@ -1519,23 +1832,101 @@ export default function TeacherCreateExamPage() {
             </Link>
           </Button>
           <div className="flex items-center gap-3 min-w-0 flex-wrap">
-            <h1 className="text-xl font-bold tracking-tight text-foreground line-clamp-1 max-w-[400px]">
-              {examTitle || (isEditMode ? 'Edit exam' : 'Exam Builder')}
+            <h1 className="text-xl font-semibold tracking-tight text-foreground whitespace-nowrap m-0 leading-6">
+              {isEditMode ? 'Edit exam' : 'Exam Builder'}
             </h1>
-            <p className="text-sm text-muted-foreground whitespace-nowrap">
+            <p className="text-sm text-muted-foreground whitespace-nowrap m-0 leading-6">
               {sections.length} {sections.length === 1 ? 'set' : 'sets'} · {totalQuestions}{' '}
               {totalQuestions === 1 ? 'question' : 'questions'}
             </p>
             {isSaving ? (
-              <span className="text-xs font-medium text-amber-600 bg-amber-500/10 px-3 py-1.5 rounded-full animate-pulse whitespace-nowrap">Saving...</span>
+              <span className="text-xs font-medium text-amber-600 bg-amber-500/10 px-2.5 py-1 rounded-full animate-pulse whitespace-nowrap">
+                Saving…
+              </span>
             ) : lastSaved ? (
-              <span className="text-xs font-medium text-emerald-600 bg-emerald-500/10 px-3 py-1.5 rounded-full whitespace-nowrap">
+              <span className="text-xs font-medium text-emerald-600 bg-emerald-500/10 px-2.5 py-1 rounded-full whitespace-nowrap">
                 {isEditMode ? 'Changes saved' : 'Draft saved'}
               </span>
             ) : null}
           </div>
         </div>
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="acsis-exam-detail__code-wrap acsis-exam-detail__code-wrap--desktop-only hidden md:flex">
+            <span className="acsis-exam-detail__code-label">Exam password</span>
+            <div className="acsis-exam-detail__code-pill">
+              {examCodeEditing ? (
+                <input
+                  type="text"
+                  className="acsis-exam-detail__code-input"
+                  value={examCodeDraft}
+                  onChange={(e) => setExamCodeDraft(e.target.value.toUpperCase())}
+                  onBlur={() => void saveExamCode()}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      void saveExamCode()
+                    }
+                    if (e.key === 'Escape') {
+                      e.preventDefault()
+                      cancelExamCodeEdit()
+                    }
+                  }}
+                  maxLength={12}
+                  autoFocus
+                  disabled={examCodeSaving}
+                  aria-label="Edit exam password"
+                />
+              ) : examCode ? (
+                <code
+                  role="button"
+                  tabIndex={0}
+                  title="Double-click to change exam password"
+                  onDoubleClick={beginExamCodeEdit}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') beginExamCodeEdit()
+                  }}
+                >
+                  {examCodeVisible ? examCode : '••••••'}
+                </code>
+              ) : (
+                <span className="text-xs text-muted-foreground px-1 whitespace-nowrap">Auto on save</span>
+              )}
+              {examCode ? (
+                <>
+                  <button
+                    type="button"
+                    className="acsis-exam-detail__code-toggle"
+                    aria-label={examCodeVisible ? 'Hide exam password' : 'Show exam password'}
+                    aria-pressed={examCodeVisible}
+                    onClick={() => setExamCodeVisible((v) => !v)}
+                  >
+                    {examCodeVisible ? (
+                      <EyeOff size={16} strokeWidth={2} aria-hidden />
+                    ) : (
+                      <Eye size={16} strokeWidth={2} aria-hidden />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    className="acsis-exam-detail__code-copy"
+                    aria-label="Copy exam password"
+                    onClick={() => void copyToClipboard(examCode, { successMessage: 'Exam password copied.' })}
+                  >
+                    <Copy size={16} strokeWidth={2} aria-hidden />
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className="acsis-exam-detail__code-toggle"
+                  aria-label="Set exam password"
+                  onClick={beginExamCodeEdit}
+                >
+                  <Pencil size={14} strokeWidth={2} aria-hidden />
+                </button>
+              )}
+            </div>
+          </div>
           <Button variant="ghost" size="icon" onClick={handlePreview} title="Preview Student View" className="rounded-full text-muted-foreground hover:text-foreground h-8 w-8">
             <Eye size={18} />
           </Button>
@@ -1569,105 +1960,7 @@ export default function TeacherCreateExamPage() {
         
         <div className="p-6 flex-1 space-y-8 overflow-y-auto">
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label className="text-sm font-semibold">Target Class</Label>
-              <select
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-70"
-                value={selectedClass}
-                onChange={(e) => setSelectedClass(e.target.value)}
-                disabled={isEditMode || loadingClasses}
-              >
-                {loadingClasses ? (
-                  <option value="">Loading classes...</option>
-                ) : classes.length === 0 ? (
-                  <option value="">No classes available</option>
-                ) : (
-                  <>
-                    <option value="" disabled>Select a class</option>
-                    {classes.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} ({c.academicYear} - {formatSemesterLabel(c.semester)})
-                      </option>
-                    ))}
-                  </>
-                )}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-sm font-semibold">Exam Title</Label>
-              <Input 
-                type="text" 
-                placeholder="e.g. Midterm Examination"
-                value={examTitle} 
-                onChange={(e) => setExamTitle(e.target.value)} 
-              />
-            </div>
-
-            <div className="exam-builder-card bg-primary/5 border-primary/20 p-4 rounded-xl">
-              <div className="flex items-center justify-between mb-3">
-                <div className="text-sm font-semibold text-primary flex items-center gap-2">
-                  <Calculator size={16} />
-                  Blueprint Summary
-                </div>
-              </div>
-              <div className="grid gap-3 text-sm text-foreground">
-                <div className="flex items-center justify-between rounded-md bg-background/80 p-3 border border-primary/10">
-                  <span>Total questions</span>
-                  <span className="font-semibold">{totalQuestions}</span>
-                </div>
-                <div className="flex items-center justify-between rounded-md bg-background/80 p-3 border border-primary/10">
-                  <span>Total points</span>
-                  <span className="font-semibold">{totalPoints}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-sm font-semibold">Exam Description (Optional)</Label>
-              <textarea 
-                placeholder="Brief instructions or summary"
-                value={examDescription} 
-                onChange={(e) => setExamDescription(e.target.value)} 
-                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[60px]"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="exam-password" className="text-sm font-semibold">
-                Exam password <span className="font-normal text-muted-foreground">(optional)</span>
-              </Label>
-              <div className="relative">
-                <Input
-                  id="exam-password"
-                  type={showPassword ? 'text' : 'password'}
-                  maxLength={20}
-                  autoComplete="new-password"
-                  placeholder={isEditMode ? 'Leave blank to keep current password' : 'Leave blank for open lobby'}
-                  value={examPassword}
-                  onChange={(e) => setExamPassword(e.target.value)}
-                  className="pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                  tabIndex="-1"
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
-                >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-              {isEditMode ? (
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  Change the exam password from the exam detail page after publishing.
-                </p>
-              ) : null}
-              <p className="text-xs text-muted-foreground leading-relaxed">{COPY.examPassword}</p>
-              <p className="text-xs text-muted-foreground leading-relaxed">{COPY.classAccessCode}</p>
-            </div>
-
-            <div className="space-y-4 pt-5 mt-2 border-t border-border">
+            <div className="space-y-4 pt-1">
               <div>
                 <p className="text-sm font-semibold text-foreground">Exam Scheduling</p>
                 <p className="text-xs text-muted-foreground mt-1">If set, the exam will strictly start and end at these times.</p>
@@ -1821,7 +2114,125 @@ export default function TeacherCreateExamPage() {
 
         <main className="exam-builder flex-1 p-6 md:p-8 lg:p-12 min-w-0">
           <div className="max-w-5xl mx-auto space-y-8">
-          
+
+            <div className="exam-builder-meta space-y-4">
+              <div className="space-y-4">
+                <input
+                  type="text"
+                  value={examTitle}
+                  onChange={(e) => setExamTitle(e.target.value)}
+                  placeholder="Exam title"
+                  className="exam-builder-meta__title"
+                />
+                <input
+                  type="text"
+                  value={examDescription}
+                  onChange={(e) => setExamDescription(e.target.value)}
+                  placeholder="Short description (optional)"
+                  className="exam-builder-meta__description"
+                />
+              </div>
+
+              {!isEditMode ? (
+                <div className="exam-builder-target rounded-xl border border-border bg-card/50 p-4 space-y-3">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-foreground">Post to classes</p>
+                    <p className="text-xs text-muted-foreground">
+                      Choose a course, then select the section(s) where you teach it.
+                    </p>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="builder-exam-course">Course</Label>
+                      {allCourseOptions.length === 0 ? (
+                        <select
+                          id="builder-exam-course"
+                          disabled
+                          className="acsis-class-toolbar__select w-full text-muted-foreground"
+                        >
+                          <option>No courses available</option>
+                        </select>
+                      ) : (
+                        <select
+                          id="builder-exam-course"
+                          value={selectedCourse || ''}
+                          onChange={(e) => {
+                            const key = e.target.value
+                            setSelectedCourse(key)
+                            setSelectedSections((prev) =>
+                              prev.filter((sectionId) =>
+                                (classesByTermId.get(String(sectionId)) || []).some(
+                                  (course) =>
+                                    buildCourseKey(
+                                      String(course.courseCode || course.course_code || '').trim(),
+                                      String(course.name || '').trim(),
+                                    ) === key,
+                                ),
+                              ),
+                            )
+                          }}
+                          className="acsis-class-toolbar__select w-full"
+                          disabled={loadingClasses}
+                        >
+                          <option value="" disabled hidden>
+                            Select course
+                          </option>
+                          {allCourseOptions.map((course) => (
+                            <option key={course.key} value={course.key}>
+                              {course.label}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Sections</Label>
+                      <div className="grid grid-cols-1 gap-2 max-h-36 overflow-y-auto pr-1">
+                        {selectableTerms.map((term) => {
+                          const id = String(term.id)
+                          const checked = selectedSections.includes(id)
+                          const sectionDisabled = Boolean(selectedCourse) && !termHasSelectedCourse(id)
+                          return (
+                            <label
+                              key={id}
+                              className={`flex items-center gap-2 p-2 border border-border rounded-md text-sm ${
+                                sectionDisabled
+                                  ? 'opacity-50 cursor-not-allowed bg-muted/30'
+                                  : 'hover:bg-muted/50 cursor-pointer'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                disabled={sectionDisabled}
+                                onChange={(e) => {
+                                  const next = e.target.checked
+                                    ? Array.from(new Set([...selectedSections, id]))
+                                    : selectedSections.filter((s) => s !== id)
+                                  setSelectedSections(next)
+                                }}
+                                className="h-4 w-4 rounded border-input disabled:cursor-not-allowed"
+                              />
+                              <span className="font-medium">{formatSectionTitle(term)}</span>
+                            </label>
+                          )
+                        })}
+                      </div>
+                      {!selectedCourse ? (
+                        <p className="text-xs text-muted-foreground">Select a course to see which sections are available.</p>
+                      ) : selectedClassIds.length === 0 ? (
+                        <p className="text-xs text-amber-700 dark:text-amber-300">Pick at least one section.</p>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">
+                          Posting to {selectedClassIds.length} {selectedClassIds.length === 1 ? 'class' : 'classes'}.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+
             <div className="exam-builder-sets">
               {sections.map((sec, secIndex) => {
                 let qOffset = 0

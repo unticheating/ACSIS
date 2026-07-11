@@ -1,8 +1,15 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import TeacherPageHeader from '@/components/teacher/TeacherPageHeader.jsx'
 import PageSpinner from '@/components/ui/page-spinner.jsx'
 import StudentCourseCard from '@/components/student/StudentCourseCard.jsx'
-import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
+import {
+  DragDropContext,
+  Droppable,
+  Draggable,
+  useKeyboardSensor,
+  useMouseSensor,
+} from '@hello-pangea/dnd'
+import useLongPressTouchSensor from '@/hooks/useLongPressTouchSensor.js'
 import {
   Dialog,
   DialogContent,
@@ -103,6 +110,11 @@ export default function StudentExamsPage() {
 
   const [draggingId, setDraggingId] = useState(null)
 
+  const dndSensors = useMemo(
+    () => [useMouseSensor, useKeyboardSensor, useLongPressTouchSensor],
+    [],
+  )
+
   async function handleDragEnd(result) {
     setDraggingId(null)
     if (!result.destination) return
@@ -157,7 +169,10 @@ export default function StudentExamsPage() {
               </button>
             </div>
           ) : (
-            <DragDropContext 
+            <DragDropContext
+              sensors={dndSensors}
+              enableDefaultSensors={false}
+              dragHandleUsageInstructions="Press and hold a class card briefly, then drag to reorder."
               onDragStart={(start) => setDraggingId(start.draggableId)}
               onDragEnd={handleDragEnd}
             >

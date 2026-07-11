@@ -906,3 +906,50 @@ html:not(.dark) .exam-builder-inline-editor {
   border-color: hsl(var(--primary) / 0.45);
   background: hsl(var(--primary) / 0.06);
 }
+
+.exam-builder-meta__title,
+.exam-builder-meta__description {
+  width: 100%;
+  box-sizing: border-box;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid hsl(var(--border));
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.exam-builder-meta__title {
+  padding: 0.75rem 0.75rem 0.625rem;
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.5;
+  color: hsl(var(--foreground));
+}
+
+.exam-builder-meta__title::placeholder {
+  color: hsl(var(--muted-foreground) / 0.55);
+}
+
+.exam-builder-meta__title:focus {
+  outline: none;
+  border-bottom-color: hsl(var(--foreground));
+}
+
+.exam-builder-meta__description {
+  padding: 0.625rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: hsl(var(--muted-foreground));
+}
+
+.exam-builder-meta__description::placeholder {
+  color: hsl(var(--muted-foreground) / 0.55);
+}
+
+.exam-builder-meta__description:focus {
+  outline: none;
+  color: hsl(var(--foreground));
+  border-bottom-color: hsl(var(--foreground));
+}

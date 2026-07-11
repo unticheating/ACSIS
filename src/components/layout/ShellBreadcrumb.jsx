@@ -4,6 +4,7 @@ import { resolveShellPageTitle } from '@/config/shellConfig.js'
 import { useInstitutionTheme } from '@/context/InstitutionThemeContext.jsx'
 import { useDetectionsToolbar } from '@/context/DetectionsToolbarContext.jsx'
 import { useTeacherShellBreadcrumbSegments } from '@/context/TeacherShellBreadcrumbContext.jsx'
+import { useStudentShellBreadcrumbSegments } from '@/context/StudentShellBreadcrumbContext.jsx'
 import DetectionsSeatSettingsMenu from '@/components/teacher/DetectionsSeatSettingsMenu.jsx'
 import DetectionsViewModeToggle from '@/components/teacher/DetectionsViewModeToggle.jsx'
 

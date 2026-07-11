@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   ChevronDown,
   ChevronUp,
+  ClipboardList,
   Copy,
   Eye,
   EyeOff,

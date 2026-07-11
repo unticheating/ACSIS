@@ -9,6 +9,7 @@ import MobileTopBar from '../components/layout/MobileTopBar.jsx'
 import ShellBreadcrumb from '../components/layout/ShellBreadcrumb.jsx'
 import { DetectionsToolbarProvider } from '../context/DetectionsToolbarContext.jsx'
 import { TeacherShellBreadcrumbProvider } from '../context/TeacherShellBreadcrumbContext.jsx'
+import { StudentShellBreadcrumbProvider } from '../context/StudentShellBreadcrumbContext.jsx'
 import { shellConfig } from '../config/shellConfig.js'
 import '../styles/summary-stat-cards.css'
 import '../styles/shell-dark.css'
@@ -65,13 +66,17 @@ export default function AppShell({ role }) {
     </DetectionsToolbarProvider>
   )
 
+  const studentChrome = (
+    <StudentShellBreadcrumbProvider>{portalChrome}</StudentShellBreadcrumbProvider>
+  )
+
   return (
     <div className="acsis-app">
       <a className="acsis-skip-link" href="#acsis-main-content">
         Skip to main content
       </a>
       <AppSidebar items={nav} settingsPath={settingsPath} />
-      {role === 'teacher' ? teacherChrome : portalChrome}
+      {role === 'teacher' ? teacherChrome : role === 'student' ? studentChrome : portalChrome}
     </div>
   )
 }
