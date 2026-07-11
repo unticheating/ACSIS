@@ -194,7 +194,7 @@ export default function TeacherCreateExamPage() {
 
   const [questionType, setQuestionType] = useState('multiple')
   const [questionText, setQuestionText] = useState('')
-  const [questionPoints, setQuestionPoints] = useState(1)
+  const [questionPoints, setQuestionPoints] = useState('1')
   const [mc, setMc] = useState(emptyMc)
   const [identAcceptableAnswers, setIdentAcceptableAnswers] = useState('')
   const [identPresentationAnswer, setIdentPresentationAnswer] = useState('')
@@ -273,7 +273,7 @@ export default function TeacherCreateExamPage() {
 
   const resetQuestionForm = useCallback(() => {
     setQuestionText('')
-    setQuestionPoints(1)
+    setQuestionPoints('1')
     resetAnswerFields()
     setQuestionImage(null)
     setEditingQuestion(null)
@@ -313,7 +313,7 @@ export default function TeacherCreateExamPage() {
         opt4: opts[3] || '',
         correct: correctIdx >= 0 ? String(correctIdx + 1) : '',
       })
-      setQuestionPoints(q.points || 1)
+      setQuestionPoints(String(q.points ?? 1))
       setIdentAcceptableAnswers('')
       setIdentPresentationAnswer('')
       setAnswerExplanation(q.answerExplanation || '')
@@ -321,7 +321,7 @@ export default function TeacherCreateExamPage() {
       setCodingAnswer('')
       setCodingLanguage('javascript')
     } else if (formType === 'identification') {
-      setQuestionPoints(q.points || 1)
+      setQuestionPoints(String(q.points ?? 1))
       resetMc()
       const { acceptable, presentation } = identificationDisplayFromQuestion(q)
       setIdentAcceptableAnswers(joinIdentificationAnswersList(acceptable))
@@ -331,7 +331,7 @@ export default function TeacherCreateExamPage() {
       setCodingAnswer('')
       setCodingLanguage('javascript')
     } else if (formType === 'truefalse') {
-      setQuestionPoints(q.points || 1)
+      setQuestionPoints(String(q.points ?? 1))
       resetMc()
       setIdentAcceptableAnswers('')
       setIdentPresentationAnswer('')
@@ -340,7 +340,7 @@ export default function TeacherCreateExamPage() {
       setCodingAnswer('')
       setCodingLanguage('javascript')
     } else if (formType === 'coding') {
-      setQuestionPoints(q.points || 1)
+      setQuestionPoints(String(q.points ?? 1))
       resetMc()
       setIdentAcceptableAnswers('')
       setIdentPresentationAnswer('')
@@ -353,7 +353,7 @@ export default function TeacherCreateExamPage() {
       setDiagramVariant(DEFAULT_DIAGRAM_VARIANT)
       setDiagramReference(emptyDiagramData())
     } else if (formType === 'matching') {
-      setQuestionPoints(q.points || 1)
+      setQuestionPoints(String(q.points ?? 1))
       resetMc()
       setIdentAcceptableAnswers('')
       setIdentPresentationAnswer('')
@@ -366,7 +366,7 @@ export default function TeacherCreateExamPage() {
       setDiagramVariant(DEFAULT_DIAGRAM_VARIANT)
       setDiagramReference(emptyDiagramData())
     } else if (formType === 'essay') {
-      setQuestionPoints(q.points || 1)
+      setQuestionPoints(String(q.points ?? 1))
       resetMc()
       setIdentAcceptableAnswers('')
       setIdentPresentationAnswer('')
@@ -379,7 +379,7 @@ export default function TeacherCreateExamPage() {
       setDiagramVariant(DEFAULT_DIAGRAM_VARIANT)
       setDiagramReference(emptyDiagramData())
     } else if (formType === 'diagramming') {
-      setQuestionPoints(q.points || 1)
+      setQuestionPoints(String(q.points ?? 1))
       resetMc()
       setIdentAcceptableAnswers('')
       setIdentPresentationAnswer('')
@@ -1634,7 +1634,7 @@ export default function TeacherCreateExamPage() {
                 type="number"
                 min="1"
                 value={questionPoints}
-                onChange={(e) => setQuestionPoints(Number(e.target.value) || 1)}
+                onChange={(e) => setQuestionPoints(e.target.value)}
               />
             </div>
           </div>

@@ -21,14 +21,14 @@ export function useStudentShellBreadcrumbSegments() {
  * @param {{ label: string, to?: string }[] | null} trail
  */
 export function useStudentShellBreadcrumbTrail(trail) {
-  const ctx = useContext(StudentShellBreadcrumbContext)
+  const setSegments = useContext(StudentShellBreadcrumbContext)?.setSegments
   const trailKey =
     trail?.map((s) => `${coerceDisplayString(s.label)}\0${coerceDisplayString(s.to)}`).join('\n') ?? ''
   useEffect(() => {
-    if (!ctx) return undefined
-    ctx.setSegments(trail)
+    if (!setSegments) return undefined
+    setSegments(trail)
     return () => {
-      ctx.setSegments(null)
+      setSegments(null)
     }
-  }, [ctx, trail, trailKey])
+  }, [setSegments, trailKey, trail])
 }

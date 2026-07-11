@@ -42,24 +42,31 @@ async function insertIdentificationChoices(client, questionId, q) {
   return { acceptable, presentation };
 }
 
+function normalizeQuestionPoints(points) {
+  const parsed = Number(points);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+}
+
 async function insertQuestionWithChoices(client, examId, sectionId, q, orderNum) {
   const dbType = mapQuestionTypeToDb(q.type);
   const imageUrl = q.imageUrl || null;
   const identMeta =
     dbType === 'identification' ? resolveIdentificationPayload(q) : { presentation: null };
   const explanation = normalizeAnswerExplanation(q);
+  const points = normalizeQuestionPoints(q.points);
   const qResult = await client.query(
     `INSERT INTO questions (
        exam_id, section_id, question_text, question_type, points, order_num, image_url,
        presentation_answer, answer_explanation
      )
-     VALUES ($1, $2, $3, $4, 1.00, $5, $6, $7, $8)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      RETURNING question_id`,
     [
       examId,
       sectionId,
       q.question,
       dbType,
+      points,
       orderNum,
       imageUrl,
       dbType === 'identification' ? identMeta.presentation || null : null,
@@ -166,6 +173,7 @@ async function updateQuestionInPlace(client, examId, sectionId, q, orderNum, que
   const identMeta =
     dbType === 'identification' ? resolveIdentificationPayload(q) : { presentation: null };
   const explanation = normalizeAnswerExplanation(q);
+  const points = normalizeQuestionPoints(q.points);
   await client.query(
     `UPDATE questions
      SET question_text = $1,
@@ -174,8 +182,9 @@ async function updateQuestionInPlace(client, examId, sectionId, q, orderNum, que
          section_id = $4,
          image_url = $5,
          presentation_answer = $6,
-         answer_explanation = $7
-     WHERE question_id = $8 AND exam_id = $9`,
+         answer_explanation = $7,
+         points = $8
+     WHERE question_id = $9 AND exam_id = $10`,
     [
       q.question,
       dbType,
@@ -184,6 +193,7 @@ async function updateQuestionInPlace(client, examId, sectionId, q, orderNum, que
       imageUrl,
       dbType === 'identification' ? identMeta.presentation || null : null,
       explanation,
+      points,
       questionId,
       examId,
     ],

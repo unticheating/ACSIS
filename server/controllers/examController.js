@@ -57,6 +57,7 @@ const questionSchema = z.object({
     'diagramming',
   ]),
   question: z.string().min(1, 'Question text cannot be empty'),
+  points: z.coerce.number().positive('Points must be at least 1').optional().default(1),
   options: z.array(choiceSchema).optional(),
   correctAnswer: z.string().optional().default(''),
   presentationAnswer: z.string().optional().nullable(),

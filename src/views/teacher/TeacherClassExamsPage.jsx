@@ -93,26 +93,37 @@ export default function TeacherClassExamsPage() {
   }, [editOpen])
 
   useEffect(() => {
-    async function loadData() {
-      setLoading(true)
+    let cancelled = false
+    async function loadData(isBackground) {
+      if (!isBackground) setLoading(true)
       try {
         const res = await apiFetch(`/api/teacher/classes/${classId}/exams`)
         if (!res.ok) throw new Error('Failed to fetch class.')
-        setCls(await res.json())
+        const data = await res.json()
+        if (!cancelled) {
+          setCls(data)
+          setError(null)
+        }
       } catch (err) {
-        setError(err.message)
+        if (!cancelled) {
+          setError(err.message)
+          if (!isBackground) setCls(null)
+        }
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
-    loadData()
+    loadData(tick > 0)
+    return () => {
+      cancelled = true
+    }
   }, [classId, tick])
 
   useEffect(() => {
     if (pageView !== 'students' || !classId) return
     let cancelled = false
-    async function loadEnrolled() {
-      setEnrolledLoading(true)
+    async function loadEnrolled(isBackground) {
+      if (!isBackground) setEnrolledLoading(true)
       try {
         const res = await apiFetch(`/api/teacher/classes/${classId}/enrollments`)
         const data = await res.json().catch(() => [])
@@ -120,12 +131,12 @@ export default function TeacherClassExamsPage() {
           setEnrolled(Array.isArray(data) ? data : [])
         }
       } catch {
-        if (!cancelled) setEnrolled([])
+        if (!cancelled && !isBackground) setEnrolled([])
       } finally {
         if (!cancelled) setEnrolledLoading(false)
       }
     }
-    loadEnrolled()
+    loadEnrolled(tick > 0)
     return () => {
       cancelled = true
     }
@@ -188,7 +199,7 @@ export default function TeacherClassExamsPage() {
     }
   }
 
-  if (loading) {
+  if (loading && !cls) {
     return (
       <div className="acsis-mc-view acsis-view">
         <PageSpinner label="Loading exams…" />
