@@ -200,8 +200,10 @@ export default function StudentExamSessionPage() {
 
     const locked = true
     setExamLocked(locked)
-    setLockReason((prev) => prev || data.lockReason || 'teacher_closed')
+    const reason = data.lockReason || 'teacher_closed'
+    setLockReason((prev) => prev || reason)
     examLockedRef.current = locked
+    lockReasonRef.current = reason
     setHit({ exam: { ...data.exam, questions: data.questions || [] } })
     if ((data.questions?.length || 0) > 0) {
       setScene('question')
@@ -338,8 +340,10 @@ export default function StudentExamSessionPage() {
             Boolean(data.sessionLocked)
           if (shouldLock && !examLockedRef.current) {
             setExamLocked(true)
-            setLockReason(data.lockReason || 'teacher_closed')
+            const reason = data.lockReason || 'teacher_closed'
+            setLockReason(reason)
             examLockedRef.current = true
+            lockReasonRef.current = reason
           } else if (shouldLock) {
             setLockReason((prev) => prev || data.lockReason || 'teacher_closed')
           }
@@ -390,12 +394,29 @@ export default function StudentExamSessionPage() {
         const loadedMax = resolveMaxWarnings(data.maxWarnings, institutionMaxWarnings)
         setMaxWarnings(loadedMax)
         setWarningCount(displayStrikeCount(data.warningCount, loadedMax))
-        const locked = Boolean(data.sessionLocked)
-        setExamLocked(locked)
-        setLockReason(locked ? data.lockReason || null : null)
-        examLockedRef.current = locked
         warningCountRef.current = displayStrikeCount(data.warningCount, loadedMax)
-        lockingRef.current = false
+
+        const serverLocked = Boolean(data.sessionLocked)
+        if (serverLocked) {
+          setExamLocked(true)
+          setLockReason(data.lockReason || null)
+          examLockedRef.current = true
+          lockingRef.current = false
+        } else if (lockingRef.current) {
+          // Keep local lock while the lock API is in flight.
+        } else if (
+          examLockedRef.current &&
+          lockReasonRef.current === 'max_warnings' &&
+          displayStrikeCount(data.warningCount, loadedMax) < loadedMax
+        ) {
+          setExamLocked(false)
+          setLockReason(null)
+          examLockedRef.current = false
+        } else if (!examLockedRef.current) {
+          setExamLocked(false)
+          setLockReason(null)
+          examLockedRef.current = false
+        }
         setHit((prev) =>
           prev
             ? {
@@ -459,6 +480,7 @@ export default function StudentExamSessionPage() {
   const autosaveSkipRef = useRef(true)
   const matchingOptionsRef = useRef({})
   const examLockedRef = useRef(false)
+  const lockReasonRef = useRef(null)
   const warningCountRef = useRef(0)
   const maxWarningsRef = useRef(resolveMaxWarnings(undefined, institutionMaxWarnings))
 
@@ -512,6 +534,9 @@ export default function StudentExamSessionPage() {
     examLockedRef.current = examLocked
   }, [examLocked])
   useEffect(() => {
+    lockReasonRef.current = lockReason
+  }, [lockReason])
+  useEffect(() => {
     warningCountRef.current = warningCount
   }, [warningCount])
   useEffect(() => {
@@ -530,14 +555,21 @@ export default function StudentExamSessionPage() {
       if (classId === 'preview') {
         setExamLocked(true)
         setLockReason(reason)
+        examLockedRef.current = true
+        lockReasonRef.current = reason
         return
       }
       if (!classId || !examId || lockingRef.current) return
       lockingRef.current = true
+      setExamLocked(true)
+      setLockReason(reason)
+      examLockedRef.current = true
+      lockReasonRef.current = reason
       try {
         const res = await lockStudentExam(classId, examId, reason)
-        setExamLocked(true)
-        setLockReason(res.lockReason || reason)
+        const resolvedReason = res.lockReason || reason
+        setLockReason(resolvedReason)
+        lockReasonRef.current = resolvedReason
         setMaxWarnings(resolveMaxWarnings(res.maxWarnings, institutionMaxWarnings))
         if (res.warningCount != null) {
           setWarningCount(
@@ -546,8 +578,10 @@ export default function StudentExamSessionPage() {
         }
       } catch (err) {
         console.error('[exam lock]', err)
-        setExamLocked(true)
         setLockReason(reason)
+        lockReasonRef.current = reason
+      } finally {
+        lockingRef.current = false
       }
     },
     [classId, examId, institutionMaxWarnings],
@@ -649,14 +683,14 @@ export default function StudentExamSessionPage() {
         return
       }
       setSecondsLeft(seconds)
-      if (seconds <= 0 && !examLocked && !lockingRef.current) {
+      if (seconds <= 0 && !examLockedRef.current && !lockingRef.current) {
         void applyExamLock('time_up')
       }
     }
     tick()
     const id = window.setInterval(tick, 1000)
     return () => window.clearInterval(id)
-  }, [scene, hit?.exam, examLocked, applyExamLock])
+  }, [scene, hit?.exam, applyExamLock])
 
   useEffect(() => {
     if (classId === 'preview') return undefined
