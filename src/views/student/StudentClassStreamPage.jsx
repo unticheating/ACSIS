@@ -10,6 +10,7 @@ import { DropdownMenuActionItem } from '@/components/ui/dropdown-menu-action-ite
 import { apiFetch } from '@/lib/apiFetch.js'
 import { acsisToastError } from '@/lib/acsisToast.js'
 import StreamBackLink from '@/components/layout/StreamBackLink.jsx'
+import ClassCourseHeader from '@/components/classes/ClassCourseHeader.jsx'
 import { formatCourseDisplayLabels } from '@/lib/sectionLabel.js'
 import {
   Dialog,
