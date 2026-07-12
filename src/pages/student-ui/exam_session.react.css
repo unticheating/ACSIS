@@ -410,7 +410,7 @@
   margin-bottom: 1rem;
 }
 
-/* Max warnings: blur question body; student uses Send exam in footer */
+/* Locked exam (time up, teacher ended, max warnings): blur question body; student uses Send exam in footer */
 .acsis-student-exam .exam-strike-lock-blur {
   filter: blur(7px);
   opacity: 0.45;

@@ -1101,9 +1101,6 @@ export default function StudentExamSessionPage() {
 
 
 
-  const strikesDisplay = displayStrikeCount(warningCount, maxWarnings)
-  const maxStrikesReached = strikesDisplay >= maxWarnings
-
   // Lobby Scene
   if (scene === 'lobby') {
     const examSt = normalizeExamStatus(hit.exam.status)
@@ -1365,8 +1362,8 @@ export default function StudentExamSessionPage() {
               ) : null}
               <div className="exam-question-scroll">
                 <div
-                  className={maxStrikesReached ? 'exam-strike-lock-blur' : undefined}
-                  aria-hidden={maxStrikesReached ? true : undefined}
+                  className={examLocked ? 'exam-strike-lock-blur' : undefined}
+                  aria-hidden={examLocked ? true : undefined}
                 >
                   <div className="exam-question-intro">
                   <div
