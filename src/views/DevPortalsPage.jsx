@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { ChevronLeft } from 'lucide-react'
 import '../styles/summary-stat-cards.css'
 import { SummaryStatGrid } from '@/components/dashboard/SummaryStatCard.jsx'
 import { cn } from '@/lib/utils'
@@ -56,6 +57,9 @@ export default function DevPortalsPage() {
           <button 
             onClick={() => logout()} 
             style={{ 
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
               color: 'var(--brand-plp, var(--acsis-brand-800, #14532d))', 
               fontWeight: 600, 
               background: 'none', 
@@ -66,7 +70,8 @@ export default function DevPortalsPage() {
               textDecoration: 'underline'
             }}
           >
-            ← Back to login
+            <ChevronLeft size={16} strokeWidth={2.25} aria-hidden />
+            Back to login
           </button>
         </p>
         <h1 style={{ fontSize: '1.75rem', color: 'var(--brand-mark, var(--acsis-brand-800, #14532d))', marginBottom: 8 }}>

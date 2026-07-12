@@ -1,17 +1,22 @@
 import { getPool } from '../db.js';
-import { 
+import {
+  gradeSessionAnswersQuery,
+  holdUnsubmittedExamSessionsQuery,
+  listOnHoldSessionIdsForExamQuery,
+  getStudentSessionsForExamsQuery,
+} from '../repositories/examSessionRepository.js';
+import {
   insertExamTransaction,
   updateExamDraftTransaction,
   getExamsByClassIdQuery,
   listTeacherExamsWithClassMetaQuery,
-  updateExamStatusQuery, 
+  updateExamStatusQuery,
   deleteExamQuery,
   getExamWithQuestionsQuery,
   verifyExamPasswordQuery,
   updateExamPasswordByTeacherQuery,
 } from '../repositories/examRepository.js';
 import { closeOtherTeacherOngoingExamsQuery, listSubmittedSessionIdsForExamQuery } from '../repositories/examResultsRepository.js';
-import { gradeSessionAnswersQuery } from '../repositories/examSessionRepository.js';
 import { finalizeExamResultsService } from './examReleaseService.js';
 import { 
   getClassByIdQuery, 
@@ -23,7 +28,6 @@ import {
 import { getExamAssignmentAccessQuery } from '../repositories/examAssignmentRepository.js'
 import { checkEnrollment } from '../repositories/studentRepository.js';
 import { EXAM_STATUS, nextStatusAfterClose, nextStatusAfterPublish } from '../lib/examStatus.js';
-import { getStudentSessionsForExamsQuery } from '../repositories/examSessionRepository.js';
 import { generateExamPassword } from '../lib/examCodes.js';
 import { recordTeacherActivityQuery } from '../repositories/teacherActivityRepository.js'
 import { sendUpcomingExamEmail } from '../lib/sendEmail.js';
@@ -481,6 +485,15 @@ export async function closeExamService(classId, examId) {
     const success = await updateExamStatusQuery(classId, examId, nextStatus)
     if (!success) {
       return { ok: false, status: 404, error: 'Exam not found.' }
+    }
+    await holdUnsubmittedExamSessionsQuery(examId)
+    const onHoldSessionIds = await listOnHoldSessionIdsForExamQuery(examId)
+    for (const sessionId of onHoldSessionIds) {
+      try {
+        await gradeSessionAnswersQuery(sessionId)
+      } catch (err) {
+        console.error('[examService.closeExam] grade on_hold session failed:', sessionId, err)
+      }
     }
     void recordTeacherActivityQuery({
       teacherMemberId,

@@ -27,7 +27,7 @@ import {
   isPersistedEntityId,
   newLocalQuestionId,
 } from '@/lib/examContentPayload.js'
-import { mapExamToBuilderState, newSection } from '@/lib/mapExamToBuilder.js'
+import { mapExamToBuilderState, cloneBuilderStateForCopy, newSection } from '@/lib/mapExamToBuilder.js'
 import {
   apiTypeFromFormType,
   formTypeFromQuestionType,
@@ -74,6 +74,32 @@ function emptyMc() {
 
 const INITIAL_EXAM_SECTION = newSection(1)
 
+function buildExamDirtySnapshot({
+  examTitle,
+  examDescription,
+  sections,
+  shuffleQuestions,
+  shuffleChoices,
+  selectedClassIds,
+  examCode,
+  scheduledStart,
+  scheduledEnd,
+  isAutoPublish,
+}) {
+  return JSON.stringify({
+    title: String(examTitle || '').trim(),
+    description: String(examDescription || '').trim(),
+    sections: buildExamSectionsPayload(sections),
+    shuffleQuestions: Boolean(shuffleQuestions),
+    shuffleChoices: Boolean(shuffleChoices),
+    selectedClassIds: [...selectedClassIds].map(String).sort(),
+    examCode: String(examCode || '').trim(),
+    scheduledStart: scheduledStart ? new Date(scheduledStart).toISOString() : null,
+    scheduledEnd: scheduledEnd ? new Date(scheduledEnd).toISOString() : null,
+    isAutoPublish: Boolean(isAutoPublish),
+  })
+}
+
 export default function TeacherCreateExamPage() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
@@ -83,7 +109,10 @@ export default function TeacherCreateExamPage() {
   const [loadingClasses, setLoadingClasses] = useState(true)
   const classesQuery = searchParams.get('classes') || ''
   const editExamIdParam = searchParams.get('examId') || ''
-  const isEditMode = Boolean(editExamIdParam)
+  const copyFromParam = searchParams.get('copyFrom') || ''
+  const sourceClassIdParam = searchParams.get('classId')?.trim() || ''
+  const isCopyMode = Boolean(copyFromParam)
+  const isEditMode = Boolean(editExamIdParam) && !isCopyMode
   const initialClassIds = useMemo(() => {
     const fromQuery = classesQuery ? classesQuery.split(',').map((id) => id.trim()).filter(Boolean) : []
     const fromClassId = searchParams.get('classId')?.trim()
@@ -128,8 +157,8 @@ export default function TeacherCreateExamPage() {
   }, [])
 
   useEffect(() => {
-    if (!editExamIdParam || !selectedClass) {
-      setLoadingEditExam(false)
+    if (!editExamIdParam || isCopyMode || !selectedClass) {
+      if (!copyFromParam) setLoadingEditExam(false)
       return undefined
     }
 
@@ -179,7 +208,62 @@ export default function TeacherCreateExamPage() {
     return () => {
       cancelled = true
     }
-  }, [editExamIdParam, selectedClass])
+  }, [editExamIdParam, selectedClass, isCopyMode, copyFromParam])
+
+  useEffect(() => {
+    if (!copyFromParam || !sourceClassIdParam) {
+      return undefined
+    }
+
+    let cancelled = false
+    async function loadExamForCopy() {
+      setLoadingEditExam(true)
+      try {
+        const res = await apiFetch(`/api/teacher/classes/${sourceClassIdParam}/exams/${copyFromParam}`)
+        if (!res.ok) throw new Error('Failed to load exam for copying.')
+        const exam = await res.json()
+        if (cancelled) return
+
+        const { sections: loadedSections, description } = cloneBuilderStateForCopy(
+          mapExamToBuilderState(exam),
+        )
+        const sourceTitle = String(exam.title || '').trim()
+        setExamTitle(sourceTitle ? `Copy of ${sourceTitle}` : 'Copy of exam')
+        setExamDescription(description)
+        setSections(loadedSections)
+        setActiveSectionId(loadedSections[0]?.id || INITIAL_EXAM_SECTION.id)
+        const initialSection = loadedSections[0]
+        if (initialSection?.questionType) {
+          setQuestionType(initialSection.questionType)
+        } else {
+          const lastQuestion = loadedSections.flatMap((s) => s.questions).at(-1)
+          if (lastQuestion) {
+            setQuestionType(formTypeFromQuestionType(lastQuestion.type))
+          }
+        }
+        setShuffleQuestions(!!exam.shuffleQuestions)
+        setShuffleChoices(!!exam.shuffleChoices)
+        setScheduledStart(exam.scheduledStart || '')
+        setScheduledEnd(exam.scheduledEnd || '')
+        setIsAutoPublish(!!exam.isAutoPublish)
+        setExamCode('')
+        primaryClassIdRef.current = null
+        mirroredExamIdsRef.current = {}
+        setLastSaved(null)
+      } catch (err) {
+        if (!cancelled) {
+          acsisToastError(err instanceof Error ? err.message : 'Failed to load exam.')
+        }
+      } finally {
+        if (!cancelled) setLoadingEditExam(false)
+      }
+    }
+
+    void loadExamForCopy()
+    return () => {
+      cancelled = true
+    }
+  }, [copyFromParam, sourceClassIdParam])
 
   const [examTitle, setExamTitle] = useState('')
   const [examDescription, setExamDescription] = useState('')
@@ -231,10 +315,13 @@ export default function TeacherCreateExamPage() {
   const [shuffleChoices, setShuffleChoices] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const [examId, setExamId] = useState(editExamIdParam || null)
-  const [loadingEditExam, setLoadingEditExam] = useState(Boolean(editExamIdParam))
+  const [examId, setExamId] = useState(isEditMode ? editExamIdParam : null)
+  const [loadingEditExam, setLoadingEditExam] = useState(Boolean(editExamIdParam || copyFromParam))
   const [isSaving, setIsSaving] = useState(false)
   const [lastSaved, setLastSaved] = useState(null)
+  const [savedSnapshot, setSavedSnapshot] = useState(/** @type {string | null} */ (null))
+  const allowLeaveRef = useRef(false)
+  const snapshotBaselineReadyRef = useRef(false)
   const [composingQuestionSectionId, setComposingQuestionSectionId] = useState(null)
   const [editingQuestion, setEditingQuestion] = useState(/** @type {{ sectionId: string, questionId: string } | null} */ (null))
   const editPanelRef = useRef(null)
@@ -760,6 +847,42 @@ export default function TeacherCreateExamPage() {
     [sections],
   )
 
+  const dirtySnapshotInput = useMemo(
+    () => ({
+      examTitle,
+      examDescription,
+      sections,
+      shuffleQuestions,
+      shuffleChoices,
+      selectedClassIds,
+      examCode,
+      scheduledStart,
+      scheduledEnd,
+      isAutoPublish,
+    }),
+    [
+      examTitle,
+      examDescription,
+      sections,
+      shuffleQuestions,
+      shuffleChoices,
+      selectedClassIds,
+      examCode,
+      scheduledStart,
+      scheduledEnd,
+      isAutoPublish,
+    ],
+  )
+
+  const currentSnapshot = useMemo(
+    () => buildExamDirtySnapshot(dirtySnapshotInput),
+    [dirtySnapshotInput],
+  )
+
+  const hasUnsavedChanges = savedSnapshot !== null && currentSnapshot !== savedSnapshot
+  const shouldConfirmLeave =
+    !allowLeaveRef.current && !loadingEditExam && (hasUnsavedChanges || isSaving)
+
   const normalizeCourseText = useCallback(
     (value) => String(value || '').trim().replace(/\s+/g, ' ').toLowerCase(),
     [],
@@ -1155,6 +1278,20 @@ export default function TeacherCreateExamPage() {
         }
 
         setLastSaved(new Date())
+        setSavedSnapshot(
+          buildExamDirtySnapshot({
+            examTitle: title,
+            examDescription,
+            sections,
+            shuffleQuestions,
+            shuffleChoices,
+            selectedClassIds,
+            examCode,
+            scheduledStart,
+            scheduledEnd,
+            isAutoPublish,
+          }),
+        )
         return { ok: true, examId: currentExamId, error: undefined }
       } catch (err) {
         console.error('Exam draft save failed:', err)
@@ -1307,6 +1444,7 @@ export default function TeacherCreateExamPage() {
           ? `Exam "${title}" updated (${totalQuestions} questions, ${sections.length} set(s)).${codeMsg}`
           : `Exam "${title}" saved for ${createdIds.length} class(es) (${totalQuestions} questions, ${sections.length} set(s)).${codeMsg} Publish from the class page when ready.`,
       )
+      allowLeaveRef.current = true
       if (isEditMode && mainExamId) {
         navigate(`/teacher/my-classes/${selectedClass}/exams/${mainExamId}`)
       } else {
@@ -1759,9 +1897,54 @@ export default function TeacherCreateExamPage() {
 
   const backHref = isEditMode && examId
     ? `/teacher/my-classes/${selectedClass}/exams/${examId}`
-    : selectedClass
-      ? `/teacher/my-classes/${selectedClass}`
-      : '/teacher/my-classes'
+    : isCopyMode && sourceClassIdParam && copyFromParam
+      ? `/teacher/my-classes/${sourceClassIdParam}/exams/${copyFromParam}`
+      : selectedClass
+        ? `/teacher/my-classes/${selectedClass}`
+        : '/teacher/my-classes'
+
+  useEffect(() => {
+    if (loadingEditExam || loadingClasses) {
+      snapshotBaselineReadyRef.current = false
+      setSavedSnapshot(null)
+      return undefined
+    }
+    if (snapshotBaselineReadyRef.current) return undefined
+
+    const timer = window.setTimeout(() => {
+      if (snapshotBaselineReadyRef.current) return
+      snapshotBaselineReadyRef.current = true
+      setSavedSnapshot(buildExamDirtySnapshot(dirtySnapshotInput))
+    }, 300)
+
+    return () => window.clearTimeout(timer)
+  }, [loadingEditExam, loadingClasses, dirtySnapshotInput])
+
+  useEffect(() => {
+    if (!shouldConfirmLeave) return undefined
+    const onBeforeUnload = (event) => {
+      event.preventDefault()
+      event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [shouldConfirmLeave])
+
+  async function handleBack() {
+    if (shouldConfirmLeave) {
+      const ok = await confirm({
+        title: isSaving ? 'Leave while saving?' : 'Discard unsaved changes?',
+        description: isSaving
+          ? 'Your exam is still being saved. If you leave now, recent changes may not be saved.'
+          : 'You have unsaved changes in this exam. If you leave now, they may be lost.',
+        confirmLabel: 'Leave without saving',
+        destructive: true,
+      })
+      if (!ok) return
+    }
+    allowLeaveRef.current = true
+    navigate(backHref)
+  }
 
   function handlePreview() {
     const payload = buildExamSectionsPayload(sections)
@@ -1826,14 +2009,19 @@ export default function TeacherCreateExamPage() {
       {/* TOP HEADER */}
       <header className="exam-builder-page__header border-b border-border px-6 py-4 flex items-center justify-between gap-4 shrink-0 shadow-sm">
         <div className="flex items-center gap-4 min-w-0">
-          <Button variant="ghost" size="icon" asChild className="rounded-full text-muted-foreground hover:text-foreground shrink-0">
-            <Link to={backHref}>
-              <ArrowLeft size={20} />
-            </Link>
+          <Button
+            variant="ghost"
+            size="icon"
+            type="button"
+            className="rounded-full text-muted-foreground hover:text-foreground shrink-0"
+            onClick={() => void handleBack()}
+            aria-label="Go back"
+          >
+            <ArrowLeft size={20} />
           </Button>
           <div className="flex items-center gap-3 min-w-0 flex-wrap">
             <h1 className="text-xl font-semibold tracking-tight text-foreground whitespace-nowrap m-0 leading-6">
-              {isEditMode ? 'Edit exam' : 'Exam Builder'}
+              {isEditMode ? 'Edit exam' : isCopyMode ? 'Create a copy' : 'Exam Builder'}
             </h1>
             <p className="text-sm text-muted-foreground whitespace-nowrap m-0 leading-6">
               {sections.length} {sections.length === 1 ? 'set' : 'sets'} · {totalQuestions}{' '}
@@ -2136,9 +2324,13 @@ export default function TeacherCreateExamPage() {
               {!isEditMode ? (
                 <div className="exam-builder-target rounded-xl border border-border bg-card/50 p-4 space-y-3">
                   <div className="space-y-1">
-                    <p className="text-sm font-medium text-foreground">Post to classes</p>
+                    <p className="text-sm font-medium text-foreground">
+                      {isCopyMode ? 'Post copy to classes' : 'Post to classes'}
+                    </p>
                     <p className="text-xs text-muted-foreground">
-                      Choose a course, then select the section(s) where you teach it.
+                      {isCopyMode
+                        ? 'Choose the section(s) where this copy should be posted. You can use this section or others.'
+                        : 'Choose a course, then select the section(s) where you teach it.'}
                     </p>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">

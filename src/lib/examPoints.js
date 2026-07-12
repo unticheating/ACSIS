@@ -23,3 +23,26 @@ export function sumExamTotalPoints(questions) {
   if (!Array.isArray(questions) || questions.length === 0) return 0
   return questions.reduce((total, q) => total + maxPointsForQuestion(q), 0)
 }
+
+/** Max points for a review row from API fields. */
+export function maxPointsForReviewAnswer(answer) {
+  if (!answer) return 0
+  const points = Number(answer.questionPoints ?? 1)
+  const type = String(answer.questionType || '').toLowerCase()
+  if (type === 'matching') {
+    const pairCount = Number(answer.correctPairCount ?? 0)
+    return points * (pairCount > 0 ? pairCount : 1)
+  }
+  return points
+}
+
+export function earnedPointsForReviewAnswer(answer) {
+  if (!answer) return 0
+  if (answer.pointsAwarded != null && Number.isFinite(Number(answer.pointsAwarded))) {
+    return Number(answer.pointsAwarded)
+  }
+  if (answer.isCorrect === true) {
+    return maxPointsForReviewAnswer(answer)
+  }
+  return 0
+}

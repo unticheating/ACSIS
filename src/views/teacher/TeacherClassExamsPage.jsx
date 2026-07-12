@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import StreamBackLink from '@/components/layout/StreamBackLink.jsx'
 import { useTeacherShellBreadcrumbTrail } from '@/context/TeacherShellBreadcrumbContext.jsx'
 import { apiFetch } from '@/lib/apiFetch.js'
 import {
@@ -211,9 +212,9 @@ export default function TeacherClassExamsPage() {
     return (
       <div className="acsis-mc-view acsis-view">
         <p className="acsis-mc-sub">This class could not be found.</p>
-        <Link to="/teacher/my-classes" className="acsis-stream-back">
+        <StreamBackLink to="/teacher/my-classes">
           Back to My Classes
-        </Link>
+        </StreamBackLink>
       </div>
     )
   }
@@ -384,6 +385,8 @@ export default function TeacherClassExamsPage() {
 
   return (
     <div className="acsis-mc-view acsis-view">
+      <StreamBackLink to="/teacher/my-classes">My Classes</StreamBackLink>
+
       <ClassCourseHeader
         course={cls}
         menu={

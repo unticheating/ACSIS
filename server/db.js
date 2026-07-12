@@ -19,7 +19,7 @@ export function getPool() {
       (config.databaseUrl || '').includes('supabase.com')
     pool = new Pool({
       connectionString: config.databaseUrl,
-      max: isServerless ? 2 : 5,
+      max: isServerless ? 1 : 5,
       connectionTimeoutMillis: isServerless ? 15000 : 5000,
       idleTimeoutMillis: isServerless ? 10000 : 30000,
       ssl: useSsl ? { rejectUnauthorized: false } : undefined,

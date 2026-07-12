@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import StreamBackLink from '@/components/layout/StreamBackLink.jsx'
 import { ImagePlus, Trash2, Info, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -472,7 +472,7 @@ export default function AdminSettingsPage({ basePath = '/admin' }) {
         </FadeIn>
 
         <p className="admin-settings-back">
-          <Link to={basePath}>← Back to dashboard</Link>
+          <StreamBackLink to={basePath}>Back to dashboard</StreamBackLink>
         </p>
       </div>
       

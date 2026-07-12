@@ -1421,22 +1421,25 @@ html.dark .reports-page.exam-audit-logs .exam-audit-logs__search-input:focus-vis
 .reports-page.exam-audit-logs .exam-audit-logs__filters-row {
   display: flex;
   align-items: flex-end;
-  gap: 12px;
-  flex-wrap: wrap;
+  gap: 10px;
+  flex-wrap: nowrap;
+  min-width: 0;
 }
 
 .reports-page.exam-audit-logs .exam-audit-logs__filters {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  flex: 1;
-  min-width: min(100%, 720px);
+  display: flex;
+  flex: 1 1 auto;
+  align-items: flex-end;
+  gap: 10px;
+  min-width: 0;
+  flex-wrap: nowrap;
 }
 
 .reports-page.exam-audit-logs .exam-audit-logs__filter {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  flex: 1 1 0;
   min-width: 0;
 }
 
@@ -1460,6 +1463,8 @@ html.dark .reports-page.exam-audit-logs .exam-audit-logs__search-input:focus-vis
   font-weight: 600;
   cursor: pointer;
   transition: border-color 0.18s ease, background 0.18s ease;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .reports-page.exam-audit-logs .exam-audit-logs__select:hover {
@@ -1523,14 +1528,14 @@ html.dark .reports-page.exam-audit-logs .exam-audit-logs__search-input:focus-vis
 
 .reports-page.exam-audit-logs .exam-audit-logs__filters-actions {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 8px;
   flex-shrink: 0;
-  margin-left: auto;
 }
 
 .reports-page.exam-audit-logs .exam-audit-logs__export {
   white-space: nowrap;
+  min-height: 36px;
 }
 
 .reports-page.exam-audit-logs .exam-audit-logs__clear {
@@ -1700,6 +1705,51 @@ html.dark .reports-page.exam-audit-logs .exam-audit-logs__search-input:focus-vis
   border-color: color-mix(in srgb, #ec4899 36%, transparent);
 }
 
+.reports-page.exam-audit-logs .exam-audit-logs__badge--violation_detected,
+.reports-page.exam-audit-logs .exam-audit-logs__badge--student_detected {
+  color: #c2410c;
+  background: color-mix(in srgb, #f97316 16%, var(--rp-surface-muted));
+  border-color: color-mix(in srgb, #f97316 36%, transparent);
+}
+
+.reports-page.exam-audit-logs .exam-audit-logs__pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-top: 1px solid var(--rp-border);
+}
+
+.reports-page.exam-audit-logs .exam-audit-logs__page-status {
+  font-size: 0.875rem;
+  color: var(--rp-muted);
+  min-width: 7rem;
+  text-align: center;
+}
+
+.reports-page.exam-audit-logs .exam-audit-logs__page-btn {
+  min-height: 36px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--rp-border);
+  background: var(--rp-surface-muted);
+  color: var(--rp-text);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.reports-page.exam-audit-logs .exam-audit-logs__page-btn:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--rp-accent) 40%, var(--rp-border));
+  color: var(--rp-accent);
+}
+
+.reports-page.exam-audit-logs .exam-audit-logs__page-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .reports-page.exam-audit-logs .exam-audit-logs__badge--user_login,
 .reports-page.exam-audit-logs .exam-audit-logs__badge--teacher_login {
   color: #4338ca;
@@ -1816,19 +1866,31 @@ html.dark .reports-page.exam-audit-logs .exam-audit-logs__badge--violation_dismi
   border-color: color-mix(in srgb, #ec4899 48%, transparent);
 }
 
+html.dark .reports-page.exam-audit-logs .exam-audit-logs__badge--violation_detected,
+html.dark .reports-page.exam-audit-logs .exam-audit-logs__badge--student_detected {
+  color: #fdba74;
+  background: color-mix(in srgb, #f97316 24%, transparent);
+  border-color: color-mix(in srgb, #f97316 48%, transparent);
+}
+
 @media (max-width: 1100px) {
   .reports-page.exam-audit-logs .exam-audit-logs__filters-row {
-    flex-direction: column;
+    flex-wrap: wrap;
     align-items: stretch;
   }
 
   .reports-page.exam-audit-logs .exam-audit-logs__filters {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    min-width: 0;
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .reports-page.exam-audit-logs .exam-audit-logs__filter {
+    flex: 1 1 calc(50% - 5px);
+    min-width: min(100%, 200px);
   }
 
   .reports-page.exam-audit-logs .exam-audit-logs__filters-actions {
-    margin-left: 0;
+    width: 100%;
     justify-content: flex-end;
   }
 }
@@ -1844,7 +1906,12 @@ html.dark .reports-page.exam-audit-logs .exam-audit-logs__badge--violation_dismi
   }
 
   .reports-page.exam-audit-logs .exam-audit-logs__filters {
-    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+
+  .reports-page.exam-audit-logs .exam-audit-logs__filter {
+    flex: 1 1 auto;
+    width: 100%;
   }
 
   .reports-page.exam-audit-logs .exam-audit-logs__filters-actions {

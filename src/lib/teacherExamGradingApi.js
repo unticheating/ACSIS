@@ -9,13 +9,19 @@ async function parseJson(res) {
   return data
 }
 
-export async function manualGradeAnswer(classId, examId, sessionId, answerId, isCorrect) {
+export async function manualGradeAnswer(classId, examId, sessionId, answerId, payload) {
+  const body =
+    typeof payload === 'boolean'
+      ? { isCorrect: payload }
+      : payload && typeof payload === 'object'
+        ? payload
+        : {}
   const res = await apiFetch(
     `/api/teacher/classes/${classId}/exams/${examId}/results/${sessionId}/answers/${answerId}/grade`,
     {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ isCorrect }),
+      body: JSON.stringify(body),
     },
   )
   return parseJson(res)

@@ -1,4 +1,4 @@
-import { getPool } from '../db.js'
+import { labelForCheatEvent } from '../lib/cheatEventLabels.js'
 import { normalizeExamPassword } from '../lib/examCodes.js'
 import { EXAM_STATUS, nextStatusAfterRestart, nextStatusAfterStart } from '../lib/examStatus.js'
 import { autoCloseExams } from './examService.js'
@@ -234,6 +234,20 @@ export async function getStudentExamSessionService(classId, examId, studentMembe
   }
 
   if (status === EXAM_STATUS.OPEN && session) {
+    const full = await getExamWithQuestionsQuery(classId, examId, false)
+    if (full?.questions) {
+      const layout = await getSessionShuffleLayoutQuery(session.session_id)
+      payload.questions = applyLayoutToExamQuestions(full.questions, layout, { forStudent: true })
+      const { questions, correctAnswer, _choicesMeta, ...examPublic } = full
+      payload.exam = { ...examMeta, ...examPublic, code: examMeta.code }
+    }
+    const savedRows = await listStudentAnswersForSessionQuery(session.session_id)
+    payload.savedAnswers = mapSavedAnswers(savedRows)
+  } else if (
+    status === EXAM_STATUS.CLOSED &&
+    session &&
+    (session.status === 'on_hold' || session.status === 'in_progress')
+  ) {
     const full = await getExamWithQuestionsQuery(classId, examId, false)
     if (full?.questions) {
       const layout = await getSessionShuffleLayoutQuery(session.session_id)
@@ -504,8 +518,8 @@ export async function logCheatingEventService(classId, examId, studentMemberId, 
       classId,
       examId,
       studentMemberId,
-      eventType: 'student_detected',
-      details: `${eventType}${details ? ` — ${details}` : ''}`.slice(0, 500),
+      eventType: 'violation_detected',
+      details: `${labelForCheatEvent(eventType)}${details ? ` — ${details}` : ''}`.slice(0, 500),
     }).catch((err) => {
       console.error('[examSessionService.logCheatingEvent] teacher activity log failed:', err)
     })

@@ -52,6 +52,7 @@ function buildExamAuditFilters({
   eventType = '',
   examId = '',
   sectionKey = '',
+  subjectKey = '',
   search = '',
   dateFrom = '',
   dateTo = '',
@@ -64,8 +65,13 @@ function buildExamAuditFilters({
   ]
 
   if (eventType) {
-    params.push(eventType)
-    clauses.push(`tal.event_type = $${params.length + 2}`)
+    if (eventType === 'violation_detected') {
+      params.push(['violation_detected', 'student_detected'])
+      clauses.push(`tal.event_type = ANY($${params.length + 2}::text[])`)
+    } else {
+      params.push(eventType)
+      clauses.push(`tal.event_type = $${params.length + 2}`)
+    }
   }
 
   if (examId) {
@@ -94,6 +100,20 @@ function buildExamAuditFilters({
     }
   }
 
+  if (subjectKey) {
+    if (String(subjectKey).startsWith('class:')) {
+      params.push(Number(String(subjectKey).slice(6)))
+      clauses.push(`tal.class_id = $${params.length + 2}`)
+    } else {
+      params.push(String(subjectKey).toLowerCase())
+      const idx = params.length + 2
+      clauses.push(`(
+        LOWER(TRIM(COALESCE(c.course_code, ''))) = $${idx}
+        OR LOWER(TRIM(COALESCE(c.class_name, ''))) = $${idx}
+      )`)
+    }
+  }
+
   if (dateFrom) {
     params.push(dateFrom)
     clauses.push(`tal.occurred_at >= $${params.length + 2}::date`)
@@ -112,6 +132,7 @@ function buildExamAuditFilters({
       tal.event_type,
       COALESCE(tal.details, ''),
       COALESCE(c.class_name, ''),
+      COALESCE(c.course_code, ''),
       COALESCE(e.title, ''),
       COALESCE(sec.title, ''),
       COALESCE(tt.program_code, ''),
@@ -130,6 +151,7 @@ export async function listExamAuditLogsFilteredQuery(
     eventType = '',
     examId = '',
     sectionKey = '',
+    subjectKey = '',
     search = '',
     dateFrom = '',
     dateTo = '',
@@ -142,6 +164,7 @@ export async function listExamAuditLogsFilteredQuery(
     eventType,
     examId,
     sectionKey,
+    subjectKey,
     search,
     dateFrom,
     dateTo,
@@ -164,6 +187,7 @@ export async function listExamAuditLogsFilteredQuery(
         labelForAuditEvent(row.eventType),
         row.details,
         row.className,
+        row.courseCode,
         row.examTitle,
         row.questionSetTitle,
         formatAuditSectionLabel(row),

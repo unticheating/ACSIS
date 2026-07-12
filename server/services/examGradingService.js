@@ -9,7 +9,9 @@ import { getExamForJoinQuery } from '../repositories/examSessionRepository.js'
 import { listExamSessionsForExamQuery } from '../repositories/examResultsRepository.js'
 import { recordTeacherActivityQuery } from '../repositories/teacherActivityRepository.js'
 
-export async function manualGradeAnswerService(classId, examId, sessionId, answerId, teacherMemberId, isCorrect) {
+export async function manualGradeAnswerService(classId, examId, sessionId, answerId, teacherMemberId, payload) {
+  const isCorrect = payload?.isCorrect
+  const pointsAwarded = payload?.pointsAwarded
   try {
     const cls = await getTeacherClassByIdQuery(classId, teacherMemberId)
     if (!cls) {
@@ -31,6 +33,7 @@ export async function manualGradeAnswerService(classId, examId, sessionId, answe
 
     const updated = await updateManualAnswerGradeQuery(sessionId, answerId, {
       isCorrect,
+      pointsAwarded,
       checkedBy: teacherMemberId,
     })
     if (!updated) {

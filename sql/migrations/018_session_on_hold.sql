@@ -1,0 +1,12 @@
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_enum e
+    JOIN pg_type t ON e.enumtypid = t.oid
+    WHERE t.typname = 'session_status' AND e.enumlabel = 'on_hold'
+  ) THEN
+    ALTER TYPE session_status ADD VALUE 'on_hold';
+  END IF;
+END
+$$;

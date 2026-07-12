@@ -3,7 +3,9 @@ import { ensureCheatEventSchema } from '../lib/ensureCheatEventSchema.js'
 import { getExamSessionUserColumn } from '../lib/schemaCompat.js'
 import { ensureExamSessionShuffleColumns } from '../lib/ensureExamSessionShuffleSchema.js'
 import { ensureExamSessionLockedColumns } from '../lib/ensureExamSessionLockedSchema.js'
+import { ensureSessionOnHoldStatus } from '../lib/ensureSessionOnHoldSchema.js'
 import { buildShuffleLayout } from '../lib/examShuffle.js'
+import { ensurePointsAwardedColumn } from '../lib/ensurePointsAwardedSchema.js'
 import { computeExamRanksQuery } from './examResultsRepository.js'
 
 export async function getExamForJoinQuery(classId, examId) {
@@ -161,11 +163,35 @@ export async function lockExamSessionQuery(sessionId, reason = null) {
     `UPDATE exam_sessions
      SET locked_at = COALESCE(locked_at, NOW()),
          lock_reason = COALESCE(lock_reason, $2)
-     WHERE session_id = $1 AND status = 'in_progress'
+     WHERE session_id = $1 AND status IN ('in_progress', 'on_hold')
      RETURNING session_id, locked_at, lock_reason`,
     [sessionId, reason],
   )
   return rows[0] || null
+}
+
+/** Move joined-but-unsubmitted sessions to on_hold when the teacher closes the exam. */
+export async function holdUnsubmittedExamSessionsQuery(examId) {
+  await ensureExamSessionLockedColumns()
+  await ensureSessionOnHoldStatus()
+  const pool = getPool()
+  await pool.query(
+    `UPDATE exam_sessions
+     SET status = 'on_hold',
+         locked_at = NOW(),
+         lock_reason = COALESCE(lock_reason, 'teacher_closed')
+     WHERE exam_id = $1 AND status = 'in_progress'`,
+    [examId],
+  )
+}
+
+export async function listOnHoldSessionIdsForExamQuery(examId) {
+  const pool = getPool()
+  const { rows } = await pool.query(
+    `SELECT session_id FROM exam_sessions WHERE exam_id = $1 AND status = 'on_hold'`,
+    [examId],
+  )
+  return rows.map((r) => Number(r.session_id))
 }
 
 export async function getQuestionTypeQuery(questionId) {
@@ -289,11 +315,14 @@ export async function upsertStudentAnswerQuery(sessionId, questionId, { choiceId
 }
 
 export async function gradeSessionAnswersQuery(sessionId) {
+  await ensurePointsAwardedColumn()
   const pool = getPool()
   await pool.query(
     `UPDATE student_answers sa
      SET 
        is_correct = CASE
+         WHEN sa.manually_checked = TRUE AND sa.points_awarded IS NOT NULL THEN
+           CASE WHEN sa.points_awarded > 0 THEN TRUE ELSE FALSE END
          WHEN q.question_type = 'identification' AND EXISTS (
              SELECT 1 FROM choices c
              WHERE c.question_id = sa.question_id AND c.is_correct = TRUE
@@ -351,6 +380,7 @@ export async function gradeSessionAnswersQuery(sessionId) {
     `SELECT
        COALESCE(SUM(
          CASE 
+           WHEN sa.points_awarded IS NOT NULL THEN sa.points_awarded
            WHEN q.question_type = 'matching' THEN 
              CASE 
                WHEN sa.manually_checked = TRUE THEN 

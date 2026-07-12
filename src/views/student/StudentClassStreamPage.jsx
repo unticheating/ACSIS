@@ -9,15 +9,26 @@ import {
 import { DropdownMenuActionItem } from '@/components/ui/dropdown-menu-action-item.jsx'
 import { apiFetch } from '@/lib/apiFetch.js'
 import { acsisToastError } from '@/lib/acsisToast.js'
-import ClassCourseHeader from '@/components/classes/ClassCourseHeader.jsx'
+import StreamBackLink from '@/components/layout/StreamBackLink.jsx'
 import { formatCourseDisplayLabels } from '@/lib/sectionLabel.js'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog.jsx'
+import { Button } from '@/components/ui/button.jsx'
 import {
   canStudentEnterExamCode,
   isExamEnterableByStudent,
   isExamLobbyScheduledFuture,
+  isStudentSessionOnHold,
   labelForStudentExam,
   normalizeExamStatus,
   PG_EXAM_STATUS,
+  shouldShowExamOnStudentStream,
 } from '@/lib/examFlowUi.js'
 import { joinStudentExam } from '@/lib/studentExamApi.js'
 import FadeIn from '@/components/ui/fade-in.jsx'
@@ -37,6 +48,7 @@ export default function StudentClassStreamPage() {
   const [joinCode, setJoinCode] = useState('')
   const [joinError, setJoinError] = useState(null)
   const [joining, setJoining] = useState(false)
+  const [holdExam, setHoldExam] = useState(null)
 
   useEffect(() => {
     async function loadData() {
@@ -61,14 +73,7 @@ export default function StudentClassStreamPage() {
 
   const examsSorted = useMemo(() => {
     let list = [...(cls?.exams || [])]
-    list = list.filter((exam) => {
-      if ((exam.status || '').toLowerCase() === 'closed') return false
-      if (exam.scheduledEnd) {
-        const end = new Date(exam.scheduledEnd).getTime()
-        if (Number.isFinite(end) && Date.now() > end) return false
-      }
-      return true
-    })
+    list = list.filter((exam) => shouldShowExamOnStudentStream(exam))
     list.sort((a, b) => Number(b.id) - Number(a.id))
     return list
   }, [cls])
@@ -118,9 +123,7 @@ export default function StudentClassStreamPage() {
   if (loading) {
     return (
       <div className="acsis-mc-view acsis-view">
-        <Link to="/student/my-classes" className="acsis-stream-back">
-          ← Enrolled classes
-        </Link>
+        <StreamBackLink to="/student/my-classes">Enrolled classes</StreamBackLink>
         <PageSpinner label="Loading class…" />
       </div>
     )
@@ -129,9 +132,7 @@ export default function StudentClassStreamPage() {
   if (error === 'NOT_ENROLLED') {
     return (
       <div className="acsis-mc-view acsis-view">
-        <Link to="/student/my-classes" className="acsis-stream-back">
-          ← Enrolled classes
-        </Link>
+        <StreamBackLink to="/student/my-classes">Enrolled classes</StreamBackLink>
         <div className="acsis-mc-empty">
           <h2 className="acsis-mc-empty__title">Not enrolled in this class</h2>
           <p className="acsis-mc-empty__text">
@@ -152,9 +153,7 @@ export default function StudentClassStreamPage() {
         : error || 'This class could not be loaded.'
     return (
       <div className="acsis-mc-view acsis-view">
-        <Link to="/student/my-classes" className="acsis-stream-back">
-          ← Enrolled classes
-        </Link>
+        <StreamBackLink to="/student/my-classes">Enrolled classes</StreamBackLink>
         <p className="acsis-mc-sub">{message}</p>
       </div>
     )
@@ -162,9 +161,7 @@ export default function StudentClassStreamPage() {
 
   return (
     <div className="acsis-mc-view acsis-view">
-      <Link to="/student/my-classes" className="acsis-stream-back">
-        ← Enrolled classes
-      </Link>
+      <StreamBackLink to="/student/my-classes">Enrolled classes</StreamBackLink>
 
       <FadeIn as="div" delay={0.05}>
         <ClassCourseHeader
@@ -195,9 +192,11 @@ export default function StudentClassStreamPage() {
         </div>
       ) : (
         <div className="acsis-mc-stream">
-          <h2 className="text-xl font-semibold text-foreground mb-4">Upcoming exams</h2>
+          <h2 className="text-xl font-semibold text-foreground mb-4">Exams</h2>
           <ul className="acsis-stream-list">
-            {examsSorted.map((exam, index) => (
+            {examsSorted.map((exam, index) => {
+              const onHold = isStudentSessionOnHold(exam.sessionStatus, exam.status)
+              return (
               <FadeIn as="li" delay={0.1 + (index * 0.05)} key={exam.id} className="acsis-stream-item acsis-card-surface">
                 <div className="acsis-stream-item__accent" aria-hidden />
                 <div className="acsis-stream-item__main">
@@ -216,6 +215,8 @@ export default function StudentClassStreamPage() {
                       className={`acsis-pill ${
                         exam.sessionStatus === 'submitted'
                           ? 'acsis-pill--draft'
+                          : onHold
+                            ? 'acsis-pill--draft'
                           : isExamEnterableByStudent(exam.status, exam.sessionStatus, exam.scheduledStart)
                             ? 'acsis-pill--live'
                             : isExamLobbyScheduledFuture(exam.status, exam.scheduledStart)
@@ -229,7 +230,16 @@ export default function StudentClassStreamPage() {
                           ? `Opens ${new Date(exam.scheduledStart).toLocaleString()}`
                           : labelForStudentExam(exam)}
                     </span>
-                    {isExamEnterableByStudent(exam.status, exam.sessionStatus, exam.scheduledStart) ? (
+                    {onHold ? (
+                      <button
+                        type="button"
+                        className="acsis-mc-create-btn"
+                        style={{ padding: '6px 12px', fontSize: '0.8125rem' }}
+                        onClick={() => setHoldExam(exam)}
+                      >
+                        Submit
+                      </button>
+                    ) : isExamEnterableByStudent(exam.status, exam.sessionStatus, exam.scheduledStart) ? (
                       <button
                         type="button"
                         className="acsis-mc-create-btn"
@@ -274,10 +284,53 @@ export default function StudentClassStreamPage() {
                   </div>
                 </div>
               </FadeIn>
-            ))}
+            )
+            })}
           </ul>
         </div>
       )}
+
+      <Dialog open={Boolean(holdExam)} onOpenChange={(open) => !open && setHoldExam(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Exam session on hold</DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-3 text-sm text-muted-foreground">
+                <p>
+                  This exam has ended. Your session and any answers already saved are currently on
+                  hold and have not been submitted to your instructor.
+                </p>
+                <p>
+                  The exam will not reopen automatically. To submit your work, open the exam session
+                  and select <strong className="text-foreground">Send exam</strong>.
+                </p>
+                <p>
+                  If you believe there is an error with your session, or you require additional time
+                  to complete the exam, please contact your instructor. They may restart the exam at
+                  their discretion if appropriate.
+                </p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button type="button" variant="outline" onClick={() => setHoldExam(null)}>
+              Close
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                if (!holdExam) return
+                navigate(
+                  `/student/exam/session?classId=${encodeURIComponent(classId)}&examId=${encodeURIComponent(holdExam.id)}`,
+                )
+                setHoldExam(null)
+              }}
+            >
+              Open exam session
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {joinExamId ? (
         <div

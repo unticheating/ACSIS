@@ -1,5 +1,6 @@
 import { getPool } from '../db.js'
 import { ensureCheatingLogDismissedColumns } from '../lib/ensureCheatingLogDismissedSchema.js'
+import { ensurePointsAwardedColumn } from '../lib/ensurePointsAwardedSchema.js'
 import { getExamSessionJoinCondition } from '../lib/schemaCompat.js'
 import { SQL_JOIN_STUDENTS, SQL_MEMBER_SCHOOL_ID } from '../lib/memberSql.js'
 
@@ -34,6 +35,7 @@ export async function listExamSessionsForExamQuery(classId, examId) {
        es.warning_count AS "warningCount",
        es.started_at AS "startedAt",
        es.submitted_at AS "submittedAt",
+       es.locked_at AS "lockedAt",
        er.raw_score AS "rawScore",
        er.total_points AS "totalPoints",
        er.percentage,
@@ -48,7 +50,7 @@ export async function listExamSessionsForExamQuery(classId, examId) {
        u.avatar_url,
        (SELECT COUNT(*)::int FROM student_answers sa WHERE sa.session_id = es.session_id) AS "answerCount",
        (SELECT COUNT(*)::int FROM student_answers sa
-        WHERE sa.session_id = es.session_id AND sa.manually_checked = FALSE) AS "uncheckedCount",
+        WHERE sa.session_id = es.session_id AND sa.is_correct IS NULL) AS "uncheckedCount",
        (SELECT COUNT(*)::int FROM cheating_logs cl WHERE cl.session_id = es.session_id) AS "violationCount"
      FROM exam_sessions es
      JOIN exams e ON es.exam_id = e.exam_id
@@ -68,6 +70,7 @@ export async function listExamSessionsForExamQuery(classId, examId) {
     warningCount: Number(r.warningCount || 0),
     startedAt: r.startedAt,
     submittedAt: r.submittedAt,
+    lockedAt: r.lockedAt,
     rawScore: r.rawScore != null ? Number(r.rawScore) : null,
     totalPoints: r.totalPoints != null ? Number(r.totalPoints) : null,
     percentage: r.percentage != null ? Number(r.percentage) : null,
@@ -81,13 +84,13 @@ export async function listExamSessionsForExamQuery(classId, examId) {
     answerCount: Number(r.answerCount || 0),
     uncheckedCount: Number(r.uncheckedCount || 0),
     reviewComplete:
-      r.status !== 'submitted' ||
-      (Number(r.answerCount || 0) > 0 && Number(r.uncheckedCount || 0) === 0),
+      Number(r.answerCount || 0) === 0 || Number(r.uncheckedCount || 0) === 0,
     violationCount: Number(r.violationCount || 0),
   }))
 }
 
 export async function listStudentAnswersForSessionQuery(sessionId) {
+  await ensurePointsAwardedColumn()
   const pool = getPool()
   const { rows } = await pool.query(
     `SELECT
@@ -95,12 +98,16 @@ export async function listStudentAnswersForSessionQuery(sessionId) {
        sa.question_id AS "questionId",
        q.question_text AS "questionText",
        q.question_type AS "questionType",
+       q.points AS "questionPoints",
        sa.answer_text AS "answerText",
        c.choice_text AS "choiceText",
        sa.is_correct AS "isCorrect",
        sa.manually_checked AS "manuallyChecked",
        sa.checked_by AS "checkedBy",
        sa.checked_at AS "checkedAt",
+       sa.points_awarded AS "pointsAwarded",
+       (SELECT COUNT(*)::int FROM choices c2
+        WHERE c2.question_id = q.question_id AND c2.is_correct = TRUE) AS "correctPairCount",
        (SELECT json_agg(c2.choice_text ORDER BY COALESCE(c2.order_num, 9999) ASC) FROM choices c2
         WHERE c2.question_id = q.question_id AND c2.is_correct = TRUE) AS "correctChoices"
      FROM student_answers sa
@@ -121,6 +128,9 @@ export async function listStudentAnswersForSessionQuery(sessionId) {
     manuallyChecked: Boolean(r.manuallyChecked),
     checkedBy: r.checkedBy,
     checkedAt: r.checkedAt,
+    questionPoints: r.questionPoints != null ? Number(r.questionPoints) : 1,
+    pointsAwarded: r.pointsAwarded != null ? Number(r.pointsAwarded) : null,
+    correctPairCount: Number(r.correctPairCount || 0),
     expectedAnswer: Array.isArray(r.correctChoices) && r.correctChoices.length > 0 ? r.correctChoices[0] : null,
     possibleAnswers: Array.isArray(r.correctChoices) && r.correctChoices.length > 1 ? r.correctChoices.slice(1) : [],
   }))
@@ -197,19 +207,33 @@ export async function getAnswerAuditContextQuery(sessionId, answerId) {
   return rows[0] || null
 }
 
-export async function updateManualAnswerGradeQuery(sessionId, answerId, { isCorrect, checkedBy }) {
+export async function updateManualAnswerGradeQuery(sessionId, answerId, { isCorrect, pointsAwarded, checkedBy }) {
+  await ensurePointsAwardedColumn()
   const pool = getPool()
+
+  let nextCorrect = isCorrect
+  let nextPoints = pointsAwarded != null && Number.isFinite(Number(pointsAwarded)) ? Number(pointsAwarded) : null
+
+  if (nextPoints != null) {
+    nextCorrect = nextPoints > 0
+  } else if (nextCorrect === false) {
+    nextPoints = 0
+  } else if (nextCorrect === true) {
+    nextPoints = null
+  }
+
   const { rowCount } = await pool.query(
     `UPDATE student_answers sa
      SET is_correct = $1,
+         points_awarded = $2,
          manually_checked = TRUE,
-         checked_by = $2,
+         checked_by = $3,
          checked_at = NOW()
      FROM exam_sessions es
-     WHERE sa.answer_id = $3
-       AND sa.session_id = $4
+     WHERE sa.answer_id = $4
+       AND sa.session_id = $5
        AND es.session_id = sa.session_id`,
-    [Boolean(isCorrect), checkedBy, answerId, sessionId],
+    [Boolean(nextCorrect), nextPoints, checkedBy, answerId, sessionId],
   )
   return rowCount > 0
 }

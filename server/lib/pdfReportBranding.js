@@ -66,8 +66,10 @@ export function drawReportHeader(
   },
 ) {
   const contentWidth = pageWidth - pageMargin * 2
-  const logoSize = compact ? 42 : 60
-  const logoRowHeight = compact ? 48 : 70
+  const logoSize = compact ? 48 : 60
+  const teacherLogoMaxHeight = compact ? 40 : 50
+  const teacherLogoMaxWidth = compact ? 76 : 92
+  const logoRowHeight = logoSize
   const dividerPad = compact ? 8 : 15
   const titleSize = compact ? 15 : 18
   const afterTitleGap = compact ? 0.65 : 2
@@ -92,7 +94,10 @@ export function drawReportHeader(
   if (teacherLogoBase64) {
     try {
       const buffer = Buffer.from(teacherLogoBase64.replace(/^data:image\/\w+;base64,/, ''), 'base64')
-      doc.image(buffer, nextLogoX, currentY, { fit: [logoSize, logoSize] })
+      const teacherLogoY = currentY + (logoSize - teacherLogoMaxHeight) / 2
+      doc.image(buffer, nextLogoX, teacherLogoY, {
+        fit: [teacherLogoMaxWidth, teacherLogoMaxHeight],
+      })
     } catch (e) {
       console.error('Failed to load teacher logo', e)
     }

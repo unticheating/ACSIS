@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useSearchParams } from 'react-router-dom'
+import StreamBackLink from '@/components/layout/StreamBackLink.jsx'
 import { Clock, LayoutGrid, CheckCircle2, AlertTriangle, Keyboard as KeyboardIcon, Moon, Sun, ChevronLeft, ChevronRight, ChevronUp } from 'lucide-react'
 import Editor from '@monaco-editor/react'
 import { ExamSessionHeader } from '@/components/student/ExamSessionHeader.jsx'
@@ -181,10 +182,32 @@ export default function StudentExamSessionPage() {
   const [examPassword, setExamPassword] = useState('')
   const [joining, setJoining] = useState(false)
   const [scene, setScene] = useState('lobby')
+  const [sessionStatus, setSessionStatus] = useState(null)
   const [showKeyboard, setShowKeyboard] = useState(false)
   const [isSubmitDialogOpen, setIsSubmitDialogOpen] = useState(false)
   const monacoEditorRef = useRef(null)
   const sceneRef = useRef(scene)
+  const detectionOpenRef = useRef(false)
+
+  function applyClosedJoinedSession(data) {
+    const examSt = normalizeExamStatus(data.exam?.status)
+    const sessionSt = (data.sessionStatus || '').toLowerCase()
+    const closedWhileJoined =
+      sessionSt !== 'submitted' &&
+      examSt === PG_EXAM_STATUS.CLOSED &&
+      (sessionSt === 'on_hold' || sessionSt === 'in_progress')
+    if (!closedWhileJoined) return false
+
+    const locked = true
+    setExamLocked(locked)
+    setLockReason((prev) => prev || data.lockReason || 'teacher_closed')
+    examLockedRef.current = locked
+    setHit({ exam: { ...data.exam, questions: data.questions || [] } })
+    if ((data.questions?.length || 0) > 0) {
+      setScene('question')
+    }
+    return true
+  }
 
   const loadSession = useCallback(async () => {
     if (classId === 'preview') {
@@ -223,11 +246,27 @@ export default function StudentExamSessionPage() {
       const loadedMax = resolveMaxWarnings(data.maxWarnings, institutionMaxWarnings)
       setMaxWarnings(loadedMax)
       setWarningCount(displayStrikeCount(data.warningCount, loadedMax))
+      setSessionStatus(data.sessionStatus ?? null)
       const examSt = normalizeExamStatus(data.exam?.status)
+      const sessionSt = (data.sessionStatus || '').toLowerCase()
+      const closedWhileJoined =
+        sessionSt !== 'submitted' &&
+        examSt === PG_EXAM_STATUS.CLOSED &&
+        (sessionSt === 'on_hold' || sessionSt === 'in_progress')
       const locked =
-        examSt === PG_EXAM_STATUS.OPEN ? Boolean(data.sessionLocked) : false
+        sessionSt !== 'submitted' &&
+        (Boolean(data.sessionLocked) ||
+          closedWhileJoined ||
+          (examSt === PG_EXAM_STATUS.OPEN && Boolean(data.sessionLocked)))
       setExamLocked(locked)
-      setLockReason(locked ? data.lockReason || null : null)
+      setLockReason(
+        locked
+          ? data.lockReason ||
+            (closedWhileJoined ? 'teacher_closed' : null) ||
+            (displayStrikeCount(data.warningCount, loadedMax) >= loadedMax ? 'max_warnings' : null)
+          : null,
+      )
+      examLockedRef.current = locked
       if (data.savedAnswers && typeof data.savedAnswers === 'object') {
         setAnswers((prev) => ({ ...prev, ...data.savedAnswers }))
       }
@@ -245,6 +284,9 @@ export default function StudentExamSessionPage() {
         return
       }
       setHit({ exam: { ...data.exam, questions: data.questions || [] } })
+      if (closedWhileJoined && (data.questions?.length || 0) > 0) {
+        setScene('question')
+      }
       setError(null)
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to fetch exam.'
@@ -264,13 +306,17 @@ export default function StudentExamSessionPage() {
     if (classId === 'preview') return undefined
     if (!hit?.exam || needsPassword) return undefined
     const st = normalizeExamStatus(hit.exam.status)
-    if (st !== PG_EXAM_STATUS.WAITING) return undefined
+    const shouldPollLobby =
+      st === PG_EXAM_STATUS.WAITING ||
+      scene === 'lobby' ||
+      scene === 'countdown'
+    if (!shouldPollLobby) return undefined
 
     const interval = window.setInterval(() => {
       loadSession()
     }, 2500)
     return () => window.clearInterval(interval)
-  }, [classId, hit?.exam?.status, needsPassword, loadSession])
+  }, [classId, hit?.exam?.status, needsPassword, loadSession, scene])
 
   /** Sync lock/strike state when professor dismisses a false positive during the exam. */
   useEffect(() => {
@@ -284,19 +330,34 @@ export default function StudentExamSessionPage() {
         // Check exam status FIRST — if teacher closed the exam while student is answering,
         // lock them in-place immediately so they can submit (like timeout).
         if (examSt === PG_EXAM_STATUS.CLOSED) {
-          if (!examLockedRef.current) {
+          setSessionStatus(data.sessionStatus ?? null)
+          const sessionSt = (data.sessionStatus || '').toLowerCase()
+          const shouldLock =
+            sessionSt === 'on_hold' ||
+            sessionSt === 'in_progress' ||
+            Boolean(data.sessionLocked)
+          if (shouldLock && !examLockedRef.current) {
             setExamLocked(true)
-            setLockReason('teacher_closed')
+            setLockReason(data.lockReason || 'teacher_closed')
             examLockedRef.current = true
+          } else if (shouldLock) {
+            setLockReason((prev) => prev || data.lockReason || 'teacher_closed')
           }
-          // Keep questions/hit alive so the UI stays on the question scene
           setHit((prev) => ({
             exam: {
               ...(prev?.exam || {}),
               ...data.exam,
-              questions: prev?.exam?.questions || data.questions || [],
+              questions: prev?.exam?.questions?.length
+                ? prev.exam.questions
+                : data.questions || [],
             },
           }))
+          if (
+            (sessionSt === 'on_hold' || sessionSt === 'in_progress') &&
+            (data.questions?.length || 0) > 0
+          ) {
+            setScene('question')
+          }
           return
         }
 
@@ -310,7 +371,9 @@ export default function StudentExamSessionPage() {
           return
         }
         if (data.sessionStatus === 'submitted') return
+        setSessionStatus(data.sessionStatus ?? null)
         if (examSt !== PG_EXAM_STATUS.OPEN) {
+          if (applyClosedJoinedSession(data)) return
           setExamLocked(false)
           setLockReason(null)
           lockingRef.current = false
@@ -534,16 +597,20 @@ export default function StudentExamSessionPage() {
     if (!hit?.exam) return
     const st = normalizeExamStatus(hit.exam.status)
     if (st === PG_EXAM_STATUS.CLOSED) {
-      if (scene === 'question' && !examLocked) {
-        // Student was actively answering — lock in-place so they can submit, like timeout
-        setExamLocked(true)
-        setLockReason('teacher_closed')
-        examLockedRef.current = true
-      } else if (scene !== 'question' && scene !== 'submitted' && !needsPassword) {
-        // Student was in lobby/countdown — send to password entry
-        setNeedsPassword(true)
-        setHit(null)
-        setScene('lobby')
+      if (scene === 'question') {
+        if (!examLocked) {
+          setExamLocked(true)
+          setLockReason((prev) => prev || 'teacher_closed')
+          examLockedRef.current = true
+        }
+      } else if (scene !== 'submitted' && !needsPassword && !detectionOpenRef.current) {
+        const qs = questions.length > 0 ? questions : hit?.exam?.questions || []
+        if (qs.length > 0) {
+          setExamLocked(true)
+          setLockReason((prev) => prev || 'teacher_closed')
+          examLockedRef.current = true
+          setScene('question')
+        }
       }
       return
     }
@@ -559,6 +626,9 @@ export default function StudentExamSessionPage() {
   }, [hit?.exam?.status, questions.length, scene, needsPassword, examLocked])
 
   const [detectionOpen, setDetectionOpen] = useState(false)
+  useEffect(() => {
+    detectionOpenRef.current = detectionOpen
+  }, [detectionOpen])
   const [detectionReturn, setDetectionReturn] = useState(DETECTION_RETURN_SEC)
   const [overlayStrikeDisplay, setOverlayStrikeDisplay] = useState(null)
   const detectionRunningRef = useRef(false)
@@ -990,12 +1060,12 @@ export default function StudentExamSessionPage() {
               <Button type="submit" disabled={joining || !examPassword.trim()} className="w-full">
                 {joining ? 'Joining…' : 'Join exam lobby'}
               </Button>
-              <Link
+              <StreamBackLink
                 to={`/student/my-classes/${classId}`}
                 className="exam-session-exit block text-center text-sm font-medium"
               >
-                ← Back to class
-              </Link>
+                Back to class
+              </StreamBackLink>
             </form>
           </CardContent>
         </Card>
@@ -1019,7 +1089,9 @@ export default function StudentExamSessionPage() {
           </CardHeader>
           <CardContent>
             <Button variant="outline" className="w-full" asChild>
-              <Link to="/student/my-classes">← Enrolled classes</Link>
+              <StreamBackLink to="/student/my-classes" className="w-full justify-center">
+                Enrolled classes
+              </StreamBackLink>
             </Button>
           </CardContent>
         </Card>
@@ -1036,13 +1108,27 @@ export default function StudentExamSessionPage() {
   if (scene === 'lobby') {
     const examSt = normalizeExamStatus(hit.exam.status)
     const inLobby = examSt === PG_EXAM_STATUS.WAITING
+    const heldAfterClose =
+      examSt === PG_EXAM_STATUS.CLOSED &&
+      (sessionStatus === 'on_hold' || sessionStatus === 'in_progress')
     return (
       <div className="acsis-student-exam min-h-screen flex flex-col">
         <ExamSessionHeader title={examTitle} />
         <main className="lobby-main">
           <div className="my-auto flex flex-col items-center">
-            <h2 className="lobby-warning-title">Before you begin</h2>
+            <h2 className="lobby-warning-title">
+              {heldAfterClose ? 'Exam ended' : 'Before you begin'}
+            </h2>
             <div className="lobby-copy text-sm leading-relaxed text-foreground opacity-90">
+              {heldAfterClose ? (
+                <>
+                  <p>Your instructor ended the exam while you were still in the lobby.</p>
+                  <p className="mt-4">
+                    Loading your session so you can review and submit any work already saved.
+                  </p>
+                </>
+              ) : (
+                <>
               <p>This examination system monitors your activity to ensure academic fairness.</p>
               <p className="mt-4">
                 You are allowed up to <strong className="text-red-500">{maxWarnings} strikes</strong> only. If this limit is exceeded, your
@@ -1060,6 +1146,8 @@ export default function StudentExamSessionPage() {
                 <span className="inline-flex items-center rounded-full border border-red-500/30 bg-red-500/10 px-3.5 py-1.5 text-sm font-semibold tracking-wide text-red-500">Right-clicking</span>
                 <span className="inline-flex items-center rounded-full border border-red-500/30 bg-red-500/10 px-3.5 py-1.5 text-sm font-semibold tracking-wide text-red-500">Windows key</span>
               </div>
+                </>
+              )}
             </div>
           </div>
 
@@ -1067,13 +1155,17 @@ export default function StudentExamSessionPage() {
             <div className="lobby-footer !pb-2">
               <div className="lobby-spinner" aria-hidden />
               <p className="lobby-waiting text-sm font-medium text-foreground opacity-80">
-                {inLobby
+                {heldAfterClose
+                  ? 'Preparing your held session…'
+                  : inLobby
                   ? `Waiting for ${instructorWait} to start the exam…`
                   : 'Exam in progress - starting shortly…'}
               </p>
             </div>
             <p className="exam-type-hint text-xs text-muted-foreground m-0">
-              {inLobby
+              {heldAfterClose
+                ? 'You can submit saved answers once your session opens.'
+                : inLobby
                 ? 'You are in the lobby. The timer starts when your instructor goes live.'
                 : 'Your session is ongoing. Do not re-enter the exam code from the class page.'}
             </p>

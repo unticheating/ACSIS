@@ -15,8 +15,9 @@ export async function fetchTeacherReportExams() {
   return data.exams || []
 }
 
-export async function fetchTeacherExamResults(classId, examId) {
-  const res = await apiFetch(`/api/teacher/classes/${classId}/exams/${examId}/results`)
+export async function fetchTeacherExamResults(classId, examId, { includeQuestionStats = false } = {}) {
+  const query = includeQuestionStats ? '?includeQuestionStats=1' : ''
+  const res = await apiFetch(`/api/teacher/classes/${classId}/exams/${examId}/results${query}`)
   return parseJson(res)
 }
 

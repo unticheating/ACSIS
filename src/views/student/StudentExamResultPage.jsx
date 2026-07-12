@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import StreamBackLink from '@/components/layout/StreamBackLink.jsx'
 import PlpLogo from '@/components/brand/PlpLogo.jsx'
 import { fetchStudentExamSession } from '@/lib/studentExamApi.js'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card.jsx'
@@ -113,13 +113,13 @@ export default function StudentExamResultPage() {
 
           <p style={{ marginTop: 28, textAlign: 'center', fontSize: '0.875rem' }}>
             {classId ? (
-              <Link to={`/student/my-classes/${classId}`} style={{ color: '#86efac' }}>
-                ← Back to class stream
-              </Link>
+              <StreamBackLink to={`/student/my-classes/${classId}`} style={{ color: '#86efac' }}>
+                Back to class stream
+              </StreamBackLink>
             ) : (
-              <Link to="/student/my-classes" style={{ color: '#86efac' }}>
-                ← Enrolled classes
-              </Link>
+              <StreamBackLink to="/student/my-classes" style={{ color: '#86efac' }}>
+                Enrolled classes
+              </StreamBackLink>
             )}
           </p>
         </div>

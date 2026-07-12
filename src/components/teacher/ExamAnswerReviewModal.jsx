@@ -4,6 +4,7 @@ import DiagramEditor from '@/components/exam/DiagramEditor.jsx'
 import { fetchTeacherExamSessionDetail } from '@/lib/teacherExamResultsApi.js'
 import { manualGradeAnswer } from '@/lib/teacherExamGradingApi.js'
 import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
+import { earnedPointsForReviewAnswer, maxPointsForReviewAnswer } from '@/lib/examPoints.js'
 import { formatReviewAnswerText, labelForQuestionType } from '@/lib/questionTypes.js'
 
 function questionTypeShort(type) {
@@ -17,9 +18,16 @@ function questionTypeShort(type) {
   return 'ID'
 }
 
-function AnswerItem({ a, idx, savingId, gradeAnswer, setExpandedDiagram }) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const isIdent = String(a.questionType || '').toLowerCase() === 'identification';
+function AnswerItem({ a, idx, savingId, gradeAnswer, savePoints, setExpandedDiagram }) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const maxPts = maxPointsForReviewAnswer(a)
+  const earned = earnedPointsForReviewAnswer(a)
+  const [pointsDraft, setPointsDraft] = useState(() => String(earned))
+  useEffect(() => {
+    setPointsDraft(String(earnedPointsForReviewAnswer(a)))
+  }, [a.id, a.pointsAwarded, a.isCorrect, a.questionPoints, a.correctPairCount])
+
+  const isIdent = String(a.questionType || '').toLowerCase() === 'identification'
   const isDiagram = String(a.questionType || '').toLowerCase() === 'diagramming';
   const isMatching = String(a.questionType || '').toLowerCase() === 'matching';
   const answerDisplay = formatReviewAnswerText(a.questionType, a.answer);
@@ -49,7 +57,7 @@ function AnswerItem({ a, idx, savingId, gradeAnswer, setExpandedDiagram }) {
           </span>
         </div>
         
-        <div className={`relative shrink-0 ${menuOpen ? 'z-50' : 'z-10'}`}>
+        <div className={`relative shrink-0 flex items-center gap-2 flex-wrap justify-end ${menuOpen ? 'z-50' : 'z-10'}`}>
           <button 
             type="button"
             className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium border transition-colors ${colors[gradeVal]} ${savingId === a.id ? 'opacity-50 cursor-wait' : ''}`}
@@ -81,6 +89,41 @@ function AnswerItem({ a, idx, savingId, gradeAnswer, setExpandedDiagram }) {
               </button>
             </div>
           )}
+
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span className="whitespace-nowrap font-medium">Points</span>
+            <input
+              type="number"
+              min={0}
+              max={maxPts}
+              step={1}
+              value={pointsDraft}
+              disabled={savingId === a.id}
+              onChange={(e) => setPointsDraft(e.target.value)}
+              onBlur={() => {
+                const parsed = Number(pointsDraft)
+                if (!Number.isFinite(parsed)) {
+                  setPointsDraft(String(earned))
+                  return
+                }
+                const clamped = Math.max(0, Math.min(maxPts, parsed))
+                setPointsDraft(String(clamped))
+                if (clamped !== earned) {
+                  void savePoints(a, clamped)
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.currentTarget.blur()
+                }
+              }}
+              className="w-14 h-7 rounded border border-border bg-background px-2 text-xs text-foreground tabular-nums"
+              aria-label={`Points earned out of ${maxPts}`}
+            />
+            <span className="whitespace-nowrap font-medium tabular-nums text-foreground/80">
+              / {maxPts}
+            </span>
+          </label>
         </div>
       </div>
       
@@ -163,7 +206,8 @@ export default function ExamAnswerReviewModal({
   const [expandedDiagram, setExpandedDiagram] = useState(null)
 
   const currentStudent = queue[studentIndex] || null
-  const reviewedCount = answers.filter((a) => a.manuallyChecked).length
+  const pendingCount = answers.filter((a) => a.isCorrect == null).length
+  const reviewedCount = answers.length - pendingCount
 
   const loadSession = useCallback(async () => {
     if (!currentStudent?.sessionId) return
@@ -188,12 +232,13 @@ export default function ExamAnswerReviewModal({
     if (!currentStudent || savingId != null) return
     setSavingId(answer.id)
     try {
+      const maxPts = maxPointsForReviewAnswer(answer)
       const data = await manualGradeAnswer(
         classId,
         examId,
         currentStudent.sessionId,
         answer.id,
-        isCorrect,
+        isCorrect ? { isCorrect: true, pointsAwarded: maxPts } : { pointsAwarded: 0 },
       )
       setAnswers(data.answers || [])
       setSessionMeta(data.session || sessionMeta)
@@ -206,11 +251,35 @@ export default function ExamAnswerReviewModal({
     }
   }
 
+  async function savePoints(answer, pointsAwarded) {
+    if (!currentStudent || savingId != null) return
+    setSavingId(answer.id)
+    try {
+      const data = await manualGradeAnswer(
+        classId,
+        examId,
+        currentStudent.sessionId,
+        answer.id,
+        { pointsAwarded },
+      )
+      setAnswers(data.answers || [])
+      setSessionMeta(data.session || sessionMeta)
+      acsisToastSuccess('Points saved.')
+      onUpdated?.(data)
+    } catch (err) {
+      acsisToastError(err instanceof Error ? err.message : 'Failed to save points.')
+    } finally {
+      setSavingId(null)
+    }
+  }
+
   function selectStudent(idx) {
     if (idx >= 0 && idx < queue.length) setStudentIndex(idx)
   }
 
-  const showScore = sessionMeta?.percentage != null
+  const showScore =
+    sessionMeta?.percentage != null ||
+    (sessionMeta?.rawScore != null && sessionMeta?.totalPoints != null)
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-6 bg-background/80 backdrop-blur-sm" role="presentation" onClick={onClose}>
@@ -278,7 +347,10 @@ export default function ExamAnswerReviewModal({
 
           {showScore && (
             <div className="ml-auto flex items-center gap-1.5 px-2.5 py-1 rounded bg-muted/50 border border-border shrink-0">
-              <span className="text-sm font-semibold">{sessionMeta.percentage}%</span>
+              <span className="text-sm font-semibold tabular-nums">
+                {sessionMeta.rawScore}/{sessionMeta.totalPoints}
+                {sessionMeta.percentage != null ? ` (${sessionMeta.percentage}%)` : ''}
+              </span>
               {sessionMeta.rank != null && (
                 <span className="text-xs text-muted-foreground border-l border-border pl-1.5">Rank #{sessionMeta.rank}</span>
               )}
@@ -305,9 +377,9 @@ export default function ExamAnswerReviewModal({
                 <p className="text-sm font-medium text-muted-foreground">
                   {answers.length} question{answers.length === 1 ? '' : 's'}
                 </p>
-                {reviewedCount < answers.length && (
+                {pendingCount > 0 && (
                   <p className="text-xs font-medium text-amber-600 dark:text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
-                    {reviewedCount} / {answers.length} manually checked
+                    {reviewedCount} / {answers.length} graded · {pendingCount} pending
                   </p>
                 )}
               </div>
@@ -318,7 +390,8 @@ export default function ExamAnswerReviewModal({
                     a={a} 
                     idx={idx} 
                     savingId={savingId} 
-                    gradeAnswer={gradeAnswer} 
+                    gradeAnswer={gradeAnswer}
+                    savePoints={savePoints}
                     setExpandedDiagram={setExpandedDiagram} 
                   />
                 ))}

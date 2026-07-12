@@ -269,11 +269,11 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
     margin: 0;
     align-self: stretch;
     box-sizing: border-box;
-    flex: 1;
+    flex: 1 1 auto;
     display: flex;
     flex-direction: column;
     min-width: 0;
-    min-height: 0;
+    min-height: auto;
     background: var(--acsis-canvas, #DDEEE4);
 }
 
@@ -604,18 +604,19 @@ html:not(.dark) .nav-item.active .admin-nav-icon {
     font-size: 12px;
 }
 
-/* Body — fills main column; views should not introduce their own max-width columns */
+/* Body — fills main column; views grow naturally and use the window scroll */
 .content-body {
-    flex: 1;
+    flex: 1 1 auto;
     display: flex;
     flex-direction: column;
-    min-height: 0;
+    min-height: auto;
     min-width: 0;
     width: 100%;
     max-width: 100%;
     align-items: stretch;
     padding: 4px 0 8px;
     background: var(--acsis-canvas, #DDEEE4);
+    overflow: visible;
 }
 
 /* Dashboard: stat row and panels share the same full column width */
@@ -3436,8 +3437,9 @@ html.dark .activity-action-chip {
 /* Teacher/student route roots use .acsis-view (no name clash with shell) */
 .content-body > .acsis-view {
     display: block;
-    flex: 1;
-    min-height: 0;
+    flex: 0 1 auto;
+    min-height: auto;
+    overflow: visible;
 }
 
 /* Radix portals: popper wrapper must stack above fixed sidebar (z-index: 100) */

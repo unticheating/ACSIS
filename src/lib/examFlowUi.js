@@ -56,17 +56,34 @@ export function canStudentJoinExamLobby(status, sessionStatus, scheduledStart) {
   return isLobbyOpenForJoin(scheduledStart)
 }
 
-/**
- * Student may enter the exam code (lobby while waiting, or join while live if not yet in session).
- */
+/** Student may enter the exam code (lobby while waiting, or join while live if not yet in session). */
 export function canStudentEnterExamCode(status, sessionStatus, scheduledStart) {
   if ((sessionStatus || '').toLowerCase() === 'submitted') return false
   const sess = (sessionStatus || '').toLowerCase()
-  if (sess === 'in_progress') return false
+  if (sess === 'in_progress' || sess === 'on_hold') return false
   const s = normalizeExamStatus(status)
   if (s === PG_EXAM_STATUS.WAITING) return isLobbyOpenForJoin(scheduledStart)
   if (s === PG_EXAM_STATUS.OPEN) return true
   return false
+}
+
+/** Student session was held when the instructor closed the exam before submit. */
+export function isStudentSessionOnHold(sessionStatus, examStatus) {
+  const sess = (sessionStatus || '').toLowerCase()
+  const examSt = normalizeExamStatus(examStatus)
+  if (sess === 'on_hold') return true
+  return examSt === PG_EXAM_STATUS.CLOSED && sess === 'in_progress'
+}
+
+/** Keep closed exams visible when the student still has an unsubmitted held session. */
+export function shouldShowExamOnStudentStream(exam) {
+  if (isStudentSessionOnHold(exam?.sessionStatus, exam?.status)) return true
+  if (normalizeExamStatus(exam?.status) === PG_EXAM_STATUS.CLOSED) return false
+  if (exam?.scheduledEnd) {
+    const end = new Date(exam.scheduledEnd).getTime()
+    if (Number.isFinite(end) && Date.now() > end) return false
+  }
+  return true
 }
 
 /**
@@ -76,11 +93,13 @@ export function isExamEnterableByStudent(status, sessionStatus, scheduledStart) 
   if ((sessionStatus || '').toLowerCase() === 'submitted') return false
   const s = normalizeExamStatus(status)
   const sess = (sessionStatus || '').toLowerCase()
+  if (sess === 'on_hold' && s === PG_EXAM_STATUS.CLOSED) return true
   if (s === PG_EXAM_STATUS.WAITING) {
     if (sess === 'in_progress') return true
     return isLobbyOpenForJoin(scheduledStart)
   }
   if (s === PG_EXAM_STATUS.OPEN && sess === 'in_progress') return true
+  if (s === PG_EXAM_STATUS.CLOSED && sess === 'in_progress') return true
   return false
 }
 
@@ -89,10 +108,14 @@ export function labelForStudentExam(exam) {
   if ((exam?.sessionStatus || '').toLowerCase() === 'submitted') {
     return 'Submitted'
   }
+  if ((exam?.sessionStatus || '').toLowerCase() === 'on_hold') {
+    return 'On hold · submit'
+  }
   if ((exam?.sessionStatus || '').toLowerCase() === 'in_progress') {
     const examSt = normalizeExamStatus(exam?.status)
     if (examSt === PG_EXAM_STATUS.OPEN) return 'In progress'
     if (examSt === PG_EXAM_STATUS.WAITING) return 'Joined · waiting'
+    if (examSt === PG_EXAM_STATUS.CLOSED) return 'On hold · submit'
   }
   return labelForPgExamStatus(exam?.status)
 }

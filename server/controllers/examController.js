@@ -156,9 +156,14 @@ const createExamSchema = z
     }
   });
 
-const manualGradeSchema = z.object({
-  isCorrect: z.boolean(),
-});
+const manualGradeSchema = z
+  .object({
+    isCorrect: z.boolean().optional(),
+    pointsAwarded: z.coerce.number().min(0).optional(),
+  })
+  .refine((body) => body.isCorrect !== undefined || body.pointsAwarded !== undefined, {
+    message: 'Provide isCorrect or pointsAwarded.',
+  });
 
 const releaseScoresSchema = z.object({
   sendEmail: z.boolean().optional().default(true),
@@ -183,9 +188,11 @@ const exportActivityLogsSchema = z.object({
   eventType: z.string().optional(),
   examId: z.union([z.string(), z.number()]).optional(),
   sectionKey: z.string().optional(),
+  subjectKey: z.string().optional(),
   dateFrom: z.string().optional(),
   dateTo: z.string().optional(),
   examTitle: z.string().optional(),
+  subjectLabel: z.string().optional(),
   sectionLabel: z.string().optional(),
   teacherLogoBase64: z.string().optional(),
   departmentName: z.string().optional(),
@@ -582,7 +589,11 @@ export async function getTeacherExamSession(req, res) {
 
 export async function getTeacherExamResults(req, res) {
   const { classId, examId } = req.params;
-  const result = await getTeacherExamResultsService(classId, examId, req.memberId);
+  const includeQuestionStats =
+    req.query.includeQuestionStats === '1' || req.query.includeQuestionStats === 'true';
+  const result = await getTeacherExamResultsService(classId, examId, req.memberId, {
+    includeQuestionStats,
+  });
   if (!result.ok) {
     return res.status(result.status || 500).json({ error: result.error });
   }
@@ -637,9 +648,11 @@ export async function postExportTeacherActivityLogs(req, res) {
       eventType: payload.eventType || '',
       examId: payload.examId ? String(payload.examId) : '',
       sectionKey: payload.sectionKey || '',
+      subjectKey: payload.subjectKey || '',
       dateFrom: payload.dateFrom || '',
       dateTo: payload.dateTo || '',
       examTitle: payload.examTitle || '',
+      subjectLabel: payload.subjectLabel || '',
       sectionLabel: payload.sectionLabel || '',
       teacherLogoBase64: payload.teacherLogoBase64,
       departmentName: payload.departmentName,
@@ -730,7 +743,7 @@ export async function patchManualGrade(req, res) {
       sessionId,
       answerId,
       req.memberId,
-      body.isCorrect,
+      body,
     );
     if (!result.ok) {
       return res.status(result.status || 500).json({ error: result.error });

@@ -51,6 +51,7 @@ function describeFilters(filters = {}) {
   if (filters.eventType) parts.push(`Action: ${labelForAuditEvent(filters.eventType)}`)
   if (filters.teacherName) parts.push(`User: ${filters.teacherName}`)
   if (filters.examTitle) parts.push(`Quiz: ${filters.examTitle}`)
+  if (filters.subjectLabel) parts.push(`Subject: ${filters.subjectLabel}`)
   if (filters.sectionLabel) parts.push(`Section: ${filters.sectionLabel}`)
   if (filters.dateFrom || filters.dateTo) {
     const from = filters.dateFrom ? formatFilterDate(filters.dateFrom) : 'any'
@@ -239,6 +240,7 @@ export async function exportTeacherActivityLogsService(teacherMemberId, filters 
       eventType: filters.eventType || '',
       examId: filters.examId || '',
       sectionKey: filters.sectionKey || '',
+      subjectKey: filters.subjectKey || '',
       search: filters.search || '',
       dateFrom: filters.dateFrom || '',
       dateTo: filters.dateTo || '',

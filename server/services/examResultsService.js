@@ -25,7 +25,7 @@ import {
   replaceExamAssignmentsQuery,
 } from '../repositories/examAssignmentRepository.js'
 import { getPool } from '../db.js'
-import { getExamForJoinQuery } from '../repositories/examSessionRepository.js'
+import { getExamForJoinQuery, gradeSessionAnswersQuery } from '../repositories/examSessionRepository.js'
 import { ensureExamSessionLockedColumns } from '../lib/ensureExamSessionLockedSchema.js'
 import { getInstitutionMaxWarnings } from '../repositories/adminRepository.js'
 import { shouldLockExam } from '../lib/examSessionRules.js'
@@ -175,7 +175,12 @@ export async function getTeacherMonitoringSnapshotService(classId, examId, _teac
   }
 }
 
-export async function getTeacherExamResultsService(classId, examId, teacherMemberId) {
+export async function getTeacherExamResultsService(
+  classId,
+  examId,
+  teacherMemberId,
+  { includeQuestionStats = false } = {},
+) {
   try {
     const cls = await getClassByIdQuery(classId)
     if (!cls) {
@@ -189,13 +194,18 @@ export async function getTeacherExamResultsService(classId, examId, teacherMembe
 
     await computeExamRanksQuery(examId)
 
-    const [sessions, stats, violations, topStudent, questionStats] = await Promise.all([
+    const resultQueries = [
       listExamSessionsForExamQuery(classId, examId),
       getExamSubmissionStatsQuery(examId),
       listCheatingLogsForExamQuery(examId),
       getTopRankedSessionQuery(examId),
-      getQuestionAnswerStatsForExamQuery(examId),
-    ])
+    ]
+    if (includeQuestionStats) {
+      resultQueries.push(getQuestionAnswerStatsForExamQuery(examId))
+    }
+    const queryResults = await Promise.all(resultQueries)
+    const [sessions, stats, violations, topStudent] = queryResults
+    const questionStats = includeQuestionStats ? queryResults[4] : []
 
     return {
       ok: true,
@@ -267,7 +277,7 @@ export async function dismissTeacherViolationService(
     if (
       result.lockReason === 'max_warnings' &&
       result.lockedAt &&
-      result.sessionStatus === 'in_progress' &&
+      (result.sessionStatus === 'in_progress' || result.sessionStatus === 'on_hold') &&
       !shouldLockExam(result.warningCount, maxWarnings)
     ) {
       await ensureExamSessionLockedColumns()
@@ -275,7 +285,7 @@ export async function dismissTeacherViolationService(
       const { rows } = await pool.query(
         `UPDATE exam_sessions
          SET locked_at = NULL, lock_reason = NULL
-         WHERE session_id = $1 AND status = 'in_progress'
+         WHERE session_id = $1 AND status IN ('in_progress', 'on_hold')
          RETURNING session_id`,
         [sessionId],
       )
@@ -317,11 +327,14 @@ export async function getTeacherExamSessionDetailService(classId, examId, sessio
     if (!session) {
       return { ok: false, status: 404, error: 'Session not found.' }
     }
+    await gradeSessionAnswersQuery(sessionId)
     const [answers, violations] = await Promise.all([
       listStudentAnswersForSessionQuery(sessionId),
       listCheatingLogsForSessionQuery(sessionId),
     ])
-    return { ok: true, session, answers, violations }
+    const refreshed = await listExamSessionsForExamQuery(classId, examId)
+    const updatedSession = refreshed.find((s) => s.sessionId === Number(sessionId)) ?? session
+    return { ok: true, session: updatedSession, answers, violations }
   } catch (err) {
     console.error('[examResultsService.getTeacherExamSessionDetail]', err)
     return { ok: false, status: 500, error: 'Failed to load session detail.' }

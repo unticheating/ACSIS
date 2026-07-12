@@ -1,8 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
-  ChevronDown,
-  ChevronUp,
   ClipboardList,
   Copy,
   Eye,
@@ -23,13 +21,16 @@ import {
   UsersRound,
   Maximize2,
 } from 'lucide-react'
+import StreamBackLink from '@/components/layout/StreamBackLink.jsx'
 import { QuestionTypeIcon } from '@/components/exam/QuestionTypeIcon.jsx'
 import { useTeacherShellBreadcrumbTrail } from '@/context/TeacherShellBreadcrumbContext.jsx'
 import TeacherMcTabs from '@/components/teacher/TeacherMcTabs.jsx'
 import { apiFetch } from '@/lib/apiFetch.js'
 import {
   fetchTeacherExamResults,
+  fetchTeacherExamSessionDetail,
   fetchTeacherMonitoringSnapshot,
+  dismissTeacherViolation,
 } from '@/lib/teacherExamResultsApi.js'
 import { releaseExamScores } from '@/lib/teacherExamGradingApi.js'
 import ExamAnswerReviewModal from '@/components/teacher/ExamAnswerReviewModal.jsx'
@@ -37,7 +38,6 @@ import ReleaseScoresDialog from '@/components/teacher/ReleaseScoresDialog.jsx'
 import AssignExamStudentsDialog from '@/components/teacher/AssignExamStudentsDialog.jsx'
 import UserAvatar from '@/components/admin/UserAvatar.jsx'
 import RestartExamDialog from '@/components/teacher/RestartExamDialog.jsx'
-import CopyExamDialog from '@/components/teacher/CopyExamDialog.jsx'
 import {
   isExamDraft,
   isExamOngoing,
@@ -50,9 +50,12 @@ import { formatCourseBreadcrumbLabel, formatSectionTitle, formatTermPeriod } fro
 import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
 import { copyToClipboard } from '@/lib/copyToClipboard.js'
 import { sumExamTotalPoints } from '@/lib/examPoints.js'
-import { labelForFormType, summarizeQuestionTypes, uniqueQuestionTypeLabels } from '@/lib/questionTypes.js'
+import { labelForFormType, uniqueQuestionTypeLabels } from '@/lib/questionTypes.js'
 import ExamQuestionAnswerPresentation from '@/components/teacher/ExamQuestionAnswerPresentation.jsx'
 import ExamQuestionsPresentDialog from '@/components/teacher/ExamQuestionsPresentDialog.jsx'
+import TeacherViolationLogModal, {
+  normalizeTeacherViolationEntry,
+} from '@/components/teacher/TeacherViolationLogModal.jsx'
 import { useAcsisConfirm } from '@/hooks/useAcsisConfirm.jsx'
 import {
   DropdownMenu,
@@ -63,7 +66,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu.jsx'
 import { DropdownMenuActionItem } from '@/components/ui/dropdown-menu-action-item.jsx'
-import FadeIn from '@/components/ui/fade-in.jsx'
 import PageSpinner from '@/components/ui/page-spinner.jsx'
 import {
   Dialog,
@@ -86,7 +88,6 @@ import '../../pages/teacher-ui/my_classes.css'
 
 const EXAM_TABS = [
   { id: 'overview', label: 'Overview' },
-  { id: 'questions', label: 'Questions' },
   { id: 'results', label: 'Results' },
   { id: 'settings', label: 'Settings' },
 ]
@@ -370,6 +371,7 @@ function SettingsForm({ hit, classId, examId, onSaved, onChanges }) {
 
 function formatSessionStatus(status) {
   if (status === 'submitted') return 'Submitted'
+  if (status === 'on_hold') return 'On hold'
   if (status === 'in_progress') return 'In progress'
   if (!status) return '—'
   return String(status).replace(/_/g, ' ')
@@ -384,8 +386,58 @@ function formatSubmissionTime(iso) {
   }
 }
 
+function formatQuizDurationMs(ms) {
+  const totalSec = Math.max(0, Math.floor(ms / 1000))
+  const h = Math.floor(totalSec / 3600)
+  const m = Math.floor((totalSec % 3600) / 60)
+  const s = totalSec % 60
+  if (h > 0) return `${h}h ${m}m`
+  if (m > 0) return `${m}m ${s}s`
+  return `${s}s`
+}
+
+function resolveSessionQuizEndMs(session, exam) {
+  const examSt = normalizeExamStatus(exam?.status)
+  const examEndedMs =
+    examSt === PG_EXAM_STATUS.CLOSED && exam?.updatedAt
+      ? new Date(exam.updatedAt).getTime()
+      : NaN
+
+  if (session?.submittedAt) {
+    return new Date(session.submittedAt).getTime()
+  }
+
+  const status = (session?.status || '').toLowerCase()
+
+  if (status === 'on_hold' || (status === 'in_progress' && examSt === PG_EXAM_STATUS.CLOSED)) {
+    if (Number.isFinite(examEndedMs)) return examEndedMs
+    if (session?.lockedAt) return new Date(session.lockedAt).getTime()
+    return NaN
+  }
+
+  if (status === 'in_progress' && examSt === PG_EXAM_STATUS.OPEN) {
+    return Date.now()
+  }
+
+  if (session?.lockedAt) {
+    return new Date(session.lockedAt).getTime()
+  }
+
+  return NaN
+}
+
+function formatSessionQuizDuration(session, exam) {
+  const startMs = session?.startedAt ? new Date(session.startedAt).getTime() : NaN
+  if (!Number.isFinite(startMs)) return '—'
+
+  const endMs = resolveSessionQuizEndMs(session, exam)
+  if (!Number.isFinite(endMs)) return '—'
+  return formatQuizDurationMs(endMs - startMs)
+}
+
 function sessionStatusClass(status) {
   if (status === 'submitted') return 'acsis-exam-detail__session-status--submitted'
+  if (status === 'on_hold') return 'acsis-exam-detail__session-status--hold'
   if (status === 'in_progress') return 'acsis-exam-detail__session-status--active'
   return ''
 }
@@ -451,12 +503,12 @@ export default function TeacherExamDetailPage() {
   const [refreshTick, setRefreshTick] = useState(0)
   const [results, setResults] = useState(null)
   const [resultsLoading, setResultsLoading] = useState(false)
+  const [resultsRefreshing, setResultsRefreshing] = useState(false)
   const [reviewOpen, setReviewOpen] = useState(false)
   const [reviewInitialSessionId, setReviewInitialSessionId] = useState(null)
   const [releasing, setReleasing] = useState(false)
   const [releaseDialogOpen, setReleaseDialogOpen] = useState(false)
   const [restartDialogOpen, setRestartDialogOpen] = useState(false)
-  const [copyDialogOpen, setCopyDialogOpen] = useState(false)
   const [assignDialogOpen, setAssignDialogOpen] = useState(false)
   const [tab, setTab] = useState('overview')
   const [examCodeVisible, setExamCodeVisible] = useState(false)
@@ -465,7 +517,6 @@ export default function TeacherExamDetailPage() {
   const [examCodeSaving, setExamCodeSaving] = useState(false)
   const [lobbyModalOpen, setLobbyModalOpen] = useState(false)
   const [presentOpen, setPresentOpen] = useState(false)
-  const [questionsExpanded, setQuestionsExpanded] = useState(false)
   const [settingsHasChanges, setSettingsHasChanges] = useState(false)
 
   // Inline title editing
@@ -484,6 +535,11 @@ export default function TeacherExamDetailPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [filterMode, setFilterMode] = useState('Surname A-Z')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [violationModalSession, setViolationModalSession] = useState(null)
+  const [violationModalViolations, setViolationModalViolations] = useState([])
+  const [violationModalLoading, setViolationModalLoading] = useState(false)
+  const [dismissingViolationLogId, setDismissingViolationLogId] = useState(null)
+  const [violationDismissError, setViolationDismissError] = useState('')
   
   const { confirm, ConfirmDialog } = useAcsisConfirm()
 
@@ -531,50 +587,49 @@ export default function TeacherExamDetailPage() {
 
   useTeacherShellBreadcrumbTrail(breadcrumbTrail)
 
+  const examIsLive = useMemo(() => {
+    const examStatus = normalizeExamStatus(hit?.status)
+    return examStatus === PG_EXAM_STATUS.WAITING || examStatus === PG_EXAM_STATUS.OPEN
+  }, [hit?.status])
+
+  const reloadResults = useCallback(
+    async ({ background = false } = {}) => {
+      if (!classId || !examId) return
+      if (background) {
+        setResultsRefreshing(true)
+      } else {
+        setResultsLoading(true)
+      }
+      try {
+        if (examIsLive) {
+          const data = await fetchTeacherMonitoringSnapshot(classId, examId)
+          setResults((prev) => ({
+            ...data,
+            topStudent: prev?.topStudent ?? null,
+            questionStats: prev?.questionStats ?? [],
+          }))
+        } else {
+          const data = await fetchTeacherExamResults(classId, examId)
+          setResults(data)
+        }
+      } catch {
+        if (!background) setResults(null)
+      } finally {
+        if (background) {
+          setResultsRefreshing(false)
+        } else {
+          setResultsLoading(false)
+        }
+      }
+    },
+    [classId, examId, examIsLive],
+  )
+
   useEffect(() => {
     if (!classId || !examId) return undefined
     if (tab !== 'overview' && tab !== 'results') return undefined
-    let cancelled = false
-    let inFlight = false
-    const examStatus = normalizeExamStatus(hit?.status)
-    const isLive =
-      examStatus === PG_EXAM_STATUS.WAITING || examStatus === PG_EXAM_STATUS.OPEN
-
-    async function loadResults(isBackground = false) {
-      if (inFlight) return
-      inFlight = true
-      if (!isBackground) setResultsLoading(true)
-      try {
-        if (isLive) {
-          const data = await fetchTeacherMonitoringSnapshot(classId, examId)
-          if (!cancelled) {
-            setResults((prev) => ({
-              ...data,
-              topStudent: prev?.topStudent ?? null,
-              questionStats: prev?.questionStats ?? [],
-            }))
-          }
-        } else {
-          const data = await fetchTeacherExamResults(classId, examId)
-          if (!cancelled) setResults(data)
-        }
-      } catch {
-        if (!cancelled && !isBackground) setResults(null)
-      } finally {
-        inFlight = false
-        if (!cancelled && !isBackground) setResultsLoading(false)
-      }
-    }
-    loadResults(false)
-    // Live lobby/join counts: light monitoring snapshot. Full /results only after close.
-    const interval = isLive
-      ? window.setInterval(() => loadResults(true), 5000)
-      : null
-    return () => {
-      cancelled = true
-      if (interval) window.clearInterval(interval)
-    }
-  }, [classId, examId, refreshTick, tab, hit?.status])
+    reloadResults({ background: false })
+  }, [classId, examId, refreshTick, tab, reloadResults])
 
   const filteredSessions = useMemo(() => {
     let list = [...(results?.sessions || [])]
@@ -582,6 +637,8 @@ export default function TeacherExamDetailPage() {
       list = list.filter((s) => s.status === 'submitted')
     } else if (statusFilter === 'in_progress') {
       list = list.filter((s) => s.status === 'in_progress')
+    } else if (statusFilter === 'on_hold') {
+      list = list.filter((s) => s.status === 'on_hold')
     }
     if (searchQuery) {
       const q = searchQuery.toLowerCase()
@@ -631,6 +688,136 @@ export default function TeacherExamDetailPage() {
     return map
   }, [results?.violations])
 
+  const violationsBySession = useMemo(() => {
+    const map = new Map()
+    for (const v of results?.violations ?? []) {
+      if (!v.sessionId) continue
+      if (!map.has(v.sessionId)) map.set(v.sessionId, [])
+      map.get(v.sessionId).push(normalizeTeacherViolationEntry(v))
+    }
+    return map
+  }, [results?.violations])
+
+
+  function canOpenViolationLog(session) {
+    return Boolean(session?.sessionId) && Number(session.warningCount) > 0
+  }
+
+  function renderWarningCount(session) {
+    if (canOpenViolationLog(session)) {
+      return (
+        <button
+          type="button"
+          className="acsis-exam-detail__warning-count acsis-exam-detail__warning-count--active acsis-exam-detail__warning-count--clickable"
+          onClick={() => void openViolationModal(session)}
+          title="View violation log"
+          aria-label={`View ${session.warningCount} violation${Number(session.warningCount) === 1 ? '' : 's'} for ${session.studentName || 'student'}`}
+        >
+          {session.warningCount}
+        </button>
+      )
+    }
+    return (
+      <span
+        className={`acsis-exam-detail__warning-count${
+          Number(session.warningCount) > 0 ? ' acsis-exam-detail__warning-count--active' : ''
+        }`}
+      >
+        {session.warningCount}
+      </span>
+    )
+  }
+
+  async function openViolationModal(session) {
+    if (!session?.sessionId) return
+    setViolationDismissError('')
+    setViolationModalSession(session)
+    const cached = violationsBySession.get(session.sessionId) || []
+    setViolationModalViolations(cached)
+    if (cached.length > 0 || Number(session.warningCount) === 0) return
+
+    setViolationModalLoading(true)
+    try {
+      const detail = await fetchTeacherExamSessionDetail(classId, examId, session.sessionId)
+      const violations = (detail.violations || []).map(normalizeTeacherViolationEntry)
+      setViolationModalViolations(violations)
+      setViolationModalSession((prev) =>
+        prev && prev.sessionId === session.sessionId
+          ? {
+              ...prev,
+              warningCount: Number(detail.session?.warningCount ?? prev.warningCount ?? 0),
+              status: detail.session?.status ?? prev.status,
+            }
+          : prev,
+      )
+    } catch (err) {
+      setViolationDismissError(
+        err instanceof Error ? err.message : 'Failed to load violation log.',
+      )
+    } finally {
+      setViolationModalLoading(false)
+    }
+  }
+
+  async function handleDismissViolation(violation) {
+    if (!violation?.id || !violationModalSession?.sessionId) return
+    if (violation.dismissedAt) return
+    setViolationDismissError('')
+    setDismissingViolationLogId(violation.id)
+    try {
+      const result = await dismissTeacherViolation(
+        classId,
+        examId,
+        violationModalSession.sessionId,
+        violation.id,
+      )
+      const strikes = Number(result.warningCount ?? 0)
+      const nextViolations = violationModalViolations.map((v) =>
+        v.id === violation.id ? { ...v, dismissedAt: new Date().toISOString() } : v,
+      )
+      setViolationModalViolations(nextViolations)
+      setViolationModalSession((prev) =>
+        prev ? { ...prev, warningCount: strikes } : prev,
+      )
+      const refreshedResults = examIsLive
+        ? await fetchTeacherMonitoringSnapshot(classId, examId)
+        : await fetchTeacherExamResults(classId, examId)
+      if (examIsLive) {
+        setResults((prev) => ({
+          ...refreshedResults,
+          topStudent: prev?.topStudent ?? null,
+          questionStats: prev?.questionStats ?? [],
+        }))
+      } else {
+        setResults(refreshedResults)
+      }
+      const refreshedSession = (refreshedResults.sessions || []).find(
+        (row) => row.sessionId === violationModalSession.sessionId,
+      )
+      if (refreshedSession) {
+        setViolationModalSession(refreshedSession)
+      }
+      const refreshedViolations = (refreshedResults.violations || [])
+        .filter((v) => v.sessionId === violationModalSession.sessionId)
+        .map(normalizeTeacherViolationEntry)
+      if (refreshedViolations.length) {
+        setViolationModalViolations(refreshedViolations)
+      }
+    } catch (err) {
+      setViolationDismissError(err instanceof Error ? err.message : 'Could not mark as false positive.')
+    } finally {
+      setDismissingViolationLogId(null)
+    }
+  }
+
+  const examTimingContext = useMemo(
+    () => ({
+      status: results?.exam?.status ?? hit?.status,
+      updatedAt: results?.exam?.updatedAt ?? hit?.updatedAt ?? hit?.updated_at ?? null,
+    }),
+    [results?.exam, hit],
+  )
+
   const questionSets = useMemo(
     () => (hit?.questions?.length ? groupExamQuestionsBySet(hit) : []),
     [hit],
@@ -645,7 +832,8 @@ export default function TeacherExamDetailPage() {
       rank: isScoreRank,
       score: isScoreRank,
       submissionTime: isSubmissionTime,
-      warnings: true,
+      timeTaken: isSubmissionTime,
+      warnings: !isSubmissionTime,
       falsePositives: isViolations,
       actions: !isViolations,
     }
@@ -662,9 +850,9 @@ export default function TeacherExamDetailPage() {
   if (error || !hit) {
     return (
       <div className="acsis-mc-view acsis-view acsis-exam-detail">
-        <Link to={`/teacher/my-classes/${classId}`} className="acsis-stream-back">
-          ← Back to class
-        </Link>
+        <StreamBackLink to={`/teacher/my-classes/${classId}`}>
+          Back to class
+        </StreamBackLink>
         <p className="acsis-mc-sub" style={{ color: '#ef4444' }}>{error || 'This exam is not available.'}</p>
       </div>
     )
@@ -690,7 +878,6 @@ export default function TeacherExamDetailPage() {
   const questionCount = exam.questions ? exam.questions.length : exam.questionCount || 0
   const durationMins = computeDurationMinutes(exam)
   const totalPoints = sumExamTotalPoints(exam.questions)
-  const typeSummary = summarizeQuestionTypes(exam.questions)
   const typeLabels = uniqueQuestionTypeLabels(exam.questions)
   const overviewDesc = overviewDescription(exam)
   const stats = results?.stats
@@ -724,7 +911,7 @@ export default function TeacherExamDetailPage() {
   async function endExam() {
     const ok = await confirm({
       title: 'End this exam?',
-      description: 'Students will no longer be able to enter or submit.',
+      description: 'Unsubmitted students will be placed on hold and can still submit their answers.',
       confirmLabel: 'Close exam',
       destructive: true,
     })
@@ -741,6 +928,21 @@ export default function TeacherExamDetailPage() {
       setRefreshTick((t) => t + 1)
     } catch (err) {
       acsisToastError(err.message)
+    }
+  }
+
+  async function handleOpenPresentDialog() {
+    setPresentOpen(true)
+    if (results?.questionStats?.length) return
+    try {
+      const data = await fetchTeacherExamResults(classId, examId, { includeQuestionStats: true })
+      setResults((prev) => ({
+        ...(prev || {}),
+        questionStats: data.questionStats ?? [],
+        stats: data.stats ?? prev?.stats,
+      }))
+    } catch {
+      /* Present still works without per-question stats */
     }
   }
 
@@ -946,34 +1148,6 @@ export default function TeacherExamDetailPage() {
     }
   }
 
-  async function copyExam(payload) {
-    try {
-      const res = await apiFetch(`/api/teacher/classes/${classId}/exams/${examId}/copy`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          targetClassId: payload.targetClassId,
-          scheduledStart: payload.newScheduledStart
-            ? new Date(payload.newScheduledStart).toISOString()
-            : null,
-          scheduledEnd: payload.newScheduledEnd
-            ? new Date(payload.newScheduledEnd).toISOString()
-            : null,
-        }),
-      })
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error || 'Failed to copy exam.')
-      }
-      const data = await res.json()
-      acsisToastSuccess('Exam copied successfully.')
-      setCopyDialogOpen(false)
-    } catch (err) {
-      acsisToastError(err.message)
-      throw err
-    }
-  }
-
   async function remove() {
     const ok = await confirm({
       title: `Delete “${exam.title || 'this exam'}”?`,
@@ -1022,6 +1196,7 @@ export default function TeacherExamDetailPage() {
 
   const qs = new URLSearchParams({ classId })
   const createHref = `/teacher/create-exam?${qs.toString()}`
+  const copyHref = `/teacher/create-exam?classId=${coerceRouteParam(classId)}&copyFrom=${coerceRouteParam(examId)}`
   const editHref = `/teacher/create-exam?classId=${coerceRouteParam(classId)}&examId=${coerceRouteParam(examId)}`
 
   const classHint = clsMeta
@@ -1031,9 +1206,9 @@ export default function TeacherExamDetailPage() {
 
   return (
     <div className="acsis-mc-view acsis-view acsis-exam-detail">
-      <Link to={streamHref} className="acsis-stream-back">
-        ← Back to Class
-      </Link>
+      <StreamBackLink to={streamHref}>
+        Back to Class
+      </StreamBackLink>
 
       <header className="acsis-exam-detail__hero">
         <div className="acsis-exam-detail__hero-main">
@@ -1204,8 +1379,8 @@ export default function TeacherExamDetailPage() {
 
               <DropdownMenuLabel className="acsis-exam-detail__menu-label">Copies</DropdownMenuLabel>
               <DropdownMenuGroup>
-                <DropdownMenuActionItem icon={Copy} onSelect={() => setCopyDialogOpen(true)}>
-                  Copy to another section
+                <DropdownMenuActionItem icon={Copy} onSelect={() => navigate(copyHref)}>
+                  Create a copy
                 </DropdownMenuActionItem>
                 <DropdownMenuActionItem icon={Plus} onSelect={() => navigate(createHref)}>
                   New exam in this class
@@ -1231,276 +1406,131 @@ export default function TeacherExamDetailPage() {
             tabs={EXAM_TABS}
           />
         </div>
-        {(waiting || active) && (
-          <Link to={monitoringHref} className="acsis-exam-detail__monitoring-btn">
-            <span className="acsis-live-pulse-dot" aria-hidden />
-            <Radio size={16} strokeWidth={2} aria-hidden />
-            Live monitoring
-          </Link>
-        )}
-      </div>
-
-      <FadeIn className="acsis-exam-detail__panel">
-        {tab === 'overview' ? (
-          <>
-            <div className="acsis-exam-detail__questions-head">
-              <div>
-                <h2 className="acsis-exam-detail__section-title">Overview</h2>
-              </div>
-              <div className="acsis-exam-detail__questions-actions">
-                {draft ? (
-                  <>
-                    <span className="acsis-mc-sub" style={{ whiteSpace: 'nowrap' }}>Students cannot join until you publish.</span>
-                    <button
-                      type="button"
-                      className="acsis-btn-ghost acsis-exam-detail__questions-edit"
-                      onClick={publish}
-                    >
-                      <Send size={16} strokeWidth={2} aria-hidden />
-                      Publish exam
-                    </button>
-                  </>
-                ) : null}
-                {waiting ? (
-                  <>
-                    {lobbyCount > 0 ? (
-                      <button
-                        type="button"
-                        className="acsis-exam-detail__lobby-link"
-                        style={{ whiteSpace: 'nowrap' }}
-                        onClick={() => setLobbyModalOpen(true)}
-                      >
-                        {lobbyCount} student{lobbyCount === 1 ? '' : 's'} in lobby
-                      </button>
-                    ) : (
-                      <span className="acsis-mc-sub" style={{ whiteSpace: 'nowrap' }}>Students can join with the exam code</span>
-                    )}
-                    <button
-                      type="button"
-                      className="acsis-btn-ghost acsis-exam-detail__questions-edit"
-                      onClick={() => startExam({})}
-                    >
-                      <Play size={16} strokeWidth={2} fill="currentColor" aria-hidden />
-                      Start session
-                    </button>
-                  </>
-                ) : null}
-                {active ? (
-                  <>
-                    <span className="acsis-mc-sub" style={{ whiteSpace: 'nowrap' }}>
-                      {stats
-                        ? `${stats.joined} joined · ${stats.submitted} submitted`
-                        : 'Live'}
-                    </span>
-                    <button
-                      type="button"
-                      className="acsis-btn-ghost acsis-exam-detail__questions-edit"
-                      onClick={() => void endExam()}
-                      title="Close exam"
-                      aria-label="Close exam"
-                    >
-                      <StopCircle size={16} strokeWidth={2.5} aria-hidden />
-                    </button>
-                  </>
-                ) : null}
-                {closed ? (
+        {(draft || waiting || active || closed) ? (
+          <div className="acsis-exam-detail__tabs-tools">
+            <div className="acsis-exam-detail__session-toolbar">
+              {draft ? (
+                <>
+                  <span className="acsis-mc-sub acsis-exam-detail__session-hint">
+                    Students cannot join until you publish.
+                  </span>
                   <button
                     type="button"
                     className="acsis-btn-ghost acsis-exam-detail__questions-edit"
-                    onClick={() => setRestartDialogOpen(true)}
+                    onClick={publish}
                   >
-                    <RotateCcw size={16} strokeWidth={2.5} aria-hidden />
-                    Restart exam
+                    <Send size={16} strokeWidth={2} aria-hidden />
+                    Publish exam
                   </button>
-                ) : null}
-              </div>
-            </div>
-            <section className="acsis-exam-detail__panel-section">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.5rem' }}>
-                <span className="acsis-exam-detail__section-heading" style={{ margin: 0 }}>Description</span>
-                {!descEditing && (
-                  <button
-                    type="button"
-                    className="acsis-exam-detail__inline-edit-btn"
-                    aria-label="Edit exam description"
-                    title="Edit description"
-                    onClick={() => { setDescDraft(exam.description || ''); setDescEditing(true) }}
-                  >
-                    <Pencil size={14} strokeWidth={2} />
-                  </button>
-                )}
-              </div>
-              {descEditing ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  <textarea
-                    className="acsis-exam-detail__inline-textarea"
-                    value={descDraft}
-                    onChange={(e) => setDescDraft(e.target.value)}
-                    disabled={descSaving}
-                    autoFocus
-                    rows={4}
-                    aria-label="Edit exam description"
-                    style={{ width: '100%', resize: 'vertical', borderRadius: 6, padding: '8px 10px', fontFamily: 'inherit', fontSize: '0.95rem' }}
-                  />
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                </>
+              ) : null}
+              {waiting ? (
+                <>
+                  {lobbyCount > 0 ? (
                     <button
                       type="button"
-                      className="acsis-btn-ghost"
-                      style={{ fontSize: '0.8rem', padding: '4px 10px' }}
-                      onClick={() => void saveDescEdit()}
-                      disabled={descSaving}
+                      className="acsis-exam-detail__lobby-link acsis-exam-detail__session-hint"
+                      onClick={() => setLobbyModalOpen(true)}
                     >
-                      {descSaving ? 'Saving…' : 'Save'}
+                      {lobbyCount} student{lobbyCount === 1 ? '' : 's'} in lobby
                     </button>
-                    <button
-                      type="button"
-                      className="acsis-btn-ghost"
-                      style={{ fontSize: '0.8rem', padding: '4px 10px' }}
-                      onClick={() => setDescEditing(false)}
-                      disabled={descSaving}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <p
-                  className={`acsis-exam-detail__desc${
-                    overviewDesc === 'No description added for this exam.'
-                      ? ' acsis-exam-detail__desc--empty'
-                      : ''
-                  }`}
-                  style={{ margin: 0 }}
-                >
-                  {overviewDesc}
-                </p>
-              )}
-            </section>
-
-            <section className="acsis-exam-detail__panel-section">
-              <div
-                className={`acsis-summary-stats acsis-exam-detail__stats${
-                  1 + (waiting ? 1 : 0) + 2 >= 4
-                    ? ' acsis-summary-stats--4'
-                    : ''
-                }`}
-              >
-                <div className="acsis-summary-stat acsis-card-surface">
-                  <div className="acsis-summary-stat__body">
-                    <span className="acsis-summary-stat__label">Total points</span>
-                    <span className="acsis-summary-stat__value">{totalPoints}</span>
-                  </div>
-                </div>
-                <div className="acsis-summary-stat acsis-card-surface">
-                  <div className="acsis-summary-stat__body">
-                    <span className="acsis-summary-stat__label">Items</span>
-                    <span className="acsis-summary-stat__value">{questionCount}</span>
-                  </div>
-                </div>
-                <div className="acsis-summary-stat acsis-card-surface">
-                  <div className="acsis-summary-stat__body">
-                    <span className="acsis-summary-stat__label">Duration</span>
-                    <span className="acsis-summary-stat__value">
-                      {durationMins}
-                      <span className="acsis-exam-detail__stat-unit">min</span>
+                  ) : (
+                    <span className="acsis-mc-sub acsis-exam-detail__session-hint">
+                      Students can join with the exam code
                     </span>
-                  </div>
-                </div>
-                {waiting ? (
-                  <div className="acsis-summary-stat acsis-card-surface">
-                    <div className="acsis-summary-stat__body">
-                      <span className="acsis-summary-stat__label">In lobby</span>
-                      <span className="acsis-exam-detail__stat-text">
-                        {lobbyCount > 0 ? (
-                          <button
-                            type="button"
-                            className="acsis-exam-detail__lobby-link"
-                            onClick={() => setLobbyModalOpen(true)}
-                          >
-                            {lobbyCount} waiting
-                          </button>
-                        ) : (
-                          '0 waiting'
-                        )}
-                      </span>
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            </section>
-
-            <section className="acsis-exam-detail__panel-section acsis-exam-detail__panel-section--last">
-              <div className="acsis-exam-detail__types-card">
-                <span className="acsis-exam-detail__section-heading">Question types</span>
-                {typeLabels.length ? (
-                  <div className="acsis-exam-detail__type-badges">
-                    {typeLabels.map((label) => (
-                      <span key={label} className="acsis-exam-detail__type-badge" style={{ display: 'inline-flex', alignItems: 'center' }}>
-                        <QuestionTypeIcon label={label} size={14} style={{ marginRight: '4px' }} />
-                        {label}
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <span className="acsis-exam-detail__types-empty">—</span>
-                )}
-              </div>
-            </section>
-          </>
-        ) : null}
-
-        {tab === 'questions' ? (
-          <>
-            <div className="acsis-exam-detail__questions-head">
-              <div>
-                <h2 className="acsis-exam-detail__section-title">Questions</h2>
-                <p className="acsis-mc-sub acsis-exam-detail__questions-sub">
-                  {questionCount} {questionCount === 1 ? 'item' : 'items'}
-                  {typeSummary !== '—' ? ` · ${typeSummary}` : ''}
-                </p>
-              </div>
-              <div className="acsis-exam-detail__questions-actions">
-                {exam.questions?.length ? (
+                  )}
                   <button
                     type="button"
-                    className="acsis-exam-detail__present-btn"
-                    onClick={() => setPresentOpen(true)}
+                    className="acsis-btn-ghost acsis-exam-detail__questions-edit"
+                    onClick={() => startExam({})}
                   >
-                    <Presentation size={16} strokeWidth={2} aria-hidden />
-                    Present
+                    <Play size={16} strokeWidth={2} fill="currentColor" aria-hidden />
+                    Start session
                   </button>
-                ) : null}
-                <Link
-                  to={editHref}
-                  className="acsis-btn-ghost acsis-exam-detail__questions-edit"
-                  style={{ textDecoration: 'none' }}
-                >
-                  <Pencil size={16} strokeWidth={2} aria-hidden />
-                  Edit questions
-                </Link>
-              </div>
-            </div>
-            {!exam.questions?.length ? (
-              <div className="acsis-exam-detail__empty-questions">
-                <p className="acsis-mc-sub">No questions loaded for this exam.</p>
-                <Link to={editHref} className="acsis-mc-create-btn" style={{ border: 'none', textDecoration: 'none' }}>
-                  Add questions
-                </Link>
-              </div>
-            ) : !questionsExpanded ? (
-              <div style={{ display: 'flex', justifyContent: 'center', padding: '2rem 0' }}>
+                </>
+              ) : null}
+              {active ? (
+                <>
+                  <span className="acsis-mc-sub acsis-exam-detail__session-hint">
+                    {stats
+                      ? `${stats.joined} joined · ${stats.submitted} submitted`
+                      : 'Live'}
+                  </span>
+                  <button
+                    type="button"
+                    className="acsis-btn-ghost acsis-exam-detail__questions-edit"
+                    onClick={() => void endExam()}
+                    title="Close exam"
+                    aria-label="Close exam"
+                  >
+                    <StopCircle size={16} strokeWidth={2.5} aria-hidden />
+                  </button>
+                </>
+              ) : null}
+              {closed ? (
                 <button
                   type="button"
-                  className="acsis-btn-ghost"
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
-                  onClick={() => setQuestionsExpanded(true)}
+                  className="acsis-btn-ghost acsis-exam-detail__questions-edit"
+                  onClick={() => setRestartDialogOpen(true)}
                 >
-                  <ChevronDown size={16} strokeWidth={2} />
-                  View questions
+                  <RotateCcw size={16} strokeWidth={2.5} aria-hidden />
+                  Restart exam
                 </button>
+              ) : null}
+            </div>
+            {(waiting || active) ? (
+              <Link to={monitoringHref} className="acsis-exam-detail__monitoring-btn">
+                <span className="acsis-live-pulse-dot" aria-hidden />
+                <Radio size={16} strokeWidth={2} aria-hidden />
+                Live monitoring
+              </Link>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+
+      <div className="acsis-exam-detail__panel">
+        {tab === 'overview' ? (
+          <div className="acsis-exam-detail__overview-merge">
+            <section
+              className="acsis-exam-detail__overview-merge-questions"
+              aria-labelledby="exam-overview-questions-title"
+            >
+              <div className="acsis-exam-detail__questions-head acsis-exam-detail__overview-questions-head">
+                <div>
+                  <h2 id="exam-overview-questions-title" className="acsis-exam-detail__section-title">
+                    Questions
+                  </h2>
+                </div>
+                <div className="acsis-exam-detail__questions-actions">
+                  {exam.questions?.length ? (
+                    <button
+                      type="button"
+                      className="acsis-exam-detail__present-btn"
+                      onClick={() => void handleOpenPresentDialog()}
+                    >
+                      <Presentation size={16} strokeWidth={2} aria-hidden />
+                      Present
+                    </button>
+                  ) : null}
+                  <Link
+                    to={editHref}
+                    className="acsis-btn-ghost acsis-exam-detail__questions-edit"
+                    style={{ textDecoration: 'none' }}
+                  >
+                    <Pencil size={16} strokeWidth={2} aria-hidden />
+                    Edit questions
+                  </Link>
+                </div>
               </div>
-            ) : (
-              <>
+              {!exam.questions?.length ? (
+                <div className="acsis-exam-detail__empty-questions">
+                  <p className="acsis-mc-sub">No questions loaded for this exam.</p>
+                  <Link to={editHref} className="acsis-mc-create-btn" style={{ border: 'none', textDecoration: 'none' }}>
+                    Add questions
+                  </Link>
+                </div>
+              ) : (
                 <div className="acsis-exam-detail__question-sets">
                   {questionSets.map((sec, secIndex) => {
                     let qOffset = 0
@@ -1576,20 +1606,149 @@ export default function TeacherExamDetailPage() {
                     )
                   })}
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'center', padding: '1rem 0 2rem 0' }}>
-                  <button
-                    type="button"
-                    className="acsis-btn-ghost"
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
-                    onClick={() => setQuestionsExpanded(false)}
-                  >
-                    <ChevronUp size={16} strokeWidth={2} />
-                    Hide questions
-                  </button>
+              )}
+            </section>
+
+            <aside className="acsis-exam-detail__overview-merge-meta">
+              <div className="acsis-exam-detail__overview-merge-meta-inner">
+              <h2 className="acsis-exam-detail__section-title acsis-exam-detail__overview-meta-title">
+                Overview
+              </h2>
+
+              <section className="acsis-exam-detail__panel-section">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.5rem' }}>
+                  <span className="acsis-exam-detail__section-heading" style={{ margin: 0 }}>Description</span>
+                  {!descEditing && (
+                    <button
+                      type="button"
+                      className="acsis-exam-detail__inline-edit-btn"
+                      aria-label="Edit exam description"
+                      title="Edit description"
+                      onClick={() => { setDescDraft(exam.description || ''); setDescEditing(true) }}
+                    >
+                      <Pencil size={14} strokeWidth={2} />
+                    </button>
+                  )}
                 </div>
-              </>
-            )}
-          </>
+                {descEditing ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <textarea
+                      className="acsis-exam-detail__inline-textarea"
+                      value={descDraft}
+                      onChange={(e) => setDescDraft(e.target.value)}
+                      disabled={descSaving}
+                      autoFocus
+                      rows={4}
+                      aria-label="Edit exam description"
+                      style={{ width: '100%', resize: 'vertical', borderRadius: 6, padding: '8px 10px', fontFamily: 'inherit', fontSize: '0.95rem' }}
+                    />
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button
+                        type="button"
+                        className="acsis-btn-ghost"
+                        style={{ fontSize: '0.8rem', padding: '4px 10px' }}
+                        onClick={() => void saveDescEdit()}
+                        disabled={descSaving}
+                      >
+                        {descSaving ? 'Saving…' : 'Save'}
+                      </button>
+                      <button
+                        type="button"
+                        className="acsis-btn-ghost"
+                        style={{ fontSize: '0.8rem', padding: '4px 10px' }}
+                        onClick={() => setDescEditing(false)}
+                        disabled={descSaving}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p
+                    className={`acsis-exam-detail__desc${
+                      overviewDesc === 'No description added for this exam.'
+                        ? ' acsis-exam-detail__desc--empty'
+                        : ''
+                    }`}
+                    style={{ margin: 0 }}
+                  >
+                    {overviewDesc}
+                  </p>
+                )}
+              </section>
+
+              <section className="acsis-exam-detail__panel-section">
+                <div
+                  className={`acsis-summary-stats acsis-exam-detail__stats acsis-exam-detail__overview-sidebar-stats${
+                    1 + (waiting ? 1 : 0) + 2 >= 4
+                      ? ' acsis-summary-stats--4'
+                      : ''
+                  }`}
+                >
+                  <div className="acsis-summary-stat acsis-card-surface">
+                    <div className="acsis-summary-stat__body">
+                      <span className="acsis-summary-stat__label">Total points</span>
+                      <span className="acsis-summary-stat__value">{totalPoints}</span>
+                    </div>
+                  </div>
+                  <div className="acsis-summary-stat acsis-card-surface">
+                    <div className="acsis-summary-stat__body">
+                      <span className="acsis-summary-stat__label">Items</span>
+                      <span className="acsis-summary-stat__value">{questionCount}</span>
+                    </div>
+                  </div>
+                  <div className="acsis-summary-stat acsis-card-surface">
+                    <div className="acsis-summary-stat__body">
+                      <span className="acsis-summary-stat__label">Duration</span>
+                      <span className="acsis-summary-stat__value">
+                        {durationMins}
+                        <span className="acsis-exam-detail__stat-unit">min</span>
+                      </span>
+                    </div>
+                  </div>
+                  {waiting ? (
+                    <div className="acsis-summary-stat acsis-card-surface">
+                      <div className="acsis-summary-stat__body">
+                        <span className="acsis-summary-stat__label">In lobby</span>
+                        <span className="acsis-exam-detail__stat-text">
+                          {lobbyCount > 0 ? (
+                            <button
+                              type="button"
+                              className="acsis-exam-detail__lobby-link"
+                              onClick={() => setLobbyModalOpen(true)}
+                            >
+                              {lobbyCount} waiting
+                            </button>
+                          ) : (
+                            '0 waiting'
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              </section>
+
+              <section className="acsis-exam-detail__panel-section acsis-exam-detail__panel-section--last">
+                <div className="acsis-exam-detail__types-card">
+                  <span className="acsis-exam-detail__section-heading">Question types</span>
+                  {typeLabels.length ? (
+                    <div className="acsis-exam-detail__type-badges">
+                      {typeLabels.map((label) => (
+                        <span key={label} className="acsis-exam-detail__type-badge" style={{ display: 'inline-flex', alignItems: 'center' }}>
+                          <QuestionTypeIcon label={label} size={14} style={{ marginRight: '4px' }} />
+                          {label}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="acsis-exam-detail__types-empty">—</span>
+                  )}
+                </div>
+              </section>
+              </div>
+            </aside>
+          </div>
         ) : null}
 
         {tab === 'results' ? (
@@ -1603,11 +1762,26 @@ export default function TeacherExamDetailPage() {
                   </p>
                 ) : (
                   <p className="acsis-mc-sub acsis-exam-detail__questions-sub">
-                    Track submissions, scores, and per-student actions.
+                    Track submissions, scores, and per-student actions. Refresh to see the latest updates.
                   </p>
                 )}
               </div>
               <div className="acsis-exam-detail__questions-actions">
+                <button
+                  type="button"
+                  className="acsis-btn-ghost acsis-exam-detail__questions-edit"
+                  onClick={() => void reloadResults({ background: true })}
+                  disabled={resultsRefreshing || resultsLoading}
+                  aria-busy={resultsRefreshing}
+                >
+                  <RotateCcw
+                    size={16}
+                    strokeWidth={2}
+                    aria-hidden
+                    className={resultsRefreshing ? 'acsis-exam-detail__refresh-spin' : undefined}
+                  />
+                  {resultsRefreshing ? 'Refreshing…' : 'Refresh'}
+                </button>
                 <Link
                   to={reportsHref}
                   className="acsis-btn-ghost acsis-exam-detail__questions-edit"
@@ -1747,6 +1921,7 @@ export default function TeacherExamDetailPage() {
                         <option value="all">All statuses</option>
                         <option value="submitted">Submitted</option>
                         <option value="in_progress">In progress</option>
+                        <option value="on_hold">On hold</option>
                       </select>
 
                       {resultsFiltersActive ? (
@@ -1786,6 +1961,9 @@ export default function TeacherExamDetailPage() {
                         <th>Status</th>
                         {resultsTableColumns.submissionTime ? (
                           <th>Submitted</th>
+                        ) : null}
+                        {resultsTableColumns.timeTaken ? (
+                          <th className="acsis-exam-detail__table-col-num">Time taken</th>
                         ) : null}
                         {resultsTableColumns.score ? (
                           <th className="acsis-exam-detail__table-col-num">Score</th>
@@ -1840,6 +2018,11 @@ export default function TeacherExamDetailPage() {
                               {formatSubmissionTime(s.submittedAt)}
                             </td>
                           ) : null}
+                          {resultsTableColumns.timeTaken ? (
+                            <td className="acsis-exam-detail__table-col-num acsis-exam-detail__table-time-taken">
+                              {formatSessionQuizDuration(s, examTimingContext)}
+                            </td>
+                          ) : null}
                           {resultsTableColumns.score ? (
                             <td className="acsis-exam-detail__table-col-num">
                               {s.status === 'submitted' && s.percentage != null ? (
@@ -1856,13 +2039,7 @@ export default function TeacherExamDetailPage() {
                           ) : null}
                           {resultsTableColumns.warnings ? (
                             <td className="acsis-exam-detail__table-col-num">
-                              <span
-                                className={`acsis-exam-detail__warning-count${
-                                  Number(s.warningCount) > 0 ? ' acsis-exam-detail__warning-count--active' : ''
-                                }`}
-                              >
-                                {s.warningCount}
-                              </span>
+                              {renderWarningCount(s)}
                             </td>
                           ) : null}
                           {resultsTableColumns.falsePositives ? (
@@ -1872,7 +2049,7 @@ export default function TeacherExamDetailPage() {
                           ) : null}
                           {resultsTableColumns.actions ? (
                             <td className="acsis-exam-detail__table-col-action">
-                              {s.status === 'submitted' && s.sessionId ? (
+                              {(s.status === 'submitted' || s.status === 'on_hold') && s.sessionId ? (
                                 <div className="acsis-exam-detail__row-actions">
                                   <button
                                     type="button"
@@ -1885,20 +2062,22 @@ export default function TeacherExamDetailPage() {
                                     <FileText size={14} strokeWidth={2} aria-hidden="true" />
                                     Review
                                   </button>
-                                  {s.scoreReleased ? (
-                                    <span className="acsis-exam-detail__released-yes acsis-exam-detail__released-pill">
-                                      Released
-                                    </span>
-                                  ) : (
-                                    <button
-                                      type="button"
-                                      className="acsis-exam-detail__release-btn"
-                                      disabled={releasing}
-                                      onClick={() => void handleReleaseOneStudent(s.sessionId)}
-                                    >
-                                      Release
-                                    </button>
-                                  )}
+                                  {s.status === 'submitted' ? (
+                                    s.scoreReleased ? (
+                                      <span className="acsis-exam-detail__released-yes acsis-exam-detail__released-pill">
+                                        Released
+                                      </span>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        className="acsis-exam-detail__release-btn"
+                                        disabled={releasing}
+                                        onClick={() => void handleReleaseOneStudent(s.sessionId)}
+                                      >
+                                        Release
+                                      </button>
+                                    )
+                                  ) : null}
                                 </div>
                               ) : null}
                             </td>
@@ -1933,7 +2112,7 @@ export default function TeacherExamDetailPage() {
             </section>
           </>
         ) : null}
-      </FadeIn>
+      </div>
 
       {presentOpen && exam.questions?.length ? (
         <ExamQuestionsPresentDialog
@@ -1951,7 +2130,9 @@ export default function TeacherExamDetailPage() {
           classId={classId}
           examId={examId}
           examTitle={hit?.title || 'Exam'}
-          submittedSessions={results.sessions.filter((s) => s.status === 'submitted')}
+          submittedSessions={results.sessions.filter(
+            (s) => s.status === 'submitted' || s.status === 'on_hold',
+          )}
           initialSessionId={reviewInitialSessionId}
           onClose={() => {
             setReviewOpen(false)
@@ -1970,6 +2151,21 @@ export default function TeacherExamDetailPage() {
         students={results?.sessions || []}
         releasing={releasing}
         onRelease={(opts) => void handleReleaseScores(opts)}
+      />
+
+      <TeacherViolationLogModal
+        open={Boolean(violationModalSession)}
+        onClose={() => {
+          setViolationModalSession(null)
+          setViolationModalViolations([])
+          setViolationDismissError('')
+        }}
+        student={violationModalSession}
+        violations={violationModalViolations}
+        onDismissViolation={(v) => void handleDismissViolation(v)}
+        dismissingLogId={dismissingViolationLogId}
+        dismissError={violationDismissError}
+        loading={violationModalLoading}
       />
 
       <Dialog open={topScoreModalOpen} onOpenChange={setTopScoreModalOpen}>
@@ -2047,17 +2243,6 @@ export default function TeacherExamDetailPage() {
           open={restartDialogOpen}
           onOpenChange={setRestartDialogOpen}
           onRestart={restartExam}
-          defaultStart={exam.scheduledStart}
-          defaultEnd={exam.scheduledEnd}
-        />
-      ) : null}
-
-      {copyDialogOpen ? (
-        <CopyExamDialog
-          open={copyDialogOpen}
-          onOpenChange={setCopyDialogOpen}
-          currentClassId={classId}
-          onCopy={copyExam}
           defaultStart={exam.scheduledStart}
           defaultEnd={exam.scheduledEnd}
         />

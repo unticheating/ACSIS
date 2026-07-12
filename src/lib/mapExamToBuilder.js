@@ -4,6 +4,7 @@ import {
   syncSectionTitles,
 } from './questionTypes.js'
 import { boilerplateInstructionsForFormType } from './examSectionInstructions.js'
+import { newLocalQuestionId } from './examContentPayload.js'
 
 function newSection(index = 1, questionType = 'multiple') {
   return {
@@ -119,6 +120,21 @@ export function mapExamToBuilderState(exam) {
     ''
 
   return { sections, description }
+}
+
+/** Fresh local IDs for duplicating an exam in the builder (copy mode). */
+export function cloneBuilderStateForCopy({ sections, description }) {
+  return {
+    description,
+    sections: sections.map((sec, index) => ({
+      ...sec,
+      id: `sec-${Date.now()}-${index}-${Math.random().toString(36).slice(2, 9)}`,
+      questions: sec.questions.map((q) => ({
+        ...q,
+        id: newLocalQuestionId(),
+      })),
+    })),
+  }
 }
 
 /** Question sets for read-only views (exam detail, previews). */

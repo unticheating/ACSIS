@@ -10,5 +10,7 @@ export const EXAM_AUDIT_EVENT_TYPES = [
   'exam_code_updated',
   'exam_deleted',
   'answer_corrected',
+  'violation_detected',
+  'student_detected',
   'violation_dismissed',
 ]

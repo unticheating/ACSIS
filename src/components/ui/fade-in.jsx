@@ -19,8 +19,14 @@ const FadeIn = forwardRef(({
     none: { x: 0, y: 0 },
   };
 
-  const initial = { opacity: 0, ...directionOffset[direction] };
-  const animate = { opacity: 1, x: 0, y: 0 };
+  const initial =
+    direction === 'none'
+      ? { opacity: 0 }
+      : { opacity: 0, ...directionOffset[direction] };
+  const animate =
+    direction === 'none'
+      ? { opacity: 1 }
+      : { opacity: 1, x: 0, y: 0 };
   const Component = motion[as] || motion.div;
 
   return (

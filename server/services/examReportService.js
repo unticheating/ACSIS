@@ -460,7 +460,7 @@ async function buildExcelBuffer({ exam, cls, sessions, violations, generatorName
       const extMatch = teacherLogoBase64.match(/^data:image\/(\w+);base64,/);
       const ext = extMatch ? extMatch[1] : 'png';
       const teacherLogoId = workbook.addImage({ base64: b64Data, extension: ext });
-      sheet.addImage(teacherLogoId, { tl: { col: logoXOffset, row: 1 }, ext: { width: 60, height: 60 } });
+      sheet.addImage(teacherLogoId, { tl: { col: logoXOffset, row: 1 }, ext: { width: 80, height: 80 } });
     } catch(e) {}
   }
 

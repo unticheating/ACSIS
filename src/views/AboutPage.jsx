@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import StreamBackLink from '@/components/layout/StreamBackLink.jsx'
 import AuthImmersiveShell from '@/components/auth/AuthImmersiveShell.jsx'
 import AuthLoginFooter from '@/components/auth/AuthLoginFooter.jsx'
 import { useDocumentTitle } from '@/hooks/useDocumentTitle.js'
@@ -39,7 +39,7 @@ export default function AboutPage() {
             </p>
           </div>
           <p className="acsis-immersive__about-back">
-            <Link to="/">← Back to sign in</Link>
+            <StreamBackLink to="/">Back to sign in</StreamBackLink>
           </p>
         </article>
         <AuthLoginFooter />

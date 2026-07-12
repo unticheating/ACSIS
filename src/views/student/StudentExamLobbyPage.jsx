@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import StreamBackLink from '@/components/layout/StreamBackLink.jsx'
 import '../../styles/acsis-immersive.css'
 
 /**
@@ -26,9 +26,9 @@ export default function StudentExamLobbyPage() {
           <span>Waiting for JUANITO ALVAREZ JR to start the exam…</span>
         </div>
         <p style={{ marginTop: 32, fontSize: '0.85rem', opacity: 0.75 }}>
-          <Link to="/student/my-classes" style={{ color: '#86efac' }}>
-            ← Leave lobby (demo)
-          </Link>
+          <StreamBackLink to="/student/my-classes" style={{ color: '#86efac' }}>
+            Leave lobby (demo)
+          </StreamBackLink>
         </p>
       </div>
     </div>
