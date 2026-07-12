@@ -810,7 +810,8 @@ async function attachChoicesToQuestion(pool, row) {
   return qObj;
 }
 
-export async function getExamWithQuestionsQuery(classId, examId, requireActive = false) {
+export async function getExamWithQuestionsQuery(classId, examId, requireActive = false, options = {}) {
+  const includeQuestions = options.includeQuestions !== false
   const pool = getPool();
   await ensureExamSectionsSchema();
 
@@ -849,6 +850,23 @@ export async function getExamWithQuestionsQuery(classId, examId, requireActive =
     [examId],
   );
 
+  exam.sections = secResult.rows.map((s) => ({
+    id: s.id,
+    title: s.title,
+    description: s.description,
+    orderNum: s.orderNum,
+  }));
+
+  if (!includeQuestions) {
+    const countResult = await pool.query(
+      `SELECT COUNT(*)::int AS count FROM questions WHERE exam_id = $1`,
+      [examId],
+    );
+    exam.questionCount = countResult.rows[0]?.count ?? 0;
+    exam.questions = [];
+    return exam;
+  }
+
   const qResult = await pool.query(
     `SELECT
        q.question_id AS id,
@@ -875,12 +893,6 @@ export async function getExamWithQuestionsQuery(classId, examId, requireActive =
     questions.push(await attachChoicesToQuestion(pool, row));
   }
 
-  exam.sections = secResult.rows.map((s) => ({
-    id: s.id,
-    title: s.title,
-    description: s.description,
-    orderNum: s.orderNum,
-  }));
   exam.questions = questions;
   return exam;
 }

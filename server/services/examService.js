@@ -580,7 +580,13 @@ export async function verifyExamPasswordService(classId, examId, studentMemberId
   }
 }
 
-export async function getExamDetailsService(classId, examId, requireActive = false, studentMemberId = null) {
+export async function getExamDetailsService(
+  classId,
+  examId,
+  requireActive = false,
+  studentMemberId = null,
+  options = {},
+) {
   try {
     if (studentMemberId) {
       const isEnrolled = await checkEnrollment(studentMemberId, classId);
@@ -589,7 +595,7 @@ export async function getExamDetailsService(classId, examId, requireActive = fal
       }
     }
 
-    const exam = await getExamWithQuestionsQuery(classId, examId, requireActive);
+    const exam = await getExamWithQuestionsQuery(classId, examId, requireActive, options);
     if (!exam) {
       return { ok: false, status: 404, error: 'Exam not found or not active.' };
     }

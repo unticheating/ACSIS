@@ -3189,6 +3189,16 @@ html.dark .acsis-exam-detail__results-search-input:focus {
   background: color-mix(in srgb, var(--acsis-brand, #334155) 2%, transparent);
 }
 
+.acsis-exam-detail__question-answer-lazy {
+  min-height: 2.5rem;
+}
+
+.acsis-exam-detail__question-answer-placeholder {
+  min-height: 2.5rem;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--fg-muted, #6b7280) 8%, transparent);
+}
+
 .acsis-exam-detail__question-num {
   flex-shrink: 0;
   display: flex;

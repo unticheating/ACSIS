@@ -578,8 +578,10 @@ export async function postStudentVerifyExamPassword(req, res) {
 
 export async function getTeacherExamSession(req, res) {
   const { classId, examId } = req.params;
+  const includeQuestions =
+    req.query.includeQuestions !== '0' && req.query.includeQuestions !== 'false';
   // Teachers don't need active exams and don't need enrollment checks
-  const result = await getExamDetailsService(classId, examId, false, null);
+  const result = await getExamDetailsService(classId, examId, false, null, { includeQuestions });
   
   if (!result.ok) {
     return res.status(result.status || 500).json({ error: result.error });

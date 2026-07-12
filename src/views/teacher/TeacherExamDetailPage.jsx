@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   ClipboardList,
@@ -33,11 +33,7 @@ import {
   dismissTeacherViolation,
 } from '@/lib/teacherExamResultsApi.js'
 import { releaseExamScores } from '@/lib/teacherExamGradingApi.js'
-import ExamAnswerReviewModal from '@/components/teacher/ExamAnswerReviewModal.jsx'
-import ReleaseScoresDialog from '@/components/teacher/ReleaseScoresDialog.jsx'
-import AssignExamStudentsDialog from '@/components/teacher/AssignExamStudentsDialog.jsx'
-import UserAvatar from '@/components/admin/UserAvatar.jsx'
-import RestartExamDialog from '@/components/teacher/RestartExamDialog.jsx'
+import { labelForCheatEvent } from '@/lib/examAntiCheat.js'
 import {
   isExamDraft,
   isExamOngoing,
@@ -51,11 +47,7 @@ import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
 import { copyToClipboard } from '@/lib/copyToClipboard.js'
 import { sumExamTotalPoints } from '@/lib/examPoints.js'
 import { labelForFormType, uniqueQuestionTypeLabels } from '@/lib/questionTypes.js'
-import ExamQuestionAnswerPresentation from '@/components/teacher/ExamQuestionAnswerPresentation.jsx'
-import ExamQuestionsPresentDialog from '@/components/teacher/ExamQuestionsPresentDialog.jsx'
-import TeacherViolationLogModal, {
-  normalizeTeacherViolationEntry,
-} from '@/components/teacher/TeacherViolationLogModal.jsx'
+import UserAvatar from '@/components/admin/UserAvatar.jsx'
 import { useAcsisConfirm } from '@/hooks/useAcsisConfirm.jsx'
 import {
   DropdownMenu,
@@ -83,8 +75,29 @@ import {
   mapExamToBuilderState,
 } from '@/lib/mapExamToBuilder.js'
 import { buildExamSectionsPayload } from '@/lib/examContentPayload.js'
-import confetti from 'canvas-confetti'
+import LazyExamQuestionAnswerPreview from '@/components/teacher/LazyExamQuestionAnswerPreview.jsx'
 import '../../pages/teacher-ui/my_classes.css'
+
+const ExamAnswerReviewModal = lazy(() => import('@/components/teacher/ExamAnswerReviewModal.jsx'))
+const ExamQuestionsPresentDialog = lazy(() => import('@/components/teacher/ExamQuestionsPresentDialog.jsx'))
+const ReleaseScoresDialog = lazy(() => import('@/components/teacher/ReleaseScoresDialog.jsx'))
+const AssignExamStudentsDialog = lazy(() => import('@/components/teacher/AssignExamStudentsDialog.jsx'))
+const RestartExamDialog = lazy(() => import('@/components/teacher/RestartExamDialog.jsx'))
+const TeacherViolationLogModal = lazy(() => import('@/components/teacher/TeacherViolationLogModal.jsx'))
+
+function normalizeTeacherViolationEntry(v) {
+  const base = labelForCheatEvent(v.eventType) || v.eventType || 'event'
+  const detail = v.details ? ` — ${v.details}` : ''
+  const when = v.occurredAt ? new Date(v.occurredAt).toLocaleTimeString() : ''
+  return {
+    id: v.id,
+    label: `${base}${detail}${when ? ` (${when})` : ''}`,
+    dismissedAt: v.dismissedAt || null,
+    eventType: v.eventType,
+    details: v.details,
+    occurredAt: v.occurredAt,
+  }
+}
 
 const EXAM_TABS = [
   { id: 'overview', label: 'Overview' },
@@ -499,6 +512,7 @@ export default function TeacherExamDetailPage() {
   const [hit, setHit] = useState(null)
   const [clsMeta, setClsMeta] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [questionsLoading, setQuestionsLoading] = useState(false)
   const [error, setError] = useState(null)
   const [refreshTick, setRefreshTick] = useState(0)
   const [results, setResults] = useState(null)
@@ -543,19 +557,37 @@ export default function TeacherExamDetailPage() {
   
   const { confirm, ConfirmDialog } = useAcsisConfirm()
 
+  const loadExamQuestions = useCallback(async () => {
+    if (!classId || !examId) return
+    setQuestionsLoading(true)
+    try {
+      const res = await apiFetch(`/api/teacher/classes/${classId}/exams/${examId}`)
+      if (!res.ok) {
+        throw new Error('Failed to load exam questions.')
+      }
+      const data = await res.json()
+      setHit((prev) => (prev ? { ...prev, ...data, questions: data.questions || [] } : data))
+    } catch (err) {
+      acsisToastError(err instanceof Error ? err.message : 'Failed to load exam questions.')
+    } finally {
+      setQuestionsLoading(false)
+    }
+  }, [classId, examId])
+
   useEffect(() => {
     async function fetchExam() {
       if (!classId || !examId) return
       setLoading(true)
       try {
         const [examRes, classRes] = await Promise.all([
-          apiFetch(`/api/teacher/classes/${classId}/exams/${examId}`),
+          apiFetch(`/api/teacher/classes/${classId}/exams/${examId}?includeQuestions=0`),
           apiFetch(`/api/teacher/classes/${classId}`),
         ])
         if (!examRes.ok) {
           throw new Error('Exam not found or you do not have permission.')
         }
-        setHit(await examRes.json())
+        const summary = await examRes.json()
+        setHit({ ...summary, questions: [] })
         if (classRes.ok) {
           const classPayload = await classRes.json()
           setClsMeta(classPayload)
@@ -571,6 +603,14 @@ export default function TeacherExamDetailPage() {
     }
     fetchExam()
   }, [classId, examId, refreshTick])
+
+  useEffect(() => {
+    if (!classId || !examId || !hit || loading || tab !== 'overview') return undefined
+    const questionCount = Number(hit.questionCount ?? 0)
+    if (questionCount === 0) return undefined
+    if (hit.questions?.length) return undefined
+    void loadExamQuestions()
+  }, [classId, examId, hit, loading, tab, refreshTick, loadExamQuestions])
 
   const breadcrumbTrail = useMemo(() => {
     if (!hit) return null
@@ -626,10 +666,15 @@ export default function TeacherExamDetailPage() {
   )
 
   useEffect(() => {
-    if (!classId || !examId) return undefined
-    if (tab !== 'overview' && tab !== 'results') return undefined
-    reloadResults({ background: false })
-  }, [classId, examId, refreshTick, tab, reloadResults])
+    if (!classId || !examId || !hit) return undefined
+    if (tab === 'results') {
+      reloadResults({ background: false })
+      return undefined
+    }
+    if (tab === 'overview' && examIsLive) {
+      reloadResults({ background: false })
+    }
+  }, [classId, examId, hit, refreshTick, tab, reloadResults, examIsLive])
 
   const filteredSessions = useMemo(() => {
     let list = [...(results?.sessions || [])]
@@ -932,6 +977,9 @@ export default function TeacherExamDetailPage() {
   }
 
   async function handleOpenPresentDialog() {
+    if (!exam.questions?.length && Number(hit?.questionCount ?? 0) > 0) {
+      await loadExamQuestions()
+    }
     setPresentOpen(true)
     if (results?.questionStats?.length) return
     try {
@@ -1503,7 +1551,7 @@ export default function TeacherExamDetailPage() {
                   </h2>
                 </div>
                 <div className="acsis-exam-detail__questions-actions">
-                  {exam.questions?.length ? (
+                  {questionCount > 0 ? (
                     <button
                       type="button"
                       className="acsis-exam-detail__present-btn"
@@ -1523,7 +1571,11 @@ export default function TeacherExamDetailPage() {
                   </Link>
                 </div>
               </div>
-              {!exam.questions?.length ? (
+              {questionsLoading ? (
+                <div className="acsis-exam-detail__empty-questions">
+                  <PageSpinner label="Loading questions…" />
+                </div>
+              ) : !exam.questions?.length ? (
                 <div className="acsis-exam-detail__empty-questions">
                   <p className="acsis-mc-sub">No questions loaded for this exam.</p>
                   <Link to={editHref} className="acsis-mc-create-btn" style={{ border: 'none', textDecoration: 'none' }}>
@@ -1597,7 +1649,7 @@ export default function TeacherExamDetailPage() {
                                     {Number(q.points || 0)} pts
                                   </span>
                                 </div>
-                                <ExamQuestionAnswerPresentation question={q} />
+                                <LazyExamQuestionAnswerPreview question={q} />
                               </div>
                             </li>
                           ))}
@@ -1833,7 +1885,14 @@ export default function TeacherExamDetailPage() {
                       type="button"
                       className="acsis-exam-detail__top-score-reveal"
                       onClick={() => {
-                        confetti({ particleCount: 150, spread: 90, origin: { x: 0.5, y: 0.5 }, zIndex: 9999 })
+                        void import('canvas-confetti').then(({ default: confetti }) => {
+                          confetti({
+                            particleCount: 150,
+                            spread: 90,
+                            origin: { x: 0.5, y: 0.5 },
+                            zIndex: 9999,
+                          })
+                        })
                         setTopScoreModalOpen(true)
                       }}
                       aria-label="Reveal top score"
@@ -2115,58 +2174,70 @@ export default function TeacherExamDetailPage() {
       </div>
 
       {presentOpen && exam.questions?.length ? (
-        <ExamQuestionsPresentDialog
-          open={presentOpen}
-          onClose={() => setPresentOpen(false)}
-          examTitle={hit?.title || 'Exam'}
-          questions={exam.questions}
-          questionStats={results?.questionStats}
-          submittedCount={results?.stats?.submitted ?? 0}
-        />
+        <Suspense fallback={null}>
+          <ExamQuestionsPresentDialog
+            open={presentOpen}
+            onClose={() => setPresentOpen(false)}
+            examTitle={hit?.title || 'Exam'}
+            questions={exam.questions}
+            questionStats={results?.questionStats}
+            submittedCount={results?.stats?.submitted ?? 0}
+          />
+        </Suspense>
       ) : null}
 
       {reviewOpen && results?.sessions ? (
-        <ExamAnswerReviewModal
-          classId={classId}
-          examId={examId}
-          examTitle={hit?.title || 'Exam'}
-          submittedSessions={results.sessions.filter(
-            (s) => s.status === 'submitted' || s.status === 'on_hold',
-          )}
-          initialSessionId={reviewInitialSessionId}
-          onClose={() => {
-            setReviewOpen(false)
-            setReviewInitialSessionId(null)
-          }}
-          onUpdated={async () => {
-            const data = await fetchTeacherExamResults(classId, examId)
-            setResults(data)
-          }}
-        />
+        <Suspense fallback={null}>
+          <ExamAnswerReviewModal
+            classId={classId}
+            examId={examId}
+            examTitle={hit?.title || 'Exam'}
+            submittedSessions={results.sessions.filter(
+              (s) => s.status === 'submitted' || s.status === 'on_hold',
+            )}
+            initialSessionId={reviewInitialSessionId}
+            onClose={() => {
+              setReviewOpen(false)
+              setReviewInitialSessionId(null)
+            }}
+            onUpdated={async () => {
+              const data = await fetchTeacherExamResults(classId, examId)
+              setResults(data)
+            }}
+          />
+        </Suspense>
       ) : null}
 
-      <ReleaseScoresDialog
-        open={releaseDialogOpen}
-        onOpenChange={setReleaseDialogOpen}
-        students={results?.sessions || []}
-        releasing={releasing}
-        onRelease={(opts) => void handleReleaseScores(opts)}
-      />
+      {releaseDialogOpen ? (
+        <Suspense fallback={null}>
+          <ReleaseScoresDialog
+            open={releaseDialogOpen}
+            onOpenChange={setReleaseDialogOpen}
+            students={results?.sessions || []}
+            releasing={releasing}
+            onRelease={(opts) => void handleReleaseScores(opts)}
+          />
+        </Suspense>
+      ) : null}
 
-      <TeacherViolationLogModal
-        open={Boolean(violationModalSession)}
-        onClose={() => {
-          setViolationModalSession(null)
-          setViolationModalViolations([])
-          setViolationDismissError('')
-        }}
-        student={violationModalSession}
-        violations={violationModalViolations}
-        onDismissViolation={(v) => void handleDismissViolation(v)}
-        dismissingLogId={dismissingViolationLogId}
-        dismissError={violationDismissError}
-        loading={violationModalLoading}
-      />
+      {violationModalSession ? (
+        <Suspense fallback={null}>
+          <TeacherViolationLogModal
+            open={Boolean(violationModalSession)}
+            onClose={() => {
+              setViolationModalSession(null)
+              setViolationModalViolations([])
+              setViolationDismissError('')
+            }}
+            student={violationModalSession}
+            violations={violationModalViolations}
+            onDismissViolation={(v) => void handleDismissViolation(v)}
+            dismissingLogId={dismissingViolationLogId}
+            dismissError={violationDismissError}
+            loading={violationModalLoading}
+          />
+        </Suspense>
+      ) : null}
 
       <Dialog open={topScoreModalOpen} onOpenChange={setTopScoreModalOpen}>
         <DialogContent className="sm:max-w-sm">
@@ -2239,21 +2310,27 @@ export default function TeacherExamDetailPage() {
 
       {ConfirmDialog}
       {restartDialogOpen ? (
-        <RestartExamDialog
-          open={restartDialogOpen}
-          onOpenChange={setRestartDialogOpen}
-          onRestart={restartExam}
-          defaultStart={exam.scheduledStart}
-          defaultEnd={exam.scheduledEnd}
-        />
+        <Suspense fallback={null}>
+          <RestartExamDialog
+            open={restartDialogOpen}
+            onOpenChange={setRestartDialogOpen}
+            onRestart={restartExam}
+            defaultStart={exam.scheduledStart}
+            defaultEnd={exam.scheduledEnd}
+          />
+        </Suspense>
       ) : null}
 
-      <AssignExamStudentsDialog
-        open={assignDialogOpen}
-        onOpenChange={setAssignDialogOpen}
-        classId={classId}
-        examId={examId}
-      />
+      {assignDialogOpen ? (
+        <Suspense fallback={null}>
+          <AssignExamStudentsDialog
+            open={assignDialogOpen}
+            onOpenChange={setAssignDialogOpen}
+            classId={classId}
+            examId={examId}
+          />
+        </Suspense>
+      ) : null}
     </div>
   )
 }
