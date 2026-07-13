@@ -55,6 +55,7 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import Editor from '@monaco-editor/react'
 import { MONACO_EXAM_EDITOR_OPTIONS } from '@/lib/monacoExamEditor.js'
 import { DateTimePicker } from '@/components/ui/date-time-picker.jsx'
+import PageSpinner from '@/components/ui/page-spinner.jsx'
 import MatchingPairEditor from '@/components/exam/MatchingPairEditor.jsx'
 import DiagramEditor from '@/components/exam/DiagramEditor.jsx'
 import {
@@ -172,8 +173,11 @@ export default function TeacherCreateExamPage() {
   }, [])
 
   useEffect(() => {
-    if (!editExamIdParam || isCopyMode || !selectedClass) {
-      if (!copyFromParam) setLoadingEditExam(false)
+    if (!editExamIdParam || isCopyMode) {
+      return undefined
+    }
+    if (!selectedClass) {
+      setLoadingEditExam(true)
       return undefined
     }
 
@@ -1095,7 +1099,7 @@ export default function TeacherCreateExamPage() {
 
   useEffect(() => {
     if (!selectedCourse) {
-      if (selectedClassIds.length) setSelectedClassIds([])
+      if (!initialClassIds.length && selectedClassIds.length) setSelectedClassIds([])
       return
     }
     const ids = selectedSections
@@ -2240,10 +2244,13 @@ export default function TeacherCreateExamPage() {
     }
   }
 
-  if (loadingEditExam) {
+  const isBootstrappingExistingExam =
+    (isEditMode || isCopyMode) && (loadingEditExam || loadingClasses)
+
+  if (isBootstrappingExistingExam) {
     return (
-      <div className="flex items-center justify-center h-full min-h-[320px] p-8 text-muted-foreground">
-        Loading exam…
+      <div className="flex items-center justify-center h-full min-h-[320px] p-8">
+        <PageSpinner label="Loading exam…" />
       </div>
     )
   }
