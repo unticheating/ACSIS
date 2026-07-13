@@ -120,6 +120,57 @@ export async function getSessionShuffleLayoutQuery(sessionId) {
   }
 }
 
+/** Build and persist shuffle layout when exam flags require it but the session has none yet. */
+export async function ensureSessionShuffleLayoutQuery(sessionId, examId) {
+  await ensureExamSessionShuffleColumns()
+  const flags = await getExamShuffleFlagsQuery(examId)
+  if (!flags.shuffleQuestions && !flags.shuffleChoices) {
+    return { questionOrder: null, choiceOrders: null }
+  }
+
+  const layout = (await getSessionShuffleLayoutQuery(sessionId)) || {
+    questionOrder: null,
+    choiceOrders: null,
+  }
+
+  const missingQuestionOrder =
+    flags.shuffleQuestions && !(Array.isArray(layout.questionOrder) && layout.questionOrder.length)
+  const missingChoiceOrders =
+    flags.shuffleChoices &&
+    !(
+      layout.choiceOrders &&
+      typeof layout.choiceOrders === 'object' &&
+      Object.keys(layout.choiceOrders).length
+    )
+
+  if (!missingQuestionOrder && !missingChoiceOrders) {
+    return layout
+  }
+
+  const { questions, choicesByQuestion } = await fetchExamQuestionChoiceRowsQuery(examId)
+  const built = buildShuffleLayout(questions, choicesByQuestion, {
+    shuffleQuestions: flags.shuffleQuestions,
+    shuffleChoices: flags.shuffleChoices,
+  })
+
+  const questionOrder = missingQuestionOrder ? built.questionOrder : layout.questionOrder
+  const choiceOrders = missingChoiceOrders ? built.choiceOrders : layout.choiceOrders
+
+  const pool = getPool()
+  await pool.query(
+    `UPDATE exam_sessions
+     SET question_order = $1::jsonb, choice_orders = $2::jsonb
+     WHERE session_id = $3`,
+    [
+      questionOrder ? JSON.stringify(questionOrder) : null,
+      choiceOrders && Object.keys(choiceOrders).length ? JSON.stringify(choiceOrders) : null,
+      sessionId,
+    ],
+  )
+
+  return { questionOrder, choiceOrders }
+}
+
 export async function getStudentSessionsForExamsQuery(examIds, studentMemberId) {
   if (!examIds?.length) return []
   const pool = getPool()

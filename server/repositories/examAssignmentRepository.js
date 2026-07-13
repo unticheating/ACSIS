@@ -82,6 +82,39 @@ export async function listTeacherExamAssignmentRosterQuery(classId, examId, teac
   }
 }
 
+export async function listAssignedStudentEmailsForExamQuery(examId, classId) {
+  await ensureExamAssignmentSchema()
+  const pool = getPool()
+  const { rows: countRows } = await pool.query(
+    `SELECT COUNT(*)::int AS total
+     FROM exam_assignments
+     WHERE exam_id = $1`,
+    [examId],
+  )
+  const assignedTotal = Number(countRows[0]?.total || 0)
+  if (assignedTotal === 0) {
+    return { hasAssignments: false, students: [] }
+  }
+
+  const { rows } = await pool.query(
+    `SELECT u.email, u.first_name, u.last_name
+     FROM exam_assignments ea
+     JOIN institution_members im ON ea.member_id = im.member_id
+     JOIN users u ON im.uid = u.uid
+     JOIN class_enrollments ce ON ce.member_id = im.member_id AND ce.class_id = $2
+     WHERE ea.exam_id = $1`,
+    [examId, classId],
+  )
+
+  return {
+    hasAssignments: true,
+    students: rows.map((row) => ({
+      email: row.email,
+      name: [row.first_name, row.last_name].filter(Boolean).join(' ') || 'Student',
+    })),
+  }
+}
+
 export async function replaceExamAssignmentsQuery(classId, examId, teacherMemberId, studentMemberIds) {
   const cls = await getTeacherClassByIdQuery(classId, teacherMemberId)
   if (!cls) return null

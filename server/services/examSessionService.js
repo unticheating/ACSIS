@@ -38,7 +38,7 @@ async function buildStudentSubmitPayload(sessionId, scores) {
 }
 import { getExamWithQuestionsQuery } from '../repositories/examRepository.js'
 import { applyLayoutToExamQuestions } from '../lib/examShuffle.js'
-import { getSessionShuffleLayoutQuery } from '../repositories/examSessionRepository.js'
+import { ensureSessionShuffleLayoutQuery } from '../repositories/examSessionRepository.js'
 import { closeOtherTeacherOngoingExamsQuery } from '../repositories/examResultsRepository.js'
 import { checkEnrollment } from '../repositories/studentRepository.js'
 import { getInstitutionMaxWarnings } from '../repositories/adminRepository.js'
@@ -236,7 +236,7 @@ export async function getStudentExamSessionService(classId, examId, studentMembe
   if (status === EXAM_STATUS.OPEN && session) {
     const full = await getExamWithQuestionsQuery(classId, examId, false)
     if (full?.questions) {
-      const layout = await getSessionShuffleLayoutQuery(session.session_id)
+      const layout = await ensureSessionShuffleLayoutQuery(session.session_id, examId)
       payload.questions = applyLayoutToExamQuestions(full.questions, layout, { forStudent: true })
       const { questions, correctAnswer, _choicesMeta, ...examPublic } = full
       payload.exam = { ...examMeta, ...examPublic, code: examMeta.code }
@@ -250,7 +250,7 @@ export async function getStudentExamSessionService(classId, examId, studentMembe
   ) {
     const full = await getExamWithQuestionsQuery(classId, examId, false)
     if (full?.questions) {
-      const layout = await getSessionShuffleLayoutQuery(session.session_id)
+      const layout = await ensureSessionShuffleLayoutQuery(session.session_id, examId)
       payload.questions = applyLayoutToExamQuestions(full.questions, layout, { forStudent: true })
       const { questions, correctAnswer, _choicesMeta, ...examPublic } = full
       payload.exam = { ...examMeta, ...examPublic, code: examMeta.code }

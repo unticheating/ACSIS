@@ -61,9 +61,9 @@ import DiagramEditor from '@/components/exam/DiagramEditor.jsx'
 import {
   matchingPairsFromQuestion,
   parseMatchingStudentAnswer,
-  shuffleArray,
   stringifyMatchingStudentAnswer,
 } from '@/lib/matchingQuestion.js'
+import { applyLayoutToExamQuestions, buildShuffleLayout, shuffleArray } from '@/lib/examShuffle.js'
 import { diagramVariantFromQuestion, emptyDiagramData } from '@/lib/diagramQuestion.js'
 
 function questionTypeLabel(type) {
@@ -217,8 +217,16 @@ export default function StudentExamSessionPage() {
         const previewStr = localStorage.getItem('examPreviewData')
         if (!previewStr) throw new Error('No preview data')
         const previewData = JSON.parse(previewStr)
+        let previewQuestions = Array.isArray(previewData.questions) ? previewData.questions : []
+        if (previewData.shuffleQuestions || previewData.shuffleChoices) {
+          const layout = buildShuffleLayout(previewQuestions, {
+            shuffleQuestions: Boolean(previewData.shuffleQuestions),
+            shuffleChoices: Boolean(previewData.shuffleChoices),
+          })
+          previewQuestions = applyLayoutToExamQuestions(previewQuestions, layout)
+        }
         setNeedsPassword(false)
-        setHit({ exam: { ...previewData, status: 'open' } })
+        setHit({ exam: { ...previewData, questions: previewQuestions, status: 'open' } })
         setExamLocked(false)
         setMaxWarnings(resolveMaxWarnings(undefined, institutionMaxWarnings))
         setWarningCount(0)

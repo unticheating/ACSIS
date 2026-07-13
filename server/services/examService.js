@@ -25,7 +25,7 @@ import {
   getInstitutionDetailsByClassIdQuery,
   listClassEnrolledStudentEmailsQuery
 } from '../repositories/classRepository.js';
-import { getExamAssignmentAccessQuery } from '../repositories/examAssignmentRepository.js'
+import { getExamAssignmentAccessQuery, listAssignedStudentEmailsForExamQuery } from '../repositories/examAssignmentRepository.js'
 import { checkEnrollment } from '../repositories/studentRepository.js';
 import { EXAM_STATUS, nextStatusAfterClose, nextStatusAfterPublish } from '../lib/examStatus.js';
 import { generateExamPassword } from '../lib/examCodes.js';
@@ -396,10 +396,13 @@ export async function publishExamService(classId, examId, teacherMemberId = null
       return { ok: false, status: 404, error: 'Exam not found or you do not have permission.' };
     }
 
-    // Send emails to enrolled students about the upcoming exam
+    // Send emails about the upcoming exam (assigned students only when restricted)
     try {
       const institution = await getInstitutionDetailsByClassIdQuery(classId);
-      const students = await listClassEnrolledStudentEmailsQuery(classId);
+      const assignmentRecipients = await listAssignedStudentEmailsForExamQuery(examId, classId);
+      const students = assignmentRecipients.hasAssignments
+        ? assignmentRecipients.students
+        : await listClassEnrolledStudentEmailsQuery(classId);
       const emailPromises = students.map(student => {
         if (!student.email) return Promise.resolve();
         return sendUpcomingExamEmail({

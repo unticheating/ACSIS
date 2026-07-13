@@ -18,9 +18,11 @@ import { copyToClipboard } from '@/lib/copyToClipboard.js'
 import { sumExamTotalPoints } from '@/lib/examPoints.js'
 import {
   getScrollableParent,
+  getScrollTopForRoot,
   isDocumentScrollRoot,
   lockPageScroll,
   scrollElementToViewportOffset,
+  scrollRootTo,
 } from '@/lib/preservePageScroll.js'
 import {
   buildExamSectionsPayload,
@@ -35,13 +37,14 @@ import {
   joinIdentificationAnswersList,
   labelForFormType,
   labelForQuestionType,
+  normalizeIdentificationAnswer,
   questionMatchesSectionType,
   syncSectionTitles,
 } from '@/lib/questionTypes.js'
 import { boilerplateInstructionsForFormType } from '@/lib/examSectionInstructions.js'
 import SectionQuestionTypePicker from '@/components/exam/SectionQuestionTypePicker.jsx'
 import { QuestionTypeIcon } from '@/components/exam/QuestionTypeIcon.jsx'
-import ExamQuestionAnswerPresentation, {
+import {
   buildAnswerExplanationField,
   buildIdentificationQuestionFields,
 } from '@/components/teacher/ExamQuestionAnswerPresentation.jsx'
@@ -61,6 +64,7 @@ import {
   serializeMatchingPairs,
 } from '@/lib/matchingQuestion.js'
 import { DEFAULT_DIAGRAM_VARIANT, emptyDiagramData } from '@/lib/diagramQuestion.js'
+import { applyLayoutToExamQuestions, buildShuffleLayout } from '@/lib/examShuffle.js'
 import '../../pages/teacher-ui/create_exam.css'
 import '../../pages/teacher-ui/my_classes.css'
 
@@ -70,6 +74,17 @@ function emptyMatchingPairsState() {
 
 function emptyMc() {
   return { opt1: '', opt2: '', opt3: '', opt4: '', correct: '' }
+}
+
+function mergeIdentificationAcceptableAnswers(answers, draft = '') {
+  const merged = Array.isArray(answers) ? [...answers] : []
+  const norm = normalizeIdentificationAnswer(draft)
+  if (norm && !merged.includes(norm)) merged.push(norm)
+  return merged
+}
+
+function identificationAcceptableAnswersRaw(answers, draft = '') {
+  return joinIdentificationAnswersList(mergeIdentificationAcceptableAnswers(answers, draft))
 }
 
 const INITIAL_EXAM_SECTION = newSection(1)
@@ -280,7 +295,8 @@ export default function TeacherCreateExamPage() {
   const [questionText, setQuestionText] = useState('')
   const [questionPoints, setQuestionPoints] = useState('1')
   const [mc, setMc] = useState(emptyMc)
-  const [identAcceptableAnswers, setIdentAcceptableAnswers] = useState('')
+  const [identAcceptableAnswers, setIdentAcceptableAnswers] = useState([])
+  const [identAcceptableDraft, setIdentAcceptableDraft] = useState('')
   const [identPresentationAnswer, setIdentPresentationAnswer] = useState('')
   const [answerExplanation, setAnswerExplanation] = useState('')
   const [tfAnswer, setTfAnswer] = useState('')
@@ -292,6 +308,7 @@ export default function TeacherCreateExamPage() {
   const [diagramReference, setDiagramReference] = useState(emptyDiagramData())
   const [questionImage, setQuestionImage] = useState(null) // base64 data URI
   const imageInputRef = useRef(null)
+  const identAcceptableInputRef = useRef(null)
 
   function handleImageUpload(e) {
     const file = e.target.files?.[0]
@@ -323,8 +340,11 @@ export default function TeacherCreateExamPage() {
   const allowLeaveRef = useRef(false)
   const snapshotBaselineReadyRef = useRef(false)
   const [composingQuestionSectionId, setComposingQuestionSectionId] = useState(null)
+  const [composeInsertIndex, setComposeInsertIndex] = useState(/** @type {number | null} */ (null))
   const [editingQuestion, setEditingQuestion] = useState(/** @type {{ sectionId: string, questionId: string } | null} */ (null))
   const editPanelRef = useRef(null)
+  const saveQuestionRef = useRef(/** @type {(() => void) | null} */ (null))
+  const scrollBeforeEditRef = useRef(/** @type {{ root: Element, top: number } | null} */ (null))
   const scrollSpyPausedRef = useRef(false)
   const scrollSpyPauseTimerRef = useRef(null)
   const scrollSpyRafRef = useRef(null)
@@ -346,7 +366,8 @@ export default function TeacherCreateExamPage() {
 
   const resetAnswerFields = useCallback(() => {
     resetMc()
-    setIdentAcceptableAnswers('')
+    setIdentAcceptableAnswers([])
+    setIdentAcceptableDraft('')
     setIdentPresentationAnswer('')
     setAnswerExplanation('')
     setTfAnswer('')
@@ -367,22 +388,70 @@ export default function TeacherCreateExamPage() {
     if (imageInputRef.current) imageInputRef.current.value = ''
   }, [resetAnswerFields])
 
+  const addIdentAcceptableAnswer = useCallback((raw) => {
+    const norm = normalizeIdentificationAnswer(raw)
+    if (!norm) return
+    setIdentAcceptableAnswers((prev) => (prev.includes(norm) ? prev : [...prev, norm]))
+  }, [])
+
+  const commitIdentAcceptableDraft = useCallback(() => {
+    setIdentAcceptableDraft((draft) => {
+      const norm = normalizeIdentificationAnswer(draft)
+      if (norm) {
+        setIdentAcceptableAnswers((prev) => (prev.includes(norm) ? prev : [...prev, norm]))
+      }
+      return ''
+    })
+  }, [])
+
+  const removeIdentAcceptableAnswer = useCallback((answer) => {
+    setIdentAcceptableAnswers((prev) => prev.filter((item) => item !== answer))
+  }, [])
+
+  const removeLastIdentAcceptableAnswer = useCallback(() => {
+    setIdentAcceptableAnswers((prev) => (prev.length ? prev.slice(0, -1) : prev))
+  }, [])
+
   function cancelComposeQuestion() {
     setComposingQuestionSectionId(null)
+    setComposeInsertIndex(null)
     resetQuestionForm()
   }
 
-  function beginAddQuestion(sectionId) {
+  function beginAddQuestion(sectionId, insertIndex = null) {
     pauseScrollSpy()
     setActiveSectionId(sectionId)
     const section = sections.find((sec) => sec.id === sectionId)
     if (section?.questionType) setQuestionType(section.questionType)
     setEditingQuestion(null)
     resetQuestionForm()
+    setComposeInsertIndex(insertIndex)
     setComposingQuestionSectionId(sectionId)
+    window.requestAnimationFrame(() => {
+      editPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    })
+  }
+
+  function captureScrollBeforeEdit() {
+    const anchor =
+      document.querySelector('.exam-builder-page__body') ||
+      document.querySelector('.exam-builder-panel--questions') ||
+      document.body
+    const root = getScrollableParent(anchor)
+    scrollBeforeEditRef.current = { root, top: getScrollTopForRoot(root) }
+  }
+
+  function restoreScrollBeforeEdit() {
+    const snapshot = scrollBeforeEditRef.current
+    if (!snapshot) return
+    window.requestAnimationFrame(() => {
+      scrollRootTo(snapshot.root, snapshot.top, 'auto')
+      scrollBeforeEditRef.current = null
+    })
   }
 
   function beginEditQuestion(sectionId, q) {
+    captureScrollBeforeEdit()
     const formType = formTypeFromQuestionType(q.type)
     setActiveSectionId(sectionId)
     setComposingQuestionSectionId(null)
@@ -401,7 +470,8 @@ export default function TeacherCreateExamPage() {
         correct: correctIdx >= 0 ? String(correctIdx + 1) : '',
       })
       setQuestionPoints(String(q.points ?? 1))
-      setIdentAcceptableAnswers('')
+      setIdentAcceptableAnswers([])
+      setIdentAcceptableDraft('')
       setIdentPresentationAnswer('')
       setAnswerExplanation(q.answerExplanation || '')
       setTfAnswer('')
@@ -411,7 +481,8 @@ export default function TeacherCreateExamPage() {
       setQuestionPoints(String(q.points ?? 1))
       resetMc()
       const { acceptable, presentation } = identificationDisplayFromQuestion(q)
-      setIdentAcceptableAnswers(joinIdentificationAnswersList(acceptable))
+      setIdentAcceptableAnswers(acceptable)
+      setIdentAcceptableDraft('')
       setIdentPresentationAnswer(presentation)
       setAnswerExplanation(q.answerExplanation || '')
       setTfAnswer('')
@@ -420,7 +491,8 @@ export default function TeacherCreateExamPage() {
     } else if (formType === 'truefalse') {
       setQuestionPoints(String(q.points ?? 1))
       resetMc()
-      setIdentAcceptableAnswers('')
+      setIdentAcceptableAnswers([])
+      setIdentAcceptableDraft('')
       setIdentPresentationAnswer('')
       setAnswerExplanation(q.answerExplanation || '')
       setTfAnswer(q.correctAnswer === 'True' ? 'true' : q.correctAnswer === 'False' ? 'false' : '')
@@ -429,7 +501,8 @@ export default function TeacherCreateExamPage() {
     } else if (formType === 'coding') {
       setQuestionPoints(String(q.points ?? 1))
       resetMc()
-      setIdentAcceptableAnswers('')
+      setIdentAcceptableAnswers([])
+      setIdentAcceptableDraft('')
       setIdentPresentationAnswer('')
       setAnswerExplanation(q.answerExplanation || '')
       setTfAnswer('')
@@ -442,7 +515,8 @@ export default function TeacherCreateExamPage() {
     } else if (formType === 'matching') {
       setQuestionPoints(String(q.points ?? 1))
       resetMc()
-      setIdentAcceptableAnswers('')
+      setIdentAcceptableAnswers([])
+      setIdentAcceptableDraft('')
       setIdentPresentationAnswer('')
       setAnswerExplanation(q.answerExplanation || '')
       setTfAnswer('')
@@ -455,7 +529,8 @@ export default function TeacherCreateExamPage() {
     } else if (formType === 'essay') {
       setQuestionPoints(String(q.points ?? 1))
       resetMc()
-      setIdentAcceptableAnswers('')
+      setIdentAcceptableAnswers([])
+      setIdentAcceptableDraft('')
       setIdentPresentationAnswer('')
       setAnswerExplanation(q.answerExplanation || '')
       setTfAnswer('')
@@ -468,7 +543,8 @@ export default function TeacherCreateExamPage() {
     } else if (formType === 'diagramming') {
       setQuestionPoints(String(q.points ?? 1))
       resetMc()
-      setIdentAcceptableAnswers('')
+      setIdentAcceptableAnswers([])
+      setIdentAcceptableDraft('')
       setIdentPresentationAnswer('')
       setAnswerExplanation(q.answerExplanation || '')
       setTfAnswer('')
@@ -488,17 +564,11 @@ export default function TeacherCreateExamPage() {
     })
   }
 
-  useEffect(() => {
-    if (!editingQuestion) return undefined
-    const timer = window.setTimeout(() => {
-      editPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-    }, 50)
-    return () => window.clearTimeout(timer)
-  }, [editingQuestion])
-
   function cancelEditQuestion() {
     resetQuestionForm()
     setComposingQuestionSectionId(null)
+    setComposeInsertIndex(null)
+    restoreScrollBeforeEdit()
   }
 
   function saveQuestion() {
@@ -534,12 +604,12 @@ export default function TeacherCreateExamPage() {
       options = opts
     } else if (effectiveQuestionType === 'identification') {
       const identFields = buildIdentificationQuestionFields(
-        identAcceptableAnswers,
+        identificationAcceptableAnswersRaw(identAcceptableAnswers, identAcceptableDraft),
         identPresentationAnswer,
         answerExplanation,
       )
       if (!identFields.correctAnswer) {
-        acsisToastError('Enter at least one acceptable answer (comma-separated).')
+        acsisToastError('Enter at least one acceptable answer.')
         return
       }
       correctAnswer = identFields.correctAnswer
@@ -585,7 +655,7 @@ export default function TeacherCreateExamPage() {
       imageUrl: questionImage || null,
       ...(effectiveQuestionType === 'identification'
         ? buildIdentificationQuestionFields(
-            identAcceptableAnswers,
+            identificationAcceptableAnswersRaw(identAcceptableAnswers, identAcceptableDraft),
             identPresentationAnswer,
             answerExplanation,
           )
@@ -662,6 +732,7 @@ export default function TeacherCreateExamPage() {
         setActiveSectionId(targetSection.id)
       }
       acsisToastSuccess('Question updated.')
+      restoreScrollBeforeEdit()
     } else {
       const targetSection = sections.find((sec) => sec.id === activeSectionId) || sections[sections.length - 1]
       if (!targetSection) {
@@ -678,13 +749,22 @@ export default function TeacherCreateExamPage() {
           sec.id === targetSection.id
             ? {
                 ...sec,
-                questions: [
-                  ...sec.questions,
-                  {
+                questions: (() => {
+                  const newQuestion = {
                     id: newLocalQuestionId(),
                     ...questionPayload,
-                  },
-                ],
+                  }
+                  if (
+                    composingQuestionSectionId === targetSection.id &&
+                    composeInsertIndex != null &&
+                    composeInsertIndex < sec.questions.length
+                  ) {
+                    const next = [...sec.questions]
+                    next.splice(composeInsertIndex, 0, newQuestion)
+                    return next
+                  }
+                  return [...sec.questions, newQuestion]
+                })(),
               }
             : sec,
         ),
@@ -693,7 +773,47 @@ export default function TeacherCreateExamPage() {
 
     resetQuestionForm()
     setComposingQuestionSectionId(null)
+    setComposeInsertIndex(null)
   }
+
+  saveQuestionRef.current = saveQuestion
+
+  useEffect(() => {
+    if (!editingQuestion && !composingQuestionSectionId) return undefined
+
+    function handleMouseDown(event) {
+      const target = event.target
+      if (!(target instanceof Node)) return
+      if (editPanelRef.current?.contains(target)) return
+      if (target instanceof Element && target.closest('.exam-builder-question__actions')) return
+      if (target instanceof Element && target.closest('.exam-builder-question__grip')) return
+      saveQuestionRef.current?.()
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        if (editingQuestion) cancelEditQuestion()
+        else cancelComposeQuestion()
+        return
+      }
+      if (event.key !== 'Enter' || event.shiftKey) return
+      const target = event.target
+      if (target instanceof HTMLTextAreaElement) return
+      if (target instanceof HTMLInputElement) return
+      if (target instanceof Element && target.closest('.monaco-editor')) return
+      if (target instanceof HTMLSelectElement) return
+      event.preventDefault()
+      saveQuestionRef.current?.()
+    }
+
+    document.addEventListener('mousedown', handleMouseDown)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', handleMouseDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [editingQuestion, composingQuestionSectionId])
 
   async function deleteQuestion(sectionId, questionId) {
     const ok = await confirm({
@@ -1574,21 +1694,9 @@ export default function TeacherCreateExamPage() {
       return (
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label>Acceptable answers (comma-separated)</Label>
+            <Label htmlFor="ident-presentation-answer">Presentation answer</Label>
             <Input
-              type="text"
-              placeholder="e.g. PARIS, PARIS FRANCE, FRANCE"
-              value={identAcceptableAnswers}
-              onChange={(e) => setIdentAcceptableAnswers(e.target.value)}
-              spellCheck={false}
-            />
-            <p className="text-xs text-muted-foreground">
-              Separate each valid answer with a comma. All are counted correct when grading.
-            </p>
-          </div>
-          <div className="space-y-2">
-            <Label>Presentation answer</Label>
-            <Input
+              id="ident-presentation-answer"
               type="text"
               placeholder="Answer shown in the answer key (ultimate answer)"
               value={identPresentationAnswer}
@@ -1597,8 +1705,61 @@ export default function TeacherCreateExamPage() {
               spellCheck={false}
               style={{ textTransform: 'uppercase' }}
             />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="ident-acceptable-answers">Acceptable answers</Label>
+            <div
+              className="exam-builder-ident-pills flex min-h-[44px] w-full flex-wrap items-center gap-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-within:outline-none"
+              onClick={() => identAcceptableInputRef.current?.focus()}
+            >
+              {identAcceptableAnswers.map((answer) => (
+                <span key={answer} className="exam-builder-ident-pill">
+                  <span className="exam-builder-ident-pill__text">{answer}</span>
+                  <button
+                    type="button"
+                    className="exam-builder-ident-pill__remove"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      removeIdentAcceptableAnswer(answer)
+                    }}
+                    aria-label={`Remove ${answer}`}
+                  >
+                    <X size={12} aria-hidden />
+                  </button>
+                </span>
+              ))}
+              <input
+                id="ident-acceptable-answers"
+                ref={identAcceptableInputRef}
+                type="text"
+                className="exam-builder-ident-pills__input"
+                placeholder={identAcceptableAnswers.length ? 'Add another…' : 'Type an answer, press Enter'}
+                value={identAcceptableDraft}
+                onChange={(e) => setIdentAcceptableDraft(e.target.value.toUpperCase())}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    commitIdentAcceptableDraft()
+                  } else if (e.key === 'Backspace' && !identAcceptableDraft) {
+                    removeLastIdentAcceptableAnswer()
+                  }
+                }}
+                onBlur={commitIdentAcceptableDraft}
+                onPaste={(e) => {
+                  const text = e.clipboardData?.getData('text')
+                  if (!text || !/[,\s]/.test(text)) return
+                  e.preventDefault()
+                  for (const part of text.split(/[,\s]+/)) {
+                    addIdentAcceptableAnswer(part)
+                  }
+                }}
+                spellCheck={false}
+                autoCapitalize="characters"
+                style={{ textTransform: 'uppercase' }}
+              />
+            </div>
             <p className="text-xs text-muted-foreground">
-              Leave blank to use the first acceptable answer.
+              Press Enter after each answer. Hover a pill to remove it.
             </p>
           </div>
         </div>
@@ -1717,7 +1878,12 @@ export default function TeacherCreateExamPage() {
     diagramVariant,
     essayRubric,
     identAcceptableAnswers,
+    identAcceptableDraft,
     identPresentationAnswer,
+    addIdentAcceptableAnswer,
+    commitIdentAcceptableDraft,
+    removeIdentAcceptableAnswer,
+    removeLastIdentAcceptableAnswer,
     matchingPairs,
     mc,
     questionType,
@@ -1726,95 +1892,77 @@ export default function TeacherCreateExamPage() {
     codingLanguage,
   ])
 
-  const renderQuestionForm = (isEditing, composeSection = null) => (
+  const renderQuestionForm = (isEditing, composeSection = null) => {
+    const lockedFormType =
+      composeSection?.questionType ||
+      (isEditing && editingQuestion
+        ? sections.find((sec) => sec.id === editingQuestion.sectionId)?.questionType
+        : null) ||
+      activeSection?.questionType ||
+      questionType
+
+    return (
     <div className={`exam-builder-panel__body space-y-6${isEditing ? ' exam-builder-inline-editor__body' : ''}`}>
-      <div className="grid md:grid-cols-3 gap-6">
-        <div className="space-y-6 md:col-span-2">
-          <div className="grid grid-cols-2 gap-6">
-            {isEditing ? (
-              <div className="space-y-2">
-                <Label>Question Type</Label>
-                <select
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  value={questionType}
-                  onChange={(e) => {
-                    setQuestionType(e.target.value)
-                    resetAnswerFields()
-                  }}
-                >
-                  <option value="multiple">Multiple Choice</option>
-                  <option value="identification">Identification</option>
-                  <option value="truefalse">True / False</option>
-                  <option value="coding">Coding / Scripting</option>
-                  <option value="matching">Matching</option>
-                  <option value="essay">Essay / Paragraph</option>
-                  <option value="diagramming">Diagramming</option>
-                </select>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <Label>Question Type</Label>
-                <div className="exam-builder-set-type-locked flex h-10 items-center gap-2 rounded-md border border-input bg-muted/40 px-3 text-sm font-medium">
-                  <QuestionTypeIcon
-                    formType={composeSection?.questionType || activeSection?.questionType || questionType}
-                    size={16}
-                    className="text-primary"
-                  />
-                  <span>
-                    {labelForFormType(composeSection?.questionType || activeSection?.questionType || questionType)}
-                  </span>
-                </div>
-              </div>
-            )}
-            <div className="space-y-2">
-              <Label>Points</Label>
-              <Input
-                type="number"
-                min="1"
-                value={questionPoints}
-                onChange={(e) => setQuestionPoints(e.target.value)}
-              />
+      {isEditing ? null : (
+        <div className="grid grid-cols-2 gap-6">
+          <div className="space-y-2">
+            <Label>Question Type</Label>
+            <div className="exam-builder-set-type-locked flex h-10 items-center gap-2 rounded-md border border-input bg-muted/40 px-3 text-sm font-medium">
+              <QuestionTypeIcon formType={lockedFormType} size={16} className="text-primary" />
+              <span>{labelForFormType(lockedFormType)}</span>
             </div>
           </div>
           <div className="space-y-2">
-            <Label>Question Text</Label>
-            <textarea
-              rows={5}
-              className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 min-h-[120px]"
-              placeholder="Enter your question here..."
-              value={questionText}
-              onChange={(e) => setQuestionText(e.target.value)}
-              onPaste={(e) => {
-                const items = e.clipboardData?.items;
-                if (!items) return;
-                for (let i = 0; i < items.length; i++) {
-                  if (items[i].type.indexOf('image') !== -1) {
-                    const file = items[i].getAsFile();
-                    if (file) {
-                      const reader = new FileReader()
-                      reader.onload = (ev) => setQuestionImage(ev.target.result)
-                      reader.readAsDataURL(file)
-                      break;
-                    }
-                  }
-                }
-              }}
+            <Label>Points</Label>
+            <Input
+              type="number"
+              min="1"
+              value={questionPoints}
+              onChange={(e) => setQuestionPoints(e.target.value)}
             />
           </div>
         </div>
+      )}
 
-        {/* Image Attachment */}
-        <div className="space-y-2 md:col-span-1">
-          <Label className="flex items-center gap-1.5">
-            <ImageIcon size={14} className="text-muted-foreground" />
+      <div className="exam-builder-question-media">
+        <div className="exam-builder-question-media__field exam-builder-question-media__field--text">
+          <Label htmlFor="question-text-input">Question Text</Label>
+          <textarea
+            id="question-text-input"
+            rows={4}
+            className="exam-builder-question-media__textarea"
+            placeholder="Enter your question here..."
+            value={questionText}
+            onChange={(e) => setQuestionText(e.target.value)}
+            onPaste={(e) => {
+              const items = e.clipboardData?.items;
+              if (!items) return;
+              for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                  const file = items[i].getAsFile();
+                  if (file) {
+                    const reader = new FileReader()
+                    reader.onload = (ev) => setQuestionImage(ev.target.result)
+                    reader.readAsDataURL(file)
+                    break;
+                  }
+                }
+              }
+            }}
+          />
+        </div>
+
+        <div className="exam-builder-question-media__field exam-builder-question-media__field--image">
+          <Label htmlFor="question-image-input" className="exam-builder-question-media__image-label">
+            <ImageIcon size={14} className="text-muted-foreground" aria-hidden />
             Attach Image <span className="font-normal text-muted-foreground">(max 2 MB)</span>
           </Label>
           {questionImage ? (
-            <div className="relative inline-block w-full">
+            <div className="exam-builder-question-media__image-preview">
               <img
                 src={questionImage}
                 alt="Question attachment"
-                className="max-h-48 max-w-full w-full rounded-lg border border-border object-contain bg-muted"
+                className="exam-builder-question-media__image-preview-img"
               />
               <button
                 type="button"
@@ -1830,7 +1978,7 @@ export default function TeacherCreateExamPage() {
             </div>
           ) : (
             <div
-              className="flex items-center justify-center border-2 border-dashed border-border rounded-lg p-6 cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all h-[calc(100%-1.5rem)] min-h-[140px]"
+              className="exam-builder-question-media__dropzone"
               onClick={() => imageInputRef.current?.click()}
               onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
               onDrop={(e) => {
@@ -1857,6 +2005,7 @@ export default function TeacherCreateExamPage() {
             </div>
           )}
           <input
+            id="question-image-input"
             ref={imageInputRef}
             type="file"
             accept="image/*"
@@ -1878,20 +2027,101 @@ export default function TeacherCreateExamPage() {
         />
       </div>
       <div className="flex flex-wrap gap-2">
-        <Button onClick={saveQuestion} className="w-full md:w-auto">
-          {isEditing ? <Pencil size={16} className="mr-2" /> : <Plus size={16} className="mr-2" />}
-          {isEditing ? 'Update question' : 'Save question'}
-        </Button>
         {isEditing ? (
-          <Button type="button" variant="outline" onClick={cancelEditQuestion} className="w-full md:w-auto">
-            Cancel edit
-          </Button>
+          <p className="text-xs text-muted-foreground w-full">
+            Click outside or press Enter to save · Esc to cancel
+          </p>
         ) : (
-          <Button type="button" variant="outline" onClick={cancelComposeQuestion} className="w-full md:w-auto">
-            Cancel
-          </Button>
+          <>
+            <Button onClick={saveQuestion} className="w-full md:w-auto">
+              <Plus size={16} className="mr-2" />
+              Save question
+            </Button>
+            <Button type="button" variant="outline" onClick={cancelComposeQuestion} className="w-full md:w-auto">
+              Cancel
+            </Button>
+          </>
         )}
       </div>
+    </div>
+    )
+  }
+
+  const renderComposeQuestionCard = (sec, insertIndex) => (
+    <div className="exam-builder-question exam-builder-question--editing exam-builder-question--composing group">
+      <div className="exam-builder-question__grip" aria-hidden>
+        <span className="exam-builder-question__num">+</span>
+      </div>
+      <div className="exam-builder-question__content">
+        <div className="flex justify-between items-start gap-4">
+          <div className="min-w-0 flex-1">
+            <h3
+              className={`font-medium leading-relaxed whitespace-pre-wrap line-clamp-4 ${
+                questionText.trim() ? 'text-foreground' : 'text-muted-foreground italic'
+              }`}
+            >
+              {questionText.trim() || 'New question'}
+            </h3>
+          </div>
+          <div className="exam-builder-question__actions flex items-center gap-1 shrink-0">
+            <div className="exam-builder-question__points-field">
+              <label
+                htmlFor={`compose-question-points-${sec.id}-${insertIndex ?? 'end'}`}
+                className="exam-builder-question__points-label"
+              >
+                Points
+              </label>
+              <Input
+                id={`compose-question-points-${sec.id}-${insertIndex ?? 'end'}`}
+                type="number"
+                min="1"
+                value={questionPoints}
+                onChange={(e) => setQuestionPoints(e.target.value)}
+                className="exam-builder-question__points-input h-8 w-14 px-2 text-center text-xs font-semibold"
+              />
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={cancelComposeQuestion}
+              className="text-muted-foreground hover:text-foreground"
+              aria-label="Cancel new question"
+            >
+              <X size={18} />
+            </Button>
+          </div>
+        </div>
+        <div ref={editPanelRef} className="exam-builder-inline-editor">
+          <div className="exam-builder-inline-editor__head">
+            <Plus size={15} aria-hidden />
+            <span>New question</span>
+          </div>
+          {renderQuestionForm(true, sec)}
+        </div>
+      </div>
+    </div>
+  )
+
+  const renderQuestionInsertSlot = (onClick, ariaLabel, { leading = false } = {}) => (
+    <div
+      className={`exam-builder-question-insert-slot${
+        leading ? ' exam-builder-question-insert-slot--leading' : ''
+      }`}
+    >
+      <button
+        type="button"
+        className="exam-builder-question-insert"
+        onClick={onClick}
+        aria-label={ariaLabel}
+      >
+        <span className="exam-builder-question-insert__content">
+          <span className="exam-builder-question-insert__line" aria-hidden />
+          <span className="exam-builder-question-insert__icon" aria-hidden>
+            <Plus size={16} strokeWidth={2.5} />
+          </span>
+          <span className="exam-builder-question-insert__line" aria-hidden />
+        </span>
+      </button>
     </div>
   )
 
@@ -1948,7 +2178,19 @@ export default function TeacherCreateExamPage() {
 
   function handlePreview() {
     const payload = buildExamSectionsPayload(sections)
-    const flatQuestions = payload.flatMap((sec) => sec.questions.map(q => ({ ...q, sectionId: sec.id, sectionTitle: sec.title, sectionDescription: sec.description })))
+    const flatQuestions = payload.flatMap((sec) =>
+      sec.questions.map((q) => ({
+        ...q,
+        sectionId: sec.id,
+        sectionTitle: sec.title,
+        sectionDescription: sec.description,
+      })),
+    )
+    let previewQuestions = flatQuestions
+    if (shuffleQuestions || shuffleChoices) {
+      const layout = buildShuffleLayout(flatQuestions, { shuffleQuestions, shuffleChoices })
+      previewQuestions = applyLayoutToExamQuestions(flatQuestions, layout)
+    }
     const previewData = {
       title: examTitle || 'Untitled Exam',
       description: examDescription,
@@ -1956,7 +2198,9 @@ export default function TeacherCreateExamPage() {
       scheduledEnd: null,
       status: 'open',
       sections: payload,
-      questions: flatQuestions
+      questions: previewQuestions,
+      shuffleQuestions,
+      shuffleChoices,
     }
     localStorage.setItem('examPreviewData', JSON.stringify(previewData))
     window.open('/student/exam/session?classId=preview&examId=preview', '_blank')
@@ -2485,6 +2729,9 @@ export default function TeacherCreateExamPage() {
                           <p className="exam-builder-panel__subtitle">
                             {sec.questions.length}{' '}
                             {sec.questions.length === 1 ? 'question' : 'questions'} in this set
+                            {sec.questions.length > 0
+                              ? ` · ${sumExamTotalPoints(sec.questions)} pts total`
+                              : ''}
                           </p>
                         </div>
                         <div className="flex items-center gap-2 flex-wrap justify-end">
@@ -2535,7 +2782,7 @@ export default function TeacherCreateExamPage() {
                                 sec.questions.length === 0 ? ' exam-builder-question-list--empty' : ''
                               }${snapshot.isDraggingOver ? ' exam-builder-question-list--drop-target' : ''}`}
                             >
-                              {sec.questions.length === 0 && (
+                              {sec.questions.length === 0 && composingQuestionSectionId !== sec.id && (
                                 <p
                                   className={`exam-builder-empty-hint${
                                     snapshot.isDraggingOver ? ' exam-builder-empty-hint--drop' : ''
@@ -2546,10 +2793,31 @@ export default function TeacherCreateExamPage() {
                                     : `Drag ${labelForFormType(sec.questionType)} questions here from another set of the same type`}
                                 </p>
                               )}
+                              {sec.questions.length === 0 &&
+                              composingQuestionSectionId === sec.id &&
+                              !editingQuestion ? (
+                                <div className="exam-builder-question-wrap exam-builder-question-wrap--composer">
+                                  {renderComposeQuestionCard(sec, 0)}
+                                </div>
+                              ) : null}
                               {sec.questions.map((q, index) => {
                                 const isEditingThis =
                                   editingQuestion?.sectionId === sec.id &&
                                   editingQuestion?.questionId === String(q.id)
+                                const showInsertSlots =
+                                  !editingQuestion &&
+                                  composingQuestionSectionId !== sec.id &&
+                                  draggingQuestionType == null &&
+                                  !snapshot.isDraggingOver
+                                const showComposerHere =
+                                  composingQuestionSectionId === sec.id &&
+                                  !editingQuestion &&
+                                  composeInsertIndex === index
+                                const showComposerAtEnd =
+                                  composingQuestionSectionId === sec.id &&
+                                  !editingQuestion &&
+                                  (composeInsertIndex == null || composeInsertIndex >= sec.questions.length) &&
+                                  index === sec.questions.length - 1
                                 return (
                                 <Draggable key={q.id} draggableId={String(q.id)} index={index}>
                                   {(provided, snapshot) => (
@@ -2557,10 +2825,21 @@ export default function TeacherCreateExamPage() {
                                       ref={provided.innerRef}
                                       {...provided.draggableProps}
                                       style={provided.draggableProps.style}
-                                      className={`exam-builder-question group${
-                                        snapshot.isDragging ? ' exam-builder-question--dragging' : ''
-                                      }${isEditingThis ? ' exam-builder-question--editing' : ''}`}
+                                      className="exam-builder-question-wrap"
                                     >
+                                      {index === 0 && showInsertSlots
+                                        ? renderQuestionInsertSlot(
+                                            () => beginAddQuestion(sec.id, 0),
+                                            'Add question at start of set',
+                                            { leading: true },
+                                          )
+                                        : null}
+                                      {showComposerHere ? renderComposeQuestionCard(sec, index) : null}
+                                      <div
+                                        className={`exam-builder-question group${
+                                          snapshot.isDragging ? ' exam-builder-question--dragging' : ''
+                                        }${isEditingThis ? ' exam-builder-question--editing' : ''}`}
+                                      >
                                       <div
                                         {...provided.dragHandleProps}
                                         className="exam-builder-question__grip"
@@ -2568,17 +2847,73 @@ export default function TeacherCreateExamPage() {
                                         <span className="exam-builder-question__num">{qOffset + index + 1}</span>
                                         <GripVertical size={16} />
                                       </div>
-                                      <div className="exam-builder-question__content">
+                                      <div
+                                        className={`exam-builder-question__content${
+                                          isEditingThis ? '' : ' exam-builder-question__content--clickable'
+                                        }`}
+                                        onClick={
+                                          isEditingThis
+                                            ? undefined
+                                            : (event) => {
+                                                if (event.target instanceof Element && event.target.closest('button')) {
+                                                  return
+                                                }
+                                                beginEditQuestion(sec.id, q)
+                                              }
+                                        }
+                                        onKeyDown={
+                                          isEditingThis
+                                            ? undefined
+                                            : (event) => {
+                                                if (event.key === 'Enter' || event.key === ' ') {
+                                                  event.preventDefault()
+                                                  beginEditQuestion(sec.id, q)
+                                                }
+                                              }
+                                        }
+                                        role={isEditingThis ? undefined : 'button'}
+                                        tabIndex={isEditingThis ? undefined : 0}
+                                        aria-label={
+                                          isEditingThis
+                                            ? undefined
+                                            : `Edit question ${qOffset + index + 1}: ${q.question}`
+                                        }
+                                      >
                                         <div className="flex justify-between items-start gap-4">
-                                          <div>
+                                          <div className="min-w-0 flex-1">
                                             <h3 className="font-medium text-foreground leading-relaxed whitespace-pre-wrap line-clamp-4" title={q.question}>
                                               {q.question}
                                             </h3>
-                                            <p className="text-xs text-muted-foreground mt-1">
-                                              {q.points ?? 1} pts · {labelForQuestionType(q.type)}
-                                            </p>
                                           </div>
-                                          <div className="flex items-center gap-1 shrink-0">
+                                          <div
+                                            className="exam-builder-question__actions flex items-center gap-1 shrink-0"
+                                            onMouseDown={(event) => {
+                                              if (isEditingThis) event.stopPropagation()
+                                            }}
+                                          >
+                                            {isEditingThis ? (
+                                              <div
+                                                className="exam-builder-question__points-field"
+                                                onClick={(event) => event.stopPropagation()}
+                                                onMouseDown={(event) => event.stopPropagation()}
+                                              >
+                                                <label
+                                                  htmlFor={`question-points-${q.id}`}
+                                                  className="exam-builder-question__points-label"
+                                                >
+                                                  Points
+                                                </label>
+                                                <Input
+                                                  id={`question-points-${q.id}`}
+                                                  type="number"
+                                                  min="1"
+                                                  value={questionPoints}
+                                                  onChange={(e) => setQuestionPoints(e.target.value)}
+                                                  onKeyDown={(event) => event.stopPropagation()}
+                                                  className="exam-builder-question__points-input h-8 w-14 px-2 text-center text-xs font-semibold"
+                                                />
+                                              </div>
+                                            ) : null}
                                             <Button
                                               variant="ghost"
                                               size="icon"
@@ -2587,20 +2922,6 @@ export default function TeacherCreateExamPage() {
                                               aria-label="Duplicate question"
                                             >
                                               <Copy size={17} />
-                                            </Button>
-                                            <Button
-                                              variant="ghost"
-                                              size="icon"
-                                              onClick={() => beginEditQuestion(sec.id, q)}
-                                              className={`text-muted-foreground hover:text-primary hover:bg-primary/10 transition-opacity ${
-                                                isEditingThis
-                                                  ? 'text-primary bg-primary/10 opacity-100'
-                                                  : 'opacity-100 md:opacity-0 md:group-hover:opacity-100'
-                                              }`}
-                                              aria-label="Edit question"
-                                              aria-pressed={isEditingThis}
-                                            >
-                                              <Pencil size={17} />
                                             </Button>
                                             <Button
                                               variant="ghost"
@@ -2622,17 +2943,23 @@ export default function TeacherCreateExamPage() {
                                             />
                                           </div>
                                         )}
-                                        <div className="mt-3">
-                                          <span className="exam-builder-type-badge">
-                                            <QuestionTypeIcon type={q.type} size={12} className="mr-1" />
-                                            {labelForQuestionType(q.type)}
-                                          </span>
-                                        </div>
-                                        <ExamQuestionAnswerPresentation question={q} className="mt-3" />
+                                        {!isEditingThis ? (
+                                          <div className="mt-3">
+                                            <span className="exam-builder-type-badge">
+                                              <QuestionTypeIcon type={q.type} size={12} className="mr-1" />
+                                              {labelForQuestionType(q.type)}
+                                              <span className="exam-builder-type-badge__points">
+                                                {Number(q.points ?? 1) || 1}pt
+                                              </span>
+                                            </span>
+                                          </div>
+                                        ) : null}
                                         {isEditingThis ? (
                                           <div
                                             ref={editPanelRef}
                                             className="exam-builder-inline-editor"
+                                            onClick={(event) => event.stopPropagation()}
+                                            onMouseDown={(event) => event.stopPropagation()}
                                           >
                                             <div className="exam-builder-inline-editor__head">
                                               <Pencil size={15} aria-hidden />
@@ -2642,6 +2969,14 @@ export default function TeacherCreateExamPage() {
                                           </div>
                                         ) : null}
                                       </div>
+                                      </div>
+                                      {showInsertSlots
+                                        ? renderQuestionInsertSlot(
+                                            () => beginAddQuestion(sec.id, index + 1),
+                                            `Add question after question ${qOffset + index + 1}`,
+                                          )
+                                        : null}
+                                      {showComposerAtEnd ? renderComposeQuestionCard(sec, sec.questions.length) : null}
                                     </div>
                                   )}
                                 </Draggable>
@@ -2651,24 +2986,6 @@ export default function TeacherCreateExamPage() {
                             </div>
                           )}
                         </Droppable>
-                        {composingQuestionSectionId === sec.id && !editingQuestion ? (
-                          <section className="exam-builder-panel exam-builder-panel--composer exam-builder-panel--active mt-4">
-                            <div className="exam-builder-panel__head">
-                              <div>
-                                <p className="exam-builder-panel__title">New question</p>
-                              </div>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={cancelComposeQuestion}
-                                className="text-muted-foreground hover:text-foreground"
-                              >
-                                <X size={16} />
-                              </Button>
-                            </div>
-                            {renderQuestionForm(false, sec)}
-                          </section>
-                        ) : null}
                       </div>
                     </section>
                   </div>
