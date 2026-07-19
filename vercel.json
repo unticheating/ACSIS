@@ -1,5 +1,18 @@
 {
   "version": 2,
+  "redirects": [
+    {
+      "source": "/(.*)",
+      "has": [
+        {
+          "type": "query",
+          "key": "fbclid"
+        }
+      ],
+      "destination": "/$1?",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     {
       "source": "/api",

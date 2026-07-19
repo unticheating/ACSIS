@@ -13,6 +13,10 @@ export async function ensureExamSessionSchemaCompat(pool) {
   if (examSessionFkChecked) return
   examSessionFkChecked = true
 
+  // On Vercel the DB is fully migrated — skip the information_schema catalog
+  // scan entirely. This avoids consuming a connection slot on cold starts.
+  if (process.env.VERCEL) return
+
   const { rows: tableRows } = await pool.query(
     `SELECT 1 FROM information_schema.tables
      WHERE table_schema = 'public' AND table_name = 'institution_members'`,
@@ -45,6 +49,13 @@ export async function ensureExamSessionSchemaCompat(pool) {
 export async function getExamSessionUserColumn(pool) {
   if (examSessionUserColumn) return examSessionUserColumn
 
+  // On Vercel the DB is fully migrated to use member_id — skip the
+  // information_schema query and return the known column immediately.
+  if (process.env.VERCEL) {
+    examSessionUserColumn = 'member_id'
+    return examSessionUserColumn
+  }
+
   await ensureExamSessionSchemaCompat(pool)
 
   const { rows } = await pool.query(
@@ -70,6 +81,13 @@ let examSessionJoinCondition = null
  */
 export async function getExamSessionJoinCondition(pool, esAlias = 'es', imAlias = 'im') {
   if (examSessionJoinCondition) {
+    return examSessionJoinCondition.replace(/ES_ALIAS/g, esAlias).replace(/IM_ALIAS/g, imAlias)
+  }
+
+  // On Vercel the DB is fully migrated to use member_id — skip the
+  // information_schema query and return the known join condition immediately.
+  if (process.env.VERCEL) {
+    examSessionJoinCondition = `ES_ALIAS.member_id = IM_ALIAS.member_id`
     return examSessionJoinCondition.replace(/ES_ALIAS/g, esAlias).replace(/IM_ALIAS/g, imAlias)
   }
 

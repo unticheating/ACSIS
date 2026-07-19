@@ -2,9 +2,19 @@ import { getPool } from '../db.js'
 
 let ensured = false
 
-/** Adds the teacher activity log table on first use. */
+/**
+ * Adds the teacher activity log table on first use.
+ * On Vercel (production) the DB is fully migrated — skip DDL entirely to
+ * avoid holding a connection for CREATE TABLE on the Supabase pooler.
+ */
 export async function ensureTeacherActivitySchema() {
   if (ensured) return
+  // Production DB is already migrated; skip DDL on Vercel to prevent
+  // connection exhaustion on Supabase pooler.
+  if (process.env.VERCEL) {
+    ensured = true
+    return
+  }
   const pool = getPool()
   await pool.query(`
     CREATE TABLE IF NOT EXISTS teacher_activity_logs (

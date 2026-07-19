@@ -14,8 +14,19 @@ async function cheatingLogDismissColumnsPresent(pool) {
   return names.has('dismissed_at') && names.has('dismissed_by_member_id')
 }
 
+/**
+ * Adds dismissed_at / dismissed_by_member_id columns on existing DBs (migration 015).
+ * On Vercel (production) the DB is fully migrated — skip DDL entirely to
+ * avoid holding a connection for information_schema + ALTER TABLE.
+ */
 export async function ensureCheatingLogDismissedColumns() {
   if (ensured) return
+  // Production DB is already migrated; skip DDL on Vercel to prevent
+  // connection exhaustion on Supabase pooler.
+  if (process.env.VERCEL) {
+    ensured = true
+    return
+  }
   const pool = getPool()
   if (!pool) return
 
