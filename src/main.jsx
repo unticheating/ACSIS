@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
+import { Analytics } from '@vercel/analytics/react'
 import '@fontsource/google-sans/400.css'
 import '@fontsource/google-sans/500.css'
 import '@fontsource/google-sans/600.css'
@@ -46,6 +47,7 @@ createRoot(document.getElementById('root')).render(
           </InstitutionThemeProvider>
         </SessionProvider>
       </ThemeProvider>
+      <Analytics />
     </BrowserRouter>
   </StrictMode>,
 )
