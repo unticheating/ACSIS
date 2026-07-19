@@ -40,7 +40,7 @@ function mapMonitoringExamMeta(examRow) {
     status: examRow.status,
     code: examRow.password,
     scheduledStart: examRow.scheduledStart || examRow.scheduled_start || null,
-    scheduledEnd: examRow.scheduledEnd || examRow.scheduled_end || null,
+    duration: examRow.duration || 60,
     openedAt: status === EXAM_STATUS.OPEN && examRow.updated_at ? examRow.updated_at : null,
     updatedAt: examRow.updated_at || null,
   }
@@ -106,7 +106,7 @@ export async function getTeacherActiveMonitoringService(teacherMemberId) {
         classId: active.classId,
         className: active.className,
         scheduledStart: active.scheduledStart || null,
-        scheduledEnd: active.scheduledEnd || null,
+        duration: active.duration || 60,
         openedAt:
           (active.status || '').toLowerCase() === EXAM_STATUS.OPEN && active.updatedAt
             ? active.updatedAt

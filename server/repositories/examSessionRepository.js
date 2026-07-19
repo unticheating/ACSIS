@@ -11,7 +11,7 @@ import { computeExamRanksQuery } from './examResultsRepository.js'
 export async function getExamForJoinQuery(classId, examId) {
   const pool = getPool()
   const { rows } = await pool.query(
-    `SELECT e.exam_id, e.title, e.password, e.scheduled_start, e.scheduled_end, e.status, e.updated_at, c.institution_id
+    `SELECT e.exam_id, e.title, e.password, e.scheduled_start, e.duration, e.status, e.updated_at, c.institution_id
      FROM exams e
      JOIN classes c ON c.class_id = e.class_id
      WHERE e.exam_id = $1 AND e.class_id = $2 AND e.is_archived = FALSE`,
@@ -219,6 +219,20 @@ export async function lockExamSessionQuery(sessionId, reason = null) {
     [sessionId, reason],
   )
   return rows[0] || null
+}
+
+/** Stamp started_at exactly once (when the student's 3-2-1 countdown ends). Idempotent. */
+export async function stampSessionStartedAtQuery(examId, studentMemberId) {
+  const pool = getPool()
+  const col = await getExamSessionUserColumn(pool)
+  const { rows } = await pool.query(
+    `UPDATE exam_sessions
+     SET started_at = COALESCE(started_at, NOW())
+     WHERE exam_id = $1 AND ${col} = $2 AND status IN ('in_progress', 'on_hold')
+     RETURNING started_at`,
+    [examId, studentMemberId],
+  )
+  return rows[0]?.started_at ?? null
 }
 
 /** Move joined-but-unsubmitted sessions to on_hold when the teacher closes the exam. */
@@ -506,11 +520,11 @@ export async function findChoiceIdByTextQuery(questionId, choiceText) {
 function normalizeSchedulePatch(schedulePatch) {
   if (schedulePatch === undefined) return {}
   if (schedulePatch instanceof Date || schedulePatch === null) {
-    return { scheduledEnd: schedulePatch }
+    return { duration: schedulePatch }
   }
   if (typeof schedulePatch === 'object' && schedulePatch !== null) {
     const out = {}
-    if ('scheduledEnd' in schedulePatch) out.scheduledEnd = schedulePatch.scheduledEnd
+    if ('duration' in schedulePatch) out.duration = schedulePatch.duration
     if ('scheduledStart' in schedulePatch) out.scheduledStart = schedulePatch.scheduledStart
     return out
   }
@@ -527,9 +541,9 @@ export async function updateExamStatusByIdQuery(classId, examId, status, schedul
     params.push(patch.scheduledStart ? new Date(patch.scheduledStart) : null)
     query += `, scheduled_start = $${params.length}`
   }
-  if ('scheduledEnd' in patch) {
-    params.push(patch.scheduledEnd ? new Date(patch.scheduledEnd) : null)
-    query += `, scheduled_end = $${params.length}`
+  if ('duration' in patch) {
+    params.push(patch.duration || 60)
+    query += `, duration = $${params.length}`
   }
 
   query += ` WHERE exam_id = $${params.length + 1} AND class_id = $${params.length + 2}`

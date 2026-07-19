@@ -7,12 +7,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog.jsx'
-import { RotateCcw } from 'lucide-react'
+import { Label } from '@/components/ui/label.jsx'
+import { Input } from '@/components/ui/input.jsx'
+import { RotateCcw, Timer, Clock } from 'lucide-react'
 import { DateTimePicker } from '@/components/ui/date-time-picker.jsx'
 
-export default function RestartExamDialog({ open, onOpenChange, onRestart, defaultStart, defaultEnd }) {
+export default function RestartExamDialog({ open, onOpenChange, onRestart, defaultStart, defaultDuration = 60 }) {
   const [newStart, setNewStart] = useState(null)
-  const [newEnd, setNewEnd] = useState(null)
+  const [newDuration, setNewDuration] = useState(defaultDuration)
   const [restarting, setRestarting] = useState(false)
 
   useEffect(() => {
@@ -20,22 +22,9 @@ export default function RestartExamDialog({ open, onOpenChange, onRestart, defau
     const now = new Date()
     let start = defaultStart ? new Date(defaultStart) : new Date()
     if (Number.isNaN(start.getTime()) || start < now) start = now
-    let end = defaultEnd ? new Date(defaultEnd) : null
-    if (defaultStart && defaultEnd) {
-      const oldStart = new Date(defaultStart)
-      const oldEnd = new Date(defaultEnd)
-      if (
-        !Number.isNaN(oldStart.getTime()) &&
-        !Number.isNaN(oldEnd.getTime()) &&
-        oldEnd > oldStart
-      ) {
-        end = new Date(start.getTime() + (oldEnd.getTime() - oldStart.getTime()))
-      }
-    }
-    if (end && (Number.isNaN(end.getTime()) || end <= start)) end = null
     setNewStart(start)
-    setNewEnd(end)
-  }, [open, defaultStart, defaultEnd])
+    setNewDuration(defaultDuration || 60)
+  }, [open, defaultStart, defaultDuration])
 
   async function handleConfirm(e) {
     e.preventDefault()
@@ -43,7 +32,7 @@ export default function RestartExamDialog({ open, onOpenChange, onRestart, defau
     try {
       await onRestart({
         newScheduledStart: newStart,
-        newScheduledEnd: newEnd,
+        newDuration: newDuration,
       })
       onOpenChange(false)
     } finally {
@@ -63,8 +52,11 @@ export default function RestartExamDialog({ open, onOpenChange, onRestart, defau
         </DialogHeader>
 
         <div className="grid gap-4 py-4">
-          <div className="grid gap-2">
-            <label className="text-sm font-medium text-gray-700">Lobby opens at</label>
+          <div className="space-y-2">
+            <Label className="flex items-center gap-1.5">
+              <Clock size={14} className="text-muted-foreground" />
+              Lobby opens at
+            </Label>
             <DateTimePicker
               value={newStart}
               onChange={setNewStart}
@@ -73,19 +65,28 @@ export default function RestartExamDialog({ open, onOpenChange, onRestart, defau
               disablePast
             />
           </div>
-          <div className="grid gap-2">
-            <label className="text-sm font-medium text-gray-700">Exam deadline (optional)</label>
-            <DateTimePicker
-              value={newEnd}
-              onChange={setNewEnd}
-              placeholder="No fixed deadline"
-              disablePortal={true}
-              disablePast
-              minDateTime={newStart}
-            />
+
+          <div className="space-y-2">
+            <Label className="flex items-center gap-1.5">
+              <Timer size={14} className="text-muted-foreground" />
+              Exam duration
+            </Label>
+            <div className="relative">
+              <Input
+                type="number"
+                min="1"
+                value={newDuration}
+                onChange={(e) => setNewDuration(e.target.value)}
+                className="pr-14"
+                placeholder="e.g. 60"
+              />
+              <span className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-muted-foreground text-sm font-medium">
+                mins
+              </span>
+            </div>
           </div>
 
-          <DialogFooter className="mt-6 gap-2 sm:gap-0">
+          <DialogFooter className="mt-2 gap-2 sm:gap-0">
             <button
               type="button"
               className="acsis-btn-ghost"

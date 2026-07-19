@@ -25,6 +25,7 @@ import {
   logExamCheating,
   saveExamAnswer,
   submitExamAnswers,
+  stampStudentExamSessionStart,
 } from '@/lib/studentExamApi.js'
 import { PG_EXAM_STATUS, normalizeExamStatus } from '@/lib/examFlowUi.js'
 import {
@@ -204,7 +205,7 @@ export default function StudentExamSessionPage() {
     setLockReason((prev) => prev || reason)
     examLockedRef.current = locked
     lockReasonRef.current = reason
-    setHit({ exam: { ...data.exam, questions: data.questions || [] } })
+    setHit({ exam: { ...data.exam, questions: data.questions || [] }, sessionStartedAt: data.sessionStartedAt })
     if ((data.questions?.length || 0) > 0) {
       setScene('question')
     }
@@ -281,7 +282,7 @@ export default function StudentExamSessionPage() {
         setAnswers((prev) => ({ ...prev, ...data.savedAnswers }))
       }
       if (data.sessionStatus === 'submitted') {
-        setHit({ exam: data.exam })
+        setHit({ exam: data.exam, sessionStartedAt: data.sessionStartedAt })
         setSubmitResult(
           data.result
             ? { ...data.result, scoreReleased: true }
@@ -293,7 +294,7 @@ export default function StudentExamSessionPage() {
         setError(null)
         return
       }
-      setHit({ exam: { ...data.exam, questions: data.questions || [] } })
+      setHit({ exam: { ...data.exam, questions: data.questions || [] }, sessionStartedAt: data.sessionStartedAt })
       if (closedWhileJoined && (data.questions?.length || 0) > 0) {
         setScene('question')
       }
@@ -356,6 +357,7 @@ export default function StudentExamSessionPage() {
             setLockReason((prev) => prev || data.lockReason || 'teacher_closed')
           }
           setHit((prev) => ({
+            sessionStartedAt: data.sessionStartedAt,
             exam: {
               ...(prev?.exam || {}),
               ...data.exam,
@@ -368,7 +370,12 @@ export default function StudentExamSessionPage() {
             (sessionSt === 'on_hold' || sessionSt === 'in_progress') &&
             (data.questions?.length || 0) > 0
           ) {
-            setScene('question')
+            // Only skip countdown on reload if we've already stamped the start time
+            if (data.sessionStartedAt) {
+              setScene('question')
+            } else {
+              setScene('countdown')
+            }
           }
           return
         }
@@ -379,7 +386,7 @@ export default function StudentExamSessionPage() {
           setLockReason(null)
           lockingRef.current = false
           setScene('lobby')
-          setHit(data.exam ? { exam: data.exam } : null)
+          setHit(data.exam ? { exam: data.exam, sessionStartedAt: data.sessionStartedAt } : null)
           return
         }
         if (data.sessionStatus === 'submitted') return
@@ -391,6 +398,7 @@ export default function StudentExamSessionPage() {
           lockingRef.current = false
           setScene('lobby')
           setHit((prev) => ({
+            sessionStartedAt: data.sessionStartedAt,
             exam: {
               ...(prev?.exam || {}),
               ...data.exam,
@@ -428,13 +436,14 @@ export default function StudentExamSessionPage() {
         setHit((prev) =>
           prev
             ? {
+              sessionStartedAt: prev.sessionStartedAt ?? data.sessionStartedAt,
               exam: {
                 ...prev.exam,
                 ...data.exam,
                 questions: data.questions?.length ? data.questions : prev.exam?.questions || [],
               },
             }
-            : { exam: { ...data.exam, questions: data.questions || [] } },
+            : { sessionStartedAt: data.sessionStartedAt, exam: { ...data.exam, questions: data.questions || [] } },
         )
       } catch {
         /* ignore transient poll errors */
@@ -491,6 +500,8 @@ export default function StudentExamSessionPage() {
   const lockReasonRef = useRef(null)
   const warningCountRef = useRef(0)
   const maxWarningsRef = useRef(resolveMaxWarnings(undefined, institutionMaxWarnings))
+  // Tracks the real moment the student's exam clock starts (after the 3-2-1 animation ends)
+  const examActualStartRef = useRef(null)
 
   const currentQ = questions[currentQuestionIndex]
 
@@ -658,14 +669,23 @@ export default function StudentExamSessionPage() {
     }
     if (st !== PG_EXAM_STATUS.OPEN) {
       if (scene === 'countdown' || scene === 'question') {
+        examActualStartRef.current = null
         setScene('lobby')
       }
       return
     }
     if (questions.length > 0 && scene === 'lobby') {
-      setScene('countdown')
+      examActualStartRef.current = null
+      // If the student already has a server-stamped start time, skip the 3-2-1
+      // animation and jump straight into the question scene so the timer
+      // continues from where it left off rather than restarting.
+      if (hit.sessionStartedAt) {
+        setScene('question')
+      } else {
+        setScene('countdown')
+      }
     }
-  }, [hit?.exam?.status, questions.length, scene, needsPassword, examLocked])
+  }, [hit?.exam?.status, hit?.sessionStartedAt, questions.length, scene, needsPassword, examLocked])
 
   const [detectionOpen, setDetectionOpen] = useState(false)
   useEffect(() => {
@@ -682,9 +702,14 @@ export default function StudentExamSessionPage() {
     if (scene !== 'question' || !hit?.exam) return undefined
     const tick = () => {
       if (normalizeExamStatus(hit.exam.status) !== PG_EXAM_STATUS.OPEN) return
+      // Use the local actual start (after 3-2-1) if available, else fall back to server sessionStartedAt
+      const startedAt = examActualStartRef.current
+        ? new Date(examActualStartRef.current).toISOString()
+        : hit.sessionStartedAt
       const { seconds } = computeExamTimeDisplay({
         status: hit.exam.status,
-        scheduledEnd: hit.exam.scheduledEnd,
+        duration: hit.exam.duration,
+        sessionStartedAt: startedAt,
       })
       if (seconds == null) {
         setSecondsLeft(null)
@@ -1047,7 +1072,19 @@ export default function StudentExamSessionPage() {
     const step = () => {
       setCountdownNum(n)
       if (n <= 1) {
-        window.setTimeout(() => setScene('question'), 1000)
+        window.setTimeout(() => {
+          // Record the exact moment the student sees the first question
+          examActualStartRef.current = Date.now()
+          setScene('question')
+          
+          // Persist the stamp to the server so it survives reloads
+          stampStudentExamSessionStart(classId, examId).then(res => {
+            if (res.ok && res.startedAt) {
+              setHit(h => h ? { ...h, sessionStartedAt: res.startedAt } : h)
+            }
+          }).catch(console.error)
+          
+        }, 1000)
         return
       }
       n -= 1
@@ -1055,7 +1092,7 @@ export default function StudentExamSessionPage() {
     }
     const id = window.setTimeout(step, 0)
     return () => window.clearTimeout(id)
-  }, [scene])
+  }, [scene, classId, examId])
 
   if (loading) {
     return (

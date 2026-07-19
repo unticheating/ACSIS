@@ -23,6 +23,13 @@ export async function fetchStudentExamSession(classId, examId) {
   return parseJson(res)
 }
 
+export async function stampStudentExamSessionStart(classId, examId) {
+  const res = await apiFetch(`/api/student/classes/${classId}/exams/${examId}/session/start`, {
+    method: 'POST',
+  })
+  return parseJson(res)
+}
+
 export async function logExamCheating(classId, examId, eventType, details) {
   const res = await apiFetch(`/api/student/classes/${classId}/exams/${examId}/cheating`, {
     method: 'POST',

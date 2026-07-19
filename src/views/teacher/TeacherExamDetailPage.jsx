@@ -20,6 +20,7 @@ import {
   Trash2,
   UsersRound,
   Maximize2,
+  Timer,
 } from 'lucide-react'
 import StreamBackLink from '@/components/layout/StreamBackLink.jsx'
 import { QuestionTypeIcon } from '@/components/exam/QuestionTypeIcon.jsx'
@@ -129,7 +130,7 @@ function sortSessionsBySurname(sessions) {
 function SettingsForm({ hit, classId, examId, onSaved, onChanges }) {
   const [password, setPassword] = useState('')
   const [scheduledStart, setScheduledStart] = useState('')
-  const [scheduledEnd, setScheduledEnd] = useState('')
+  const [duration, setDuration] = useState(60)
   const [isAutoPublish, setIsAutoPublish] = useState(false)
   const [shuffleQuestions, setShuffleQuestions] = useState(false)
   const [shuffleChoices, setShuffleChoices] = useState(false)
@@ -138,11 +139,11 @@ function SettingsForm({ hit, classId, examId, onSaved, onChanges }) {
   // Schedule modal state
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false)
   const [modalStart, setModalStart] = useState(null)
-  const [modalEnd, setModalEnd] = useState(null)
+  const [modalDuration, setModalDuration] = useState(null)
 
   // Track original values to detect changes
   const [origScheduledStart, setOrigScheduledStart] = useState('')
-  const [origScheduledEnd, setOrigScheduledEnd] = useState('')
+  const [origDuration, setOrigDuration] = useState(60)
   const [origIsAutoPublish, setOrigIsAutoPublish] = useState(false)
   const [origShuffleQuestions, setOrigShuffleQuestions] = useState(false)
   const [origShuffleChoices, setOrigShuffleChoices] = useState(false)
@@ -150,20 +151,20 @@ function SettingsForm({ hit, classId, examId, onSaved, onChanges }) {
   useEffect(() => {
     if (hit) {
       const start = hit.scheduledStart || ''
-      const end = hit.scheduledEnd || ''
+      const dur = hit.duration || 60
       const autoPub = !!hit.isAutoPublish
       const shuffleQ = !!hit.shuffleQuestions
       const shuffleC = !!hit.shuffleChoices
 
       setPassword(hit.code || '')
       setScheduledStart(start)
-      setScheduledEnd(end)
+      setDuration(dur)
       setIsAutoPublish(autoPub)
       setShuffleQuestions(shuffleQ)
       setShuffleChoices(shuffleC)
 
       setOrigScheduledStart(start)
-      setOrigScheduledEnd(end)
+      setOrigDuration(dur)
       setOrigIsAutoPublish(autoPub)
       setOrigShuffleQuestions(shuffleQ)
       setOrigShuffleChoices(shuffleC)
@@ -172,7 +173,7 @@ function SettingsForm({ hit, classId, examId, onSaved, onChanges }) {
 
   const hasChanges = 
     scheduledStart !== origScheduledStart ||
-    scheduledEnd !== origScheduledEnd ||
+    duration !== origDuration ||
     isAutoPublish !== origIsAutoPublish ||
     shuffleQuestions !== origShuffleQuestions ||
     shuffleChoices !== origShuffleChoices
@@ -185,21 +186,21 @@ function SettingsForm({ hit, classId, examId, onSaved, onChanges }) {
 
   function openScheduleModal() {
     setModalStart(scheduledStart ? new Date(scheduledStart) : null)
-    setModalEnd(scheduledEnd ? new Date(scheduledEnd) : null)
+    setModalDuration(duration)
     setScheduleModalOpen(true)
   }
 
   function applySchedule() {
     setScheduledStart(modalStart ? modalStart.toISOString() : '')
-    setScheduledEnd(modalEnd ? modalEnd.toISOString() : '')
+    setDuration(modalDuration)
     setScheduleModalOpen(false)
   }
 
   function clearSchedule() {
     setModalStart(null)
-    setModalEnd(null)
+    setModalDuration(null)
     setScheduledStart('')
-    setScheduledEnd('')
+    setDuration(60)
     setScheduleModalOpen(false)
   }
 
@@ -211,7 +212,7 @@ function SettingsForm({ hit, classId, examId, onSaved, onChanges }) {
   }
 
   const startLabel = formatDateShort(scheduledStart)
-  const endLabel = formatDateShort(scheduledEnd)
+  const endLabel = duration ? `${duration} mins` : null
 
   async function handleSave(e) {
     e.preventDefault()
@@ -225,7 +226,7 @@ function SettingsForm({ hit, classId, examId, onSaved, onChanges }) {
         description: mapped.description || hit.description || '',
         password: password.trim(),
         scheduledStart: scheduledStart ? new Date(scheduledStart).toISOString() : null,
-        scheduledEnd: scheduledEnd ? new Date(scheduledEnd).toISOString() : null,
+        duration,
         isAutoPublish,
         shuffleQuestions,
         shuffleChoices,
@@ -275,7 +276,7 @@ function SettingsForm({ hit, classId, examId, onSaved, onChanges }) {
                   )}
                   {endLabel && (
                     <span style={{ fontSize: '0.82rem', color: 'var(--muted-foreground)' }}>
-                      <span style={{ fontWeight: 600 }}>Deadline:</span> {endLabel}
+                      <span style={{ fontWeight: 600 }}>Duration:</span> {endLabel}
                     </span>
                   )}
                 </>
@@ -340,15 +341,24 @@ function SettingsForm({ hit, classId, examId, onSaved, onChanges }) {
                 disablePortal={true}
               />
             </div>
-            <div className="grid gap-2">
-              <label className="text-sm font-medium">Exam deadline (optional)</label>
-              <DateTimePicker
-                value={modalEnd}
-                onChange={setModalEnd}
-                placeholder="No fixed deadline"
-                disablePortal={true}
-                minDateTime={modalStart}
-              />
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1.5">
+                <Timer size={14} className="text-muted-foreground" />
+                Exam duration
+              </Label>
+              <div className="relative">
+                <Input
+                  type="number"
+                  min="1"
+                  value={modalDuration || ''}
+                  onChange={(e) => setModalDuration(e.target.value)}
+                  className="pr-14"
+                  placeholder="e.g. 60"
+                />
+                <span className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-muted-foreground text-sm font-medium">
+                  mins
+                </span>
+              </div>
             </div>
           </div>
           <DialogFooter className="gap-2 sm:gap-0">
@@ -485,14 +495,7 @@ function displayStatusLabel(status) {
 }
 
 function computeDurationMinutes(exam) {
-  const direct = Number(exam?.duration)
-  if (direct > 0) return direct
-  const start = exam?.scheduledStart ? new Date(exam.scheduledStart).getTime() : NaN
-  const end = exam?.scheduledEnd ? new Date(exam.scheduledEnd).getTime() : NaN
-  if (Number.isFinite(start) && Number.isFinite(end) && end > start) {
-    return Math.max(1, Math.round((end - start) / 60000))
-  }
-  return 0
+  return Number(exam?.duration) || 60
 }
 
 function overviewDescription(exam) {
@@ -1111,7 +1114,7 @@ export default function TeacherExamDetailPage() {
         description: mapped.description || hit.description || '',
         password: hit.code || '',
         scheduledStart: hit.scheduledStart ? new Date(hit.scheduledStart).toISOString() : null,
-        scheduledEnd: hit.scheduledEnd ? new Date(hit.scheduledEnd).toISOString() : null,
+        duration: hit.duration || 60,
         isAutoPublish: !!hit.isAutoPublish,
         shuffleQuestions: !!hit.shuffleQuestions,
         shuffleChoices: !!hit.shuffleChoices,
@@ -1146,7 +1149,7 @@ export default function TeacherExamDetailPage() {
         description: next,
         password: hit.code || '',
         scheduledStart: hit.scheduledStart ? new Date(hit.scheduledStart).toISOString() : null,
-        scheduledEnd: hit.scheduledEnd ? new Date(hit.scheduledEnd).toISOString() : null,
+        duration: hit.duration || 60,
         isAutoPublish: !!hit.isAutoPublish,
         shuffleQuestions: !!hit.shuffleQuestions,
         shuffleChoices: !!hit.shuffleChoices,
@@ -1176,7 +1179,7 @@ export default function TeacherExamDetailPage() {
       newScheduledStart: payload.newScheduledStart
         ? new Date(payload.newScheduledStart).toISOString()
         : null,
-      newScheduledEnd: payload.newScheduledEnd ? new Date(payload.newScheduledEnd).toISOString() : null,
+      newDuration: payload.newDuration ? Number(payload.newDuration) : null,
     }
     try {
       const res = await apiFetch(`/api/teacher/classes/${classId}/exams/${examId}/restart`, {
@@ -2316,7 +2319,7 @@ export default function TeacherExamDetailPage() {
             onOpenChange={setRestartDialogOpen}
             onRestart={restartExam}
             defaultStart={exam.scheduledStart}
-            defaultEnd={exam.scheduledEnd}
+            defaultDuration={exam.duration || 60}
           />
         </Suspense>
       ) : null}

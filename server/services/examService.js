@@ -73,7 +73,7 @@ export async function createExamService(memberId, classId, payload) {
         shuffleQuestions: Boolean(payload.shuffleQuestions),
         shuffleChoices: Boolean(payload.shuffleChoices),
         scheduledStart: payload.scheduledStart,
-        scheduledEnd: payload.scheduledEnd,
+        duration: payload.duration || 60,
         isAutoPublish: Boolean(payload.isAutoPublish),
       },
     );
@@ -125,7 +125,7 @@ export async function updateExamDraftService(memberId, classId, examId, payload)
         shuffleQuestions: Boolean(payload.shuffleQuestions),
         shuffleChoices: Boolean(payload.shuffleChoices),
         scheduledStart: payload.scheduledStart,
-        scheduledEnd: payload.scheduledEnd,
+        duration: payload.duration || 60,
         isAutoPublish: Boolean(payload.isAutoPublish),
       },
     );
@@ -173,7 +173,7 @@ export async function updateExamDraftService(memberId, classId, examId, payload)
   }
 }
 
-export async function copyExamService(memberId, sourceClassId, targetClassId, examId, scheduledStart, scheduledEnd) {
+export async function copyExamService(memberId, sourceClassId, targetClassId, examId, scheduledStart, duration) {
   try {
     const sourceClass = await getTeacherClassByIdQuery(sourceClassId, memberId);
     if (!sourceClass) {
@@ -243,7 +243,7 @@ export async function copyExamService(memberId, sourceClassId, targetClassId, ex
           shuffleQuestions: Boolean(exam.shuffleQuestions),
           shuffleChoices: Boolean(exam.shuffleChoices),
           scheduledStart,
-          scheduledEnd,
+          duration,
           isAutoPublish: false,
         }
       );
@@ -284,20 +284,8 @@ async function attachStudentSessionsToExams(exams, studentMemberId) {
 }
 
 export async function autoCloseExams(classId, exams) {
-  const now = Date.now();
-  for (const exam of exams) {
-    if ((exam.status === EXAM_STATUS.OPEN || exam.status === EXAM_STATUS.WAITING) && exam.scheduledEnd) {
-      const endMs = new Date(exam.scheduledEnd).getTime();
-      if (Number.isFinite(endMs) && now >= endMs) {
-        try {
-          await closeExamService(classId || exam.classId, exam.id);
-        } catch (err) {
-          console.error('[autoCloseExams] failed to close exam', err);
-        }
-        exam.status = EXAM_STATUS.CLOSED;
-      }
-    }
-  }
+  // Global auto-closing based on scheduledEnd is removed because exams are now duration-based.
+  // We rely on student sessions expiring, not the exam itself closing automatically.
 }
 
 export async function listTeacherExamsWithClassMetaService(memberId) {
@@ -412,7 +400,7 @@ export async function publishExamService(classId, examId, teacherMemberId = null
           institutionName: institution?.name || 'Your Institution',
           institutionLogo: institution?.logo || null,
           scheduledStart: exam.scheduledStart,
-          scheduledEnd: exam.scheduledEnd,
+          duration: exam.duration,
         });
       });
       // Do not block the request on sending emails

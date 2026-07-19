@@ -20,6 +20,7 @@ import {
   resetExamSessionsQuery,
   upsertStudentAnswerQuery,
   deleteExamSessionQuery,
+  stampSessionStartedAtQuery,
 } from '../repositories/examSessionRepository.js'
 
 /** Students only receive numeric scores after faculty releases them. */
@@ -76,7 +77,7 @@ async function syncSessionLockState(session, examRow, institutionId) {
       return { ...session, locked_at: locked.locked_at, lock_reason: locked.lock_reason }
     }
   }
-  const endMs = examRow.scheduled_end ? new Date(examRow.scheduled_end).getTime() : NaN
+  const endMs = (session.started_at && examRow.duration) ? new Date(session.started_at).getTime() + examRow.duration * 60000 : NaN
   if (Number.isFinite(endMs) && Date.now() >= endMs) {
     const locked = await lockExamSessionQuery(session.session_id, 'time_up')
     if (locked) {
@@ -104,7 +105,7 @@ function mapExamMeta(row) {
     id: row.exam_id,
     title: row.title,
     scheduledStart: row.scheduled_start,
-    scheduledEnd: row.scheduled_end,
+    duration: row.duration || 60,
     status: row.status,
     code: row.password,
     openedAt: status === EXAM_STATUS.OPEN && row.updated_at ? row.updated_at : null,
@@ -207,6 +208,7 @@ export async function getStudentExamSessionService(classId, examId, studentMembe
     lockReason: session?.lock_reason ?? null,
     warningCount: session?.warning_count ?? 0,
     maxWarnings,
+    sessionStartedAt: session?.started_at ? new Date(session.started_at).toISOString() : null,
     savedAnswers: {},
     exam: examMeta,
     questions: [],
@@ -262,6 +264,15 @@ export async function getStudentExamSessionService(classId, examId, studentMembe
   return { ok: true, ...payload }
 }
 
+export async function stampStudentExamSessionStartService(classId, examId, studentMemberId) {
+  const session = await findExamSessionQuery(examId, studentMemberId)
+  if (!session) {
+    return { ok: false, status: 404, error: 'Session not found' }
+  }
+  const startedAt = await stampSessionStartedAtQuery(examId, studentMemberId)
+  return { ok: true, startedAt }
+}
+
 export async function lockStudentExamSessionService(classId, examId, studentMemberId, reason = 'time_up') {
   const gate = await requireOpenSession(classId, examId, studentMemberId)
   if (!gate.ok) return gate
@@ -315,7 +326,7 @@ export async function saveStudentAnswerService(classId, examId, studentMemberId,
 }
 
 export async function startExamService(classId, examId, teacherMemberId = null, opts = {}) {
-  const { newScheduledEnd } = opts
+  const { newDuration } = opts
   const exam = await getExamForJoinQuery(classId, examId)
   if (!exam) {
     return { ok: false, status: 404, error: 'Exam not found.' }
@@ -332,7 +343,7 @@ export async function startExamService(classId, examId, teacherMemberId = null, 
     await closeOtherTeacherOngoingExamsQuery(teacherMemberId, classId, examId)
   }
 
-  const updated = await updateExamStatusByIdQuery(classId, examId, next, newScheduledEnd)
+  const updated = await updateExamStatusByIdQuery(classId, examId, next, newDuration)
   if (!updated) {
     return { ok: false, status: 500, error: 'Failed to start exam.' }
   }
@@ -352,7 +363,7 @@ export async function startExamService(classId, examId, teacherMemberId = null, 
   return { ok: true, status: next }
 }
 
-function buildRestartSchedulePatch(exam, { newScheduledStart, newScheduledEnd } = {}) {
+function buildRestartSchedulePatch(exam, { newScheduledStart, newDuration } = {}) {
   const now = new Date()
   const patch = {}
 
@@ -362,24 +373,10 @@ function buildRestartSchedulePatch(exam, { newScheduledStart, newScheduledEnd } 
     patch.scheduledStart = now
   }
 
-  if (newScheduledEnd !== undefined) {
-    patch.scheduledEnd = newScheduledEnd ? new Date(newScheduledEnd) : null
+  if (newDuration !== undefined) {
+    patch.duration = newDuration ? Number(newDuration) : exam.duration
   } else {
-    const oldStartMs = exam.scheduled_start ? new Date(exam.scheduled_start).getTime() : NaN
-    const oldEndMs = exam.scheduled_end ? new Date(exam.scheduled_end).getTime() : NaN
-    if (Number.isFinite(oldStartMs) && Number.isFinite(oldEndMs) && oldEndMs > oldStartMs) {
-      patch.scheduledEnd = new Date(patch.scheduledStart.getTime() + (oldEndMs - oldStartMs))
-    } else {
-      patch.scheduledEnd = null
-    }
-  }
-
-  if (
-    patch.scheduledEnd instanceof Date &&
-    Number.isFinite(patch.scheduledEnd.getTime()) &&
-    patch.scheduledEnd <= patch.scheduledStart
-  ) {
-    patch.scheduledEnd = null
+    patch.duration = exam.duration || 60
   }
 
   return patch

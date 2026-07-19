@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { SummaryStatCard, SummaryStatGrid } from '@/components/dashboard/SummaryStatCard.jsx'
-import { BookOpen, Activity, Users, MoreVertical, Copy, Send, Trash2, Play, StopCircle, RotateCcw } from 'lucide-react'
+import { BookOpen, Activity, Users, MoreVertical, Copy, Send, Trash2, Play, StopCircle, RotateCcw, Timer, Clock } from 'lucide-react'
 import { apiFetch } from '@/lib/apiFetch.js'
 import { copyToClipboard } from '@/lib/copyToClipboard.js'
 import { acsisToastError, acsisToastSuccess } from '@/lib/acsisToast.js'
@@ -58,7 +58,7 @@ export default function TeacherDashboardPage() {
   const [restartDialogOpen, setRestartDialogOpen] = useState(false)
   const [isRestarting, setIsRestarting] = useState(false)
   const [restartDefaultStart, setRestartDefaultStart] = useState(null)
-  const [restartDefaultEnd, setRestartDefaultEnd] = useState(null)
+  const [restartDefaultDuration, setRestartDefaultDuration] = useState(60)
 
   const resetCreateExamModal = () => {
     setSelectedClassIds([])
@@ -125,7 +125,7 @@ export default function TeacherDashboardPage() {
     setIsRestarting(true)
     const body = {
       newScheduledStart: payload.newScheduledStart ? new Date(payload.newScheduledStart).toISOString() : null,
-      newScheduledEnd: payload.newScheduledEnd ? new Date(payload.newScheduledEnd).toISOString() : null,
+      newDuration: payload.newDuration ? Number(payload.newDuration) : null,
     }
     try {
       const res = await apiFetch(`/api/teacher/classes/${restartClassId}/exams/${restartExamId}/restart`, {
@@ -392,10 +392,7 @@ export default function TeacherDashboardPage() {
             const detailPath = ex.classId != null && ex.id != null
               ? `/teacher/my-classes/${encodeURIComponent(ex.classId)}/exams/${encodeURIComponent(ex.id)}`
               : null
-            const deadlineDate = ex.scheduledEnd ? new Date(ex.scheduledEnd) : null
-            const deadlineLabel = deadlineDate && !Number.isNaN(deadlineDate.getTime())
-              ? deadlineDate.toLocaleString([], { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-              : null
+            const duration = ex.duration || 60
             return (
               <FadeIn as="div" key={ex.id || ex.exam_id} delay={0.05}>
                 <Card
@@ -425,13 +422,11 @@ export default function TeacherDashboardPage() {
                     </p>
                   </CardContent>
                   <CardFooter className="pt-0 border-t border-border mt-auto px-6 py-3 bg-muted/20">
-                    <div className="flex items-center justify-between w-full">
-                      <span className={`text-sm ${statusClass}`}>{statusLabel || 'Draft'}</span>
-                      {deadlineLabel && (
-                        <span className="text-xs text-muted-foreground" title="Exam deadline">
-                          Deadline: {deadlineLabel}
-                        </span>
-                      )}
+                    <div className="flex items-center gap-1.5 mt-0.5 text-xs text-muted-foreground whitespace-nowrap overflow-hidden text-ellipsis w-full">
+                      <div className="flex items-center gap-1 overflow-hidden shrink min-w-0" title={`Duration: ${duration} mins`}>
+                        <Timer size={12} className="shrink-0" />
+                        <span className="truncate">{duration} mins</span>
+                      </div>
                     </div>
                   </CardFooter>
 
@@ -495,7 +490,7 @@ export default function TeacherDashboardPage() {
                               setRestartClassId(ex.classId)
                               setRestartExamId(ex.id)
                               setRestartDefaultStart(ex.scheduledStart || null)
-                              setRestartDefaultEnd(ex.scheduledEnd || null)
+                              setRestartDefaultDuration(ex.duration || 60)
                               setRestartDialogOpen(true)
                             }}
                           >
@@ -675,7 +670,7 @@ export default function TeacherDashboardPage() {
         onRestart={handleRestart}
         isSaving={isRestarting}
         defaultStart={restartDefaultStart}
-        defaultEnd={restartDefaultEnd}
+        defaultDuration={restartDefaultDuration}
       />
       {ConfirmDialog}
     </div>

@@ -447,7 +447,7 @@ export async function listExamsForInstitutionQuery(institutionId) {
        e.title,
        e.password AS code,
        e.scheduled_start AS "scheduledStart",
-       e.scheduled_end AS "scheduledEnd",
+       e.duration,
        e.status,
        (SELECT COUNT(*)::int FROM questions q WHERE q.exam_id = e.exam_id) AS "questionCount",
        (SELECT COUNT(*)::int FROM exam_sessions es WHERE es.exam_id = e.exam_id) AS "joinedCount",

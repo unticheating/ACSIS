@@ -498,7 +498,7 @@ export default function TeacherDetectionsPage() {
               status: data.exam.status,
               code: data.exam.code,
               scheduledStart: data.exam.scheduledStart,
-              scheduledEnd: data.exam.scheduledEnd,
+              duration: data.exam.duration,
               openedAt: data.exam.openedAt,
               updatedAt: data.exam.updatedAt,
             }

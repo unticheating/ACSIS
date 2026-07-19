@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams, useNavigate } from 'react-router-dom'
-import { Clock, Plus, Shuffle, Trash2, ArrowLeft, GripVertical, Layers, ImageIcon, X, Pencil, Copy, Settings, Eye, EyeOff, Printer } from 'lucide-react'
+import { Clock, Plus, Shuffle, Trash2, ArrowLeft, GripVertical, Layers, ImageIcon, X, Pencil, Copy, Settings, Eye, EyeOff, Printer, Timer } from 'lucide-react'
 import { Label } from '@/components/ui/label.jsx'
 import { Button } from '@/components/ui/button.jsx'
 import { Input } from '@/components/ui/input.jsx'
@@ -99,7 +99,7 @@ function buildExamDirtySnapshot({
   selectedClassIds,
   examCode,
   scheduledStart,
-  scheduledEnd,
+  duration,
   isAutoPublish,
 }) {
   return JSON.stringify({
@@ -111,7 +111,7 @@ function buildExamDirtySnapshot({
     selectedClassIds: [...selectedClassIds].map(String).sort(),
     examCode: String(examCode || '').trim(),
     scheduledStart: scheduledStart ? new Date(scheduledStart).toISOString() : null,
-    scheduledEnd: scheduledEnd ? new Date(scheduledEnd).toISOString() : null,
+    duration: duration ? Number(duration) : 60,
     isAutoPublish: Boolean(isAutoPublish),
   })
 }
@@ -208,7 +208,7 @@ export default function TeacherCreateExamPage() {
         setShuffleQuestions(!!exam.shuffleQuestions)
         setShuffleChoices(!!exam.shuffleChoices)
         setScheduledStart(exam.scheduledStart || '')
-        setScheduledEnd(exam.scheduledEnd || '')
+        setDuration(exam.duration || 60)
         setIsAutoPublish(!!exam.isAutoPublish)
         setExamCode(exam.code || '')
         primaryClassIdRef.current = selectedClass
@@ -263,7 +263,7 @@ export default function TeacherCreateExamPage() {
         setShuffleQuestions(!!exam.shuffleQuestions)
         setShuffleChoices(!!exam.shuffleChoices)
         setScheduledStart(exam.scheduledStart || '')
-        setScheduledEnd(exam.scheduledEnd || '')
+        setDuration(exam.duration || 60)
         setIsAutoPublish(!!exam.isAutoPublish)
         setExamCode('')
         primaryClassIdRef.current = null
@@ -292,7 +292,7 @@ export default function TeacherCreateExamPage() {
   const [examCodeDraft, setExamCodeDraft] = useState('')
   const [examCodeSaving, setExamCodeSaving] = useState(false)
   const [scheduledStart, setScheduledStart] = useState('')
-  const [scheduledEnd, setScheduledEnd] = useState('')
+  const [duration, setDuration] = useState(60)
   const [isAutoPublish, setIsAutoPublish] = useState(false)
 
   const [questionType, setQuestionType] = useState('multiple')
@@ -981,7 +981,7 @@ export default function TeacherCreateExamPage() {
       selectedClassIds,
       examCode,
       scheduledStart,
-      scheduledEnd,
+      duration,
       isAutoPublish,
     }),
     [
@@ -993,7 +993,7 @@ export default function TeacherCreateExamPage() {
       selectedClassIds,
       examCode,
       scheduledStart,
-      scheduledEnd,
+      duration,
       isAutoPublish,
     ],
   )
@@ -1318,7 +1318,7 @@ export default function TeacherCreateExamPage() {
         shuffleQuestions,
         shuffleChoices,
         scheduledStart: scheduledStart ? new Date(scheduledStart).toISOString() : null,
-        scheduledEnd: scheduledEnd ? new Date(scheduledEnd).toISOString() : null,
+        duration: duration ? Number(duration) : 60,
         isAutoPublish,
       }
 
@@ -1412,7 +1412,7 @@ export default function TeacherCreateExamPage() {
             selectedClassIds,
             examCode,
             scheduledStart,
-            scheduledEnd,
+            duration,
             isAutoPublish,
           }),
         )
@@ -1442,7 +1442,7 @@ export default function TeacherCreateExamPage() {
     examCode,
     examId,
     scheduledStart,
-    scheduledEnd,
+    duration,
     isAutoPublish,
     totalQuestions,
     isEditMode,
@@ -1472,7 +1472,7 @@ export default function TeacherCreateExamPage() {
     examCode,
     examId,
     scheduledStart,
-    scheduledEnd,
+    duration,
     isAutoPublish,
     totalQuestions,
     persistExamDraft,
@@ -1500,7 +1500,7 @@ export default function TeacherCreateExamPage() {
       shuffleQuestions,
       shuffleChoices,
       scheduledStart: scheduledStart ? new Date(scheduledStart).toISOString() : null,
-      scheduledEnd: scheduledEnd ? new Date(scheduledEnd).toISOString() : null,
+      duration: duration ? Number(duration) : 60,
       isAutoPublish,
       status: 'draft',
     }
@@ -2199,7 +2199,7 @@ export default function TeacherCreateExamPage() {
       title: examTitle || 'Untitled Exam',
       description: examDescription,
       scheduledStart: new Date().toISOString(),
-      scheduledEnd: null,
+      duration: 60,
       status: 'open',
       sections: payload,
       questions: previewQuestions,
@@ -2420,18 +2420,24 @@ export default function TeacherCreateExamPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-sm font-semibold flex items-center gap-2">
-                    <Clock size={14} className="text-muted-foreground" />
-                    End Time
+                  <Label className="flex items-center gap-1.5">
+                    <Timer size={14} className="text-muted-foreground" />
+                    Exam duration
                   </Label>
-                  <DateTimePicker
-                    value={scheduledEnd ? new Date(scheduledEnd) : undefined}
-                    onChange={(date) => setScheduledEnd(date ? date.toISOString() : '')}
-                    placeholder="Select end date & time"
-                    className="w-full"
-                    disablePast
-                    minDateTime={scheduledStart ? new Date(scheduledStart) : undefined}
-                  />
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      min="1"
+                      value={duration}
+                      onChange={(e) => setDuration(e.target.value)}
+                      className="pr-14"
+                      placeholder="e.g. 60"
+                    />
+                    <span className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-muted-foreground text-sm font-medium">
+                      mins
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Students have this long once they join.</p>
                 </div>
               </div>
               <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer hover:text-foreground transition-colors">

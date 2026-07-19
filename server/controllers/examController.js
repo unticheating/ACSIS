@@ -22,6 +22,7 @@ import {
   saveStudentAnswerService,
   startExamService,
   submitExamService,
+  stampStudentExamSessionStartService,
 } from '../services/examSessionService.js';
 import {
   getStudentPerformanceService,
@@ -138,7 +139,7 @@ const createExamSchema = z
     shuffleQuestions: z.boolean().optional().default(false),
     shuffleChoices: z.boolean().optional().default(false),
     scheduledStart: z.string().datetime().nullable().optional().default(null),
-    scheduledEnd: z.string().datetime().nullable().optional().default(null),
+    duration: z.coerce.number().int().min(1).optional().default(60),
     isAutoPublish: z.boolean().optional().default(false),
     description: z.string().optional().default(''),
     sections: z.array(sectionSchema).optional(),
@@ -232,7 +233,7 @@ export async function createTeacherExam(req, res) {
 const copyExamSchema = z.object({
   targetClassId: z.string().min(1, 'Target class ID is required'),
   scheduledStart: z.string().datetime().nullable().optional().default(null),
-  scheduledEnd: z.string().datetime().nullable().optional().default(null),
+  duration: z.coerce.number().int().min(1).optional().default(60),
 });
 
 export async function copyTeacherExam(req, res) {
@@ -248,7 +249,7 @@ export async function copyTeacherExam(req, res) {
       payload.targetClassId,
       examId,
       payload.scheduledStart,
-      payload.scheduledEnd
+      payload.duration
     );
 
     if (!result.ok) {
@@ -401,6 +402,20 @@ export async function getStudentExamSession(req, res) {
   }
 }
 
+export async function stampStudentExamSessionStart(req, res) {
+  const { classId, examId } = req.params;
+  try {
+    const result = await stampStudentExamSessionStartService(classId, examId, req.memberId);
+    if (!result.ok) {
+      return res.status(result.status || 500).json({ error: result.error });
+    }
+    return res.json(result);
+  } catch (err) {
+    console.error('[examController.stampStudentExamSessionStart]', err);
+    return res.status(500).json({ error: 'Failed to stamp session start.' });
+  }
+}
+
 export async function logStudentCheating(req, res) {
   const { classId, examId } = req.params;
   const eventType = typeof req.body?.eventType === 'string' ? req.body.eventType : 'other';
@@ -495,9 +510,9 @@ export async function closeTeacherExam(req, res) {
 
 export async function startTeacherExam(req, res) {
   const { classId, examId } = req.params;
-  const { newScheduledEnd } = req.body || {};
+  const { newDuration } = req.body || {};
   try {
-    const result = await startExamService(classId, examId, req.memberId, { newScheduledEnd });
+    const result = await startExamService(classId, examId, req.memberId, { newDuration });
     if (!result.ok) {
       return res.status(result.status || 500).json({ error: result.error });
     }
@@ -534,10 +549,10 @@ export async function patchTeacherExamPassword(req, res) {
 
 export async function restartTeacherExam(req, res) {
   const { classId, examId } = req.params;
-  const { newScheduledEnd, newScheduledStart } = req.body || {};
+  const { newDuration, newScheduledStart } = req.body || {};
   try {
     const result = await restartExamService(classId, examId, req.memberId, {
-      newScheduledEnd,
+      newDuration,
       newScheduledStart,
     });
     if (!result.ok) {

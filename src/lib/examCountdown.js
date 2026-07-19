@@ -1,48 +1,55 @@
 import { PG_EXAM_STATUS, normalizeExamStatus } from '@/lib/examFlowUi.js'
 
 /**
- * Remaining exam time for faculty monitoring (and similar UIs).
- * @param {{ status?: string, duration?: number | null, openedAt?: string | null }} exam
+ * Compute exam time display for either a student session (countdown) or a teacher (elapsed/duration).
+ * @param {{ status?: string, duration?: number | null, openedAt?: string | null, sessionStartedAt?: string | null }} exam
  * @param {number} [nowMs]
  */
 export function computeExamTimeDisplay(exam, nowMs = Date.now()) {
   const status = normalizeExamStatus(exam?.status)
-  const endMs = exam?.scheduledEnd ? new Date(exam.scheduledEnd).getTime() : null
 
   if (status === PG_EXAM_STATUS.CLOSED) {
     return { seconds: 0, label: 'Ended', display: '00:00:00', isLow: false }
   }
 
-  if (!endMs || !Number.isFinite(endMs)) {
-    return { seconds: null, label: 'No time limit', display: '--:--:--', isLow: false }
-  }
-
-  const remainingSec = Math.max(0, Math.floor((endMs - nowMs) / 1000))
-  const display = formatHhMmSs(remainingSec)
-
   if (status === PG_EXAM_STATUS.WAITING) {
     return {
-      seconds: remainingSec,
-      label: 'Starts soon',
-      display,
+      seconds: null,
+      label: 'Duration',
+      display: `${exam?.duration || 60}m`,
       isLow: false,
     }
   }
 
-  if (status !== PG_EXAM_STATUS.OPEN) {
+  if (exam?.sessionStartedAt) {
+    // Student view: countdown based on session start + duration
+    const endMs = new Date(exam.sessionStartedAt).getTime() + (exam.duration || 60) * 60000
+    const remainingSec = Math.max(0, Math.floor((endMs - nowMs) / 1000))
+    const display = formatHhMmSs(remainingSec)
     return {
       seconds: remainingSec,
-      label: 'Time',
+      label: 'Time left',
       display,
+      isLow: remainingSec > 0 && remainingSec <= 300,
+    }
+  }
+
+  // Teacher view: elapsed time since opened
+  if (exam?.openedAt && status === PG_EXAM_STATUS.OPEN) {
+    const elapsedSec = Math.max(0, Math.floor((nowMs - new Date(exam.openedAt).getTime()) / 1000))
+    return {
+      seconds: elapsedSec,
+      label: 'Elapsed',
+      display: formatHhMmSs(elapsedSec),
       isLow: false,
     }
   }
 
   return {
-    seconds: remainingSec,
-    label: 'Time left',
-    display,
-    isLow: remainingSec > 0 && remainingSec <= 300,
+    seconds: null,
+    label: 'Duration',
+    display: `${exam?.duration || 60}m`,
+    isLow: false,
   }
 }
 

@@ -79,10 +79,6 @@ export function isStudentSessionOnHold(sessionStatus, examStatus) {
 export function shouldShowExamOnStudentStream(exam) {
   if (isStudentSessionOnHold(exam?.sessionStatus, exam?.status)) return true
   if (normalizeExamStatus(exam?.status) === PG_EXAM_STATUS.CLOSED) return false
-  if (exam?.scheduledEnd) {
-    const end = new Date(exam.scheduledEnd).getTime()
-    if (Number.isFinite(end) && Date.now() > end) return false
-  }
   return true
 }
 
